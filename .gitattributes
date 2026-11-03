@@ -1,0 +1,4 @@
+# Keep line endings consistent between Windows (the PC) and Linux (Home Hub).
+* text=auto eol=lf
+*.png binary
+*.ico binary
