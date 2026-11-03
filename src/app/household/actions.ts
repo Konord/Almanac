@@ -1,0 +1,147 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { DEFAULT_SETTINGS, isTimeZone, requireHousehold } from "@/lib/household";
+import { createClient } from "@/lib/supabase/server";
+import { MEMBER_COLOURS, type MemberColour } from "./options";
+
+/*
+ * Every action re-checks who is signed in (requireHousehold) instead of
+ * trusting the form. The database's security rules check again on top.
+ * Each change is also written to the activity log.
+ */
+
+function back(kind: "error" | "message", text: string): never {
+  redirect(`/household?${kind}=${encodeURIComponent(text)}`);
+}
+
+function text(formData: FormData, key: string): string {
+  return String(formData.get(key) ?? "").trim();
+}
+
+function readMember(formData: FormData) {
+  const name = text(formData, "name");
+  const role = text(formData, "role");
+  const colour = text(formData, "colour");
+  const birthYearText = text(formData, "birthYear");
+  const birthYear = birthYearText ? Number(birthYearText) : null;
+
+  if (!name) back("error", "Every member needs a name.");
+  if (role !== "parent" && role !== "child") back("error", "Choose parent or child.");
+  if (!MEMBER_COLOURS.some((c) => c.value === colour)) back("error", "Choose a colour.");
+  if (birthYear !== null && (!Number.isInteger(birthYear) || birthYear < 1900 || birthYear > 2100)) {
+    back("error", "Birth year should look like 2018.");
+  }
+  return { name, role, colour: colour as MemberColour, birth_year: birthYear };
+}
+
+async function log(action: string, targetType: string, targetId: string, details: Record<string, string> = {}) {
+  const household = await requireHousehold();
+  const supabase = await createClient();
+  await supabase.from("activity_log").insert({
+    household_id: household.id,
+    action,
+    target_type: targetType,
+    target_id: targetId,
+    details,
+  });
+}
+
+export async function addMember(formData: FormData) {
+  const household = await requireHousehold();
+  const member = readMember(formData);
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("members")
+    .insert({ ...member, household_id: household.id })
+    .select("id")
+    .single();
+  if (error) back("error", error.message);
+
+  await log("member_added", "member", data.id, { name: member.name });
+  revalidatePath("/household");
+  back("message", `Added ${member.name}.`);
+}
+
+export async function updateMember(formData: FormData) {
+  await requireHousehold();
+  const id = text(formData, "id");
+  const member = readMember(formData);
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("members").update(member).eq("id", id);
+  if (error) back("error", error.message);
+
+  await log("member_updated", "member", id, { name: member.name });
+  revalidatePath("/household");
+  back("message", `Saved ${member.name}.`);
+}
+
+export async function removeMember(formData: FormData) {
+  await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("members").delete().eq("id", id);
+  if (error) back("error", error.message);
+
+  await log("member_removed", "member", id, { name });
+  revalidatePath("/household");
+  back("message", `Removed ${name}.`);
+}
+
+export async function setPin(formData: FormData) {
+  await requireHousehold();
+  const id = text(formData, "id");
+  const pin = text(formData, "pin");
+  const confirm = text(formData, "confirmPin");
+
+  if (!/^\d{4,8}$/.test(pin)) back("error", "A PIN must be 4 to 8 digits.");
+  if (pin !== confirm) back("error", "The two PINs don't match.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_member_pin", { member_id: id, pin });
+  if (error) back("error", error.message);
+
+  await log("member_pin_set", "member", id);
+  revalidatePath("/household");
+  back("message", "PIN saved.");
+}
+
+export async function saveSettings(formData: FormData) {
+  const household = await requireHousehold();
+  const name = text(formData, "householdName");
+  const timeZone = text(formData, "timeZone");
+  const currency = text(formData, "currency").toUpperCase();
+  const weekStartsOn = text(formData, "weekStartsOn") === "1" ? 1 : 0;
+  const units = text(formData, "units") === "imperial" ? "imperial" : "metric";
+  const temperatureUnit = text(formData, "temperatureUnit") === "fahrenheit" ? "fahrenheit" : "celsius";
+
+  if (!name) back("error", "The household needs a name.");
+  if (!isTimeZone(timeZone)) back("error", `"${timeZone}" isn't a time zone I recognise.`);
+  if (!/^[A-Z]{3}$/.test(currency)) back("error", "Currency should be a 3-letter code like CAD.");
+
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...household.settings,
+    timeZone,
+    currency,
+    weekStartsOn,
+    units,
+    temperatureUnit,
+  };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("households")
+    .update({ name, settings })
+    .eq("id", household.id);
+  if (error) back("error", error.message);
+
+  await log("settings_updated", "household", household.id);
+  revalidatePath("/", "layout");
+  back("message", "Settings saved.");
+}
