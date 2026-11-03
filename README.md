@@ -7,13 +7,15 @@ to-dos. It suggests; the parents approve.
 The full plan lives in the **Almanac Design Doc**. This repo is built one
 phase at a time, following its build order.
 
-## What's here so far (Phase 1, steps 1 and 2)
+## What's here so far (Phase 1, Phase 2 step 1)
 
 | Folder / file | What it is |
 | --- | --- |
 | `src/app/` | The screens. `page.tsx` is the home screen, `layout.tsx` wraps every page. |
 | `src/theme/tokens.ts` | Every colour and size the app uses. Change the look here, never in components. |
 | `src/app/login`, `setup`, `household` | Sign in, first-time household setup, and the people and settings screen. |
+| `src/app/calendar` | Layers (Court, Appointments, Kids, Family…) and one-off events for the next two weeks. |
+| `src/lib/time.ts` | Converts between local times ("9am in Toronto") and the moments the database stores. Has tests. |
 | `src/lib/` | Shared code: the database connection (`supabase/`), household settings (`household.ts`) and generated database types. |
 | `src/proxy.ts` | Runs before every page: keeps the login fresh and sends signed-out visitors to sign in. |
 | `supabase/migrations/` | Every change to the database, in order. Never edit the database by hand. |
@@ -73,6 +75,7 @@ When you're done: press `Ctrl+C` to stop the app, and run
 
 ```bash
 npm run lint         # spots common mistakes
+npm test             # checks the tricky logic (time zones so far)
 npm run test:db      # checks the database security rules
 npm run build        # builds the production version; if this passes, it will deploy
 ```
