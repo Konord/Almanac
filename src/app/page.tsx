@@ -19,7 +19,7 @@ export default function Home() {
         <div className="max-w-md text-center">
           <p className="text-3xl text-ink">The board is ready.</p>
           <p className="mt-3 text-lg text-ink-muted">
-            Calendar, chores and meals will appear here as each phase is built.
+            Chores and meals will appear here as each phase is built. The Today view arrives with the calendar.
           </p>
           <div className="mt-8 flex justify-center gap-3" aria-label="Marker colours">
             <span className="size-10 rounded-full bg-marker-black" title="Black marker" />
@@ -27,12 +27,20 @@ export default function Home() {
             <span className="size-10 rounded-full bg-marker-red" title="Red marker" />
             <span className="size-10 rounded-full bg-marker-green" title="Green marker" />
           </div>
-          <Link
-            href="/household"
-            className="mt-8 inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] border-2 border-frame bg-board px-5 text-lg text-ink"
-          >
-            Household &amp; people
-          </Link>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/calendar"
+              className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-marker-blue px-5 text-lg text-board"
+            >
+              Calendar
+            </Link>
+            <Link
+              href="/household"
+              className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] border-2 border-frame bg-board px-5 text-lg text-ink"
+            >
+              Household &amp; people
+            </Link>
+          </div>
         </div>
       </section>
     </main>
