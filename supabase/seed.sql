@@ -1,0 +1,2 @@
+-- Dev seed data. Households are created through the app's setup screen,
+-- because each one belongs to a login. Nothing else to seed yet.
