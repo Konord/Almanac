@@ -7,13 +7,17 @@ to-dos. It suggests; the parents approve.
 The full plan lives in the **Almanac Design Doc**. This repo is built one
 phase at a time, following its build order.
 
-## What's here so far (Phase 1, step 1)
+## What's here so far (Phase 1, steps 1 and 2)
 
 | Folder / file | What it is |
 | --- | --- |
 | `src/app/` | The screens. `page.tsx` is the home screen, `layout.tsx` wraps every page. |
 | `src/theme/tokens.ts` | Every colour and size the app uses. Change the look here, never in components. |
-| `supabase/` | Settings for the local Supabase (database, logins, admin dashboard). Migrations will go in `supabase/migrations/`. |
+| `src/app/login`, `setup`, `household` | Sign in, first-time household setup, and the people and settings screen. |
+| `src/lib/` | Shared code: the database connection (`supabase/`), household settings (`household.ts`) and generated database types. |
+| `src/proxy.ts` | Runs before every page: keeps the login fresh and sends signed-out visitors to sign in. |
+| `supabase/migrations/` | Every change to the database, in order. Never edit the database by hand. |
+| `supabase/tests/` | Security checks for the database (who can see what). |
 | `.env.example` | The list of secret settings the app needs. Copy it to `.env.local` and fill it in. |
 
 ## One-time setup on your PC (Windows)
@@ -39,20 +43,37 @@ npx supabase start   # starts the local database in Docker (first run takes a fe
 npm run dev          # starts the app
 ```
 
-Open http://localhost:3000. You should see the blank whiteboard with
-today's date.
+The first time only: `npx supabase start` prints some addresses and keys.
+Copy `.env.example` to `.env.local` and paste in the **API URL** and the
+**Publishable key**. (These local keys are the same for everyone and only
+work on your own PC.)
 
-`npx supabase start` prints some local addresses and keys. The one called
-**Studio** (usually http://127.0.0.1:54323) is the database admin
-dashboard. Nothing is in the database yet; tables arrive in step 2.
+Open http://localhost:3000. You'll be sent to sign in:
+
+1. Enter an email and password and press **Create household login**. Locally,
+   no email is actually sent.
+2. Name your household.
+3. Add the people in it, and set a PIN for each parent.
+
+The **Studio** address `npx supabase start` printed (usually
+http://127.0.0.1:54323) is the database admin dashboard, where you can look
+at the tables.
 
 When you're done: press `Ctrl+C` to stop the app, and run
 `npx supabase stop` to stop the database.
+
+## Changing the database
+
+1. Create a new migration: `npx supabase migration new describe_the_change`
+2. Write the SQL in the file it creates under `supabase/migrations/`.
+3. `npm run db:reset` rebuilds your local database from all migrations (it wipes local data).
+4. `npm run db:types` updates `src/lib/database.types.ts` so TypeScript knows about the change.
 
 ## Checking your work
 
 ```bash
 npm run lint         # spots common mistakes
+npm run test:db      # checks the database security rules
 npm run build        # builds the production version; if this passes, it will deploy
 ```
 
