@@ -15,6 +15,7 @@ phase at a time, following its build order.
 | `src/theme/tokens.ts` | Every colour and size the app uses. Change the look here, never in components. |
 | `src/app/login`, `setup`, `household` | Sign in, first-time household setup, and the people and settings screen. |
 | `src/app/calendar` | Layers (Court, Appointments, Kids, Family…) and one-off events for the next two weeks. |
+| `src/lib/recurrence.ts` | Turns repeating events ("every Tuesday") into the individual dates shown on the calendar, with skips and moves. Has tests. |
 | `src/lib/time.ts` | Converts between local times ("9am in Toronto") and the moments the database stores. Has tests. |
 | `src/lib/` | Shared code: the database connection (`supabase/`), household settings (`household.ts`) and generated database types. |
 | `src/proxy.ts` | Runs before every page: keeps the login fresh and sends signed-out visitors to sign in. |

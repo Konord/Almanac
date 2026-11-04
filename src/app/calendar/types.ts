@@ -20,4 +20,15 @@ export type CalendarEvent = {
   energy_cost: number;
   visibility: string;
   notes: string | null;
+  timezone: string;
+  recurrence_rule: string | null;
+};
+
+/** One occurrence on the calendar: a one-off event, or one date of a series. */
+export type CalendarItem = CalendarEvent & {
+  /** The event row it comes from (same as id for one-off events). */
+  series_id: string;
+  /** For a repeating event, the occurrence's original date. */
+  occurrence_date: string | null;
+  moved: boolean;
 };

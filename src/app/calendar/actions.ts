@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { isMemberColour } from "@/lib/colours";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
+import { buildRule, isValidRule, type RepeatEnd, type RepeatFrequency } from "@/lib/recurrence";
 import { addDays, isLocalDate, isLocalTime, zonedToUtc } from "@/lib/time";
+import { dayOfWeek } from "@/lib/calendar-layout";
 import { isVisibility } from "./options";
 
 /*
@@ -136,9 +138,12 @@ function readEvent(formData: FormData, timeZone: string) {
     : zonedToUtc(endDate, endTime, timeZone);
   if (endsAt < startsAt) back(formData, "error", "The event ends before it starts.");
 
+  const recurrenceRule = readRepeat(formData, startDate);
+
   return {
     title,
     layer_id: layerId,
+    recurrence_rule: recurrenceRule,
     starts_at: startsAt.toISOString(),
     ends_at: endsAt.toISOString(),
     all_day: allDay,
@@ -148,6 +153,36 @@ function readEvent(formData: FormData, timeZone: string) {
     visibility,
     notes: notes || null,
   };
+}
+
+const FREQUENCIES: RepeatFrequency[] = ["none", "daily", "weekly", "monthly", "yearly"];
+const ENDS: RepeatEnd[] = ["never", "on", "after"];
+
+/** Turns the "Repeats" fields into an RRULE string, or null. */
+function readRepeat(formData: FormData, startDate: string): string | null {
+  const frequency = text(formData, "repeatFrequency") as RepeatFrequency;
+  if (!FREQUENCIES.includes(frequency) || frequency === "none") return null;
+  const interval = Number(text(formData, "repeatInterval") || "1");
+  const end = text(formData, "repeatEnd") as RepeatEnd;
+  const until = text(formData, "repeatUntil");
+  const count = Number(text(formData, "repeatCount"));
+  const weekdays = formData.getAll("repeatWeekdays").map(Number).filter((d) => d >= 0 && d <= 6);
+
+  if (!Number.isInteger(interval) || interval < 1 || interval > 52) back(formData, "error", "Repeat every 1 to 52.");
+  if (!ENDS.includes(end)) back(formData, "error", "Choose when the repeat ends.");
+  if (end === "on" && (!isLocalDate(until) || until < startDate)) back(formData, "error", "Pick an end date on or after the first date.");
+  if (end === "after" && (!Number.isInteger(count) || count < 1 || count > 500)) back(formData, "error", "Repeat between 1 and 500 times.");
+
+  const rule = buildRule({
+    frequency,
+    interval,
+    weekdays: frequency === "weekly" && weekdays.length === 0 ? [dayOfWeek(startDate)] : weekdays,
+    end,
+    until: end === "on" ? until : null,
+    count: end === "after" ? count : null,
+  });
+  if (rule && !isValidRule(rule)) back(formData, "error", "That repeat pattern didn't work. Try a simpler one.");
+  return rule;
 }
 
 export async function addEvent(formData: FormData) {
@@ -187,4 +222,76 @@ export async function removeEvent(formData: FormData) {
   await log(household.id, "event_removed", "event", id, title);
   revalidatePath("/calendar");
   back(formData, "message", `Removed ${title}.`);
+}
+
+// ---------------------------------------------------------------------------
+// Single occurrences of a repeating event
+// ---------------------------------------------------------------------------
+
+/** "Skip just this one": hides one date of a repeating event. */
+export async function skipOccurrence(formData: FormData) {
+  const household = await requireHousehold();
+  const eventId = text(formData, "eventId");
+  const date = text(formData, "occurrenceDate");
+  const title = text(formData, "title");
+  if (!isLocalDate(date)) back(formData, "error", "Couldn't tell which date to skip.");
+  const supabase = await createClient();
+  const { error } = await supabase.from("event_exceptions").upsert(
+    { household_id: household.id, event_id: eventId, original_date: date, skipped: true, new_starts_at: null, new_ends_at: null },
+    { onConflict: "event_id,original_date" },
+  );
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "event_occurrence_skipped", "event", eventId, `${title} (${date})`);
+  revalidatePath("/calendar");
+  back(formData, "message", `Skipped ${title} on ${date}.`);
+}
+
+/** "Move just this one": gives one date of a repeating event new times. */
+export async function moveOccurrence(formData: FormData) {
+  const household = await requireHousehold();
+  const { timeZone } = household.settings;
+  const eventId = text(formData, "eventId");
+  const originalDate = text(formData, "occurrenceDate");
+  const title = text(formData, "title");
+  const date = text(formData, "newDate");
+  const startTime = text(formData, "newStartTime");
+  const endTime = text(formData, "newEndTime");
+  const allDay = formData.get("allDay") === "true";
+
+  if (!isLocalDate(originalDate) || !isLocalDate(date)) back(formData, "error", "Check the new date.");
+  if (!allDay && (!isLocalTime(startTime) || !isLocalTime(endTime))) back(formData, "error", "Add a start and end time.");
+  const startsAt = allDay ? zonedToUtc(date, "00:00", timeZone) : zonedToUtc(date, startTime, timeZone);
+  const endsAt = allDay ? zonedToUtc(addDays(date, 1), "00:00", timeZone) : zonedToUtc(date, endTime, timeZone);
+  if (endsAt < startsAt) back(formData, "error", "It ends before it starts.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("event_exceptions").upsert(
+    {
+      household_id: household.id,
+      event_id: eventId,
+      original_date: originalDate,
+      skipped: false,
+      new_starts_at: startsAt.toISOString(),
+      new_ends_at: endsAt.toISOString(),
+    },
+    { onConflict: "event_id,original_date" },
+  );
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "event_occurrence_moved", "event", eventId, `${title} (${originalDate})`);
+  revalidatePath("/calendar");
+  back(formData, "message", `Moved ${title} on ${originalDate}.`);
+}
+
+/** Undoes a skip or move, putting one date back to the usual pattern. */
+export async function resetOccurrence(formData: FormData) {
+  const household = await requireHousehold();
+  const eventId = text(formData, "eventId");
+  const date = text(formData, "occurrenceDate");
+  const title = text(formData, "title");
+  const supabase = await createClient();
+  const { error } = await supabase.from("event_exceptions").delete().eq("event_id", eventId).eq("original_date", date);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "event_occurrence_reset", "event", eventId, `${title} (${date})`);
+  revalidatePath("/calendar");
+  back(formData, "message", `${title} on ${date} is back to normal.`);
 }

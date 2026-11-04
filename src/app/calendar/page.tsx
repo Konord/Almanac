@@ -1,18 +1,32 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Button, Notice, Panel, firstParam } from "@/components/ui";
+import { Button, Field, Input, Notice, Panel, firstParam } from "@/components/ui";
 import { MEMBER_COLOUR_CLASS } from "@/lib/colours";
 import { addMonths, monthGridDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
+import { describeRule, expandEvents, parseRule, type ExceptionLike } from "@/lib/recurrence";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { addEvent, addLayer, removeEvent, removeLayer, updateEvent, updateLayer } from "./actions";
+import {
+  addEvent,
+  addLayer,
+  moveOccurrence,
+  removeEvent,
+  removeLayer,
+  resetOccurrence,
+  skipOccurrence,
+  updateEvent,
+  updateLayer,
+} from "./actions";
 import { EventFields, LayerFields } from "./forms";
 import { VISIBILITY_OPTIONS } from "./options";
-import type { CalendarEvent, Layer, Member } from "./types";
+import type { CalendarEvent, CalendarItem, Layer, Member } from "./types";
 import { MonthView, WeekView } from "./views";
 
 type View = "week" | "month";
+
+const EVENT_COLUMNS =
+  "id, title, layer_id, starts_at, ends_at, all_day, member_id, energy_cost, visibility, notes, timezone, recurrence_rule";
 
 export default function CalendarPage(props: PageProps<"/calendar">) {
   return (
@@ -35,6 +49,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const dateParam = firstParam(params.date);
   const anchor = dateParam && isLocalDate(dateParam) ? dateParam : today;
   const editId = firstParam(params.edit);
+  const occParam = firstParam(params.occ);
+  const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const addParam = firstParam(params.add);
   const addDate = addParam && isLocalDate(addParam) ? addParam : undefined;
 
@@ -42,7 +58,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const rangeStart = zonedToUtc(days[0], "00:00", timeZone);
   const rangeEnd = zonedToUtc(addDays(days.at(-1) ?? anchor, 1), "00:00", timeZone);
 
-  const [layersResult, membersResult, eventsResult] = await Promise.all([
+  const [layersResult, membersResult, eventsResult, seriesResult] = await Promise.all([
     supabase
       .from("layers")
       .select("id, name, colour, owner_member_id, counts_toward_busyness, visibility")
@@ -51,18 +67,39 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
     supabase.from("members").select("id, name").order("role", { ascending: false }).order("name"),
     supabase
       .from("events")
-      .select("id, title, layer_id, starts_at, ends_at, all_day, member_id, energy_cost, visibility, notes")
+      .select(EVENT_COLUMNS)
+      .is("recurrence_rule", null)
       .lt("starts_at", rangeEnd.toISOString())
-      .gt("ends_at", rangeStart.toISOString())
+      .gte("ends_at", rangeStart.toISOString())
       .order("starts_at"),
+    // Repeating events that have started by the end of the range; their
+    // individual dates are worked out below.
+    supabase.from("events").select(EVENT_COLUMNS).not("recurrence_rule", "is", null).lt("starts_at", rangeEnd.toISOString()),
   ]);
   if (layersResult.error) throw layersResult.error;
   if (membersResult.error) throw membersResult.error;
   if (eventsResult.error) throw eventsResult.error;
+  if (seriesResult.error) throw seriesResult.error;
+
+  const seriesIds = seriesResult.data.map((e) => e.id);
+  let exceptions: ExceptionLike[] = [];
+  if (seriesIds.length > 0) {
+    const { data, error } = await supabase
+      .from("event_exceptions")
+      .select("event_id, original_date, skipped, new_starts_at, new_ends_at")
+      .in("event_id", seriesIds);
+    if (error) throw error;
+    exceptions = data;
+  }
 
   const layers: Layer[] = layersResult.data;
   const members: Member[] = membersResult.data;
-  const events: CalendarEvent[] = eventsResult.data;
+  const events: CalendarItem[] = expandEvents<CalendarEvent>(
+    [...eventsResult.data, ...seriesResult.data],
+    exceptions,
+    rangeStart,
+    rangeEnd,
+  );
   const layerById = new Map(layers.map((l) => [l.id, l]));
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -71,13 +108,13 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   if (editId) {
     const { data } = await supabase
       .from("events")
-      .select("id, title, layer_id, starts_at, ends_at, all_day, member_id, energy_cost, visibility, notes")
+      .select(EVENT_COLUMNS)
       .eq("id", editId)
       .maybeSingle();
     editing = data;
   }
 
-  const current = { view, date: anchor };
+  const current: Record<string, string | null> = { view, date: anchor };
   const href = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
     const merged: Record<string, string | null> = { ...current, ...changes };
@@ -138,7 +175,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           layers={layers}
           members={members}
           returnTo={returnTo}
-          closeHref={href({ edit: null })}
+          closeHref={href({ edit: null, occ: null })}
+          occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
+          occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
+          isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
+          skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
           memberName={editing.member_id ? memberById.get(editing.member_id)?.name : undefined}
         />
       ) : null}
@@ -242,7 +283,15 @@ function EditEventPanel({
   returnTo,
   closeHref,
   memberName,
+  occurrence,
+  occurrenceDate,
+  isException,
+  skippedDates,
 }: {
+  skippedDates: string[];
+  occurrence: CalendarItem | null;
+  occurrenceDate: string | undefined;
+  isException: boolean;
   event: CalendarEvent;
   household: Household;
   layers: Layer[];
@@ -259,7 +308,44 @@ function EditEventPanel({
 
   return (
     <Panel title={`Edit: ${event.title}`}>
-      {memberName ? <p className="-mt-2 mb-4 text-base text-ink-muted">For {memberName}</p> : null}
+      <p className="-mt-2 mb-4 text-base text-ink-muted">
+        {memberName ? `For ${memberName} · ` : ""}
+        {describeRule(event.recurrence_rule)}
+      </p>
+      {occurrenceDate ? (
+        <OccurrenceControls
+          event={event}
+          household={household}
+          occurrence={occurrence}
+          occurrenceDate={occurrenceDate}
+          isException={isException}
+          returnTo={returnTo}
+        />
+      ) : null}
+      {skippedDates.length > 0 ? (
+        <div className="mb-6">
+          <h3 className="mb-2 text-lg font-semibold text-ink">Skipped dates</h3>
+          <ul className="flex flex-wrap gap-2">
+            {skippedDates.map((date) => (
+              <li key={date}>
+                <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board pl-3">
+                  <input type="hidden" name="eventId" value={event.id} />
+                  <input type="hidden" name="occurrenceDate" value={date} />
+                  <input type="hidden" name="title" value={event.title} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <span className="text-base text-ink">{date}</span>
+                  <Button variant="secondary" className="border-0">
+                    Bring back
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {event.recurrence_rule ? (
+        <h3 className="mb-3 text-xl font-semibold text-ink">Every date</h3>
+      ) : null}
       <form action={updateEvent} className="grid gap-4 sm:grid-cols-2">
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
@@ -278,10 +364,11 @@ function EditEventPanel({
             energyCost: event.energy_cost,
             visibility: event.visibility,
             notes: event.notes ?? "",
+            repeat: parseRule(event.recurrence_rule),
           }}
         />
         <div className="flex gap-3 sm:col-span-2">
-          <Button>Save event</Button>
+          <Button>{event.recurrence_rule ? "Save every date" : "Save event"}</Button>
           <CloseLink href={closeHref} />
         </div>
       </form>
@@ -289,9 +376,80 @@ function EditEventPanel({
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="title" value={event.title} />
         <input type="hidden" name="returnTo" value={returnTo} />
-        <Button variant="danger">Remove event</Button>
+        <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove event"}</Button>
       </form>
     </Panel>
+  );
+}
+
+/** "Just this one" controls for one date of a repeating event. */
+function OccurrenceControls({
+  event,
+  household,
+  occurrence,
+  occurrenceDate,
+  isException,
+  returnTo,
+}: {
+  event: CalendarEvent;
+  household: Household;
+  occurrence: CalendarItem | null;
+  occurrenceDate: string;
+  isException: boolean;
+  returnTo: string;
+}) {
+  const { timeZone, locale } = household.settings;
+  const start = occurrence ? new Date(occurrence.starts_at) : zonedToUtc(occurrenceDate, localTimeOf(new Date(event.starts_at), event.timezone), timeZone);
+  const end = occurrence ? new Date(occurrence.ends_at) : new Date(start.getTime() + (new Date(event.ends_at).getTime() - new Date(event.starts_at).getTime()));
+  const dayLabel = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(
+    zonedToUtc(occurrenceDate, "12:00", timeZone),
+  );
+  const hidden = (
+    <>
+      <input type="hidden" name="eventId" value={event.id} />
+      <input type="hidden" name="occurrenceDate" value={occurrenceDate} />
+      <input type="hidden" name="title" value={event.title} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+    </>
+  );
+
+  return (
+    <div className="mb-8 rounded-[var(--radius)] border-2 border-marker-blue bg-board p-4">
+      <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
+      <p className="mb-4 text-base text-ink-muted">Changes here leave the rest of the dates alone.</p>
+      <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
+        {hidden}
+        <input type="hidden" name="allDay" value={String(event.all_day)} />
+        <Field label="Move to">
+          <Input name="newDate" type="date" defaultValue={localDateOf(start, timeZone)} required />
+        </Field>
+        {event.all_day ? null : (
+          <>
+            <Field label="Starts at">
+              <Input name="newStartTime" type="time" defaultValue={localTimeOf(start, timeZone)} required />
+            </Field>
+            <Field label="Ends at">
+              <Input name="newEndTime" type="time" defaultValue={localTimeOf(end, timeZone)} required />
+            </Field>
+          </>
+        )}
+        <div className="sm:col-span-3">
+          <Button variant="secondary">Move this one</Button>
+        </div>
+      </form>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <form action={skipOccurrence}>
+          {hidden}
+          <Button variant="danger">Skip this one</Button>
+        </form>
+        {isException ? (
+          <form action={resetOccurrence}>
+            {hidden}
+            <Button variant="secondary">Put back to normal</Button>
+          </form>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

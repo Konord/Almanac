@@ -1,6 +1,7 @@
 import { Field, Input, Select } from "@/components/ui";
 import { MEMBER_COLOURS } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
+import type { RepeatOptions } from "@/lib/recurrence";
 import type { Layer, Member } from "./types";
 
 /** The form fields for adding or editing an event or a layer. */
@@ -17,6 +18,7 @@ export type EventDefaults = {
   energyCost?: number;
   visibility?: string;
   notes?: string;
+  repeat?: RepeatOptions;
 };
 
 export function EventFields({ layers, members, defaults }: { layers: Layer[]; members: Member[]; defaults: EventDefaults }) {
@@ -50,6 +52,7 @@ export function EventFields({ layers, members, defaults }: { layers: Layer[]; me
         <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-6 accent-marker-blue" />
         All day (times are ignored)
       </label>
+      <RepeatFields repeat={defaults.repeat} />
       <Field label="Who it's for" hint="Optional.">
         <Select name="memberId" defaultValue={defaults.memberId ?? ""}>
           <option value="">Nobody in particular</option>
@@ -129,5 +132,64 @@ export function LayerFields({ layer, members }: { layer?: Layer; members: Member
         Events here make a day count as busy
       </label>
     </>
+  );
+}
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** "Repeats" choices, turned into an RRULE by the server action. */
+function RepeatFields({ repeat }: { repeat?: RepeatOptions }) {
+  return (
+    <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2 sm:grid-cols-2">
+      <legend className="px-1 text-base font-medium text-ink">Repeats</legend>
+      <Field label="How often">
+        <Select name="repeatFrequency" defaultValue={repeat?.frequency ?? "none"}>
+          <option value="none">Doesn&apos;t repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly (same date)</option>
+          <option value="yearly">Yearly</option>
+        </Select>
+      </Field>
+      <Field label="Every" hint="1 = every week, 2 = every other week, and so on.">
+        <Input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} />
+      </Field>
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <span className="text-base font-medium text-ink">On these days (weekly only)</span>
+        <div className="flex flex-wrap gap-2">
+          {WEEKDAY_LABELS.map((label, i) => (
+            <label
+              key={label}
+              className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base text-ink"
+            >
+              <input
+                type="checkbox"
+                name="repeatWeekdays"
+                value={i}
+                defaultChecked={repeat?.weekdays.includes(i)}
+                className="size-5 accent-marker-blue"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        <span className="text-sm text-ink-muted">Leave all unticked to use the event&apos;s own day.</span>
+      </div>
+      <Field label="Ends">
+        <Select name="repeatEnd" defaultValue={repeat?.end ?? "never"}>
+          <option value="never">Never</option>
+          <option value="on">On a date</option>
+          <option value="after">After a number of times</option>
+        </Select>
+      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="End date">
+          <Input name="repeatUntil" type="date" defaultValue={repeat?.until ?? ""} />
+        </Field>
+        <Field label="Times">
+          <Input name="repeatCount" type="number" min={1} max={500} defaultValue={repeat?.count ?? ""} />
+        </Field>
+      </div>
+    </fieldset>
   );
 }
