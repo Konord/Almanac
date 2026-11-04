@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { DEFAULT_SETTINGS, isTimeZone, requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
-import { MEMBER_COLOURS, type MemberColour } from "./options";
+import { MEMBER_COLOURS, type MemberColour } from "@/lib/colours";
 
 /*
  * Every action re-checks who is signed in (requireHousehold) instead of

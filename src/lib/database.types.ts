@@ -49,6 +49,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"events": {
+                  Row: {
+                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"id": string,"layer_id": string,"member_id": string | null,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"energy_cost"?: number,"household_id": string,"id"?: string,"layer_id": string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"energy_cost"?: number,"household_id"?: string,"id"?: string,"layer_id"?: string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "events_created_by_household_id_fkey"
+      columns: ["created_by","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "events_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "events_layer_id_household_id_fkey"
+      columns: ["layer_id","household_id"]
+isOneToOne: false
+      referencedRelation: "layers"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "events_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"households": {
                   Row: {
                     "auth_user_id": string | null,"created_at": string,"id": string,"name": string,"settings": NonNullable<Json>,"updated_at": string
@@ -62,6 +100,38 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"layers": {
+                  Row: {
+                    "colour": string,"counts_toward_busyness": boolean,"created_at": string,"created_by": string | null,"household_id": string,"id": string,"name": string,"owner_member_id": string | null,"sort_order": number,"type": string,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "colour"?: string,"counts_toward_busyness"?: boolean,"created_at"?: string,"created_by"?: string | null,"household_id": string,"id"?: string,"name": string,"owner_member_id"?: string | null,"sort_order"?: number,"type"?: string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "colour"?: string,"counts_toward_busyness"?: boolean,"created_at"?: string,"created_by"?: string | null,"household_id"?: string,"id"?: string,"name"?: string,"owner_member_id"?: string | null,"sort_order"?: number,"type"?: string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "layers_created_by_household_id_fkey"
+      columns: ["created_by","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "layers_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "layers_owner_member_id_household_id_fkey"
+      columns: ["owner_member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
                   ]
                 },"members": {
                   Row: {
@@ -109,7 +179,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "create_household":
+            "add_starter_layers":
+{ Args: { "target_household": string }; Returns: undefined
+                           },
+"create_household":
 { Args: { "household_name": string }; Returns: string
                            },
 "current_household_id":

@@ -15,3 +15,7 @@ export const MEMBER_COLOUR_CLASS: Record<string, string> = {
   "marker-green": "bg-marker-green",
   "marker-black": "bg-marker-black",
 };
+
+export function isMemberColour(value: string): value is MemberColour {
+  return MEMBER_COLOURS.some((c) => c.value === value);
+}

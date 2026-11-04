@@ -5,7 +5,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { addMember, removeMember, saveSettings, setPin, updateMember } from "./actions";
-import { MEMBER_COLOURS, MEMBER_COLOUR_CLASS } from "./options";
+import { MEMBER_COLOURS, MEMBER_COLOUR_CLASS } from "@/lib/colours";
 
 export default function HouseholdPage(props: PageProps<"/household">) {
   return (
