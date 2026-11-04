@@ -127,6 +127,44 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               <option value="fahrenheit">Fahrenheit</option>
             </Select>
           </Field>
+          <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2 sm:grid-cols-3">
+            <legend className="px-2 text-lg font-semibold text-ink">Free and busy days</legend>
+            <p className="text-base text-ink-muted sm:col-span-3">
+              The Today screen calls a day free or busy from the events in it. Only time between the start and end of
+              the day counts, and only layers set to count toward busy.
+            </p>
+            <Field label="Day starts">
+              <Input name="dayStarts" type="time" defaultValue={settings.dayProfile.dayStarts} required />
+            </Field>
+            <Field label="Evening starts">
+              <Input name="eveningStarts" type="time" defaultValue={settings.dayProfile.eveningStarts} required />
+            </Field>
+            <Field label="Day ends">
+              <Input name="dayEnds" type="time" defaultValue={settings.dayProfile.dayEnds} required />
+            </Field>
+            <Field label="Busy day after (hours of events)">
+              <Input
+                name="busyDayHours"
+                type="number"
+                min="0.25"
+                max="24"
+                step="0.25"
+                defaultValue={settings.dayProfile.busyDayMinutes / 60}
+                required
+              />
+            </Field>
+            <Field label="Busy evening after (hours)">
+              <Input
+                name="busyEveningHours"
+                type="number"
+                min="0.25"
+                max="24"
+                step="0.25"
+                defaultValue={settings.dayProfile.busyEveningMinutes / 60}
+                required
+              />
+            </Field>
+          </fieldset>
           <div className="sm:col-span-2">
             <Button>Save settings</Button>
           </div>

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/database.types";
+import { DEFAULT_DAY_PROFILE, type DayProfileSettings } from "@/lib/day-profile";
+import { isLocalTime } from "@/lib/time";
 
 /**
  * Household settings live in the database (households.settings), not in
@@ -15,6 +17,8 @@ export type HouseholdSettings = {
   /** 0 = Sunday, 1 = Monday */
   weekStartsOn: 0 | 1;
   activeTheme: string;
+  /** What counts as a free or busy day (see src/lib/day-profile.ts). */
+  dayProfile: DayProfileSettings;
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -26,6 +30,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   currency: "CAD",
   weekStartsOn: 0,
   activeTheme: "whiteboard",
+  dayProfile: DEFAULT_DAY_PROFILE,
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -45,7 +50,33 @@ export function parseSettings(raw: Json): HouseholdSettings {
     currency: pick("currency", (v) => typeof v === "string" && /^[A-Z]{3}$/.test(v)),
     weekStartsOn: pick("weekStartsOn", (v) => v === 0 || v === 1),
     activeTheme: pick("activeTheme", (v) => typeof v === "string" && v.length > 0),
+    dayProfile: parseDayProfile(value.dayProfile),
   };
+}
+
+/** Day-profile thresholds, filling any missing or odd values with defaults. */
+export function parseDayProfile(raw: Json | undefined): DayProfileSettings {
+  const value = raw !== null && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const time = (key: "dayStarts" | "dayEnds" | "eveningStarts") => {
+    const v = value[key];
+    return typeof v === "string" && isLocalTime(v) ? v : DEFAULT_DAY_PROFILE[key];
+  };
+  const minutes = (key: "busyDayMinutes" | "busyEveningMinutes") => {
+    const v = value[key];
+    return typeof v === "number" && Number.isInteger(v) && v > 0 && v <= 24 * 60 ? v : DEFAULT_DAY_PROFILE[key];
+  };
+  const result = {
+    dayStarts: time("dayStarts"),
+    dayEnds: time("dayEnds"),
+    eveningStarts: time("eveningStarts"),
+    busyDayMinutes: minutes("busyDayMinutes"),
+    busyEveningMinutes: minutes("busyEveningMinutes"),
+  };
+  // The day has to end after it starts, with the evening in between.
+  if (!(result.dayStarts < result.eveningStarts && result.eveningStarts < result.dayEnds)) {
+    return { ...result, dayStarts: DEFAULT_DAY_PROFILE.dayStarts, eveningStarts: DEFAULT_DAY_PROFILE.eveningStarts, dayEnds: DEFAULT_DAY_PROFILE.dayEnds };
+  }
+  return result;
 }
 
 export function isTimeZone(value: unknown): boolean {

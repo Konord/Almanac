@@ -1,75 +1,268 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { connection } from "next/server";
-import { requireHousehold } from "@/lib/household";
+import { Notice, firstParam } from "@/components/ui";
+import { CHIP_CLASS } from "@/lib/colours";
+import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
+import { requireHousehold, type Household } from "@/lib/household";
+import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
+import { PROFILE_CLASS, ProfileTag } from "./calendar/profile-tag";
+import type { CalendarItem, Layer, Member } from "./calendar/types";
+import { ViewChooser } from "./calendar/view-chooser";
+import { eventsOnDay, isAllDayStyle, shortTime, weekdayLabel } from "./calendar/views";
+
+/** How many days the "Coming up" strip shows after today. */
+const COMING_UP_DAYS = 6;
 
 /**
- * The home screen. Still mostly a blank whiteboard: the real Today screen
- * arrives in Phase 2. It now uses the household's own name, time zone and
- * locale from the database.
+ * The Today screen: what kind of day it is, what's on, and a glance at the
+ * week ahead. Chores, meals and weather join it in later phases.
  */
-export default function Home() {
+export default function Home(props: PageProps<"/">) {
   return (
-    <main className="flex flex-1 flex-col gap-8 p-8 sm:p-12">
-      <Suspense fallback={<HeaderFrame name="Almanac" date="" />}>
-        <Header />
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-8">
+      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+        <Today searchParams={props.searchParams} />
       </Suspense>
-
-      <section className="flex flex-1 items-center justify-center rounded-[var(--radius)] border-2 border-dashed border-frame bg-panel/40 p-8">
-        <div className="max-w-md text-center">
-          <p className="text-3xl text-ink">The board is ready.</p>
-          <p className="mt-3 text-lg text-ink-muted">
-            Chores and meals will appear here as each phase is built. The Today view arrives with the calendar.
-          </p>
-          <div className="mt-8 flex justify-center gap-3" aria-label="Marker colours">
-            <span className="size-10 rounded-full bg-marker-black" title="Black marker" />
-            <span className="size-10 rounded-full bg-marker-blue" title="Blue marker" />
-            <span className="size-10 rounded-full bg-marker-red" title="Red marker" />
-            <span className="size-10 rounded-full bg-marker-green" title="Green marker" />
-          </div>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link
-              href="/calendar"
-              className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-marker-blue px-5 text-lg text-board"
-            >
-              Calendar
-            </Link>
-            <Link
-              href="/household"
-              className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] border-2 border-frame bg-board px-5 text-lg text-ink"
-            >
-              Household &amp; people
-            </Link>
-          </div>
-        </div>
-      </section>
     </main>
   );
 }
 
-/**
- * The household name and today's date in its time zone. connection() makes
- * Next.js work the date out when the page is opened, not once at build time.
- */
-async function Header() {
-  await connection();
+async function Today({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   const household = await requireHousehold();
-  const { locale, timeZone } = household.settings;
-  const today = new Intl.DateTimeFormat(locale, {
-    timeZone,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(new Date());
+  const params = await searchParams;
+  const { locale, timeZone, dayProfile } = household.settings;
+  const now = new Date();
+  const today = localDateOf(now, timeZone);
 
-  return <HeaderFrame name={household.name} date={today} />;
+  const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
+  const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
+  const { layers, members, views, items } = await loadCalendar(rangeStart, rangeEnd);
+  const savedView = await deviceView(views);
+  const shown = itemsInView(items, savedView);
+  const profiles = profilesFor(days, items, layers, household);
+  const layerById = new Map(layers.map((l) => [l.id, l]));
+  const memberById = new Map(members.map((m) => [m.id, m]));
+
+  const noon = (day: LocalDate) => zonedToUtc(day, "12:00", timeZone);
+  const longDate = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(now);
+  const todayProfile = profiles.get(today);
+  const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
+  const error = firstParam(params.error);
+  const message = firstParam(params.message);
+
+  return (
+    <>
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b-4 border-marker-blue pb-4">
+        <div>
+          <p className="text-xl text-ink-muted">{household.name}</p>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink sm:text-5xl">{longDate}</h1>
+        </div>
+        <nav className="flex flex-wrap gap-2">
+          <NavLink href="/calendar" primary>
+            Calendar
+          </NavLink>
+          <NavLink href="/household">Household &amp; people</NavLink>
+        </nav>
+      </header>
+
+      {error ? <Notice tone="error">{error}</Notice> : null}
+      {message ? <Notice tone="success">{message}</Notice> : null}
+
+      <ViewChooser views={views} current={savedView} returnTo="" returnPath="/" />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section className="flex min-w-0 flex-col gap-4">
+          {todayProfile ? (
+            <ProfileCard
+              profile={todayProfile}
+              label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))}
+              household={household}
+            />
+          ) : null}
+
+          <div className="rounded-[var(--radius)] border-2 border-frame bg-board p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-semibold text-ink">Today&apos;s plan</h2>
+              <Link
+                href={`/calendar?view=week&date=${today}&add=${today}`}
+                className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-marker-blue px-4 text-lg text-board"
+              >
+                + Add
+              </Link>
+            </div>
+            {todayItems.length === 0 ? (
+              <p className="py-6 text-center text-xl text-ink-muted">Nothing on the calendar today.</p>
+            ) : (
+              <TodayList
+                items={todayItems}
+                now={now}
+                today={today}
+                household={household}
+                layerById={layerById}
+                memberById={memberById}
+              />
+            )}
+          </div>
+        </section>
+
+        <section className="flex min-w-0 flex-col gap-3">
+          <h2 className="text-2xl font-semibold text-ink">Coming up</h2>
+          <ul className="flex flex-col gap-2">
+            {days.slice(1).map((day) => {
+              const profile = profiles.get(day);
+              const dayItems = sortForDay(eventsOnDay(shown, day, timeZone), timeZone);
+              return (
+                <li key={day}>
+                  <Link
+                    href={`/calendar?view=week&date=${day}`}
+                    className="flex flex-col gap-1 rounded-[var(--radius)] border-2 border-frame bg-board px-4 py-3 hover:bg-panel"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-lg font-semibold text-ink">
+                        {new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "short", day: "numeric" }).format(noon(day))}
+                      </span>
+                      {profile ? <ProfileTag kind={profile.kind} /> : null}
+                    </span>
+                    <span className="truncate text-base text-ink-muted">
+                      {dayItems.length === 0
+                        ? "Nothing planned"
+                        : dayItems
+                            .slice(0, 2)
+                            .map((e) => e.title)
+                            .join(", ") + (dayItems.length > 2 ? ` and ${dayItems.length - 2} more` : "")}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-sm text-ink-muted">
+            Free and busy use the day from {clockTime(zonedToUtc(today, dayProfile.dayStarts, timeZone), household)} to{" "}
+            {clockTime(zonedToUtc(today, dayProfile.dayEnds, timeZone), household)} (you can change this on{" "}
+            <Link href="/household" className="text-marker-blue underline">
+              Household &amp; people
+            </Link>
+            )
+          </p>
+        </section>
+      </div>
+    </>
+  );
 }
 
-function HeaderFrame({ name, date }: { name: string; date: string }) {
+/** The big "Free Saturday" / "Busy evening" card. */
+function ProfileCard({ profile, label, household }: { profile: DayProfile; label: string; household: Household }) {
+  const { timeZone, dayProfile } = household.settings;
+  const today = localDateOf(new Date(), timeZone);
+  const time = (t: string) => clockTime(zonedToUtc(today, t, timeZone), household);
+  const detail =
+    profile.kind === "busy_evening"
+      ? `${formatMinutes(profile.eveningMinutes)} of plans after ${time(dayProfile.eveningStarts)}, and ${formatMinutes(profile.freeMinutes)} free overall.`
+      : profile.kind === "busy"
+        ? `${formatMinutes(profile.busyMinutes)} of plans, leaving ${formatMinutes(profile.freeMinutes)} free.`
+        : profile.busyMinutes === 0
+          ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}.`
+          : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}.`;
+
   return (
-    <header className="flex items-baseline justify-between gap-4 border-b-4 border-marker-blue pb-4">
-      <h1 className="text-5xl font-semibold tracking-tight text-ink">{name}</h1>
-      <p className="text-2xl text-ink-muted">{date || " "}</p>
-    </header>
+    <div className={`rounded-[var(--radius)] border-4 bg-board p-6 ${PROFILE_CLASS[profile.kind]}`}>
+      <p className="text-5xl font-semibold tracking-tight sm:text-6xl">{label}</p>
+      <p className="mt-2 text-xl text-ink">{detail}</p>
+    </div>
+  );
+}
+
+function TodayList({
+  items,
+  now,
+  today,
+  household,
+  layerById,
+  memberById,
+}: {
+  items: CalendarItem[];
+  now: Date;
+  today: LocalDate;
+  household: Household;
+  layerById: Map<string, Layer>;
+  memberById: Map<string, Member>;
+}) {
+  const { timeZone } = household.settings;
+  // Where the "Now" line goes: before the first timed item that hasn't ended.
+  const nowIndex = items.findIndex((e) => !isAllDayStyle(e, timeZone) && new Date(e.ends_at) > now);
+
+  return (
+    <ul className="flex flex-col">
+      {items.map((e, i) => {
+        const allDay = isAllDayStyle(e, timeZone);
+        const ended = !allDay && new Date(e.ends_at) <= now;
+        const layer = layerById.get(e.layer_id);
+        const member = e.member_id ? memberById.get(e.member_id) : undefined;
+        const href = `/calendar?view=week&date=${today}&edit=${e.series_id}${e.occurrence_date ? `&occ=${e.occurrence_date}` : ""}`;
+        return (
+          <li key={e.id}>
+            {i === nowIndex ? <NowLine time={shortTime(now, household)} /> : null}
+            <Link
+              href={href}
+              className={`flex min-h-[var(--touch-target)] items-center gap-4 border-t border-frame/70 py-3 first:border-t-0 ${ended ? "opacity-50" : ""}`}
+            >
+              <span className="w-24 shrink-0 text-lg text-ink-muted sm:w-32">
+                {allDay ? "All day" : `${shortTime(new Date(e.starts_at), household)}–${shortTime(new Date(e.ends_at), household)}`}
+              </span>
+              <span className={`size-4 shrink-0 rounded-full ${(CHIP_CLASS[layer?.colour ?? ""] ?? CHIP_CLASS["marker-black"]).split(" ")[0]}`} />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-xl font-semibold text-ink">
+                  {e.recurrence_rule ? <span aria-label="Repeats">↻ </span> : null}
+                  {e.title}
+                </span>
+                <span className="truncate text-base text-ink-muted">
+                  {[layer?.name, member?.name].filter(Boolean).join(" · ")}
+                  {ended ? " · done" : ""}
+                </span>
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+      {nowIndex === -1 && items.some((e) => !isAllDayStyle(e, timeZone)) ? <NowLine time={shortTime(now, household)} /> : null}
+    </ul>
+  );
+}
+
+function NowLine({ time }: { time: string }) {
+  return (
+    <div className="flex items-center gap-3 py-1" aria-label={`Now, ${time}`}>
+      <span className="text-sm font-semibold uppercase tracking-wide text-marker-red">Now · {time}</span>
+      <span className="h-0.5 flex-1 bg-marker-red" />
+    </div>
+  );
+}
+
+/** A time for sentences, like "5 p.m." or "5:30 p.m." (in the household's locale). */
+function clockTime(instant: Date, household: Household): string {
+  const { locale, timeZone } = household.settings;
+  return new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" }).format(instant).replace(":00", "");
+}
+
+/** All-day items first, then by start time. */
+function sortForDay(items: CalendarItem[], timeZone: string): CalendarItem[] {
+  return items.toSorted((a, b) => {
+    const aAll = isAllDayStyle(a, timeZone) ? 0 : 1;
+    const bAll = isAllDayStyle(b, timeZone) ? 0 : 1;
+    return aAll - bAll || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
+  });
+}
+
+function NavLink({ href, children, primary }: { href: string; children: React.ReactNode; primary?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-5 text-lg ${
+        primary ? "bg-marker-blue text-board" : "border-2 border-frame bg-board text-ink"
+      }`}
+    >
+      {children}
+    </Link>
   );
 }

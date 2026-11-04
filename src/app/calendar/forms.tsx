@@ -2,7 +2,7 @@ import { Field, Input, Select } from "@/components/ui";
 import { MEMBER_COLOURS } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
-import type { Layer, Member } from "./types";
+import type { Layer, Member, SavedView } from "./types";
 
 /** The form fields for adding or editing an event or a layer. */
 
@@ -191,5 +191,36 @@ function RepeatFields({ repeat }: { repeat?: RepeatOptions }) {
         </Field>
       </div>
     </fieldset>
+  );
+}
+
+/** Name and layers for a saved view. */
+export function ViewFields({ layers, view }: { layers: Layer[]; view?: SavedView }) {
+  return (
+    <>
+      <Field label="Name">
+        <Input name="name" defaultValue={view?.name} required maxLength={40} placeholder="e.g. Court and appointments" />
+      </Field>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1.5 text-base font-medium text-ink">Layers it shows</legend>
+        <div className="flex flex-wrap gap-2">
+          {layers.map((layer) => (
+            <label
+              key={layer.id}
+              className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base text-ink"
+            >
+              <input
+                type="checkbox"
+                name="layerIds"
+                value={layer.id}
+                defaultChecked={view?.layer_ids.includes(layer.id)}
+                className="size-5 accent-marker-blue"
+              />
+              {layer.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </>
   );
 }
