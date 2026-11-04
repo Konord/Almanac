@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isMemberColour } from "@/lib/colours";
 import { requireHousehold } from "@/lib/household";
@@ -9,6 +10,7 @@ import { buildRule, isValidRule, type RepeatEnd, type RepeatFrequency } from "@/
 import { addDays, isLocalDate, isLocalTime, zonedToUtc } from "@/lib/time";
 import { dayOfWeek } from "@/lib/calendar-layout";
 import { isVisibility } from "./options";
+import { VIEW_COOKIE } from "./data";
 
 /*
  * Like the household actions: each one re-checks the signed-in household,
@@ -24,7 +26,9 @@ function back(formData: FormData, kind: "error" | "message", text: string): neve
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
   params.set(kind, text);
-  redirect(`/calendar?${params.toString()}`);
+  // The Today screen sends returnPath "/"; everything else is the calendar.
+  const path = formData.get("returnPath") === "/" ? "/" : "/calendar";
+  redirect(`${path}?${params.toString()}`);
 }
 
 function text(formData: FormData, key: string): string {
@@ -294,4 +298,80 @@ export async function resetOccurrence(formData: FormData) {
   await log(household.id, "event_occurrence_reset", "event", eventId, `${title} (${date})`);
   revalidatePath("/calendar");
   back(formData, "message", `${title} on ${date} is back to normal.`);
+}
+
+// ---------------------------------------------------------------------------
+// Saved views
+// ---------------------------------------------------------------------------
+
+function readView(formData: FormData) {
+  const name = text(formData, "name");
+  const layerIds = formData.getAll("layerIds").map(String).filter(Boolean);
+  if (!name) back(formData, "error", "A view needs a name.");
+  if (layerIds.length === 0) back(formData, "error", "Pick at least one layer for the view.");
+  return { name, layer_ids: layerIds };
+}
+
+export async function addView(formData: FormData) {
+  const household = await requireHousehold();
+  const view = readView(formData);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("views")
+    .insert({ ...view, household_id: household.id })
+    .select("id")
+    .single();
+  if (error) back(formData, "error", error.code === "23505" ? `There's already a view called ${view.name}.` : error.message);
+  await log(household.id, "view_added", "view", data.id, view.name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Added the ${view.name} view.`);
+}
+
+export async function updateView(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const view = readView(formData);
+  const supabase = await createClient();
+  const { error } = await supabase.from("views").update(view).eq("id", id);
+  if (error) back(formData, "error", error.code === "23505" ? `There's already a view called ${view.name}.` : error.message);
+  await log(household.id, "view_updated", "view", id, view.name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Saved the ${view.name} view.`);
+}
+
+export async function removeView(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+  const { error } = await supabase.from("views").delete().eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "view_removed", "view", id, name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Removed the ${name} view.`);
+}
+
+/**
+ * Picks which view this screen shows. The choice is kept in a cookie, so
+ * each device (the wall screen, a phone) remembers its own.
+ */
+export async function chooseView(formData: FormData) {
+  await requireHousehold();
+  const id = text(formData, "viewId");
+  const store = await cookies();
+  if (id) {
+    store.set(VIEW_COOKIE, id, { path: "/", maxAge: 60 * 60 * 24 * 400, sameSite: "lax", httpOnly: true });
+  } else {
+    store.delete(VIEW_COOKIE);
+  }
+  revalidatePath("/", "layout");
+  const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
+  const params = new URLSearchParams();
+  for (const key of ["view", "date"]) {
+    const value = from.get(key);
+    if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
+  }
+  const path = formData.get("returnPath") === "/" ? "/" : "/calendar";
+  const query = params.toString();
+  redirect(query ? `${path}?${query}` : path);
 }

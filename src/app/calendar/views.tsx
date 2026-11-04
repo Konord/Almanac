@@ -3,6 +3,8 @@ import { CHIP_CLASS } from "@/lib/colours";
 import type { Household } from "@/lib/household";
 import { layoutDay, monthOf } from "@/lib/calendar-layout";
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import type { DayProfile } from "@/lib/day-profile";
+import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Layer } from "./types";
 
 /** Height of one hour in the week grid. */
@@ -16,6 +18,8 @@ type ViewProps = {
   layerById: Map<string, Layer>;
   /** Builds a link back to this page with some settings changed. */
   href: (changes: Record<string, string | null>) => string;
+  /** Each day's free/busy profile. */
+  profiles: Map<LocalDate, DayProfile>;
 };
 
 function chipClass(layer: Layer | undefined): string {
@@ -26,13 +30,13 @@ function dayBounds(day: LocalDate, timeZone: string) {
   return { start: zonedToUtc(day, "00:00", timeZone), end: zonedToUtc(addDays(day, 1), "00:00", timeZone) };
 }
 
-function eventsOnDay(events: CalendarItem[], day: LocalDate, timeZone: string) {
+export function eventsOnDay(events: CalendarItem[], day: LocalDate, timeZone: string) {
   const { start, end } = dayBounds(day, timeZone);
   return events.filter((e) => new Date(e.starts_at) < end && new Date(e.ends_at) > start);
 }
 
 /** All-day events, and timed events that run past midnight, go in the top row. */
-function isAllDayStyle(event: CalendarItem, timeZone: string): boolean {
+export function isAllDayStyle(event: CalendarItem, timeZone: string): boolean {
   if (event.all_day) return true;
   return localDateOf(new Date(event.starts_at), timeZone) !== localDateOf(new Date(new Date(event.ends_at).getTime() - 1), timeZone);
 }
@@ -42,7 +46,7 @@ function minutesIntoDay(instant: Date, timeZone: string): number {
   return h * 60 + m;
 }
 
-function shortTime(instant: Date, household: Household): string {
+export function shortTime(instant: Date, household: Household): string {
   const { locale, timeZone } = household.settings;
   return new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" })
     .format(instant)
@@ -59,7 +63,7 @@ function weekdayLabel(day: LocalDate, household: Household, style: "short" | "lo
 // Week view
 // ---------------------------------------------------------------------------
 
-export function WeekView({ household, days, today, events, layerById, href }: ViewProps) {
+export function WeekView({ household, days, today, events, layerById, href, profiles }: ViewProps) {
   const { timeZone } = household.settings;
 
   // Show 6am–10pm, stretched to fit anything earlier or later this week.
@@ -98,6 +102,7 @@ export function WeekView({ household, days, today, events, layerById, href }: Vi
               >
                 {Number(day.slice(8))}
               </span>
+              {profiles.get(day) ? <ProfileTag kind={profiles.get(day)!.kind} /> : null}
             </Link>
           ))}
         </div>
@@ -189,7 +194,7 @@ export function WeekView({ household, days, today, events, layerById, href }: Vi
 /** How many events a month cell lists before "+ N more". */
 const MONTH_CELL_LIMIT = 3;
 
-export function MonthView({ household, days, today, events, layerById, href, anchor }: ViewProps & { anchor: LocalDate }) {
+export function MonthView({ household, days, today, events, layerById, href, profiles, anchor }: ViewProps & { anchor: LocalDate }) {
   const { timeZone } = household.settings;
   const month = monthOf(anchor);
 
@@ -205,7 +210,7 @@ export function MonthView({ household, days, today, events, layerById, href, anc
           const dayEvents = eventsOnDay(events, day, timeZone).sort((a, b) => {
             const aAll = isAllDayStyle(a, timeZone) ? 0 : 1;
             const bAll = isAllDayStyle(b, timeZone) ? 0 : 1;
-            return aAll - bAll || a.starts_at.localeCompare(b.starts_at);
+            return aAll - bAll || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
           });
           const shown = dayEvents.slice(0, MONTH_CELL_LIMIT);
           const more = dayEvents.length - shown.length;
@@ -217,15 +222,20 @@ export function MonthView({ household, days, today, events, layerById, href, anc
                 i >= 7 ? "border-t" : ""
               } ${inMonth ? "" : "bg-panel/60"}`}
             >
-              <Link
-                href={href({ view: "week", date: day, edit: null, add: null })}
-                className={`flex size-8 items-center justify-center self-start rounded-full text-base font-semibold ${
-                  day === today ? "bg-marker-blue text-board" : inMonth ? "text-ink" : "text-ink-muted"
-                }`}
-                title="Open this week"
-              >
-                {Number(day.slice(8))}
-              </Link>
+              <div className="flex items-center justify-between gap-1">
+                <Link
+                  href={href({ view: "week", date: day, edit: null, add: null })}
+                  className={`flex size-8 items-center justify-center rounded-full text-base font-semibold ${
+                    day === today ? "bg-marker-blue text-board" : inMonth ? "text-ink" : "text-ink-muted"
+                  }`}
+                  title="Open this week"
+                >
+                  {Number(day.slice(8))}
+                </Link>
+                {inMonth && profiles.get(day) && profiles.get(day)!.kind !== "free" ? (
+                  <ProfileTag kind={profiles.get(day)!.kind} />
+                ) : null}
+              </div>
               {shown.map((e) => {
                 const allDay = isAllDayStyle(e, timeZone);
                 const layer = layerById.get(e.layer_id);

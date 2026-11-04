@@ -32,3 +32,6 @@ export type CalendarItem = CalendarEvent & {
   occurrence_date: string | null;
   moved: boolean;
 };
+
+/** A saved set of layers, e.g. "Court + appointments". */
+export type SavedView = { id: string; name: string; layer_ids: string[] };

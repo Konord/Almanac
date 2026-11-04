@@ -5,11 +5,14 @@ import { MEMBER_COLOUR_CLASS } from "@/lib/colours";
 import { addMonths, monthGridDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
-import { describeRule, expandEvents, parseRule, type ExceptionLike } from "@/lib/recurrence";
+import { describeRule, parseRule } from "@/lib/recurrence";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import {
   addEvent,
   addLayer,
+  addView,
+  removeView,
+  updateView,
   moveOccurrence,
   removeEvent,
   removeLayer,
@@ -18,15 +21,14 @@ import {
   updateEvent,
   updateLayer,
 } from "./actions";
-import { EventFields, LayerFields } from "./forms";
+import { EventFields, LayerFields, ViewFields } from "./forms";
+import { ViewChooser } from "./view-chooser";
 import { VISIBILITY_OPTIONS } from "./options";
+import { deviceView, EVENT_COLUMNS, itemsInView, loadCalendar, profilesFor, rangeOf } from "./data";
 import type { CalendarEvent, CalendarItem, Layer, Member } from "./types";
 import { MonthView, WeekView } from "./views";
 
 type View = "week" | "month";
-
-const EVENT_COLUMNS =
-  "id, title, layer_id, starts_at, ends_at, all_day, member_id, energy_cost, visibility, notes, timezone, recurrence_rule";
 
 export default function CalendarPage(props: PageProps<"/calendar">) {
   return (
@@ -55,51 +57,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const addDate = addParam && isLocalDate(addParam) ? addParam : undefined;
 
   const days = view === "week" ? weekDays(anchor, weekStartsOn) : monthGridDays(anchor, weekStartsOn);
-  const rangeStart = zonedToUtc(days[0], "00:00", timeZone);
-  const rangeEnd = zonedToUtc(addDays(days.at(-1) ?? anchor, 1), "00:00", timeZone);
-
-  const [layersResult, membersResult, eventsResult, seriesResult] = await Promise.all([
-    supabase
-      .from("layers")
-      .select("id, name, colour, owner_member_id, counts_toward_busyness, visibility")
-      .order("sort_order")
-      .order("name"),
-    supabase.from("members").select("id, name").order("role", { ascending: false }).order("name"),
-    supabase
-      .from("events")
-      .select(EVENT_COLUMNS)
-      .is("recurrence_rule", null)
-      .lt("starts_at", rangeEnd.toISOString())
-      .gte("ends_at", rangeStart.toISOString())
-      .order("starts_at"),
-    // Repeating events that have started by the end of the range; their
-    // individual dates are worked out below.
-    supabase.from("events").select(EVENT_COLUMNS).not("recurrence_rule", "is", null).lt("starts_at", rangeEnd.toISOString()),
-  ]);
-  if (layersResult.error) throw layersResult.error;
-  if (membersResult.error) throw membersResult.error;
-  if (eventsResult.error) throw eventsResult.error;
-  if (seriesResult.error) throw seriesResult.error;
-
-  const seriesIds = seriesResult.data.map((e) => e.id);
-  let exceptions: ExceptionLike[] = [];
-  if (seriesIds.length > 0) {
-    const { data, error } = await supabase
-      .from("event_exceptions")
-      .select("event_id, original_date, skipped, new_starts_at, new_ends_at")
-      .in("event_id", seriesIds);
-    if (error) throw error;
-    exceptions = data;
-  }
-
-  const layers: Layer[] = layersResult.data;
-  const members: Member[] = membersResult.data;
-  const events: CalendarItem[] = expandEvents<CalendarEvent>(
-    [...eventsResult.data, ...seriesResult.data],
-    exceptions,
-    rangeStart,
-    rangeEnd,
-  );
+  const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
+  const { layers, members, views, items, exceptions } = await loadCalendar(rangeStart, rangeEnd);
+  const savedView = await deviceView(views);
+  const events: CalendarItem[] = itemsInView(items, savedView);
+  const profiles = profilesFor(days, items, layers, household);
   const layerById = new Map(layers.map((l) => [l.id, l]));
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -201,8 +163,18 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         </Panel>
       ) : null}
 
+      <ViewChooser views={views} current={savedView} returnTo={returnTo} returnPath="/calendar" />
+
       {view === "week" ? (
-        <WeekView household={household} days={days} today={today} events={events} layerById={layerById} href={href} />
+        <WeekView
+          household={household}
+          days={days}
+          today={today}
+          events={events}
+          layerById={layerById}
+          href={href}
+          profiles={profiles}
+        />
       ) : (
         <MonthView
           household={household}
@@ -211,6 +183,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           events={events}
           layerById={layerById}
           href={href}
+          profiles={profiles}
           anchor={anchor}
         />
       )}
@@ -228,7 +201,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       <details className="rounded-[var(--radius)] border-2 border-frame bg-panel/60 p-5">
         <summary className="cursor-pointer text-xl font-semibold text-ink">Manage layers</summary>
         <p className="mt-3 mb-4 text-base text-ink-muted">
-          Every event belongs to a layer. Later you&apos;ll be able to choose which layers each screen and phone shows.
+          Every event belongs to a layer. To show only some layers on a screen, make a view below.
         </p>
         <ul className="mb-6 flex flex-col gap-3">
           {layers.map((layer) => (
@@ -268,6 +241,51 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           <LayerFields members={members} />
           <div className="sm:col-span-2">
             <Button>Add layer</Button>
+          </div>
+        </form>
+      </details>
+
+      <details className="rounded-[var(--radius)] border-2 border-frame bg-panel/60 p-5">
+        <summary className="cursor-pointer text-xl font-semibold text-ink">Manage views</summary>
+        <p className="mt-3 mb-4 text-base text-ink-muted">
+          A view is a set of layers, like &ldquo;Court and appointments&rdquo;. Each screen remembers the view you
+          picked on it, so the wall can show everything while a phone shows just a few layers.
+        </p>
+        <ul className="mb-6 flex flex-col gap-3">
+          {views.map((v) => (
+            <li key={v.id} className="rounded-[var(--radius)] border-2 border-frame bg-board p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-lg font-semibold text-ink">{v.name}</span>
+                <span className="text-base text-ink-muted">
+                  {v.layer_ids.map((id) => layerById.get(id)?.name).filter(Boolean).join(", ") || "No layers"}
+                </span>
+              </div>
+              <details className="mt-2">
+                <summary className="cursor-pointer text-base text-marker-blue">Edit</summary>
+                <form action={updateView} className="mt-4 grid gap-4">
+                  <input type="hidden" name="id" value={v.id} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <ViewFields layers={layers} view={v} />
+                  <div>
+                    <Button>Save view</Button>
+                  </div>
+                </form>
+                <form action={removeView} className="mt-4">
+                  <input type="hidden" name="id" value={v.id} />
+                  <input type="hidden" name="name" value={v.name} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <Button variant="danger">Remove the {v.name} view</Button>
+                </form>
+              </details>
+            </li>
+          ))}
+        </ul>
+        <h3 className="mb-3 text-xl font-semibold text-ink">Add a view</h3>
+        <form action={addView} className="grid gap-4">
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <ViewFields layers={layers} />
+          <div>
+            <Button>Add view</Button>
           </div>
         </form>
       </details>
