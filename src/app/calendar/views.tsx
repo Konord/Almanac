@@ -3,7 +3,7 @@ import { CHIP_CLASS } from "@/lib/colours";
 import type { Household } from "@/lib/household";
 import { layoutDay, monthOf } from "@/lib/calendar-layout";
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import type { CalendarEvent, Layer } from "./types";
+import type { CalendarItem, Layer } from "./types";
 
 /** Height of one hour in the week grid. */
 const HOUR_REM = 3;
@@ -12,7 +12,7 @@ type ViewProps = {
   household: Household;
   days: LocalDate[];
   today: LocalDate;
-  events: CalendarEvent[];
+  events: CalendarItem[];
   layerById: Map<string, Layer>;
   /** Builds a link back to this page with some settings changed. */
   href: (changes: Record<string, string | null>) => string;
@@ -26,13 +26,13 @@ function dayBounds(day: LocalDate, timeZone: string) {
   return { start: zonedToUtc(day, "00:00", timeZone), end: zonedToUtc(addDays(day, 1), "00:00", timeZone) };
 }
 
-function eventsOnDay(events: CalendarEvent[], day: LocalDate, timeZone: string) {
+function eventsOnDay(events: CalendarItem[], day: LocalDate, timeZone: string) {
   const { start, end } = dayBounds(day, timeZone);
   return events.filter((e) => new Date(e.starts_at) < end && new Date(e.ends_at) > start);
 }
 
 /** All-day events, and timed events that run past midnight, go in the top row. */
-function isAllDayStyle(event: CalendarEvent, timeZone: string): boolean {
+function isAllDayStyle(event: CalendarItem, timeZone: string): boolean {
   if (event.all_day) return true;
   return localDateOf(new Date(event.starts_at), timeZone) !== localDateOf(new Date(new Date(event.ends_at).getTime() - 1), timeZone);
 }
@@ -112,7 +112,7 @@ export function WeekView({ household, days, today, events, layerById, href }: Vi
                 .map((e) => (
                   <Link
                     key={e.id}
-                    href={href({ edit: e.id, add: null })}
+                    href={href({ edit: e.series_id, occ: e.occurrence_date, add: null })}
                     className={`truncate rounded px-2 py-1 text-sm font-medium ${chipClass(layerById.get(e.layer_id))}`}
                   >
                     {e.title}
@@ -154,7 +154,7 @@ export function WeekView({ household, days, today, events, layerById, href }: Vi
                   return (
                     <Link
                       key={block.id}
-                      href={href({ edit: event.id, add: null })}
+                      href={href({ edit: event.series_id, occ: event.occurrence_date, add: null })}
                       className={`absolute overflow-hidden rounded px-1.5 py-1 text-xs leading-tight shadow-sm ring-1 ring-board ${chipClass(layerById.get(event.layer_id))}`}
                       style={{
                         top: `${top}rem`,
@@ -163,7 +163,10 @@ export function WeekView({ household, days, today, events, layerById, href }: Vi
                         width: `calc(${100 / block.lanes}% - 4px)`,
                       }}
                     >
-                      <span className="block truncate text-sm font-semibold">{event.title}</span>
+                      <span className="block truncate text-sm font-semibold">
+                        {event.recurrence_rule ? <span aria-label="Repeats">↻ </span> : null}
+                        {event.title}
+                      </span>
                       <span className="block truncate opacity-90">
                         {shortTime(new Date(event.starts_at), household)}–{shortTime(new Date(event.ends_at), household)}
                       </span>
@@ -227,11 +230,11 @@ export function MonthView({ household, days, today, events, layerById, href, anc
                 const allDay = isAllDayStyle(e, timeZone);
                 const layer = layerById.get(e.layer_id);
                 return allDay ? (
-                  <Link key={e.id} href={href({ edit: e.id, add: null })} className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${chipClass(layer)}`}>
+                  <Link key={e.id} href={href({ edit: e.series_id, occ: e.occurrence_date, add: null })} className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${chipClass(layer)}`}>
                     {e.title}
                   </Link>
                 ) : (
-                  <Link key={e.id} href={href({ edit: e.id, add: null })} className="flex items-center gap-1 truncate text-xs text-ink">
+                  <Link key={e.id} href={href({ edit: e.series_id, occ: e.occurrence_date, add: null })} className="flex items-center gap-1 truncate text-xs text-ink">
                     <span className={`size-2 shrink-0 rounded-full ${chipClass(layer).split(" ")[0]}`} />
                     <span className="text-ink-muted">{shortTime(new Date(e.starts_at), household)}</span>
                     <span className="truncate font-medium">{e.title}</span>

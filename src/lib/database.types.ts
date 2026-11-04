@@ -49,6 +49,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"event_exceptions": {
+                  Row: {
+                    "created_at": string,"event_id": string,"household_id": string,"id": string,"new_ends_at": string | null,"new_starts_at": string | null,"original_date": string,"skipped": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"event_id": string,"household_id": string,"id"?: string,"new_ends_at"?: string | null,"new_starts_at"?: string | null,"original_date": string,"skipped"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"event_id"?: string,"household_id"?: string,"id"?: string,"new_ends_at"?: string | null,"new_starts_at"?: string | null,"original_date"?: string,"skipped"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_exceptions_event_id_household_id_fkey"
+      columns: ["event_id","household_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "event_exceptions_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"events": {
                   Row: {
                     "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"id": string,"layer_id": string,"member_id": string | null,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
