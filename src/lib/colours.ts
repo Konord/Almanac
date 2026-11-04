@@ -19,3 +19,11 @@ export const MEMBER_COLOUR_CLASS: Record<string, string> = {
 export function isMemberColour(value: string): value is MemberColour {
   return MEMBER_COLOURS.some((c) => c.value === value);
 }
+
+/** Filled "chip" look for calendar items, per marker colour. */
+export const CHIP_CLASS: Record<string, string> = {
+  "marker-blue": "bg-marker-blue text-board",
+  "marker-red": "bg-marker-red text-board",
+  "marker-green": "bg-marker-green text-board",
+  "marker-black": "bg-marker-black text-board",
+};
