@@ -13,8 +13,16 @@ import { isVisibility } from "./options";
  * the database security rules check again, and changes go in the activity log.
  */
 
-function back(kind: "error" | "message", text: string): never {
-  redirect(`/calendar?${kind}=${encodeURIComponent(text)}`);
+/** Returns to the calendar view the form came from, with a message. */
+function back(formData: FormData, kind: "error" | "message", text: string): never {
+  const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
+  const params = new URLSearchParams();
+  for (const key of ["view", "date"]) {
+    const value = from.get(key);
+    if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
+  }
+  params.set(kind, text);
+  redirect(`/calendar?${params.toString()}`);
 }
 
 function text(formData: FormData, key: string): string {
@@ -44,9 +52,9 @@ function readLayer(formData: FormData) {
   const name = text(formData, "name");
   const colour = text(formData, "colour");
   const visibility = text(formData, "visibility");
-  if (!name) back("error", "A layer needs a name.");
-  if (!isMemberColour(colour)) back("error", "Choose a colour.");
-  if (!isVisibility(visibility)) back("error", "Choose who can see this layer.");
+  if (!name) back(formData, "error", "A layer needs a name.");
+  if (!isMemberColour(colour)) back(formData, "error", "Choose a colour.");
+  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this layer.");
   return {
     name,
     colour,
@@ -65,10 +73,10 @@ export async function addLayer(formData: FormData) {
     .insert({ ...layer, household_id: household.id, sort_order: 100 })
     .select("id")
     .single();
-  if (error) back("error", error.message);
+  if (error) back(formData, "error", error.message);
   await log(household.id, "layer_added", "layer", data.id, layer.name);
   revalidatePath("/calendar");
-  back("message", `Added the ${layer.name} layer.`);
+  back(formData, "message", `Added the ${layer.name} layer.`);
 }
 
 export async function updateLayer(formData: FormData) {
@@ -77,10 +85,10 @@ export async function updateLayer(formData: FormData) {
   const layer = readLayer(formData);
   const supabase = await createClient();
   const { error } = await supabase.from("layers").update(layer).eq("id", id);
-  if (error) back("error", error.message);
+  if (error) back(formData, "error", error.message);
   await log(household.id, "layer_updated", "layer", id, layer.name);
   revalidatePath("/calendar");
-  back("message", `Saved the ${layer.name} layer.`);
+  back(formData, "message", `Saved the ${layer.name} layer.`);
 }
 
 export async function removeLayer(formData: FormData) {
@@ -89,10 +97,10 @@ export async function removeLayer(formData: FormData) {
   const name = text(formData, "name");
   const supabase = await createClient();
   const { error } = await supabase.from("layers").delete().eq("id", id);
-  if (error) back("error", error.message);
+  if (error) back(formData, "error", error.message);
   await log(household.id, "layer_removed", "layer", id, name);
   revalidatePath("/calendar");
-  back("message", `Removed the ${name} layer and its events.`);
+  back(formData, "message", `Removed the ${name} layer and its events.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,22 +119,22 @@ function readEvent(formData: FormData, timeZone: string) {
   const visibility = text(formData, "visibility");
   const notes = text(formData, "notes");
 
-  if (!title) back("error", "An event needs a title.");
-  if (!layerId) back("error", "Choose a layer.");
-  if (!isLocalDate(startDate) || !isLocalDate(endDate)) back("error", "Check the dates.");
-  if (endDate < startDate) back("error", "The end date is before the start date.");
+  if (!title) back(formData, "error", "An event needs a title.");
+  if (!layerId) back(formData, "error", "Choose a layer.");
+  if (!isLocalDate(startDate) || !isLocalDate(endDate)) back(formData, "error", "Check the dates.");
+  if (endDate < startDate) back(formData, "error", "The end date is before the start date.");
   if (!allDay && (!isLocalTime(startTime) || !isLocalTime(endTime))) {
-    back("error", "Add a start and end time, or tick All day.");
+    back(formData, "error", "Add a start and end time, or tick All day.");
   }
-  if (![0, 1, 2, 3].includes(energyCost)) back("error", "Choose an energy cost.");
-  if (!isVisibility(visibility)) back("error", "Choose who can see this event.");
+  if (![0, 1, 2, 3].includes(energyCost)) back(formData, "error", "Choose an energy cost.");
+  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
   // All-day events run from midnight on the start date to midnight after the end date.
   const startsAt = allDay ? zonedToUtc(startDate, "00:00", timeZone) : zonedToUtc(startDate, startTime, timeZone);
   const endsAt = allDay
     ? zonedToUtc(addDays(endDate, 1), "00:00", timeZone)
     : zonedToUtc(endDate, endTime, timeZone);
-  if (endsAt < startsAt) back("error", "The event ends before it starts.");
+  if (endsAt < startsAt) back(formData, "error", "The event ends before it starts.");
 
   return {
     title,
@@ -151,10 +159,10 @@ export async function addEvent(formData: FormData) {
     .insert({ ...event, household_id: household.id })
     .select("id")
     .single();
-  if (error) back("error", error.message);
+  if (error) back(formData, "error", error.message);
   await log(household.id, "event_added", "event", data.id, event.title);
   revalidatePath("/calendar");
-  back("message", `Added ${event.title}.`);
+  back(formData, "message", `Added ${event.title}.`);
 }
 
 export async function updateEvent(formData: FormData) {
@@ -163,10 +171,10 @@ export async function updateEvent(formData: FormData) {
   const event = readEvent(formData, household.settings.timeZone);
   const supabase = await createClient();
   const { error } = await supabase.from("events").update(event).eq("id", id);
-  if (error) back("error", error.message);
+  if (error) back(formData, "error", error.message);
   await log(household.id, "event_updated", "event", id, event.title);
   revalidatePath("/calendar");
-  back("message", `Saved ${event.title}.`);
+  back(formData, "message", `Saved ${event.title}.`);
 }
 
 export async function removeEvent(formData: FormData) {
@@ -175,8 +183,8 @@ export async function removeEvent(formData: FormData) {
   const title = text(formData, "title");
   const supabase = await createClient();
   const { error } = await supabase.from("events").delete().eq("id", id);
-  if (error) back("error", error.message);
+  if (error) back(formData, "error", error.message);
   await log(household.id, "event_removed", "event", id, title);
   revalidatePath("/calendar");
-  back("message", `Removed ${title}.`);
+  back(formData, "message", `Removed ${title}.`);
 }
