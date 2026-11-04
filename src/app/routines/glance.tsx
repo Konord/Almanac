@@ -18,7 +18,7 @@ export function RoutinesGlance({ data, date, household }: { data: RoutineData; d
     .filter((p) => p.routines.length > 0);
 
   return (
-    <div className="rounded-[var(--radius)] border-2 border-frame bg-board p-5">
+    <div className="flex flex-col rounded-[var(--radius)] border-2 border-frame bg-board p-5 lg:min-h-0 lg:flex-1">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold text-ink">Routines</h2>
         <Link href="/routines" className="text-lg text-marker-blue underline">
@@ -34,7 +34,7 @@ export function RoutinesGlance({ data, date, household }: { data: RoutineData; d
           .
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:min-h-0 lg:grid-cols-1 lg:overflow-y-auto">
           {people.map(({ member, routines }) => {
             const current = glanceRoutine(
               routines.map((r) => ({ ...r, kind: r.template.kind, complete: r.progress.complete })),

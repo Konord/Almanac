@@ -17,7 +17,7 @@ import { isVisibility } from "../calendar/options";
 function returnPath(formData: FormData): string {
   const value = String(formData.get("returnTo") ?? "");
   // Only our own pages, never another website.
-  return /^\/(routines)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/routines";
+  return /^\/(routines(\/manage)?)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/routines";
 }
 
 function back(formData: FormData, kind: "error" | "message", text: string): never {
