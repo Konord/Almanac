@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { DEFAULT_SETTINGS, isTimeZone, requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
+import { isLocalTime } from "@/lib/time";
 import { MEMBER_COLOURS, type MemberColour } from "@/lib/colours";
 
 /*
@@ -124,6 +125,26 @@ export async function saveSettings(formData: FormData) {
   if (!isTimeZone(timeZone)) back("error", `"${timeZone}" isn't a time zone I recognise.`);
   if (!/^[A-Z]{3}$/.test(currency)) back("error", "Currency should be a 3-letter code like CAD.");
 
+  const dayStarts = text(formData, "dayStarts");
+  const eveningStarts = text(formData, "eveningStarts");
+  const dayEnds = text(formData, "dayEnds");
+  if (![dayStarts, eveningStarts, dayEnds].every(isLocalTime)) back("error", "Day times should look like 07:00.");
+  if (!(dayStarts < eveningStarts && eveningStarts < dayEnds)) {
+    back("error", "The day has to start before the evening, and the evening before the day ends.");
+  }
+  const busyDayHours = Number(text(formData, "busyDayHours"));
+  const busyEveningHours = Number(text(formData, "busyEveningHours"));
+  if (!(busyDayHours > 0 && busyDayHours <= 24) || !(busyEveningHours > 0 && busyEveningHours <= 24)) {
+    back("error", "Busy hours should be a number between 0 and 24, like 4 or 1.5.");
+  }
+  const dayProfile = {
+    dayStarts,
+    eveningStarts,
+    dayEnds,
+    busyDayMinutes: Math.round(busyDayHours * 60),
+    busyEveningMinutes: Math.round(busyEveningHours * 60),
+  };
+
   const settings = {
     ...DEFAULT_SETTINGS,
     ...household.settings,
@@ -132,6 +153,7 @@ export async function saveSettings(formData: FormData) {
     weekStartsOn,
     units,
     temperatureUnit,
+    dayProfile,
   };
 
   const supabase = await createClient();
