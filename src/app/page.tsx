@@ -9,6 +9,8 @@ import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./c
 import { PROFILE_CLASS, ProfileTag } from "./calendar/profile-tag";
 import type { CalendarItem, Layer, Member } from "./calendar/types";
 import { ViewChooser } from "./calendar/view-chooser";
+import { loadRoutines } from "./routines/data";
+import { RoutinesGlance } from "./routines/glance";
 import { eventsOnDay, isAllDayStyle, shortTime, weekdayLabel } from "./calendar/views";
 
 /** How many days the "Coming up" strip shows after today. */
@@ -37,7 +39,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const { layers, members, views, items } = await loadCalendar(rangeStart, rangeEnd);
+  const [{ layers, members, views, items }, routineData] = await Promise.all([
+    loadCalendar(rangeStart, rangeEnd),
+    loadRoutines(today),
+  ]);
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
@@ -62,6 +67,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           <NavLink href="/calendar" primary>
             Calendar
           </NavLink>
+          <NavLink href="/routines">Routines</NavLink>
           <NavLink href="/household">Household &amp; people</NavLink>
         </nav>
       </header>
@@ -80,6 +86,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
               household={household}
             />
           ) : null}
+
+          <RoutinesGlance data={routineData} date={today} household={household} />
 
           <div className="rounded-[var(--radius)] border-2 border-frame bg-board p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -156,19 +164,21 @@ function ProfileCard({ profile, label, household }: { profile: DayProfile; label
   const { timeZone, dayProfile } = household.settings;
   const today = localDateOf(new Date(), timeZone);
   const time = (t: string) => clockTime(zonedToUtc(today, t, timeZone), household);
+  // Times like "9 p.m." already end in a full stop, so don't add a second.
+  const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
   const detail =
     profile.kind === "busy_evening"
-      ? `${formatMinutes(profile.eveningMinutes)} of plans after ${time(dayProfile.eveningStarts)}, and ${formatMinutes(profile.freeMinutes)} free overall.`
+      ? `${formatMinutes(profile.eveningMinutes)} of plans after ${time(dayProfile.eveningStarts)}, and ${formatMinutes(profile.freeMinutes)} free overall`
       : profile.kind === "busy"
-        ? `${formatMinutes(profile.busyMinutes)} of plans, leaving ${formatMinutes(profile.freeMinutes)} free.`
+        ? `${formatMinutes(profile.busyMinutes)} of plans, leaving ${formatMinutes(profile.freeMinutes)} free`
         : profile.busyMinutes === 0
-          ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}.`
-          : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}.`;
+          ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`
+          : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`;
 
   return (
     <div className={`rounded-[var(--radius)] border-4 bg-board p-6 ${PROFILE_CLASS[profile.kind]}`}>
       <p className="text-5xl font-semibold tracking-tight sm:text-6xl">{label}</p>
-      <p className="mt-2 text-xl text-ink">{detail}</p>
+      <p className="mt-2 text-xl text-ink">{sentence(detail)}</p>
     </div>
   );
 }
