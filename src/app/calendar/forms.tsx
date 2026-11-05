@@ -2,7 +2,7 @@ import { Avatar, Chips, Field, Input, Select } from "@/components/ui";
 import { PERSON_COLOURS, strong } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
-import { ExtraTabs, LengthControl } from "./quick-controls";
+import { CardTabs, LengthControl } from "./quick-controls";
 import { PendingSync } from "./pending-sync";
 import type { Layer, Member, SavedView } from "./types";
 
@@ -172,11 +172,23 @@ const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** The finer repeat choices (how often lives in the chips above). Turned into an RRULE by the server action. */
 function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
   return (
-    <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2 sm:grid-cols-[10rem_1fr]">
+    <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2">
       <legend className="px-1 text-base font-bold text-ink">Repeat details</legend>
-      <Field label="Every" hint="2 = every other week, and so on.">
-        <Input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} />
-      </Field>
+      <div className="grid grid-cols-[7rem_1fr] items-end gap-4">
+        <Field label="Every">
+          <Input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} aria-describedby="repeat-every-hint" />
+        </Field>
+        <Chips
+          name="repeatEnd"
+          label="Stops"
+          defaultValue={repeat?.end ?? "never"}
+          options={[
+            { value: "never", label: "Never" },
+            { value: "on", label: "On a date" },
+            { value: "after", label: "After some times" },
+          ]}
+        />
+      </div>
       <Chips
         name="repeatWeekdays"
         label="On these days (weekly only)"
@@ -184,27 +196,17 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
         defaultValue={(repeat?.weekdays ?? []).map(String)}
         options={WEEKDAY_LABELS.map((label, i) => ({ value: String(i), label }))}
       />
-      <Chips
-        name="repeatEnd"
-        label="Stops"
-        defaultValue={repeat?.end ?? "never"}
-        className="sm:col-span-2"
-        options={[
-          { value: "never", label: "Never" },
-          { value: "on", label: "On a date" },
-          { value: "after", label: "After a number of times" },
-        ]}
-      />
-      <div className="grid grid-cols-2 gap-4 sm:col-span-2">
-        <Field label="End date">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Stop date">
           <Input name="repeatUntil" type="date" defaultValue={repeat?.until ?? ""} />
         </Field>
-        <Field label="Times">
+        <Field label="How many times">
           <Input name="repeatCount" type="number" min={1} max={500} defaultValue={repeat?.count ?? ""} />
         </Field>
       </div>
+      <p id="repeat-every-hint" className="text-sm text-ink-muted">Every 2 weekly = every other week.</p>
     </fieldset>
-  );
+  )
 }
 
 /** Name and layers for a saved view. */
@@ -256,37 +258,48 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
   return (
     <>
       <PendingSync defaults={defaults} />
-      <Field label="What">
-        <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus />
-      </Field>
-      <div className="grid grid-cols-[1fr_auto] items-end gap-4">
-        <Field label="Day">
-          <Input name="startDate" type="date" defaultValue={defaults.date} required />
-        </Field>
-        <label className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
-          <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-5 accent-ink" />
-          All day
-        </label>
-      </div>
-      {/* Hidden while All day is ticked. */}
-      <div className="grid gap-4 group-has-[input[name=allDay]:checked]:hidden">
-        <Field label="Starts at">
-          <Input name="startTime" type="time" step={900} defaultValue={defaults.startTime ?? ""} required={false} />
-        </Field>
-        <LengthControl initial={defaults.minutes} />
-      </div>
-      <Chips
-        name="memberId"
-        label="Who it's for"
-        defaultValue={defaults.memberId ?? ""}
-        options={[
-          { value: "", label: "Everyone" },
-          ...members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} size="sm" /> })),
-        ]}
-      />
       {layers.length > 1 ? null : <input type="hidden" name="layerId" value={layers[0]?.id ?? ""} />}
-      <ExtraTabs
+      <CardTabs
         tabs={[
+          {
+            label: "Event",
+            panel: (
+              <>
+                <Field label="What">
+                  <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus />
+                </Field>
+                <div className="grid grid-cols-[1fr_1fr] gap-4">
+                  <Field label="Day">
+                    <Input name="startDate" type="date" defaultValue={defaults.date} required />
+                  </Field>
+                  {/* Hidden while All day is ticked. */}
+                  <div className="group-has-[input[name=allDay]:checked]:invisible">
+                    <Field label="Starts at">
+                      <Input name="startTime" type="time" step={900} defaultValue={defaults.startTime ?? ""} required={false} />
+                    </Field>
+                  </div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <div className="min-w-0 flex-1 group-has-[input[name=allDay]:checked]:invisible">
+                    <LengthControl initial={defaults.minutes} />
+                  </div>
+                  <label className="flex min-h-[var(--touch-target)] shrink-0 cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
+                    <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-5 accent-ink" />
+                    All day
+                  </label>
+                </div>
+                <Chips
+                  name="memberId"
+                  label="Who it's for"
+                  defaultValue={defaults.memberId ?? ""}
+                  options={[
+                    { value: "", label: "Everyone" },
+                    ...members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} size="sm" /> })),
+                  ]}
+                />
+              </>
+            ),
+          },
           {
             label: "Repeats",
             panel: (
@@ -294,7 +307,6 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
                 <Chips
                   name="repeatFrequency"
                   label="How often"
-                  className="sm:col-span-2"
                   defaultValue="none"
                   options={[
                     { value: "none", label: "No" },
@@ -309,9 +321,9 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
             ),
           },
           {
-            label: "Several days",
+            label: "Days",
             panel: (
-              <Field label="Ends on" hint="The last day it runs. Leave blank for one day.">
+              <Field label="Runs over several days? Last day" hint="Leave blank if it's just the one day.">
                 <Input name="endDate" type="date" />
               </Field>
             ),
@@ -320,17 +332,18 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
             label: "More",
             panel: (
               <>
-                <Field label="Picture" hint="One emoji. Leave blank to let Almanac pick from the name.">
-                  <Input name="icon" maxLength={8} placeholder="🗓️" />
-                </Field>
-                <Field label="Notes" hint="Optional.">
-                  <Input name="notes" maxLength={2000} />
-                </Field>
+                <div className="grid grid-cols-[8rem_1fr] gap-4">
+                  <Field label="Picture">
+                    <Input name="icon" maxLength={8} placeholder="🗓️" />
+                  </Field>
+                  <Field label="Notes">
+                    <Input name="notes" maxLength={2000} />
+                  </Field>
+                </div>
                 {layers.length > 1 ? (
                   <Chips
                     name="layerId"
                     label="Layer"
-                    className="sm:col-span-2"
                     defaultValue={layers[0]?.id}
                     options={layers.map((l) => ({
                       value: l.id,
@@ -342,11 +355,10 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
                 <Chips
                   name="energyCost"
                   label="Energy cost"
-                  className="sm:col-span-2"
                   defaultValue="1"
                   options={ENERGY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
                 />
-                <Chips name="visibility" label="Who can see it" className="sm:col-span-2" defaultValue="everyone" options={VISIBILITY_OPTIONS} />
+                <Chips name="visibility" label="Who can see it" defaultValue="everyone" options={VISIBILITY_OPTIONS} />
               </>
             ),
           },

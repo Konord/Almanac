@@ -59,23 +59,25 @@ export function LengthControl({ initial }: { initial: number }) {
 }
 
 /**
- * Tabs for the extra settings. Every panel stays in the form (just hidden),
- * so whatever you set in one tab is still sent when you press Add.
+ * Tabs across the top of the add card: the event itself first, then the
+ * rarer settings. Only one shows at a time, so the card never needs to
+ * scroll. Every tab stays in the form (just hidden), so whatever you set
+ * in one is still sent when you press Add.
  */
-export function ExtraTabs({ tabs }: { tabs: { label: string; panel: ReactNode }[] }) {
-  const [open, setOpen] = useState<number | null>(null);
+export function CardTabs({ tabs }: { tabs: { label: string; panel: ReactNode }[] }) {
+  const [open, setOpen] = useState(0);
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2" role="tablist">
+    <div className="flex min-h-0 flex-1 flex-col gap-5">
+      <div className="flex shrink-0 gap-1 rounded-[var(--radius)] bg-rail p-1" role="tablist">
         {tabs.map((t, i) => (
           <button
             key={t.label}
             type="button"
             role="tab"
             aria-selected={open === i}
-            onClick={() => setOpen(open === i ? null : i)}
-            className={`flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-4 text-lg font-bold ${
-              open === i ? "bg-ink text-board" : "bg-rail text-ink hover:bg-panel"
+            onClick={() => setOpen(i)}
+            className={`flex min-h-[var(--touch-target)] flex-1 items-center justify-center rounded-[calc(var(--radius)-0.25rem)] px-3 text-lg font-bold ${
+              open === i ? "bg-board text-ink shadow-sm" : "text-ink-muted hover:text-ink"
             }`}
           >
             {t.label}
@@ -83,7 +85,7 @@ export function ExtraTabs({ tabs }: { tabs: { label: string; panel: ReactNode }[
         ))}
       </div>
       {tabs.map((t, i) => (
-        <div key={t.label} role="tabpanel" hidden={open !== i} className="grid gap-4 rounded-[var(--radius-card)] border border-frame p-4 sm:grid-cols-2">
+        <div key={t.label} role="tabpanel" hidden={open !== i} className="grid content-start gap-5">
           {t.panel}
         </div>
       ))}

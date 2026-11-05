@@ -82,11 +82,11 @@ export function QuickAddSheet({
       {layers.length === 0 ? (
         <p className="text-lg text-ink-muted">Add a layer first (under Layers on the calendar).</p>
       ) : (
-        <form action={addEvent} className="group grid gap-5">
+        <form action={addEvent} className="group flex h-full flex-col gap-5">
           <input type="hidden" name="returnTo" value={returnTo} />
           <input type="hidden" name="returnPath" value={returnPath} />
           <QuickAddFields layers={layers} members={members} defaults={pending} />
-          <div className="flex gap-3">
+          <div className="mt-auto flex shrink-0 gap-3">
             <Button>Add event</Button>
             <Link
               href={closeHref}
