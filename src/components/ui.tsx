@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Alarm, Broom, CalendarBlank, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
-import { strong } from "@/lib/colours";
+import { soft, strong } from "@/lib/colours";
 
 /**
  * Small building blocks shared by every screen, in the locked "bright"
@@ -176,12 +176,36 @@ export function Card({
 }
 
 /** A person's round avatar: their initial on their strong colour. */
-export function Avatar({ name, colour, size = "md" }: { name: string; colour: string | null | undefined; size?: "sm" | "md" }) {
+/**
+ * A person's sticker: the first letter of their name in their colour, or
+ * their own picture (an emoji) on their pastel colour if they chose one.
+ */
+export function Avatar({
+  name,
+  colour,
+  icon,
+  size = "md",
+}: {
+  name: string;
+  colour: string | null | undefined;
+  icon?: string | null;
+  size?: "sm" | "md" | "lg";
+}) {
+  const box = size === "sm" ? "size-7 text-[0.8125rem]" : size === "lg" ? "size-12 text-xl" : "size-11 text-sm";
+  if (icon) {
+    return (
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full border-2 ${box}`}
+        style={{ background: soft(colour), borderColor: strong(colour) }}
+        aria-hidden
+      >
+        <Emoji emoji={icon} className="size-[72%]" />
+      </span>
+    );
+  }
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${
-        size === "sm" ? "size-7 text-[0.8125rem]" : "size-11 text-sm"
-      }`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${box}`}
       style={{ background: strong(colour) }}
       aria-hidden
     >
@@ -293,4 +317,53 @@ export function Notice({ tone, children }: { tone: "error" | "success"; children
 /** Reads a single string from Next.js search params. */
 export function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+export type ChipOption = { value: string; label: string; leading?: ReactNode };
+
+/**
+ * A row of big tappable choices, used instead of a dropdown so picking
+ * something on a touch screen is one tap. Underneath they're ordinary
+ * radio buttons (pick one) or checkboxes (pick several), so forms work
+ * without any extra code.
+ */
+export function Chips({
+  name,
+  label,
+  options,
+  defaultValue,
+  multiple = false,
+  className = "",
+}: {
+  name: string;
+  label: string;
+  options: readonly ChipOption[];
+  defaultValue?: string | readonly string[];
+  multiple?: boolean;
+  className?: string;
+}) {
+  const chosen = new Set(Array.isArray(defaultValue) ? defaultValue : defaultValue === undefined ? [] : [defaultValue]);
+  return (
+    <fieldset className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      <legend className="mb-1.5 text-base font-bold text-ink">{label}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <label
+            key={o.value}
+            className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent"
+          >
+            <input
+              type={multiple ? "checkbox" : "radio"}
+              name={name}
+              value={o.value}
+              defaultChecked={chosen.has(o.value)}
+              className="sr-only"
+            />
+            {o.leading}
+            {o.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
 }

@@ -44,7 +44,7 @@ export function Assignments({
           return (
             <div key={m.id} className="rounded-[var(--radius-card)] border border-frame p-4">
               <h3 className="mb-2 flex items-center gap-3 text-xl font-bold text-ink">
-                <Avatar name={m.name} colour={m.colour} size="sm" />
+                <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" />
                 {m.name}
               </h3>
               {mine.length === 0 ? (

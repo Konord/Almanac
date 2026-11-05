@@ -86,7 +86,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
                           {c.active ? "" : " · paused"}
                         </span>
                       </span>
-                      {who ? <Avatar name={who.name} colour={who.colour} size="sm" /> : null}
+                      {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
                     </Link>
                   </li>
                 );

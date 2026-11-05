@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { addMember, removeMember, saveSettings, setPin, updateMember } from "./actions";
 import { PERSON_COLOURS, strong } from "@/lib/colours";
+import { EmojiPicker } from "@/components/emoji-picker";
 
 export default function HouseholdPage(props: PageProps<"/household">) {
   return (
@@ -22,6 +23,7 @@ type Member = {
   name: string;
   role: string;
   colour: string;
+  icon: string | null;
   birth_year: number | null;
   hasPin: boolean;
 };
@@ -33,7 +35,7 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
 
   const { data: rows, error } = await supabase
     .from("members")
-    .select("id, name, role, colour, birth_year")
+    .select("id, name, role, colour, icon, birth_year")
     .order("role", { ascending: false }) // parents first
     .order("sort_order")
     .order("name");
@@ -210,7 +212,7 @@ function MemberEditor({ member }: { member: Member }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Avatar name={member.name} colour={member.colour} />
+        <Avatar name={member.name} colour={member.colour} icon={member.icon} />
         <span className="text-xl font-bold text-ink">{member.name}</span>
         <span className="text-base text-ink-muted">
           {member.role === "parent" ? "Parent" : "Child"}
@@ -256,9 +258,14 @@ function MemberEditor({ member }: { member: Member }) {
 function MemberFields({ member }: { member?: Member }) {
   return (
     <>
-      <Field label="Name">
-        <Input name="name" defaultValue={member?.name} required maxLength={40} />
-      </Field>
+      <div className="flex gap-3">
+        <EmojiPicker initial={member?.icon ?? ""} nameField="name" letter fullScreen />
+        <div className="min-w-0 flex-1">
+          <Field label="Name" hint="Tap the circle to give them a picture instead of a letter.">
+            <Input name="name" defaultValue={member?.name} required maxLength={40} />
+          </Field>
+        </div>
+      </div>
       <Field label="Role">
         <Select name="role" defaultValue={member?.role ?? "parent"}>
           <option value="parent">Parent</option>

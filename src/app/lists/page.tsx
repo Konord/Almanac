@@ -34,7 +34,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const supabase = await createClient();
   const [{ lists, todos }, { data: memberRows }] = await Promise.all([
     loadTodos(),
-    supabase.from("members").select("id, name, colour").order("sort_order").order("name"),
+    supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
   ]);
   const members = (memberRows ?? []) as ChoreMember[];
   const memberById = new Map(members.map((m) => [m.id, m]));

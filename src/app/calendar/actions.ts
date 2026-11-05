@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isPersonColour } from "@/lib/colours";
-import { requireHousehold } from "@/lib/household";
+import { requireHousehold, type HouseholdSettings } from "@/lib/household";
+import { fillTimes } from "@/lib/quick-times";
 import { createClient } from "@/lib/supabase/server";
 import { buildRule, isValidRule, type RepeatEnd, type RepeatFrequency } from "@/lib/recurrence";
 import { addDays, isLocalDate, isLocalTime, zonedToUtc } from "@/lib/time";
@@ -113,35 +114,43 @@ export async function removeLayer(formData: FormData) {
 // Events
 // ---------------------------------------------------------------------------
 
-function readEvent(formData: FormData, timeZone: string) {
+function readEvent(formData: FormData, settings: HouseholdSettings) {
+  const timeZone = settings.timeZone;
   const title = text(formData, "title");
   const layerId = text(formData, "layerId");
   const startDate = text(formData, "startDate");
-  const endDate = text(formData, "endDate") || startDate;
-  const allDay = formData.get("allDay") === "on";
-  const startTime = text(formData, "startTime");
-  const endTime = text(formData, "endTime");
-  const energyCost = Number(text(formData, "energyCost"));
-  const visibility = text(formData, "visibility");
+  const energyCost = Number(text(formData, "energyCost") || "1");
+  const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
   const icon = text(formData, "icon");
 
   if (!title) back(formData, "error", "An event needs a title.");
   if (!layerId) back(formData, "error", "Choose a layer.");
-  if (!isLocalDate(startDate) || !isLocalDate(endDate)) back(formData, "error", "Check the dates.");
-  if (endDate < startDate) back(formData, "error", "The end date is before the start date.");
-  if (!allDay && (!isLocalTime(startTime) || !isLocalTime(endTime))) {
-    back(formData, "error", "Add a start and end time, or tick All day.");
-  }
-  if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🦷.");
+  const endDateInput = text(formData, "endDate") || startDate;
+  if (!isLocalDate(startDate) || !isLocalDate(endDateInput)) back(formData, "error", "Check the dates.");
+  if (endDateInput < startDate) back(formData, "error", "The end date is before the start date.");
+  // Blank times mean all day; a start time alone gets the usual length.
+  const times = fillTimes({
+    allDay: formData.get("allDay") === "on",
+    startDate,
+    endDate: endDateInput,
+    startTime: text(formData, "startTime"),
+    endTime: text(formData, "endTime"),
+    // The quick-add card sends a length; the full form uses the usual length.
+    defaultMinutes: readMinutes(formData) ?? settings.defaultEventMinutes,
+  });
+  if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
+  if (icon && [...icon].length > 8) back(formData, "error", "The picture should be one emoji, like 🦷.");
   if (![0, 1, 2, 3].includes(energyCost)) back(formData, "error", "Choose an energy cost.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
+  const allDay = times.allDay;
+  const endDate = times.allDay ? endDateInput : times.endDate;
   // All-day events run from midnight on the start date to midnight after the end date.
-  const startsAt = allDay ? zonedToUtc(startDate, "00:00", timeZone) : zonedToUtc(startDate, startTime, timeZone);
-  const endsAt = allDay
+  const startsAt = times.allDay ? zonedToUtc(startDate, "00:00", timeZone) : zonedToUtc(startDate, times.startTime, timeZone);
+  const endsAt = times.allDay
     ? zonedToUtc(addDays(endDate, 1), "00:00", timeZone)
-    : zonedToUtc(endDate, endTime, timeZone);
+    : zonedToUtc(endDate, times.endTime, timeZone);
   if (endsAt < startsAt) back(formData, "error", "The event ends before it starts.");
 
   const recurrenceRule = readRepeat(formData, startDate);
@@ -154,12 +163,17 @@ function readEvent(formData: FormData, timeZone: string) {
     ends_at: endsAt.toISOString(),
     all_day: allDay,
     timezone: timeZone,
-    member_id: optionalId(formData, "memberId"),
     energy_cost: energyCost,
     visibility,
     notes: notes || null,
     icon: icon || null,
   };
+}
+
+/** A length in minutes from the quick-add card, if it sent a sensible one. */
+function readMinutes(formData: FormData): number | null {
+  const minutes = Number(text(formData, "minutes"));
+  return Number.isInteger(minutes) && minutes >= 5 && minutes <= 24 * 60 ? minutes : null;
 }
 
 const FREQUENCIES: RepeatFrequency[] = ["none", "daily", "weekly", "monthly", "yearly"];
@@ -192,9 +206,42 @@ function readRepeat(formData: FormData, startDate: string): string | null {
   return rule;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The ids ticked on the card's stickers ("memberIds" for people, "tagIds" for tags). */
+function readIds(formData: FormData, key: "memberIds" | "tagIds"): string[] {
+  return [...new Set(formData.getAll(key).map(String).filter((id) => UUID.test(id)))];
+}
+
+/** Makes exactly these people (or tags) belong to an event. */
+async function setLinks(
+  table: "event_members" | "event_tags",
+  householdId: string,
+  eventId: string,
+  ids: string[],
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { error: clearError } = await supabase.from(table).delete().eq("event_id", eventId);
+  if (clearError) return clearError.message;
+  if (ids.length === 0) return null;
+  const { error } =
+    table === "event_members"
+      ? await supabase.from(table).insert(ids.map((id) => ({ event_id: eventId, member_id: id, household_id: householdId })))
+      : await supabase.from(table).insert(ids.map((id) => ({ event_id: eventId, tag_id: id, household_id: householdId })));
+  return error?.message ?? null;
+}
+
+/** Saves an event's people and tags from the card. */
+async function saveStickers(formData: FormData, householdId: string, eventId: string) {
+  const error =
+    (await setLinks("event_members", householdId, eventId, readIds(formData, "memberIds"))) ??
+    (await setLinks("event_tags", householdId, eventId, readIds(formData, "tagIds")));
+  if (error) back(formData, "error", error);
+}
+
 export async function addEvent(formData: FormData) {
   const household = await requireHousehold();
-  const event = readEvent(formData, household.settings.timeZone);
+  const event = readEvent(formData, household.settings);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("events")
@@ -202,18 +249,39 @@ export async function addEvent(formData: FormData) {
     .select("id")
     .single();
   if (error) back(formData, "error", error.message);
+  await saveStickers(formData, household.id, data.id);
   await log(household.id, "event_added", "event", data.id, event.title);
+  // "Save as a template" next to the Add button.
+  if (formData.get("saveTemplate") === "on") {
+    const startTime = text(formData, "startTime");
+    const { error: templateError } = await supabase.from("event_templates").insert({
+      household_id: household.id,
+      title: event.title,
+      icon: event.icon,
+      start_time: !event.all_day && isLocalTime(startTime) ? startTime : null,
+      minutes: readMinutes(formData) ?? household.settings.defaultEventMinutes,
+      all_day: event.all_day,
+      member_ids: readIds(formData, "memberIds"),
+      tag_ids: readIds(formData, "tagIds"),
+      notes: event.notes,
+      sort_order: 100,
+    });
+    if (templateError) back(formData, "error", `Added ${event.title}, but the template didn't save: ${templateError.message}`);
+    await log(household.id, "template_added", "event_template", data.id, event.title);
+  }
   revalidatePath("/calendar");
-  back(formData, "message", `Added ${event.title}.`);
+  revalidatePath("/");
+  back(formData, "message", formData.get("saveTemplate") === "on" ? `Added ${event.title} and saved it as a template.` : `Added ${event.title}.`);
 }
 
 export async function updateEvent(formData: FormData) {
   const household = await requireHousehold();
   const id = text(formData, "id");
-  const event = readEvent(formData, household.settings.timeZone);
+  const event = readEvent(formData, household.settings);
   const supabase = await createClient();
   const { error } = await supabase.from("events").update(event).eq("id", id);
   if (error) back(formData, "error", error.message);
+  await saveStickers(formData, household.id, id);
   await log(household.id, "event_updated", "event", id, event.title);
   revalidatePath("/calendar");
   back(formData, "message", `Saved ${event.title}.`);
@@ -377,4 +445,156 @@ export async function chooseView(formData: FormData) {
   const path = formData.get("returnPath") === "/" ? "/" : "/calendar";
   const query = params.toString();
   redirect(query ? `${path}?${query}` : path);
+}
+
+// ---------------------------------------------------------------------------
+// Dragging an event on a timeline
+// ---------------------------------------------------------------------------
+
+/**
+ * Moves or stretches an event after it's dragged on the week or Today
+ * timeline. A one-off event just changes; for a repeating event only the
+ * dragged date moves (like "Move just this one"). Dropping it in another
+ * person's column on Today swaps that person in for the one whose column
+ * it came from (one-off events only).
+ * Called straight from the browser, so it returns an error instead of redirecting.
+ */
+export async function rescheduleEvent(input: {
+  eventId: string;
+  occurrenceDate: string | null;
+  date: string;
+  startTime: string;
+  minutes: number;
+  /** Slid sideways on Today: these people come off and those go on. */
+  members?: { remove: string[]; add: string[] };
+}): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  const { timeZone } = household.settings;
+  const { eventId, occurrenceDate, date, startTime, minutes } = input;
+  if (!isLocalDate(date) || !isLocalTime(startTime)) return { error: "Couldn't tell where it was dropped." };
+  if (!Number.isInteger(minutes) || minutes < 5 || minutes > 24 * 60) return { error: "That length doesn't work." };
+  const startsAt = zonedToUtc(date, startTime, timeZone);
+  const endsAt = new Date(startsAt.getTime() + minutes * 60_000);
+
+  const supabase = await createClient();
+  const { data: event, error: findError } = await supabase.from("events").select("id, title, recurrence_rule").eq("id", eventId).maybeSingle();
+  if (findError || !event) return { error: "Couldn't find that event." };
+
+  if (event.recurrence_rule) {
+    if (!occurrenceDate || !isLocalDate(occurrenceDate)) return { error: "Couldn't tell which date to move." };
+    const { error } = await supabase.from("event_exceptions").upsert(
+      {
+        household_id: household.id,
+        event_id: eventId,
+        original_date: occurrenceDate,
+        skipped: false,
+        new_starts_at: startsAt.toISOString(),
+        new_ends_at: endsAt.toISOString(),
+      },
+      { onConflict: "event_id,original_date" },
+    );
+    if (error) return { error: error.message };
+    await log(household.id, "event_occurrence_moved", "event", eventId, `${event.title} (${occurrenceDate})`);
+  } else {
+    const { error } = await supabase
+      .from("events")
+      .update({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), all_day: false })
+      .eq("id", eventId);
+    if (error) return { error: error.message };
+    if (input.members) {
+      const linkError = await moveMembers(household.id, eventId, input.members);
+      if (linkError) return { error: linkError };
+    }
+  }
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return {};
+}
+
+/**
+ * Takes some people off an event and puts others on. An event for everyone
+ * counts as being for each person; one that ends up for everybody in the
+ * household is stored as "everyone".
+ */
+async function moveMembers(householdId: string, eventId: string, change: { remove: string[]; add: string[] }): Promise<string | null> {
+  const supabase = await createClient();
+  const [{ data: rows, error }, { data: all, error: allError }] = await Promise.all([
+    supabase.from("event_members").select("member_id").eq("event_id", eventId),
+    supabase.from("members").select("id"),
+  ]);
+  if (error || allError) return (error ?? allError)!.message;
+  const everyone = all.map((m) => m.id);
+  const current = rows.length > 0 ? rows.map((r) => r.member_id) : everyone;
+  const next = new Set(current.filter((id) => !change.remove.includes(id)));
+  for (const id of change.add) if (everyone.includes(id)) next.add(id);
+  const ids = everyone.every((id) => next.has(id)) ? [] : [...next];
+  return setLinks("event_members", householdId, eventId, ids);
+}
+
+/**
+ * Stretching a bubble on Today over more (or fewer) people. For a
+ * repeating event this changes who every date is for.
+ */
+export async function changeEventPeople(input: { eventId: string; remove: string[]; add: string[] }): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  const supabase = await createClient();
+  const { data: event, error: findError } = await supabase.from("events").select("id, title").eq("id", input.eventId).maybeSingle();
+  if (findError || !event) return { error: "Couldn't find that event." };
+  const error = await moveMembers(household.id, event.id, { remove: input.remove, add: input.add });
+  if (error) return { error };
+  await log(household.id, "event_updated", "event", event.id, event.title);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// Tags and templates
+// ---------------------------------------------------------------------------
+
+/**
+ * Makes a new tag from the add card's "+ Tag" sticker. Called straight from
+ * the browser, so it returns the new tag (or an error) instead of redirecting.
+ */
+export async function createTag(input: { name: string; icon: string }): Promise<{ tag?: { id: string; name: string; icon: string | null }; error?: string }> {
+  const household = await requireHousehold();
+  const name = input.name.trim();
+  const icon = input.icon.trim() || null;
+  if (!name || name.length > 30) return { error: "A tag needs a name of up to 30 letters." };
+  if (icon && [...icon].length > 8) return { error: "The picture should be one emoji." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tags")
+    .insert({ household_id: household.id, name, icon, sort_order: 100 })
+    .select("id, name, icon")
+    .single();
+  if (error) return { error: error.code === "23505" ? `There's already a tag called ${name}.` : error.message };
+  await log(household.id, "tag_added", "tag", data.id, name);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return { tag: data };
+}
+
+export async function removeTag(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+  const { error } = await supabase.from("tags").delete().eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "tag_removed", "tag", id, name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Removed the ${name} tag.`);
+}
+
+export async function removeTemplate(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+  const { error } = await supabase.from("event_templates").delete().eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "template_removed", "event_template", id, name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Removed the ${name} template.`);
 }

@@ -1,17 +1,16 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Plus, Stack } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
+import { CaretLeft, CaretRight, Plus, Stack, Tag, Trash, X } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
 import { strong } from "@/lib/colours";
-import { addMonths, monthGridDays, weekDays } from "@/lib/calendar-layout";
+import { addMonths, dayOfWeek, monthGridDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import {
-  addEvent,
   addLayer,
   addView,
   removeView,
@@ -19,16 +18,21 @@ import {
   moveOccurrence,
   removeEvent,
   removeLayer,
+  removeTag,
+  removeTemplate,
   resetOccurrence,
   skipOccurrence,
   updateEvent,
   updateLayer,
 } from "./actions";
-import { EventFields, LayerFields, ViewFields } from "./forms";
+import { EventCardFields, LayerFields, ViewFields } from "./forms";
 import { ViewChooser } from "./view-chooser";
+import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
 import { VISIBILITY_OPTIONS } from "./options";
-import { deviceView, EVENT_COLUMNS, itemsInView, loadCalendar, profilesFor, rangeOf } from "./data";
-import type { CalendarEvent, CalendarItem, Layer, Member, SavedView } from "./types";
+import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, profilesFor, rangeOf } from "./data";
+import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedView, Tag as TagType } from "./types";
+import { eventEmoji } from "@/lib/emoji";
+import { lengthLabel } from "@/lib/quick-times";
 import { loadRoutines } from "../routines/data";
 import { PeopleRow } from "../routines/people-row";
 import { MonthView, WeekView } from "./views";
@@ -58,13 +62,12 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const editId = firstParam(params.edit);
   const occParam = firstParam(params.occ);
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
-  const addParam = firstParam(params.add);
-  const addDate = addParam && isLocalDate(addParam) ? addParam : undefined;
-  const panel = firstParam(params.panel) === "layers" ? "layers" : null;
+  const panelParam = firstParam(params.panel);
+  const panel = panelParam === "layers" || panelParam === "tags" ? panelParam : null;
 
   const days = view === "week" ? weekDays(anchor, weekStartsOn) : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, items, exceptions }, routineData] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items, exceptions }, routineData] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
   ]);
@@ -72,6 +75,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const events: CalendarItem[] = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
   const layerById = new Map(layers.map((l) => [l.id, l]));
+  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
   // The event being edited might be outside the visible range, so fetch it on its own.
@@ -82,10 +86,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       .select(EVENT_COLUMNS)
       .eq("id", editId)
       .maybeSingle();
-    editing = data;
+    editing = data ? toEvent(data) : null;
   }
 
-  const current: Record<string, string | null> = { view, date: anchor };
+  // While adding, moving between weeks or views keeps you in adding mode.
+  const current: Record<string, string | null> = { view, date: anchor, placing: placing ? "1" : null };
   const href = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
     const merged: Record<string, string | null> = { ...current, ...changes };
@@ -93,8 +98,13 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
     return `/calendar?${next.toString()}`;
   };
   const returnTo = `view=${view}&date=${anchor}`;
-  const closeHref = href({ edit: null, occ: null, add: null, panel: null });
+  const closeHref = href({ edit: null, occ: null, add: null, panel: null, placing: null });
+  /** Where tapping a day or time while adding goes (start and length get added for a time). */
+  const addHref = (day: LocalDate, extra: Record<string, string> = {}) => href({ add: day, edit: null, panel: null, placing: null, ...extra });
 
+  // Open the edit card on the side away from the event, so it stays in view.
+  const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
+  const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
   const step = (n: number) => (view === "week" ? addDays(anchor, 7 * n) : addMonths(anchor, n));
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -109,6 +119,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={view === "week" ? "Next week" : "Next month"} icon={CaretRight} />
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+          <SoftLink href={href({ panel: "tags", edit: null, add: null })}>
+            <Tag size="1.5rem" aria-hidden />
+            Tags
+          </SoftLink>
           <SoftLink href={href({ panel: "layers", edit: null, add: null })}>
             <Stack size="1.5rem" aria-hidden />
             {savedView ? savedView.name : "Layers"}
@@ -126,11 +140,26 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
+      {placing ? (
+        <PlacingBar
+          hint={view === "week" ? "Tap a time to add an event there, or drag down to set how long. Tap a day's name for all day." : "Tap a day to add an event on it."}
+          cancelHref={closeHref}
+        />
+      ) : null}
 
       {view === "week" ? <PeopleRow data={routineData} date={today} hrefFor={(id) => `/routines?member=${id}`} /> : null}
 
       {view === "week" ? (
-        <WeekView household={household} days={days} today={today} events={events} memberById={memberById} href={href} profiles={profiles} />
+        <WeekView
+          household={household}
+          days={days}
+          today={today}
+          events={events}
+          memberById={memberById}
+          href={href}
+          profiles={profiles}
+          adding={{ placing, pending, addHref }}
+        />
       ) : (
         <MonthView
           household={household}
@@ -141,52 +170,54 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           href={href}
           profiles={profiles}
           anchor={anchor}
+          adding={{ placing, pending, addHref }}
         />
       )}
 
-      {/* Add button, bottom right */}
+      {/* Add button, bottom right: starts adding mode, or cancels it. */}
       <Link
-        href={href({ add: anchor >= days[0] && anchor <= days[days.length - 1] ? anchor : days[0], edit: null, panel: null })}
+        href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
         scroll={false}
-        aria-label="Add an event"
-        title="Add an event"
-        className="fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full bg-ink text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)]"
+        aria-label={placing ? "Stop adding" : "Add an event"}
+        title={placing ? "Stop adding" : "Add an event"}
+        className={`fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)] ${
+          placing ? "bg-accent" : "bg-ink"
+        }`}
       >
-        <Plus size="2.625rem" weight="bold" aria-hidden />
+        {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
       </Link>
 
       {editing ? (
-        <Sheet title={editing.title} closeHref={closeHref}>
+        <Sheet title={editing.title} closeHref={closeHref} narrow side={editSide}>
           <EditEventPanel
+            everyDateHref={href({ edit: editing.id, occ: editOccurrence ?? null, scope: "all", add: null, panel: null })}
+            showEveryDate={firstParam(params.scope) === "all"}
             event={editing}
             household={household}
             layers={layers}
             members={members}
+            tags={tags}
             returnTo={returnTo}
             closeHref={closeHref}
             occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
             occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
             isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
             skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
-            memberName={editing.member_id ? memberById.get(editing.member_id)?.name : undefined}
+            memberName={editing.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(" and ") || undefined}
           />
         </Sheet>
       ) : null}
 
-      {addDate && !editing ? (
-        <Sheet title="Add an event" closeHref={closeHref}>
-          {layers.length === 0 ? (
-            <p className="text-lg text-ink-muted">Add a layer first (under Layers).</p>
-          ) : (
-            <form action={addEvent} className="grid gap-4 sm:grid-cols-2">
-              <input type="hidden" name="returnTo" value={`view=${view}&date=${addDate}`} />
-              <EventFields layers={layers} members={members} defaults={{ startDate: addDate }} />
-              <div className="flex gap-3 sm:col-span-2">
-                <Button>Add event</Button>
-                <CloseLink href={closeHref} />
-              </div>
-            </form>
-          )}
+      {pending && !editing ? (
+        <QuickAddSheet
+          // A day late in the week opens the card on the left, so the day stays in view.
+          side={(dayOfWeek(pending.date) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right"}
+          pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
+      ) : null}
+
+      {panel === "tags" ? (
+        <Sheet title="Tags and templates" closeHref={closeHref} narrow>
+          <TagsPanel tags={tags} templates={templates} memberById={memberById} tagById={new Map(tags.map((t) => [t.id, t]))} returnTo={returnTo} />
         </Sheet>
       ) : null}
 
@@ -334,6 +365,7 @@ function EditEventPanel({
   household,
   layers,
   members,
+  tags,
   returnTo,
   closeHref,
   memberName,
@@ -341,6 +373,8 @@ function EditEventPanel({
   occurrenceDate,
   isException,
   skippedDates,
+  everyDateHref,
+  showEveryDate,
 }: {
   skippedDates: string[];
   occurrence: CalendarItem | null;
@@ -350,23 +384,31 @@ function EditEventPanel({
   household: Household;
   layers: Layer[];
   members: Member[];
+  tags: TagType[];
   returnTo: string;
   closeHref: string;
   memberName: string | undefined;
+  /** For a repeating event: the link that switches to changing every date. */
+  everyDateHref: string;
+  showEveryDate: boolean;
 }) {
   const { timeZone } = household.settings;
   const start = new Date(event.starts_at);
   const end = new Date(event.ends_at);
   const startDate = localDateOf(start, timeZone);
   const endDate = event.all_day ? addDays(localDateOf(end, timeZone), -1) : localDateOf(end, timeZone);
+  const summary = (
+    <p className="shrink-0 text-lg text-ink-muted">
+      {memberName ? `For ${memberName} · ` : ""}
+      {describeRule(event.recurrence_rule)}
+    </p>
+  );
 
-  return (
-    <div>
-      <p className="mb-5 text-lg text-ink-muted">
-        {memberName ? `For ${memberName} · ` : ""}
-        {describeRule(event.recurrence_rule)}
-      </p>
-      {occurrenceDate ? (
+  // A repeating event opens on "just this date" first; every date is one tap away.
+  if (occurrenceDate && !showEveryDate) {
+    return (
+      <div className="flex h-full flex-col gap-5">
+        {summary}
         <OccurrenceControls
           event={event}
           household={household}
@@ -375,46 +417,41 @@ function EditEventPanel({
           isException={isException}
           returnTo={returnTo}
         />
-      ) : null}
-      {skippedDates.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="mb-2 text-lg font-semibold text-ink">Skipped dates</h3>
-          <ul className="flex flex-wrap gap-2">
-            {skippedDates.map((date) => (
-              <li key={date}>
-                <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
-                  <input type="hidden" name="eventId" value={event.id} />
-                  <input type="hidden" name="occurrenceDate" value={date} />
-                  <input type="hidden" name="title" value={event.title} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
-                  <span className="text-base text-ink">{date}</span>
-                  <Button variant="secondary" className="border-0">
-                    Bring back
-                  </Button>
-                </form>
-              </li>
-            ))}
-          </ul>
+        {skippedDates.length > 0 ? <SkippedDates event={event} dates={skippedDates} returnTo={returnTo} /> : null}
+        <div className="mt-auto flex shrink-0 gap-3">
+          <Link
+            href={everyDateHref}
+            scroll={false}
+            className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board"
+          >
+            Change every date
+          </Link>
+          <CloseLink href={closeHref} label="Close" />
         </div>
-      ) : null}
-      {event.recurrence_rule ? (
-        <h3 className="mb-3 text-xl font-semibold text-ink">Every date</h3>
-      ) : null}
-      <form action={updateEvent} className="grid gap-4 sm:grid-cols-2">
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-5">
+      {summary}
+      <form id="edit-event" action={updateEvent} className="group flex min-h-0 flex-1 flex-col">
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
-        <EventFields
+        <EventCardFields
           layers={layers}
           members={members}
+          tags={tags}
           defaults={{
             title: event.title,
             layerId: event.layer_id,
-            startDate,
-            endDate,
+            date: startDate,
+            endDate: event.all_day ? endDate : undefined,
             allDay: event.all_day,
-            startTime: event.all_day ? "" : localTimeOf(start, timeZone),
-            endTime: event.all_day ? "" : localTimeOf(end, timeZone),
-            memberId: event.member_id ?? "",
+            startTime: event.all_day ? undefined : localTimeOf(start, timeZone),
+            minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
+            memberIds: event.member_ids,
+            tagIds: event.tag_ids,
             energyCost: event.energy_cost,
             visibility: event.visibility,
             notes: event.notes ?? "",
@@ -422,17 +459,47 @@ function EditEventPanel({
             repeat: parseRule(event.recurrence_rule),
           }}
         />
-        <div className="flex gap-3 sm:col-span-2">
-          <Button>{event.recurrence_rule ? "Save every date" : "Save event"}</Button>
-          <CloseLink href={closeHref} />
-        </div>
       </form>
-      <form action={removeEvent} className="mt-4">
-        <input type="hidden" name="id" value={event.id} />
-        <input type="hidden" name="title" value={event.title} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove event"}</Button>
-      </form>
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <Button form="edit-event">{event.recurrence_rule ? "Save every date" : "Save"}</Button>
+        <CloseLink href={closeHref} />
+        <form action={removeEvent} className="ml-auto">
+          <input type="hidden" name="id" value={event.id} />
+          <input type="hidden" name="title" value={event.title} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove"}</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** How many skipped dates to list before "and N more". */
+const SKIPPED_LIMIT = 6;
+
+/** Dates skipped from a repeating event, each with a way to bring it back. */
+function SkippedDates({ event, dates, returnTo }: { event: CalendarEvent; dates: string[]; returnTo: string }) {
+  const shown = dates.slice(-SKIPPED_LIMIT);
+  return (
+    <div className="shrink-0">
+      <h3 className="mb-2 text-lg font-bold text-ink">Skipped dates</h3>
+      <ul className="flex flex-wrap gap-2">
+        {shown.map((date) => (
+          <li key={date}>
+            <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
+              <input type="hidden" name="eventId" value={event.id} />
+              <input type="hidden" name="occurrenceDate" value={date} />
+              <input type="hidden" name="title" value={event.title} />
+              <input type="hidden" name="returnTo" value={returnTo} />
+              <span className="text-base text-ink">{date}</span>
+              <Button variant="secondary" className="border-0">
+                Bring back
+              </Button>
+            </form>
+          </li>
+        ))}
+      </ul>
+      {dates.length > shown.length ? <p className="mt-2 text-base text-ink-muted">and {dates.length - shown.length} earlier</p> : null}
     </div>
   );
 }
@@ -469,7 +536,7 @@ function OccurrenceControls({
   );
 
   return (
-    <div className="mb-8 rounded-[var(--radius-card)] bg-rail p-5">
+    <div className="shrink-0 rounded-[var(--radius-card)] bg-rail p-5">
       <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
       <p className="mb-4 text-base text-ink-muted">Changes here leave the rest of the dates alone.</p>
       <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
@@ -489,7 +556,7 @@ function OccurrenceControls({
           </>
         )}
         <div className="sm:col-span-3">
-          <Button variant="secondary">Move this one</Button>
+          <Button variant="secondary" className="bg-board">Move this one</Button>
         </div>
       </form>
       <div className="mt-4 flex flex-wrap gap-3">
@@ -508,14 +575,14 @@ function OccurrenceControls({
   );
 }
 
-function CloseLink({ href }: { href: string }) {
+function CloseLink({ href, label = "Cancel" }: { href: string; label?: string }) {
   return (
     <Link
       href={href}
       scroll={false}
       className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
     >
-      Cancel
+      {label}
     </Link>
   );
 }
@@ -538,4 +605,89 @@ function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household:
 
 function visibilityLabel(value: string): string {
   return VISIBILITY_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/**
+ * The tags and templates you've made, with a way to remove each. New ones
+ * are made on the add card ("New tag", and "Save as a template too").
+ */
+function TagsPanel({
+  tags,
+  templates,
+  memberById,
+  tagById,
+  returnTo,
+}: {
+  tags: TagType[];
+  templates: EventTemplate[];
+  memberById: Map<string, Member>;
+  tagById: Map<string, TagType>;
+  returnTo: string;
+}) {
+  const back = `${returnTo}&panel=tags`;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <section className="flex flex-col gap-3">
+        <h3 className="text-2xl font-bold text-ink">Tags</h3>
+        {tags.length === 0 ? <p className="text-lg text-ink-muted">No tags yet. Tap &ldquo;New tag&rdquo; when adding an event.</p> : null}
+        <ul className="grid grid-cols-2 gap-2">
+          {tags.slice(0, 16).map((t) => (
+            <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
+              <Emoji emoji={t.icon || eventEmoji(null, t.name)} className="size-8" />
+              <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{t.name}</span>
+              <form action={removeTag}>
+                <input type="hidden" name="id" value={t.id} />
+                <input type="hidden" name="name" value={t.name} />
+                <input type="hidden" name="returnTo" value={back} />
+                <RemoveButton label={`Remove the ${t.name} tag`} />
+              </form>
+            </li>
+          ))}
+        </ul>
+        {tags.length > 16 ? <p className="text-base text-ink-muted">+ {tags.length - 16} more</p> : null}
+      </section>
+      <section className="flex flex-col gap-3">
+        <h3 className="text-2xl font-bold text-ink">Templates</h3>
+        {templates.length === 0 ? (
+          <p className="text-lg text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding an event.</p>
+        ) : null}
+        <ul className="grid grid-cols-2 gap-2">
+          {templates.slice(0, 8).map((t) => {
+            const who = t.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(", ");
+            const tagNames = t.tag_ids.map((id) => tagById.get(id)?.name).filter(Boolean).join(", ");
+            const when = t.all_day ? "All day" : `${t.start_time ? `${t.start_time}, ` : ""}${lengthLabel(t.minutes)}`;
+            return (
+              <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
+                <Emoji emoji={t.icon || eventEmoji(null, t.title)} className="size-8" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-lg font-bold text-ink">{t.title}</span>
+                  <span className="truncate text-sm text-ink-muted">{[when, who, tagNames].filter(Boolean).join(" · ")}</span>
+                </span>
+                <form action={removeTemplate}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <input type="hidden" name="name" value={t.title} />
+                  <input type="hidden" name="returnTo" value={back} />
+                  <RemoveButton label={`Remove the ${t.title} template`} />
+                </form>
+              </li>
+            );
+          })}
+        </ul>
+        {templates.length > 8 ? <p className="text-base text-ink-muted">+ {templates.length - 8} more</p> : null}
+      </section>
+    </div>
+  );
+}
+
+function RemoveButton({ label }: { label: string }) {
+  return (
+    <button
+      type="submit"
+      aria-label={label}
+      title={label}
+      className="flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-danger"
+    >
+      <Trash size="1.5rem" aria-hidden />
+    </button>
+  );
 }

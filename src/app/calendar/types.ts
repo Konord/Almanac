@@ -7,7 +7,23 @@ export type Layer = {
   visibility: string;
 };
 
-export type Member = { id: string; name: string; colour: string };
+export type Member = { id: string; name: string; colour: string; icon: string | null };
+
+/** A label stuck on events, like Work or Work from home. */
+export type Tag = { id: string; name: string; icon: string | null };
+
+/** A ready-made event, like Court. */
+export type EventTemplate = {
+  id: string;
+  title: string;
+  icon: string | null;
+  start_time: string | null;
+  minutes: number;
+  all_day: boolean;
+  member_ids: string[];
+  tag_ids: string[];
+  notes: string | null;
+};
 
 export type CalendarEvent = {
   id: string;
@@ -16,7 +32,8 @@ export type CalendarEvent = {
   starts_at: string;
   ends_at: string;
   all_day: boolean;
-  member_id: string | null;
+  /** Who it's for; empty means everyone. */
+  member_ids: string[];
   energy_cost: number;
   visibility: string;
   notes: string | null;
@@ -24,6 +41,7 @@ export type CalendarEvent = {
   recurrence_rule: string | null;
   /** One emoji, or null to guess one from the title. */
   icon: string | null;
+  tag_ids: string[];
 };
 
 /** One occurrence on the calendar: a one-off event, or one date of a series. */

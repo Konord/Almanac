@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Emoji } from "@/components/ui";
-import { EVERYONE_COLOUR, soft } from "@/lib/colours";
+import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import type { Household } from "@/lib/household";
 import { layoutDay, monthOf } from "@/lib/calendar-layout";
@@ -8,6 +8,10 @@ import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@
 import type { DayProfile } from "@/lib/day-profile";
 import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Member } from "./types";
+import type { QuickDefaults } from "./forms";
+import { PlaceOnTimeline } from "@/components/place-on-timeline";
+import { DraggableEvent } from "@/components/draggable-event";
+import { PendingBlock } from "@/components/pending-block";
 
 type ViewProps = {
   household: Household;
@@ -19,11 +23,25 @@ type ViewProps = {
   href: (changes: Record<string, string | null>) => string;
   /** Each day's free/busy profile. */
   profiles: Map<LocalDate, DayProfile>;
+  /** Adding by placing: whether we're in adding mode, and the event being added. */
+  adding?: Adding;
 };
 
-/** Each event takes its person's colour; events for nobody in particular are "everyone" orange. */
-export function eventColour(event: CalendarItem, memberById: Map<string, Member>): string {
-  return (event.member_id ? memberById.get(event.member_id)?.colour : undefined) ?? EVERYONE_COLOUR;
+export type Adding = {
+  placing: boolean;
+  pending: QuickDefaults | null;
+  /** Where tapping a day goes while adding. */
+  addHref: (day: LocalDate, extra?: Record<string, string>) => string;
+};
+
+/**
+ * Each event takes its (first) person's colour; events for nobody in particular
+ * are "everyone" orange. On Today, pass the column's person so an event for
+ * two people takes each one's colour in their own column.
+ */
+export function eventColour(event: CalendarItem, memberById: Map<string, Member>, column?: string): string {
+  const id = column && event.member_ids.includes(column) ? column : event.member_ids.find((m) => memberById.has(m));
+  return (id ? memberById.get(id)?.colour : undefined) ?? EVERYONE_COLOUR;
 }
 
 function dayBounds(day: LocalDate, timeZone: string) {
@@ -149,26 +167,37 @@ export function EventBlock({
   style,
   big = false,
   narrow = false,
+  drag,
+  colours,
 }: {
   event: CalendarItem;
   colour: string;
   household: Household;
   href: string;
   style: React.CSSProperties;
+  /** Makes the block draggable on a timeline. */
+  drag?: {
+    day: LocalDate;
+    /** On Today: the person columns, and which of them this bubble covers. */
+    people?: { columns: string[]; run: string[]; gap: string };
+    start: number;
+    minutes: number;
+    first: number;
+    last: number;
+  };
+  /** A bubble shared by several people fades from one person's colour to the next. */
+  colours?: string[];
   big?: boolean;
   /** Squeezed in beside two or more others: just the picture and a clipped title. */
   narrow?: boolean;
 }) {
-  return (
-    <Link
-      href={href}
-      scroll={false}
-      className={`absolute flex overflow-hidden text-left text-ink ${
-        big ? "items-start gap-2 rounded-2xl px-2.5 py-2" : "flex-col gap-px rounded-[0.875rem] px-2 py-1.25"
-      }`}
-      style={{ ...style, background: soft(colour) }}
-      title={`${event.title}, ${timeRange(event, household)}`}
-    >
+  const className = `absolute flex overflow-hidden text-left text-ink ${
+    big ? "items-start gap-2 rounded-2xl px-2.5 py-2" : "flex-col gap-px rounded-[0.875rem] px-2 py-1.25"
+  }`;
+  const title = `${event.title}, ${timeRange(event, household)}`;
+  const background = colours && colours.length > 1 ? `linear-gradient(to right, ${colours.map(soft).join(", ")})` : soft(colour);
+  const content = (
+    <>
       {narrow ? (
         <>
           <Emoji emoji={eventEmoji(event.icon, event.title)} className="size-6" />
@@ -196,6 +225,35 @@ export function EventBlock({
           </span>
         </>
       )}
+    </>
+  );
+  if (drag) {
+    // Drawn by a small browser-side component so it can follow your finger.
+    const { top: _top, height: _height, ...rest } = style;
+    void _top;
+    void _height;
+    return (
+      <DraggableEvent
+        href={href}
+        eventId={event.series_id}
+        occurrenceDate={event.occurrence_date}
+        day={drag.day}
+        people={drag.people}
+        start={drag.start}
+        minutes={drag.minutes}
+        first={drag.first}
+        last={drag.last}
+        className={className}
+        style={{ ...rest, background }}
+        title={title}
+      >
+        {content}
+      </DraggableEvent>
+    );
+  }
+  return (
+    <Link href={href} scroll={false} className={className} style={{ ...style, background }} title={title}>
+      {content}
     </Link>
   );
 }
@@ -211,7 +269,10 @@ export function DayBlocks({
   linkFor,
   big = false,
   colourFor,
+  draggable,
 }: {
+  /** Lets you drag the blocks to move or stretch them. */
+  draggable?: object;
   events: CalendarItem[];
   day: LocalDate;
   first: number;
@@ -249,6 +310,11 @@ export function DayBlocks({
             href={linkFor(event)}
             big={big}
             narrow={!big && block.lanes >= 3}
+            drag={
+              draggable
+                ? { day, start: block.startMin, minutes: block.endMin - block.startMin, first, last }
+                : undefined
+            }
             style={{
               top: `calc(${top}% + ${gap})`,
               height: `calc(${height}% - 2 * ${gap})`,
@@ -271,7 +337,7 @@ export function nowPercent(now: Date, first: number, last: number, timeZone: str
 // Week view
 // ---------------------------------------------------------------------------
 
-export function WeekView({ household, days, today, events, memberById, href, profiles }: ViewProps) {
+export function WeekView({ household, days, today, events, memberById, href, profiles, adding }: ViewProps) {
   const { timeZone } = household.settings;
   const { first, last } = timelineRange(events, days, timeZone);
   const now = new Date();
@@ -291,9 +357,9 @@ export function WeekView({ household, days, today, events, memberById, href, pro
             return (
               <div key={day} className="flex min-w-0 flex-1 basis-0 flex-col gap-2 px-1">
                 <Link
-                  href={href({ add: day, edit: null, panel: null })}
+                  href={adding ? adding.addHref(day, { allday: "1" }) : href({ add: day, allday: "1", edit: null, panel: null })}
                   scroll={false}
-                  title="Add something on this day"
+                  title="Add an all-day event on this day"
                   className="flex h-12.5 items-center gap-2 rounded-xl pl-2.5 text-2xl font-bold text-ink hover:bg-rail lg:text-3xl"
                 >
                   {weekdayLabel(day, household)}
@@ -344,6 +410,7 @@ export function WeekView({ household, days, today, events, memberById, href, pro
           {days.map((day) => (
             <div
               key={day}
+              data-drop-day={day}
               className={`relative min-w-0 flex-1 basis-0 border-l border-panel ${day === today ? "bg-[#FCFCFD]" : ""}`}
             >
               <DayBlocks
@@ -354,9 +421,21 @@ export function WeekView({ household, days, today, events, memberById, href, pro
                 household={household}
                 memberById={memberById}
                 linkFor={editLink}
+                draggable={{}}
               />
               {day === today ? (
                 <NowLine percent={nowPercent(now, first, last, timeZone)} label={`Now, ${shortTime(now, household)}`} />
+              ) : null}
+              <PendingBlock day={day} first={first} last={last} />
+              {adding?.placing || adding?.pending ? (
+                <PlaceOnTimeline
+                  moveTo={adding.pending ? { day } : undefined}
+                  href={adding.addHref(day)}
+                  first={first}
+                  last={last}
+                  defaultMinutes={household.settings.defaultEventMinutes}
+                  label={`Add an event on ${weekdayLabel(day, household, "long")}`}
+                />
               ) : null}
             </div>
           ))}
@@ -370,8 +449,10 @@ export function WeekView({ household, days, today, events, memberById, href, pro
 // Month view
 // ---------------------------------------------------------------------------
 
-/** How many things a month cell lists before "+ N more". */
+/** How many timed events a month cell lists before "+ N more". */
 const MONTH_CELL_LIMIT = 4;
+/** How many stickers fit beside the date number. */
+const MONTH_STICKER_LIMIT = 4;
 
 export function MonthView({
   household,
@@ -382,6 +463,7 @@ export function MonthView({
   href,
   profiles,
   anchor,
+  adding,
 }: ViewProps & { anchor: LocalDate }) {
   const { timeZone } = household.settings;
   const month = monthOf(anchor);
@@ -401,23 +483,35 @@ export function MonthView({
         style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}
       >
         {days.map((day, i) => {
-          const dayEvents = eventsOnDay(events, day, timeZone).sort((a, b) => {
-            const aAll = isAllDayStyle(a, timeZone) ? 0 : 1;
-            const bAll = isAllDayStyle(b, timeZone) ? 0 : 1;
-            return aAll - bAll || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
-          });
-          const shown = dayEvents.slice(0, MONTH_CELL_LIMIT);
-          const more = dayEvents.length - shown.length;
+          // Connor's sketch (2026-11-05): all-day things are stickers beside the date;
+          // timed events are lines of picture, title in the person's colour, and time.
+          const dayEvents = eventsOnDay(events, day, timeZone);
+          const stickers = dayEvents.filter((e) => isAllDayStyle(e, timeZone));
+          const timed = dayEvents
+            .filter((e) => !isAllDayStyle(e, timeZone))
+            .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+          const shownStickers = stickers.slice(0, MONTH_STICKER_LIMIT);
+          const shown = timed.slice(0, MONTH_CELL_LIMIT);
+          const more = timed.length - shown.length + stickers.length - shownStickers.length;
+          const editHref = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
           const inMonth = monthOf(day) === month;
           const profile = profiles.get(day);
           return (
             <div
               key={day}
-              className={`flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden border-frame p-1.5 ${i % 7 === 0 ? "" : "border-l"} ${
+              className={`relative flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden border-frame p-1.5 ${i % 7 === 0 ? "" : "border-l"} ${
                 i >= 7 ? "border-t" : ""
-              } ${inMonth ? "bg-board" : "bg-rail"}`}
+              } ${inMonth ? "bg-board" : "bg-rail"} ${adding?.pending?.date === day ? "outline-3 -outline-offset-3 outline-accent" : ""}`}
             >
-              <div className="flex shrink-0 items-center justify-between gap-1">
+              {adding?.placing ? (
+                <Link
+                  href={adding.addHref(day, { allday: "1" })}
+                  scroll={false}
+                  aria-label={`Add an event on ${weekdayLabel(day, household, "long")} ${Number(day.slice(8))}`}
+                  className="absolute inset-0 z-10 hover:bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
+                />
+              ) : null}
+              <div className="flex shrink-0 items-center gap-1">
                 <Link
                   href={href({
                     view: "week",
@@ -433,28 +527,30 @@ export function MonthView({
                 >
                   {Number(day.slice(8))}
                 </Link>
-                {inMonth && profile && profile.kind !== "free" ? <ProfileTag kind={profile.kind} /> : null}
+                {shownStickers.map((e) => (
+                  <Link key={e.id} href={editHref(e)} scroll={false} title={e.title} aria-label={`${e.title}, all day`} className="shrink-0">
+                    <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-8" />
+                  </Link>
+                ))}
+                {inMonth && profile && profile.kind !== "free" ? (
+                  <span className="ml-auto">
+                    <ProfileTag kind={profile.kind} />
+                  </span>
+                ) : null}
               </div>
               {shown.map((e) => (
                 <Link
                   key={e.id}
-                  href={href({
-                    edit: e.series_id,
-                    occ: e.occurrence_date,
-                    add: null,
-                    panel: null,
-                  })}
+                  href={editHref(e)}
                   scroll={false}
-                  className="flex min-h-0 shrink items-center gap-1.5 overflow-hidden rounded-lg px-1.5 py-0.5 text-sm font-bold text-ink"
-                  style={{ background: soft(eventColour(e, memberById)) }}
+                  title={`${e.title}, ${timeRange(e, household)}`}
+                  className="flex min-h-0 shrink items-center gap-1.5 overflow-hidden px-1 text-base font-bold"
                 >
-                  <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-5.5" />
-                  {isAllDayStyle(e, timeZone) ? null : (
-                    <span className="shrink-0 font-semibold text-ink-soft">
-                      {shortTime(new Date(e.starts_at), household)}
-                    </span>
-                  )}
-                  <span className="truncate">{e.title}</span>
+                  <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
+                  <span className="min-w-0 truncate" style={{ color: strong(eventColour(e, memberById)) }}>
+                    {e.title}
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-ink-soft">{shortTime(new Date(e.starts_at), household)}</span>
                 </Link>
               ))}
               {more > 0 ? (

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addMonths, dayOfWeek, layoutDay, monthGridDays, startOfWeek, weekDays } from "./calendar-layout.ts";
+import { addMonths, dayOfWeek, layoutDay, layoutSpans, memberRuns, monthGridDays, startOfWeek, weekDays } from "./calendar-layout.ts";
 
 test("finds the day of the week", () => {
   assert.equal(dayOfWeek("2026-11-04"), 3); // Wednesday
@@ -52,4 +52,26 @@ test("overlapping events sit side by side", () => {
   assert.deepEqual(byId.b, [1, 2]);
   assert.deepEqual(byId.c, [1, 2]); // reuses b's lane once b ends
   assert.deepEqual(byId.d, [0, 1]); // a separate group later in the day
+});
+
+test("an event's people make runs of neighbouring columns", () => {
+  const cols = ["mom", "ava", "dad", "sam"];
+  assert.deepEqual(memberRuns(["mom", "ava"], cols), [[0, 1]]);
+  assert.deepEqual(memberRuns(["mom", "dad"], cols), [[0, 0], [2, 2]]);
+  assert.deepEqual(memberRuns([], cols), [[0, 3]]);
+  assert.deepEqual(memberRuns(["gone"], cols), [[0, 3]]);
+  assert.deepEqual(memberRuns(["sam", "dad", "ava"], cols), [[1, 3]]);
+});
+
+test("spanning blocks share lanes only where they meet", () => {
+  const placed = layoutSpans([
+    { id: "karate", startMin: 600, endMin: 660, c0: 0, c1: 1 },
+    { id: "soccer", startMin: 600, endMin: 660, c0: 2, c1: 3 },
+    { id: "dentist", startMin: 630, endMin: 690, c0: 1, c1: 1 },
+  ]);
+  const by = Object.fromEntries(placed.map((p) => [p.id, p]));
+  assert.equal(by.soccer.lanes, 1);
+  assert.equal(by.karate.lanes, 2);
+  assert.equal(by.dentist.lanes, 2);
+  assert.notEqual(by.karate.lane, by.dentist.lane);
 });
