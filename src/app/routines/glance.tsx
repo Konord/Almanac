@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { Alarm } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Card, Emoji, ProgressBar } from "@/components/ui";
 import type { Household } from "@/lib/household";
 import { glanceRoutine, hhmm, isLate, kindForTime } from "@/lib/routines";
@@ -20,7 +20,7 @@ export function RoutinesGlance({ data, date, household, className = "" }: { data
   return (
     <Card
       title="Routines"
-      icon={ListChecks}
+      icon={Alarm}
       tint="teal"
       className={className}
       aside={
