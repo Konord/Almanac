@@ -1,5 +1,5 @@
-import { Field, Input, Select } from "@/components/ui";
-import { PERSON_COLOURS } from "@/lib/colours";
+import { Avatar, Chips, Field, Input, Select } from "@/components/ui";
+import { PERSON_COLOURS, strong } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import type { Layer, Member, SavedView } from "./types";
@@ -23,71 +23,97 @@ export type EventDefaults = {
 };
 
 export function EventFields({ layers, members, defaults }: { layers: Layer[]; members: Member[]; defaults: EventDefaults }) {
+  const repeat = defaults.repeat;
+  // Open "More options" straight away if this event already uses any of them.
+  const usesMore = Boolean(
+    defaults.icon ||
+      defaults.notes ||
+      (defaults.endDate && defaults.endDate !== defaults.startDate) ||
+      (defaults.energyCost ?? 1) !== 1 ||
+      (defaults.visibility ?? "everyone") !== "everyone" ||
+      (repeat && repeat.frequency !== "none" && (repeat.interval > 1 || repeat.weekdays.length > 0 || repeat.end !== "never")),
+  );
+
   return (
     <>
       <Field label="What">
-        <Input name="title" defaultValue={defaults.title} required maxLength={120} />
-      </Field>
-      <Field label="Picture" hint="One emoji, like 🦷 or 🏒. Leave blank to let Almanac pick from the title.">
-        <Input name="icon" defaultValue={defaults.icon} maxLength={8} placeholder="🗓️" />
-      </Field>
-      <Field label="Layer">
-        <Select name="layerId" defaultValue={defaults.layerId ?? layers[0]?.id}>
-          {layers.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </Select>
+        <Input name="title" defaultValue={defaults.title} required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus={!defaults.title} />
       </Field>
       <Field label="Date">
         <Input name="startDate" type="date" defaultValue={defaults.startDate} required />
       </Field>
-      <Field label="Ends on" hint="Leave blank if it's the same day.">
-        <Input name="endDate" type="date" defaultValue={defaults.endDate === defaults.startDate ? "" : defaults.endDate} />
-      </Field>
-      <Field label="Starts at">
-        <Input name="startTime" type="time" defaultValue={defaults.startTime} />
-      </Field>
-      <Field label="Ends at">
-        <Input name="endTime" type="time" defaultValue={defaults.endTime} />
-      </Field>
-      <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-2">
-        <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-6 accent-accent" />
-        All day (times are ignored)
-      </label>
-      <RepeatFields repeat={defaults.repeat} />
-      <Field label="Who it's for" hint="Optional.">
-        <Select name="memberId" defaultValue={defaults.memberId ?? ""}>
-          <option value="">Nobody in particular</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Energy cost" hint="How draining it is. Busy days are worked out from this later.">
-        <Select name="energyCost" defaultValue={String(defaults.energyCost ?? 1)}>
-          {ENERGY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Who can see it">
-        <Select name="visibility" defaultValue={defaults.visibility ?? "everyone"}>
-          {VISIBILITY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Notes" hint="Optional.">
-        <Input name="notes" defaultValue={defaults.notes} maxLength={2000} />
-      </Field>
+      <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+        <Field label="Starts at" hint="Leave both times blank for all day.">
+          <Input name="startTime" type="time" defaultValue={defaults.allDay ? "" : defaults.startTime} />
+        </Field>
+        <Field label="Ends at" hint="Optional.">
+          <Input name="endTime" type="time" defaultValue={defaults.allDay ? "" : defaults.endTime} />
+        </Field>
+      </div>
+      <Chips
+        name="memberId"
+        label="Who it's for"
+        className="sm:col-span-2"
+        defaultValue={defaults.memberId ?? ""}
+        options={[
+          { value: "", label: "Everyone" },
+          ...members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} size="sm" /> })),
+        ]}
+      />
+      {layers.length > 1 ? (
+        <Chips
+          name="layerId"
+          label="Layer"
+          className="sm:col-span-2"
+          defaultValue={defaults.layerId ?? layers[0]?.id}
+          options={layers.map((l) => ({
+            value: l.id,
+            label: l.name,
+            leading: <span aria-hidden className="size-4 rounded-full" style={{ background: strong(l.colour) }} />,
+          }))}
+        />
+      ) : (
+        <input type="hidden" name="layerId" value={layers[0]?.id ?? ""} />
+      )}
+      <Chips
+        name="repeatFrequency"
+        label="Repeats"
+        className="sm:col-span-2"
+        defaultValue={repeat?.frequency ?? "none"}
+        options={[
+          { value: "none", label: "No" },
+          { value: "daily", label: "Daily" },
+          { value: "weekly", label: "Weekly" },
+          { value: "monthly", label: "Monthly" },
+          { value: "yearly", label: "Yearly" },
+        ]}
+      />
+      <details open={usesMore} className="group rounded-[var(--radius-card)] border border-frame px-4 sm:col-span-2">
+        <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-ink">
+          More options
+          <span className="ml-2 font-normal text-ink-muted">picture, several days, repeat details, energy, who sees it, notes</span>
+        </summary>
+        <div className="grid gap-4 pb-4 sm:grid-cols-2">
+          <Field label="Picture" hint="One emoji, like 🦷 or 🏒. Leave blank to let Almanac pick from the title.">
+            <Input name="icon" defaultValue={defaults.icon} maxLength={8} placeholder="🗓️" />
+          </Field>
+          <Field label="Ends on" hint="Only for events over several days.">
+            <Input name="endDate" type="date" defaultValue={defaults.endDate === defaults.startDate ? "" : defaults.endDate} />
+          </Field>
+          <RepeatDetails repeat={repeat} />
+          <Chips
+            name="energyCost"
+            label="Energy cost"
+            className="sm:col-span-2"
+            defaultValue={String(defaults.energyCost ?? 1)}
+            options={ENERGY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
+          />
+          <Chips name="visibility" label="Who can see it" className="sm:col-span-2" defaultValue={defaults.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
+          <Field label="Notes" hint="Optional.">
+            <Input name="notes" defaultValue={defaults.notes} maxLength={2000} />
+          </Field>
+        </div>
+      </details>
     </>
   );
 }
@@ -141,52 +167,33 @@ export function LayerFields({ layer, members }: { layer?: Layer; members: Member
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** "Repeats" choices, turned into an RRULE by the server action. */
-function RepeatFields({ repeat }: { repeat?: RepeatOptions }) {
+/** The finer repeat choices (how often lives in the chips above). Turned into an RRULE by the server action. */
+function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
   return (
-    <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2 sm:grid-cols-2">
-      <legend className="px-1 text-base font-medium text-ink">Repeats</legend>
-      <Field label="How often">
-        <Select name="repeatFrequency" defaultValue={repeat?.frequency ?? "none"}>
-          <option value="none">Doesn&apos;t repeat</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly (same date)</option>
-          <option value="yearly">Yearly</option>
-        </Select>
-      </Field>
-      <Field label="Every" hint="1 = every week, 2 = every other week, and so on.">
+    <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2 sm:grid-cols-[10rem_1fr]">
+      <legend className="px-1 text-base font-bold text-ink">Repeat details</legend>
+      <Field label="Every" hint="2 = every other week, and so on.">
         <Input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} />
       </Field>
-      <div className="flex flex-col gap-1.5 sm:col-span-2">
-        <span className="text-base font-medium text-ink">On these days (weekly only)</span>
-        <div className="flex flex-wrap gap-2">
-          {WEEKDAY_LABELS.map((label, i) => (
-            <label
-              key={label}
-              className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base text-ink"
-            >
-              <input
-                type="checkbox"
-                name="repeatWeekdays"
-                value={i}
-                defaultChecked={repeat?.weekdays.includes(i)}
-                className="size-5 accent-accent"
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <span className="text-sm text-ink-muted">Leave all unticked to use the event&apos;s own day.</span>
-      </div>
-      <Field label="Ends">
-        <Select name="repeatEnd" defaultValue={repeat?.end ?? "never"}>
-          <option value="never">Never</option>
-          <option value="on">On a date</option>
-          <option value="after">After a number of times</option>
-        </Select>
-      </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <Chips
+        name="repeatWeekdays"
+        label="On these days (weekly only)"
+        multiple
+        defaultValue={(repeat?.weekdays ?? []).map(String)}
+        options={WEEKDAY_LABELS.map((label, i) => ({ value: String(i), label }))}
+      />
+      <Chips
+        name="repeatEnd"
+        label="Stops"
+        defaultValue={repeat?.end ?? "never"}
+        className="sm:col-span-2"
+        options={[
+          { value: "never", label: "Never" },
+          { value: "on", label: "On a date" },
+          { value: "after", label: "After a number of times" },
+        ]}
+      />
+      <div className="grid grid-cols-2 gap-4 sm:col-span-2">
         <Field label="End date">
           <Input name="repeatUntil" type="date" defaultValue={repeat?.until ?? ""} />
         </Field>

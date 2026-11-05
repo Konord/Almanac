@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isPersonColour } from "@/lib/colours";
-import { requireHousehold } from "@/lib/household";
+import { requireHousehold, type HouseholdSettings } from "@/lib/household";
+import { fillTimes } from "@/lib/quick-times";
 import { createClient } from "@/lib/supabase/server";
 import { buildRule, isValidRule, type RepeatEnd, type RepeatFrequency } from "@/lib/recurrence";
 import { addDays, isLocalDate, isLocalTime, zonedToUtc } from "@/lib/time";
@@ -113,35 +114,42 @@ export async function removeLayer(formData: FormData) {
 // Events
 // ---------------------------------------------------------------------------
 
-function readEvent(formData: FormData, timeZone: string) {
+function readEvent(formData: FormData, settings: HouseholdSettings) {
+  const timeZone = settings.timeZone;
   const title = text(formData, "title");
   const layerId = text(formData, "layerId");
   const startDate = text(formData, "startDate");
-  const endDate = text(formData, "endDate") || startDate;
-  const allDay = formData.get("allDay") === "on";
-  const startTime = text(formData, "startTime");
-  const endTime = text(formData, "endTime");
-  const energyCost = Number(text(formData, "energyCost"));
-  const visibility = text(formData, "visibility");
+  const energyCost = Number(text(formData, "energyCost") || "1");
+  const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
   const icon = text(formData, "icon");
 
   if (!title) back(formData, "error", "An event needs a title.");
   if (!layerId) back(formData, "error", "Choose a layer.");
-  if (!isLocalDate(startDate) || !isLocalDate(endDate)) back(formData, "error", "Check the dates.");
-  if (endDate < startDate) back(formData, "error", "The end date is before the start date.");
-  if (!allDay && (!isLocalTime(startTime) || !isLocalTime(endTime))) {
-    back(formData, "error", "Add a start and end time, or tick All day.");
-  }
+  const endDateInput = text(formData, "endDate") || startDate;
+  if (!isLocalDate(startDate) || !isLocalDate(endDateInput)) back(formData, "error", "Check the dates.");
+  if (endDateInput < startDate) back(formData, "error", "The end date is before the start date.");
+  // Blank times mean all day; a start time alone gets the usual length.
+  const times = fillTimes({
+    allDay: formData.get("allDay") === "on",
+    startDate,
+    endDate: endDateInput,
+    startTime: text(formData, "startTime"),
+    endTime: text(formData, "endTime"),
+    defaultMinutes: settings.defaultEventMinutes,
+  });
+  if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
   if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🦷.");
   if (![0, 1, 2, 3].includes(energyCost)) back(formData, "error", "Choose an energy cost.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
+  const allDay = times.allDay;
+  const endDate = times.allDay ? endDateInput : times.endDate;
   // All-day events run from midnight on the start date to midnight after the end date.
-  const startsAt = allDay ? zonedToUtc(startDate, "00:00", timeZone) : zonedToUtc(startDate, startTime, timeZone);
-  const endsAt = allDay
+  const startsAt = times.allDay ? zonedToUtc(startDate, "00:00", timeZone) : zonedToUtc(startDate, times.startTime, timeZone);
+  const endsAt = times.allDay
     ? zonedToUtc(addDays(endDate, 1), "00:00", timeZone)
-    : zonedToUtc(endDate, endTime, timeZone);
+    : zonedToUtc(endDate, times.endTime, timeZone);
   if (endsAt < startsAt) back(formData, "error", "The event ends before it starts.");
 
   const recurrenceRule = readRepeat(formData, startDate);
@@ -194,7 +202,7 @@ function readRepeat(formData: FormData, startDate: string): string | null {
 
 export async function addEvent(formData: FormData) {
   const household = await requireHousehold();
-  const event = readEvent(formData, household.settings.timeZone);
+  const event = readEvent(formData, household.settings);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("events")
@@ -210,7 +218,7 @@ export async function addEvent(formData: FormData) {
 export async function updateEvent(formData: FormData) {
   const household = await requireHousehold();
   const id = text(formData, "id");
-  const event = readEvent(formData, household.settings.timeZone);
+  const event = readEvent(formData, household.settings);
   const supabase = await createClient();
   const { error } = await supabase.from("events").update(event).eq("id", id);
   if (error) back(formData, "error", error.message);

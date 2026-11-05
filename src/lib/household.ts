@@ -21,6 +21,8 @@ export type HouseholdSettings = {
   handwriting: boolean;
   /** What counts as a free or busy day (see src/lib/day-profile.ts). */
   dayProfile: DayProfileSettings;
+  /** How long a new event lasts when only a start time is given. */
+  defaultEventMinutes: number;
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   activeTheme: "bright",
   handwriting: true,
   dayProfile: DEFAULT_DAY_PROFILE,
+  defaultEventMinutes: 60,
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -55,6 +58,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     activeTheme: pick("activeTheme", (v) => typeof v === "string" && v.length > 0),
     handwriting: pick("handwriting", (v) => typeof v === "boolean"),
     dayProfile: parseDayProfile(value.dayProfile),
+    defaultEventMinutes: pick("defaultEventMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 5 && v <= 24 * 60),
   };
 }
 

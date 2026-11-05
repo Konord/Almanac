@@ -294,3 +294,52 @@ export function Notice({ tone, children }: { tone: "error" | "success"; children
 export function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
+
+export type ChipOption = { value: string; label: string; leading?: ReactNode };
+
+/**
+ * A row of big tappable choices, used instead of a dropdown so picking
+ * something on a touch screen is one tap. Underneath they're ordinary
+ * radio buttons (pick one) or checkboxes (pick several), so forms work
+ * without any extra code.
+ */
+export function Chips({
+  name,
+  label,
+  options,
+  defaultValue,
+  multiple = false,
+  className = "",
+}: {
+  name: string;
+  label: string;
+  options: readonly ChipOption[];
+  defaultValue?: string | readonly string[];
+  multiple?: boolean;
+  className?: string;
+}) {
+  const chosen = new Set(Array.isArray(defaultValue) ? defaultValue : defaultValue === undefined ? [] : [defaultValue]);
+  return (
+    <fieldset className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      <legend className="mb-1.5 text-base font-bold text-ink">{label}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <label
+            key={o.value}
+            className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent"
+          >
+            <input
+              type={multiple ? "checkbox" : "radio"}
+              name={name}
+              value={o.value}
+              defaultChecked={chosen.has(o.value)}
+              className="sr-only"
+            />
+            {o.leading}
+            {o.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
