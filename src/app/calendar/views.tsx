@@ -10,6 +10,8 @@ import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Member } from "./types";
 import type { QuickDefaults } from "./forms";
 import { PlaceOnTimeline } from "@/components/place-on-timeline";
+import { DraggableEvent } from "@/components/draggable-event";
+import { PendingBlock } from "@/components/pending-block";
 
 type ViewProps = {
   household: Household;
@@ -160,26 +162,25 @@ export function EventBlock({
   style,
   big = false,
   narrow = false,
+  drag,
 }: {
   event: CalendarItem;
   colour: string;
   household: Household;
   href: string;
   style: React.CSSProperties;
+  /** Makes the block draggable on a timeline. */
+  drag?: { day: LocalDate; member?: string; start: number; minutes: number; first: number; last: number };
   big?: boolean;
   /** Squeezed in beside two or more others: just the picture and a clipped title. */
   narrow?: boolean;
 }) {
-  return (
-    <Link
-      href={href}
-      scroll={false}
-      className={`absolute flex overflow-hidden text-left text-ink ${
-        big ? "items-start gap-2 rounded-2xl px-2.5 py-2" : "flex-col gap-px rounded-[0.875rem] px-2 py-1.25"
-      }`}
-      style={{ ...style, background: soft(colour) }}
-      title={`${event.title}, ${timeRange(event, household)}`}
-    >
+  const className = `absolute flex overflow-hidden text-left text-ink ${
+    big ? "items-start gap-2 rounded-2xl px-2.5 py-2" : "flex-col gap-px rounded-[0.875rem] px-2 py-1.25"
+  }`;
+  const title = `${event.title}, ${timeRange(event, household)}`;
+  const content = (
+    <>
       {narrow ? (
         <>
           <Emoji emoji={eventEmoji(event.icon, event.title)} className="size-6" />
@@ -207,6 +208,35 @@ export function EventBlock({
           </span>
         </>
       )}
+    </>
+  );
+  if (drag) {
+    // Drawn by a small browser-side component so it can follow your finger.
+    const { top: _top, height: _height, ...rest } = style;
+    void _top;
+    void _height;
+    return (
+      <DraggableEvent
+        href={href}
+        eventId={event.series_id}
+        occurrenceDate={event.occurrence_date}
+        day={drag.day}
+        member={drag.member}
+        start={drag.start}
+        minutes={drag.minutes}
+        first={drag.first}
+        last={drag.last}
+        className={className}
+        style={{ ...rest, background: soft(colour) }}
+        title={title}
+      >
+        {content}
+      </DraggableEvent>
+    );
+  }
+  return (
+    <Link href={href} scroll={false} className={className} style={{ ...style, background: soft(colour) }} title={title}>
+      {content}
     </Link>
   );
 }
@@ -222,7 +252,10 @@ export function DayBlocks({
   linkFor,
   big = false,
   colourFor,
+  draggable,
 }: {
+  /** Lets you drag the blocks to move or stretch them; member is the Today column. */
+  draggable?: { member?: string };
   events: CalendarItem[];
   day: LocalDate;
   first: number;
@@ -260,6 +293,11 @@ export function DayBlocks({
             href={linkFor(event)}
             big={big}
             narrow={!big && block.lanes >= 3}
+            drag={
+              draggable
+                ? { day, member: draggable.member, start: block.startMin, minutes: block.endMin - block.startMin, first, last }
+                : undefined
+            }
             style={{
               top: `calc(${top}% + ${gap})`,
               height: `calc(${height}% - 2 * ${gap})`,
@@ -276,21 +314,6 @@ export function DayBlocks({
 /** Where "now" sits on a timeline, as a percentage (outside 0–100 when off the timeline). */
 export function nowPercent(now: Date, first: number, last: number, timeZone: string): number {
   return ((minutesIntoDay(now, timeZone) - first * 60) / ((last - first) * 60)) * 100;
-}
-
-/** A dashed outline where the event you're adding will go. */
-export function PendingBlock({ pending, day, first, last }: { pending: QuickDefaults | null | undefined; day: LocalDate; first: number; last: number }) {
-  if (!pending || pending.date !== day || pending.allDay || !pending.startTime) return null;
-  const [h, m] = pending.startTime.split(":").map(Number);
-  const span = (last - first) * 60;
-  const top = ((h * 60 + m - first * 60) / span) * 100;
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-x-1 z-10 rounded-[0.875rem] border-2 border-dashed border-accent bg-[color-mix(in_srgb,var(--color-accent)_12%,white)]"
-      style={{ top: `${top}%`, height: `${(pending.minutes / span) * 100}%` }}
-    />
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +393,7 @@ export function WeekView({ household, days, today, events, memberById, href, pro
           {days.map((day) => (
             <div
               key={day}
+              data-drop-day={day}
               className={`relative min-w-0 flex-1 basis-0 border-l border-panel ${day === today ? "bg-[#FCFCFD]" : ""}`}
             >
               <DayBlocks
@@ -380,13 +404,15 @@ export function WeekView({ household, days, today, events, memberById, href, pro
                 household={household}
                 memberById={memberById}
                 linkFor={editLink}
+                draggable={{}}
               />
               {day === today ? (
                 <NowLine percent={nowPercent(now, first, last, timeZone)} label={`Now, ${shortTime(now, household)}`} />
               ) : null}
-              <PendingBlock pending={adding?.pending} day={day} first={first} last={last} />
-              {adding?.placing ? (
+              <PendingBlock day={day} first={first} last={last} />
+              {adding?.placing || adding?.pending ? (
                 <PlaceOnTimeline
+                  moveTo={adding.pending ? { day } : undefined}
                   href={adding.addHref(day)}
                   first={first}
                   last={last}

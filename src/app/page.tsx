@@ -29,11 +29,11 @@ import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
 import { PlaceOnTimeline } from "@/components/place-on-timeline";
+import { PendingBlock } from "@/components/pending-block";
 import type { QuickDefaults } from "./calendar/forms";
 import {
   DayBlocks,
   HourLines,
-  PendingBlock,
   NowLine,
   eventsOnDay,
   isAllDayStyle,
@@ -283,7 +283,7 @@ function PeopleTimeline({
         <div className="relative mt-6.5 mb-1 flex min-h-0 flex-1 gap-2.5 pl-16.5">
           <HourLines first={first} last={last} />
           {columns.map((c) => (
-            <div key={c.id} className="relative min-w-0 flex-1 basis-0">
+            <div key={c.id} data-drop-day={today} data-drop-member={c.id} className="relative min-w-0 flex-1 basis-0">
               {(routinesFor.get(c.id) ?? []).map((r) => (
                 <RoutineBlock
                   key={r.assignment.id}
@@ -305,12 +305,14 @@ function PeopleTimeline({
                 memberById={new Map()}
                 colourFor={() => c.colour}
                 linkFor={editLink}
+                draggable={{ member: c.id }}
                 big
               />
               {/* The dashed outline only shows in the column of the person it's for. */}
-              <PendingBlock pending={pending && (pending.memberId ?? "everyone") === c.id ? pending : null} day={today} first={first} last={last} />
-              {placing ? (
+              <PendingBlock day={today} member={c.id} first={first} last={last} />
+              {placing || pending ? (
                 <PlaceOnTimeline
+                  moveTo={pending ? { day: today, member: c.id } : undefined}
                   href={`/?add=${today}&who=${c.id}`}
                   first={first}
                   last={last}

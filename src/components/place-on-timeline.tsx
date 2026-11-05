@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { updatePending, usePending } from "./pending-store";
 
 /** Times snap to the nearest quarter hour. */
 const SNAP = 15;
@@ -20,7 +21,13 @@ export function PlaceOnTimeline({
   last,
   defaultMinutes,
   label,
+  moveTo,
 }: {
+  /**
+   * While the quick-add card is open: tapping here moves the new event to
+   * this day (and person, on Today) instead of starting a fresh one.
+   */
+  moveTo?: { day: string; member?: string };
   /** Where to go when placed; start and length are added to it. */
   href: string;
   /** The hours the timeline shows (e.g. 8 to 21). */
@@ -30,8 +37,10 @@ export function PlaceOnTimeline({
   label: string;
 }) {
   const router = useRouter();
+  const pending = usePending();
+  const length = moveTo && pending ? pending.minutes : defaultMinutes;
   const box = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<{ start: number; end: number; downY: number } | null>(null);
+  const [drag, setDrag] = useState<{ start: number; end: number; downY: number; dragged: boolean } | null>(null);
   const span = (last - first) * 60;
 
   /** Minutes since midnight at a finger position, rounded down or to the nearest 15 minutes. */
@@ -45,19 +54,25 @@ export function PlaceOnTimeline({
     e.currentTarget.setPointerCapture(e.pointerId);
     // The block starts at the quarter hour you touched.
     const start = Math.min(minuteAt(e.clientY, Math.floor), last * 60 - SNAP);
-    setDrag({ start, end: start + defaultMinutes, downY: e.clientY });
+    setDrag({ start, end: start + length, downY: e.clientY, dragged: false });
   }
 
   function onPointerMove(e: React.PointerEvent) {
     if (!drag) return;
     // A small wobble is still a tap; only a real drag changes the length.
     if (Math.abs(e.clientY - drag.downY) < 12) return;
-    setDrag({ ...drag, end: Math.max(minuteAt(e.clientY), drag.start + SNAP) });
+    setDrag({ ...drag, end: Math.max(minuteAt(e.clientY), drag.start + SNAP), dragged: true });
   }
 
   function onPointerUp() {
     if (!drag) return;
     const minutes = Math.max(drag.end - drag.start, SNAP);
+    if (moveTo) {
+      updatePending({ date: moveTo.day, start: drag.start, minutes, allDay: false, ...(moveTo.member ? { member: moveTo.member } : {}) });
+      setDrag(null);
+      return;
+    }
+    setDrag(null);
     const join = href.includes("?") ? "&" : "?";
     router.push(`${href}${join}start=${clock(drag.start)}&mins=${minutes}`, { scroll: false });
   }
@@ -77,7 +92,7 @@ export function PlaceOnTimeline({
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           const join = href.includes("?") ? "&" : "?";
-          router.push(`${href}${join}mins=${defaultMinutes}`, { scroll: false });
+          router.push(`${href}${join}mins=${length}`, { scroll: false });
         }
       }}
       className="absolute inset-0 z-20 cursor-crosshair touch-none rounded-xl outline-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_6%,transparent)] focus-visible:outline-2"

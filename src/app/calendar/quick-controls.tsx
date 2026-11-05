@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { updatePending, usePending } from "@/components/pending-store";
 
 /** Ready-made lengths, in minutes. */
 const PRESETS = [30, 60, 120];
@@ -18,8 +19,12 @@ export function lengthLabel(minutes: number): string {
  * or nudge it 15 minutes at a time. Sends "minutes" with the form.
  */
 export function LengthControl({ initial }: { initial: number }) {
-  const [minutes, setMinutes] = useState(initial);
-  const nudge = (by: number) => setMinutes((m) => Math.min(Math.max(m + by, 15), 24 * 60));
+  // While adding, the length is shared with the outline on the timeline.
+  const pending = usePending();
+  const [own, setOwn] = useState(initial);
+  const minutes = pending?.minutes ?? own;
+  const setMinutes = (m: number) => (pending ? updatePending({ minutes: m }) : setOwn(m));
+  const nudge = (by: number) => setMinutes(Math.min(Math.max(minutes + by, 15), 24 * 60));
   const button =
     "flex min-h-[var(--touch-target)] min-w-[var(--touch-target)] items-center justify-center rounded-full border-2 px-4 text-lg";
   return (

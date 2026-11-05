@@ -3,6 +3,7 @@ import { PERSON_COLOURS, strong } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import { ExtraTabs, LengthControl } from "./quick-controls";
+import { PendingSync } from "./pending-sync";
 import type { Layer, Member, SavedView } from "./types";
 
 /** The form fields for adding or editing an event or a layer. */
@@ -254,6 +255,7 @@ export type QuickDefaults = {
 export function QuickAddFields({ layers, members, defaults }: { layers: Layer[]; members: Member[]; defaults: QuickDefaults }) {
   return (
     <>
+      <PendingSync defaults={defaults} />
       <Field label="What">
         <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus />
       </Field>

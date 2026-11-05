@@ -393,3 +393,65 @@ export async function chooseView(formData: FormData) {
   const query = params.toString();
   redirect(query ? `${path}?${query}` : path);
 }
+
+// ---------------------------------------------------------------------------
+// Dragging an event on a timeline
+// ---------------------------------------------------------------------------
+
+/**
+ * Moves or stretches an event after it's dragged on the week or Today
+ * timeline. A one-off event just changes; for a repeating event only the
+ * dragged date moves (like "Move just this one"). Dropping it in another
+ * person's column on Today also changes who it's for (one-off events only).
+ * Called straight from the browser, so it returns an error instead of redirecting.
+ */
+export async function rescheduleEvent(input: {
+  eventId: string;
+  occurrenceDate: string | null;
+  date: string;
+  startTime: string;
+  minutes: number;
+  memberId?: string | null;
+}): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  const { timeZone } = household.settings;
+  const { eventId, occurrenceDate, date, startTime, minutes } = input;
+  if (!isLocalDate(date) || !isLocalTime(startTime)) return { error: "Couldn't tell where it was dropped." };
+  if (!Number.isInteger(minutes) || minutes < 5 || minutes > 24 * 60) return { error: "That length doesn't work." };
+  const startsAt = zonedToUtc(date, startTime, timeZone);
+  const endsAt = new Date(startsAt.getTime() + minutes * 60_000);
+
+  const supabase = await createClient();
+  const { data: event, error: findError } = await supabase.from("events").select("id, title, recurrence_rule").eq("id", eventId).maybeSingle();
+  if (findError || !event) return { error: "Couldn't find that event." };
+
+  if (event.recurrence_rule) {
+    if (!occurrenceDate || !isLocalDate(occurrenceDate)) return { error: "Couldn't tell which date to move." };
+    const { error } = await supabase.from("event_exceptions").upsert(
+      {
+        household_id: household.id,
+        event_id: eventId,
+        original_date: occurrenceDate,
+        skipped: false,
+        new_starts_at: startsAt.toISOString(),
+        new_ends_at: endsAt.toISOString(),
+      },
+      { onConflict: "event_id,original_date" },
+    );
+    if (error) return { error: error.message };
+    await log(household.id, "event_occurrence_moved", "event", eventId, `${event.title} (${occurrenceDate})`);
+  } else {
+    const changes: { starts_at: string; ends_at: string; all_day: boolean; member_id?: string | null } = {
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      all_day: false,
+    };
+    if (input.memberId !== undefined) changes.member_id = input.memberId;
+    const { error } = await supabase.from("events").update(changes).eq("id", eventId);
+    if (error) return { error: error.message };
+    await log(household.id, "event_updated", "event", eventId, event.title);
+  }
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return {};
+}
