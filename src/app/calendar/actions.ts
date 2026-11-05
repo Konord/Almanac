@@ -465,8 +465,8 @@ export async function rescheduleEvent(input: {
   date: string;
   startTime: string;
   minutes: number;
-  /** Moved between Today's columns; null is the Everyone column. */
-  swapMember?: { from: string | null; to: string | null };
+  /** Slid sideways on Today: these people come off and those go on. */
+  members?: { remove: string[]; add: string[] };
 }): Promise<{ error?: string }> {
   const household = await requireHousehold();
   const { timeZone } = household.settings;
@@ -501,20 +501,34 @@ export async function rescheduleEvent(input: {
       .update({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), all_day: false })
       .eq("id", eventId);
     if (error) return { error: error.message };
-    const swap = input.swapMember;
-    if (swap) {
-      const { data: rows, error: whoError } = await supabase.from("event_members").select("member_id").eq("event_id", eventId);
-      if (whoError) return { error: whoError.message };
-      // Into the Everyone column: it's for everyone. Otherwise swap the person.
-      const ids = swap.to === null ? [] : [...new Set([...rows.map((r) => r.member_id).filter((id) => id !== swap.from), swap.to])];
-      const linkError = await setLinks("event_members", household.id, eventId, ids.filter((id) => UUID.test(id)));
+    if (input.members) {
+      const linkError = await moveMembers(household.id, eventId, input.members);
       if (linkError) return { error: linkError };
     }
-    await log(household.id, "event_updated", "event", eventId, event.title);
   }
   revalidatePath("/calendar");
   revalidatePath("/");
   return {};
+}
+
+/**
+ * Takes some people off an event and puts others on. An event for everyone
+ * counts as being for each person; one that ends up for everybody in the
+ * household is stored as "everyone".
+ */
+async function moveMembers(householdId: string, eventId: string, change: { remove: string[]; add: string[] }): Promise<string | null> {
+  const supabase = await createClient();
+  const [{ data: rows, error }, { data: all, error: allError }] = await Promise.all([
+    supabase.from("event_members").select("member_id").eq("event_id", eventId),
+    supabase.from("members").select("id"),
+  ]);
+  if (error || allError) return (error ?? allError)!.message;
+  const everyone = all.map((m) => m.id);
+  const current = rows.length > 0 ? rows.map((r) => r.member_id) : everyone;
+  const next = new Set(current.filter((id) => !change.remove.includes(id)));
+  for (const id of change.add) if (everyone.includes(id)) next.add(id);
+  const ids = everyone.every((id) => next.has(id)) ? [] : [...next];
+  return setLinks("event_members", householdId, eventId, ids);
 }
 
 // ---------------------------------------------------------------------------

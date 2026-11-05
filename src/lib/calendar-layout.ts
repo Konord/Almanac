@@ -92,3 +92,67 @@ export function layoutDay(blocks: TimedBlock[]): PlacedBlock[] {
   closeGroup();
   return placed;
 }
+
+// ---------------------------------------------------------------------------
+// Today: one column per person, and events that span several
+// ---------------------------------------------------------------------------
+
+/**
+ * Which runs of neighbouring columns an event covers, as [first, last]
+ * column numbers. An event for nobody in particular (or for nobody shown)
+ * is for everyone, so it covers the whole row. Mom and Ava side by side
+ * make one run; Mom and Sam with Ava between make two.
+ */
+export function memberRuns(memberIds: readonly string[], columnIds: readonly string[]): [number, number][] {
+  const mine = columnIds.map((id) => memberIds.includes(id));
+  if (!mine.some(Boolean)) return columnIds.length > 0 ? [[0, columnIds.length - 1]] : [];
+  const runs: [number, number][] = [];
+  mine.forEach((on, i) => {
+    if (!on) return;
+    const last = runs.at(-1);
+    if (last && last[1] === i - 1) last[1] = i;
+    else runs.push([i, i]);
+  });
+  return runs;
+}
+
+export type SpanBlock = TimedBlock & { c0: number; c1: number };
+export type PlacedSpan = SpanBlock & { lane: number; lanes: number };
+
+/**
+ * Like layoutDay, for blocks that can cover several columns: blocks that
+ * overlap in time and share a column go side by side. A block takes the
+ * same lane in every column it covers.
+ */
+export function layoutSpans(blocks: SpanBlock[]): PlacedSpan[] {
+  const sorted = [...blocks].sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin || a.c0 - b.c0);
+  const ends = (b: TimedBlock) => Math.max(b.endMin, b.startMin + 15);
+  const clash = (a: SpanBlock, b: SpanBlock) => a.c0 <= b.c1 && b.c0 <= a.c1 && a.startMin < ends(b) && b.startMin < ends(a);
+  const placed: PlacedSpan[] = [];
+  for (const block of sorted) {
+    const taken = new Set(placed.filter((p) => clash(p, block)).map((p) => p.lane));
+    let lane = 0;
+    while (taken.has(lane)) lane++;
+    placed.push({ ...block, lane, lanes: 1 });
+  }
+  // Each block shares its width with everything it's linked to by clashes.
+  const groupOf = placed.map((_, i) => i);
+  const find = (i: number): number => (groupOf[i] === i ? i : (groupOf[i] = find(groupOf[i])));
+  placed.forEach((a, i) => placed.forEach((b, j) => j > i && clash(a, b) && (groupOf[find(j)] = find(i))));
+  const lanes = new Map<number, number>();
+  placed.forEach((p, i) => lanes.set(find(i), Math.max(lanes.get(find(i)) ?? 0, p.lane + 1)));
+  placed.forEach((p, i) => (p.lanes = lanes.get(find(i))!));
+  return placed;
+}
+
+/**
+ * Left and width (CSS) for a block covering columns c0 to c1 of n, with
+ * `gap` between columns, in lane `lane` of `lanes`.
+ */
+export function spanBox(c0: number, c1: number, n: number, gap: string, lane = 0, lanes = 1): { left: string; width: string } {
+  const column = `((100% - ${n - 1} * ${gap}) / ${n})`;
+  return {
+    left: `calc(${column} * ${c0 + lane / lanes} + ${gap} * ${c0})`,
+    width: `calc(${column} * ${c1 - c0 + 1 / lanes} + ${gap} * ${c1 - c0})`,
+  };
+}

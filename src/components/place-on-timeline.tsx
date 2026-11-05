@@ -25,9 +25,9 @@ export function PlaceOnTimeline({
 }: {
   /**
    * While the quick-add card is open: tapping here moves the new event to
-   * this day (and person, on Today) instead of starting a fresh one.
+   * this day instead of starting a fresh one.
    */
-  moveTo?: { day: string; member?: string };
+  moveTo?: { day: string };
   /** Where to go when placed; start and length are added to it. */
   href: string;
   /** The hours the timeline shows (e.g. 8 to 21). */
@@ -68,7 +68,7 @@ export function PlaceOnTimeline({
     if (!drag) return;
     const minutes = Math.max(drag.end - drag.start, SNAP);
     if (moveTo) {
-      updatePending({ date: moveTo.day, start: drag.start, minutes, allDay: false, ...(moveTo.member ? { member: moveTo.member } : {}) });
+      updatePending({ date: moveTo.day, start: drag.start, minutes, allDay: false });
       setDrag(null);
       return;
     }

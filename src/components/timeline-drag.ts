@@ -21,7 +21,7 @@ export type Placement = {
 };
 
 /** Where the block is being dragged to, and which spot it started from. */
-type Preview = Placement & { dx: number; from: string };
+type Preview = Placement & { dx: number; from: string; fromMember?: string };
 
 const keyOf = (p: Placement) => `${p.day}|${p.member ?? ""}|${p.start}|${p.minutes}`;
 
@@ -37,7 +37,7 @@ export function toMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function columnAt(x: number, y: number): HTMLElement | null {
+export function columnAt(x: number, y: number): HTMLElement | null {
   const hit = document.elementsFromPoint(x, y).find((el) => el instanceof HTMLElement && el.dataset.dropDay);
   return (hit as HTMLElement | undefined) ?? null;
 }
@@ -61,7 +61,8 @@ export function useTimelineDrag({
   first: number;
   last: number;
   placement: Placement;
-  onDrop: (p: Placement) => void;
+  /** fromMember: on Today, the person's column the block was picked up in. */
+  onDrop: (p: Placement, fromMember?: string) => void;
   onTap?: () => void;
 }) {
   const [rawPreview, setPreview] = useState<Preview | null>(null);
@@ -74,7 +75,8 @@ export function useTimelineDrag({
 
   function begin(mode: "move" | "resize", e: React.PointerEvent) {
     e.stopPropagation();
-    const origin = (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-drop-day]");
+    // The column under your finger (a block on Today can cover several).
+    const origin = columnAt(e.clientX, e.clientY) ?? (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-drop-day]");
     if (!origin) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { mode, x: e.clientX, y: e.clientY, origin, moved: false };
@@ -107,6 +109,7 @@ export function useTimelineDrag({
       member: col.member,
       dx: target.getBoundingClientRect().left - rect.left,
       from,
+      fromMember: readColumn(d.origin).member,
     });
   }
 
@@ -119,7 +122,7 @@ export function useTimelineDrag({
       onTap?.();
       return;
     }
-    if (preview) onDrop({ start: preview.start, minutes: preview.minutes, day: preview.day, member: preview.member });
+    if (preview) onDrop({ start: preview.start, minutes: preview.minutes, day: preview.day, member: preview.member }, preview.fromMember);
   }
 
   const shown = preview ?? { ...placement, dx: 0 };

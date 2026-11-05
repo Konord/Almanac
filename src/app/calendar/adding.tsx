@@ -53,7 +53,9 @@ export function readAdding(
   const tapped = {
     startTime: start && isLocalTime(start) ? start : undefined,
     minutes: Number.isInteger(mins) && mins >= 15 && mins <= 24 * 60 ? mins : undefined,
-    memberIds: who && members.some((m) => m.id === who) ? [who] : [],
+    // One person, several ("a,b"), or "all" for the whole row (everyone).
+    memberIds: who ? who.split(",").filter((id) => members.some((m) => m.id === id)) : [],
+    wholeRow: who === "all",
   };
   const template = templates.find((t) => t.id === firstParam(params.template));
   if (template) {
@@ -73,13 +75,14 @@ export function readAdding(
         startTime,
         minutes: template.minutes,
         allDay: template.all_day || !startTime,
-        memberIds: tapped.memberIds.length > 0 ? tapped.memberIds : template.member_ids.filter((id) => memberIds.has(id)),
+        memberIds: tapped.memberIds.length > 0 || tapped.wholeRow ? tapped.memberIds : template.member_ids.filter((id) => memberIds.has(id)),
         tagIds: template.tag_ids.filter((id) => tagIds.has(id)),
       },
     };
   }
   const pending: Pending = {
-    ...tapped,
+    startTime: tapped.startTime,
+    memberIds: tapped.memberIds,
     date: add,
     minutes: tapped.minutes ?? settings.defaultEventMinutes,
     // Tapping a day (rather than a time) makes an all-day event, which you can switch off.

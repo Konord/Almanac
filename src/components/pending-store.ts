@@ -14,8 +14,8 @@ export type PendingEvent = {
   start: number | null;
   minutes: number;
   allDay: boolean;
-  /** Who it's for: "everyone" or a member id. */
-  member: string;
+  /** Who it's for (member ids); empty means everyone. */
+  members: string[];
 };
 
 let current: PendingEvent | null = null;

@@ -1,33 +1,84 @@
 "use client";
 
-import { updatePending, usePending } from "./pending-store";
-import { useTimelineDrag } from "./timeline-drag";
+import { memberRuns, spanBox } from "@/lib/calendar-layout";
+import { updatePending, usePending, type PendingEvent } from "./pending-store";
+import { useTimelineDrag, type Placement } from "./timeline-drag";
 
 /**
- * The dashed outline of the event you're adding. Drag it to move it, or
- * drag its bottom edge to change the length; the card follows along.
+ * The dashed outline of the event you're adding (week view: one per day
+ * column). Drag it to move it, or drag its bottom edge to change the
+ * length; the card follows along.
  */
-export function PendingBlock({ day, member, first, last }: { day: string; member?: string; first: number; last: number }) {
+export function PendingBlock({ day, first, last }: { day: string; first: number; last: number }) {
   const pending = usePending();
-  const show =
-    pending !== null && !pending.allDay && pending.start !== null && pending.date === day && (member === undefined || pending.member === member);
-  if (!show) return null;
-  return <Outline first={first} last={last} placement={{ start: pending.start!, minutes: pending.minutes, day, member }} />;
+  if (pending === null || pending.allDay || pending.start === null || pending.date !== day) return null;
+  return (
+    <Outline
+      first={first}
+      last={last}
+      placement={{ start: pending.start, minutes: pending.minutes, day }}
+      onDrop={(p) => updatePending({ date: p.day, start: p.start, minutes: p.minutes })}
+    />
+  );
 }
 
-function Outline({ first, last, placement }: { first: number; last: number; placement: { start: number; minutes: number; day: string; member?: string } }) {
-  const drag = useTimelineDrag({
-    first,
-    last,
-    placement,
-    onDrop: (p) => updatePending({ date: p.day, start: p.start, minutes: p.minutes, ...(p.member ? { member: p.member } : {}) }),
-  });
+/**
+ * On Today: the outline across the chosen people's columns (the whole row
+ * when it's for everyone). Sliding it sideways moves it to other people.
+ */
+export function PendingSpans({ day, columns, first, last, gap }: { day: string; columns: string[]; first: number; last: number; gap: string }) {
+  const pending = usePending();
+  if (pending === null || pending.allDay || pending.start === null || pending.date !== day) return null;
+  const runs = memberRuns(pending.members, columns);
+  return (
+    <>
+      {runs.map(([c0, c1]) => {
+        const run = columns.slice(c0, c1 + 1);
+        return (
+          <Outline
+            key={`${c0}-${c1}`}
+            first={first}
+            last={last}
+            placement={{ start: pending.start!, minutes: pending.minutes, day, member: run[0] }}
+            style={spanBox(c0, c1, columns.length, gap)}
+            onDrop={(p, from) => {
+              const changes: Partial<PendingEvent> = { start: p.start, minutes: p.minutes };
+              if (from && p.member && p.member !== from) {
+                const shift = columns.indexOf(p.member) - columns.indexOf(from);
+                const start = Math.min(Math.max(c0 + shift, 0), columns.length - run.length);
+                const moved = columns.slice(start, start + run.length);
+                // For everyone, the outline already covers the row; otherwise swap this run's people.
+                if (pending.members.length > 0) changes.members = [...pending.members.filter((m) => !run.includes(m)), ...moved];
+              }
+              updatePending(changes);
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function Outline({
+  first,
+  last,
+  placement,
+  style,
+  onDrop,
+}: {
+  first: number;
+  last: number;
+  placement: Placement;
+  style?: React.CSSProperties;
+  onDrop: (p: Placement, fromMember?: string) => void;
+}) {
+  const drag = useTimelineDrag({ first, last, placement, onDrop });
   return (
     <div
       {...drag.bodyHandlers}
       aria-label={`New event, ${drag.label}. Drag to move it.`}
-      className="absolute inset-x-1 z-30 flex cursor-grab touch-none flex-col rounded-[0.875rem] border-2 border-dashed border-accent bg-[color-mix(in_srgb,var(--color-accent)_14%,white)] px-2 py-1 select-none active:cursor-grabbing"
-      style={drag.position}
+      className={`absolute z-30 flex cursor-grab touch-none flex-col rounded-[0.875rem] border-2 border-dashed border-accent bg-[color-mix(in_srgb,var(--color-accent)_14%,white)] px-2 py-1 select-none active:cursor-grabbing ${style ? "" : "inset-x-1"}`}
+      style={{ ...style, ...drag.position }}
     >
       <span className="text-sm font-bold text-ink">{drag.label}</span>
       <ResizeHandle handlers={drag.handleHandlers} />

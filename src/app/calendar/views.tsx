@@ -168,6 +168,7 @@ export function EventBlock({
   big = false,
   narrow = false,
   drag,
+  colours,
 }: {
   event: CalendarItem;
   colour: string;
@@ -175,7 +176,17 @@ export function EventBlock({
   href: string;
   style: React.CSSProperties;
   /** Makes the block draggable on a timeline. */
-  drag?: { day: LocalDate; member?: string; start: number; minutes: number; first: number; last: number };
+  drag?: {
+    day: LocalDate;
+    /** On Today: the person columns, and which of them this bubble covers. */
+    people?: { columns: string[]; run: string[] };
+    start: number;
+    minutes: number;
+    first: number;
+    last: number;
+  };
+  /** A bubble shared by several people fades from one person's colour to the next. */
+  colours?: string[];
   big?: boolean;
   /** Squeezed in beside two or more others: just the picture and a clipped title. */
   narrow?: boolean;
@@ -184,6 +195,7 @@ export function EventBlock({
     big ? "items-start gap-2 rounded-2xl px-2.5 py-2" : "flex-col gap-px rounded-[0.875rem] px-2 py-1.25"
   }`;
   const title = `${event.title}, ${timeRange(event, household)}`;
+  const background = colours && colours.length > 1 ? `linear-gradient(to right, ${colours.map(soft).join(", ")})` : soft(colour);
   const content = (
     <>
       {narrow ? (
@@ -226,13 +238,13 @@ export function EventBlock({
         eventId={event.series_id}
         occurrenceDate={event.occurrence_date}
         day={drag.day}
-        member={drag.member}
+        people={drag.people}
         start={drag.start}
         minutes={drag.minutes}
         first={drag.first}
         last={drag.last}
         className={className}
-        style={{ ...rest, background: soft(colour) }}
+        style={{ ...rest, background }}
         title={title}
       >
         {content}
@@ -240,7 +252,7 @@ export function EventBlock({
     );
   }
   return (
-    <Link href={href} scroll={false} className={className} style={{ ...style, background: soft(colour) }} title={title}>
+    <Link href={href} scroll={false} className={className} style={{ ...style, background }} title={title}>
       {content}
     </Link>
   );
@@ -259,8 +271,8 @@ export function DayBlocks({
   colourFor,
   draggable,
 }: {
-  /** Lets you drag the blocks to move or stretch them; member is the Today column. */
-  draggable?: { member?: string };
+  /** Lets you drag the blocks to move or stretch them. */
+  draggable?: object;
   events: CalendarItem[];
   day: LocalDate;
   first: number;
@@ -300,7 +312,7 @@ export function DayBlocks({
             narrow={!big && block.lanes >= 3}
             drag={
               draggable
-                ? { day, member: draggable.member, start: block.startMin, minutes: block.endMin - block.startMin, first, last }
+                ? { day, start: block.startMin, minutes: block.endMin - block.startMin, first, last }
                 : undefined
             }
             style={{

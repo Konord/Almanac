@@ -16,7 +16,7 @@ export function DraggableEvent({
   eventId,
   occurrenceDate,
   day,
-  member,
+  people,
   start,
   minutes,
   first,
@@ -30,8 +30,11 @@ export function DraggableEvent({
   eventId: string;
   occurrenceDate: string | null;
   day: string;
-  /** The Today column it sits in; moving to another column changes who it's for. */
-  member?: string;
+  /**
+   * On Today: every person's column in order, and the run of them this
+   * bubble covers. Dragging it sideways moves it to the people it lands on.
+   */
+  people?: { columns: string[]; run: string[] };
   start: number;
   minutes: number;
   first: number;
@@ -47,9 +50,9 @@ export function DraggableEvent({
   const drag = useTimelineDrag({
     first,
     last,
-    placement: { start, minutes, day, member },
+    placement: { start, minutes, day, member: people?.run[0] },
     onTap: () => router.push(href, { scroll: false }),
-    onDrop: (p) =>
+    onDrop: (p, fromMember) =>
       startSaving(async () => {
         const result = await rescheduleEvent({
           eventId,
@@ -57,9 +60,7 @@ export function DraggableEvent({
           date: p.day,
           startTime: clock(p.start),
           minutes: p.minutes,
-          ...(member !== undefined && p.member !== member
-            ? { swapMember: { from: member === "everyone" ? null : member, to: p.member === "everyone" ? null : (p.member ?? null) } }
-            : {}),
+          ...(people && fromMember && p.member && p.member !== fromMember ? { members: shiftRun(people, fromMember, p.member) } : {}),
         });
         if (result.error) {
           drag.clearPreview();
@@ -91,4 +92,13 @@ export function DraggableEvent({
       <ResizeHandle handlers={drag.handleHandlers} />
     </div>
   );
+}
+
+/** The people a bubble covers after sliding it from one person's column to another's. */
+function shiftRun(people: { columns: string[]; run: string[] }, from: string, to: string): { remove: string[]; add: string[] } {
+  const { columns, run } = people;
+  const c0 = columns.indexOf(run[0]);
+  const delta = columns.indexOf(to) - columns.indexOf(from);
+  const start = Math.min(Math.max(c0 + delta, 0), columns.length - run.length);
+  return { remove: run, add: columns.slice(start, start + run.length) };
 }

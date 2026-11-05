@@ -28,12 +28,14 @@ import { floatingRoutines, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
-import { PlaceOnTimeline } from "@/components/place-on-timeline";
-import { PendingBlock } from "@/components/pending-block";
+import { PlaceAcrossPeople } from "@/components/place-across-people";
+import { PendingSpans } from "@/components/pending-block";
+import { layoutSpans, memberRuns, spanBox } from "@/lib/calendar-layout";
 import type { QuickDefaults } from "./calendar/forms";
 import {
-  DayBlocks,
+  EventBlock,
   HourLines,
+  minutesIntoDay,
   NowLine,
   eventsOnDay,
   isAllDayStyle,
@@ -42,6 +44,9 @@ import {
   timelineRange,
   weekdayLabel,
 } from "./calendar/views";
+
+/** The space between people's columns on the timeline. */
+const COLUMN_GAP = "0.625rem";
 
 /** How many days the "Coming up" card looks ahead. */
 const COMING_UP_DAYS = 6;
@@ -170,8 +175,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 }
 
 /**
- * Today as a timeline with one column per person (plus "Everyone" for
- * things that aren't for anyone in particular).
+ * Today as a timeline with one column per person. An event for several
+ * people next to each other is one bubble across their columns; one for
+ * everyone stretches across the whole row.
  */
 function PeopleTimeline({
   allDay,
@@ -208,34 +214,33 @@ function PeopleTimeline({
   const range = timelineRange(timed, [today], timeZone);
   const first = Math.min(range.first, ...placements.map((p) => Math.floor(p.startMin / 60)));
   const last = Math.max(range.last, ...placements.map((p) => Math.ceil(p.endMin / 60)));
+  // No "Everyone" column (Connor, 2026-11-05): things for everyone span the row.
+  // A household with nobody in it yet still gets one column to add things to.
   const columns: {
     id: string;
     name: string;
     colour: string;
     icon?: string | null;
-    items: CalendarItem[];
     progress?: { done: number; total: number };
-  }[] = [
-    ...members.map((m) => ({
-      id: m.id,
-      name: m.name,
-      colour: m.colour,
-      icon: m.icon,
-      items: timed.filter((e) => e.member_ids.includes(m.id)),
-      progress: dayProgress(routineData, m.id, today),
-    })),
-    // While adding, "Everyone" always shows so you can add things for the whole family.
-    ...(forEveryone.length > 0 || members.length === 0 || placing
-      ? [
-          {
-            id: "everyone",
-            name: "Everyone",
-            colour: EVERYONE_COLOUR,
-            items: forEveryone,
-          },
-        ]
-      : []),
-  ];
+  }[] =
+    members.length > 0
+      ? members.map((m) => ({ id: m.id, name: m.name, colour: m.colour, icon: m.icon, progress: dayProgress(routineData, m.id, today) }))
+      : [{ id: "everyone", name: "Everyone", colour: EVERYONE_COLOUR }];
+  const columnIds = columns.map((c) => c.id);
+  const colourOf = new Map(columns.map((c) => [c.id, c.colour]));
+  const placedEvents = layoutSpans(
+    sortForDay(eventsOnDay(timed, today, timeZone), timeZone).flatMap((e) =>
+      memberRuns(e.member_ids, columnIds).map(([c0, c1]) => ({
+        id: `${e.id}|${c0}`,
+        startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
+        endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
+        c0,
+        c1,
+      })),
+    ),
+  );
+  const eventById = new Map(timed.map((e) => [e.id, e]));
+  const span = (last - first) * 60;
   const editLink = (e: CalendarItem) =>
     `/calendar?view=week&date=${today}&edit=${e.series_id}${e.occurrence_date ? `&occ=${e.occurrence_date}` : ""}`;
 
@@ -298,32 +303,58 @@ function PeopleTimeline({
                   household={household}
                 />
               ))}
-              <DayBlocks
-                events={c.items}
-                day={today}
-                first={first}
-                last={last}
-                household={household}
-                memberById={new Map()}
-                colourFor={() => c.colour}
-                linkFor={editLink}
-                draggable={{ member: c.id }}
-                big
-              />
-              {/* The dashed outline only shows in the column of the person it's for. */}
-              <PendingBlock day={today} member={c.id} first={first} last={last} />
-              {placing || pending ? (
-                <PlaceOnTimeline
-                  moveTo={pending ? { day: today, member: c.id } : undefined}
-                  href={`/?add=${today}&who=${c.id}`}
+            </div>
+          ))}
+          {/* Events sit over the columns so one bubble can span several people. */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 left-16.5">
+            {placedEvents.map((block) => {
+              const event = eventById.get(block.id.split("|")[0])!;
+              const run = columnIds.slice(block.c0, block.c1 + 1);
+              const top = ((block.startMin - first * 60) / span) * 100;
+              const height = (Math.max(block.endMin - block.startMin, 30) / span) * 100;
+              return (
+                <div key={block.id} className="pointer-events-auto">
+                  <EventBlock
+                    event={event}
+                    colour={colourOf.get(run[0]) ?? EVERYONE_COLOUR}
+                    colours={run.map((id) => colourOf.get(id) ?? EVERYONE_COLOUR)}
+                    household={household}
+                    href={editLink(event)}
+                    big
+                    drag={{
+                      day: today,
+                      people: { columns: columnIds, run },
+                      start: block.startMin,
+                      minutes: block.endMin - block.startMin,
+                      first,
+                      last,
+                    }}
+                    style={{
+                      top: `calc(${top}% + 3px)`,
+                      height: `calc(${height}% - 6px)`,
+                      ...spanBox(block.c0, block.c1, columns.length, COLUMN_GAP, block.lane, block.lanes),
+                    }}
+                  />
+                </div>
+              );
+            })}
+            <div className="pointer-events-auto">
+              <PendingSpans day={today} columns={columnIds} first={first} last={last} gap={COLUMN_GAP} />
+            </div>
+            {placing || pending ? (
+              <div className="pointer-events-auto">
+                <PlaceAcrossPeople
+                  columns={columns.map((c) => ({ id: c.id, name: c.name }))}
+                  href={`/?add=${today}`}
                   first={first}
                   last={last}
                   defaultMinutes={household.settings.defaultEventMinutes}
-                  label={`Add an event for ${c.name}`}
+                  gap={COLUMN_GAP}
+                  moving={Boolean(pending)}
                 />
-              ) : null}
-            </div>
-          ))}
+              </div>
+            ) : null}
+          </div>
           <div className="pointer-events-none absolute inset-y-0 right-0 left-14.5">
             <NowLine percent={nowPercent(now, first, last, timeZone)} label={`Now, ${shortTime(now, household)}`} />
           </div>
