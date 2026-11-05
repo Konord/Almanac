@@ -10,6 +10,8 @@ export type RoutineTemplate = {
   audience: string;
   premade: boolean;
   visibility: string;
+  usual_start: string | null;
+  usual_minutes: number | null;
 };
 export type RoutineStep = {
   id: string;
@@ -43,7 +45,7 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
   const supabase = await createClient();
   const [members, templates, steps, assignments, checks] = await Promise.all([
     supabase.from("members").select("id, name, role, colour").order("sort_order").order("name"),
-    supabase.from("routine_templates").select("id, name, kind, audience, premade, visibility").order("sort_order").order("name"),
+    supabase.from("routine_templates").select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes").order("sort_order").order("name"),
     supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential").order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, weekdays, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),

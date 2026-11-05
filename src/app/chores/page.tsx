@@ -30,7 +30,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
   const params = await searchParams;
   const { locale, timeZone } = household.settings;
   const today = localDateOf(new Date(), timeZone);
-  const { chores, rounds, members } = await loadChores(today);
+  const { chores, rounds, members } = await loadChores(today, timeZone);
   const memberById = new Map(members.map((m) => [m.id, m]));
   const choreById = new Map(chores.map((c) => [c.id, c]));
   const due = dueChores(chores);

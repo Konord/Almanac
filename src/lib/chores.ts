@@ -21,6 +21,8 @@ export type ChoreRule = {
   /** "MM-DD", or null when the chore has no season. */
   season_start: string | null;
   season_end: string | null;
+  /** For a chore never done: the first day it's due (else today). */
+  first_due?: LocalDate | null;
 };
 
 /** A done or skipped round of a chore. */
@@ -143,8 +145,9 @@ export function choreTiming(rule: ChoreRule, rounds: ChoreRound[], today: LocalD
 
   let dueOn: LocalDate;
   if (lastRound === null) {
-    // Never done: due now, or on its day if it has one.
-    dueOn = rule.preferred_weekday === null ? today : onOrAfterWeekday(today, rule.preferred_weekday);
+    // Never done: due now (or from its first day), on its weekday if it has one.
+    const from = rule.first_due ?? today;
+    dueOn = rule.preferred_weekday === null ? from : onOrAfterWeekday(from, rule.preferred_weekday);
   } else {
     dueOn = addInterval(lastRound, rule.repeat_every, rule.repeat_unit);
     if (rule.preferred_weekday !== null && rule.repeat_unit !== "day") {
@@ -161,4 +164,20 @@ export function describeRepeat(rule: ChoreRule, seasonLabel?: string): string {
   if (rule.season_start && rule.season_end) return `Once a year${seasonLabel ? `, ${seasonLabel}` : ""}`;
   const [one, many] = UNIT_LABEL[rule.repeat_unit];
   return rule.repeat_every === 1 ? `Every ${one}` : `Every ${rule.repeat_every} ${many}`;
+}
+
+/** Starter chores are spread over at most four weeks, so day one isn't everything at once. */
+const STARTER_SPREAD_DAYS = 28;
+
+/**
+ * The first due date for a starter chore that hasn't been done yet: a
+ * steady pick between the day it was added and one interval later
+ * (at most four weeks), so the starter list arrives a few at a time.
+ */
+export function starterFirstDue(id: string, addedOn: LocalDate, rule: Pick<ChoreRule, "repeat_every" | "repeat_unit">): LocalDate {
+  const intervalDays = daysBetween(addedOn, addInterval(addedOn, rule.repeat_every, rule.repeat_unit));
+  const spread = Math.max(1, Math.min(intervalDays, STARTER_SPREAD_DAYS));
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return addDays(addedOn, hash % spread);
 }

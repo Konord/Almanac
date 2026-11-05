@@ -31,7 +31,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
   const household = await requireHousehold();
   const params = await searchParams;
   const today = localDateOf(new Date(), household.settings.timeZone);
-  const { chores, members } = await loadChores(today);
+  const { chores, members } = await loadChores(today, household.settings.timeZone);
   const memberById = new Map(members.map((m) => [m.id, m]));
   const editId = firstParam(params.edit);
   const adding = firstParam(params.add) === "1";

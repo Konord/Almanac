@@ -271,14 +271,14 @@ isOneToOne: false
                   ]
                 },"routine_templates": {
                   Row: {
-                    "audience": string,"created_at": string,"household_id": string,"id": string,"kind": string,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"visibility": string
+                    "audience": string,"created_at": string,"household_id": string,"id": string,"kind": string,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "audience"?: string,"created_at"?: string,"household_id": string,"id"?: string,"kind"?: string,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "audience"?: string,"created_at"?: string,"household_id": string,"id"?: string,"kind"?: string,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Update: {
-                    "audience"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"kind"?: string,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "audience"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"kind"?: string,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Relationships: [
                     {
