@@ -61,7 +61,7 @@ test("the big set: searches standard names and keywords, best first", () => {
 });
 
 test("the big set leaves out what Connor didn't want", () => {
-  for (const e of ["🕐", "🗾", "💾", "📼", "💶", "♈", "⬆", "🔟", "🈳", "🚾", "🇨🇦", "👨‍🍳"]) {
+  for (const e of ["🕐", "🗾", "💾", "📼", "💶", "♈", "⬆", "🔟", "🈳", "🚾", "🇨🇦", "👨‍🍳", "⚰"]) {
     assert.equal(emojiImage(e), null, `${e} should be left out`);
   }
   for (const e of ["⛪", "🪦", "🍺", "🗡", "🔴", "🌕", "🧑‍🍳", "🏁"]) assert.ok(emojiImage(e), `${e} should be in`);
