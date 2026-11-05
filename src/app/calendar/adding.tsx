@@ -5,7 +5,7 @@ import { Sheet } from "@/components/sheet";
 import type { HouseholdSettings } from "@/lib/household";
 import { isLocalDate, isLocalTime } from "@/lib/time";
 import { addEvent } from "./actions";
-import { QuickAddFields, type QuickDefaults } from "./forms";
+import { EventCardFields, type QuickDefaults } from "./forms";
 import type { Layer, Member } from "./types";
 
 /*
@@ -85,7 +85,7 @@ export function QuickAddSheet({
         <form action={addEvent} className="group flex h-full flex-col gap-5">
           <input type="hidden" name="returnTo" value={returnTo} />
           <input type="hidden" name="returnPath" value={returnPath} />
-          <QuickAddFields layers={layers} members={members} defaults={pending} />
+          <EventCardFields layers={layers} members={members} defaults={pending} adding />
           <div className="mt-auto flex shrink-0 gap-3">
             <Button>Add event</Button>
             <Link

@@ -23,7 +23,7 @@ import {
   updateEvent,
   updateLayer,
 } from "./actions";
-import { EventFields, LayerFields, ViewFields } from "./forms";
+import { EventCardFields, LayerFields, ViewFields } from "./forms";
 import { ViewChooser } from "./view-chooser";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
 import { VISIBILITY_OPTIONS } from "./options";
@@ -97,6 +97,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   /** Where tapping a day or time while adding goes (start and length get added for a time). */
   const addHref = (day: LocalDate, extra: Record<string, string> = {}) => href({ add: day, edit: null, panel: null, placing: null, ...extra });
 
+  // Open the edit card on the side away from the event, so it stays in view.
+  const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
+  const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
   const step = (n: number) => (view === "week" ? addDays(anchor, 7 * n) : addMonths(anchor, n));
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -176,8 +179,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       </Link>
 
       {editing ? (
-        <Sheet title={editing.title} closeHref={closeHref}>
+        <Sheet title={editing.title} closeHref={closeHref} narrow side={editSide}>
           <EditEventPanel
+            everyDateHref={href({ edit: editing.id, occ: editOccurrence ?? null, scope: "all", add: null, panel: null })}
+            showEveryDate={firstParam(params.scope) === "all"}
             event={editing}
             household={household}
             layers={layers}
@@ -351,6 +356,8 @@ function EditEventPanel({
   occurrenceDate,
   isException,
   skippedDates,
+  everyDateHref,
+  showEveryDate,
 }: {
   skippedDates: string[];
   occurrence: CalendarItem | null;
@@ -363,20 +370,27 @@ function EditEventPanel({
   returnTo: string;
   closeHref: string;
   memberName: string | undefined;
+  /** For a repeating event: the link that switches to changing every date. */
+  everyDateHref: string;
+  showEveryDate: boolean;
 }) {
   const { timeZone } = household.settings;
   const start = new Date(event.starts_at);
   const end = new Date(event.ends_at);
   const startDate = localDateOf(start, timeZone);
   const endDate = event.all_day ? addDays(localDateOf(end, timeZone), -1) : localDateOf(end, timeZone);
+  const summary = (
+    <p className="shrink-0 text-lg text-ink-muted">
+      {memberName ? `For ${memberName} · ` : ""}
+      {describeRule(event.recurrence_rule)}
+    </p>
+  );
 
-  return (
-    <div>
-      <p className="mb-5 text-lg text-ink-muted">
-        {memberName ? `For ${memberName} · ` : ""}
-        {describeRule(event.recurrence_rule)}
-      </p>
-      {occurrenceDate ? (
+  // A repeating event opens on "just this date" first; every date is one tap away.
+  if (occurrenceDate && !showEveryDate) {
+    return (
+      <div className="flex h-full flex-col gap-5">
+        {summary}
         <OccurrenceControls
           event={event}
           household={household}
@@ -385,45 +399,38 @@ function EditEventPanel({
           isException={isException}
           returnTo={returnTo}
         />
-      ) : null}
-      {skippedDates.length > 0 ? (
-        <div className="mb-6">
-          <h3 className="mb-2 text-lg font-semibold text-ink">Skipped dates</h3>
-          <ul className="flex flex-wrap gap-2">
-            {skippedDates.map((date) => (
-              <li key={date}>
-                <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
-                  <input type="hidden" name="eventId" value={event.id} />
-                  <input type="hidden" name="occurrenceDate" value={date} />
-                  <input type="hidden" name="title" value={event.title} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
-                  <span className="text-base text-ink">{date}</span>
-                  <Button variant="secondary" className="border-0">
-                    Bring back
-                  </Button>
-                </form>
-              </li>
-            ))}
-          </ul>
+        {skippedDates.length > 0 ? <SkippedDates event={event} dates={skippedDates} returnTo={returnTo} /> : null}
+        <div className="mt-auto flex shrink-0 gap-3">
+          <Link
+            href={everyDateHref}
+            scroll={false}
+            className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board"
+          >
+            Change every date
+          </Link>
+          <CloseLink href={closeHref} label="Close" />
         </div>
-      ) : null}
-      {event.recurrence_rule ? (
-        <h3 className="mb-3 text-xl font-semibold text-ink">Every date</h3>
-      ) : null}
-      <form action={updateEvent} className="grid gap-4 sm:grid-cols-2">
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-5">
+      {summary}
+      <form id="edit-event" action={updateEvent} className="group flex min-h-0 flex-1 flex-col">
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
-        <EventFields
+        <EventCardFields
           layers={layers}
           members={members}
           defaults={{
             title: event.title,
             layerId: event.layer_id,
-            startDate,
-            endDate,
+            date: startDate,
+            endDate: event.all_day ? endDate : undefined,
             allDay: event.all_day,
-            startTime: event.all_day ? "" : localTimeOf(start, timeZone),
-            endTime: event.all_day ? "" : localTimeOf(end, timeZone),
+            startTime: event.all_day ? undefined : localTimeOf(start, timeZone),
+            minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
             memberId: event.member_id ?? "",
             energyCost: event.energy_cost,
             visibility: event.visibility,
@@ -432,17 +439,47 @@ function EditEventPanel({
             repeat: parseRule(event.recurrence_rule),
           }}
         />
-        <div className="flex gap-3 sm:col-span-2">
-          <Button>{event.recurrence_rule ? "Save every date" : "Save event"}</Button>
-          <CloseLink href={closeHref} />
-        </div>
       </form>
-      <form action={removeEvent} className="mt-4">
-        <input type="hidden" name="id" value={event.id} />
-        <input type="hidden" name="title" value={event.title} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove event"}</Button>
-      </form>
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <Button form="edit-event">{event.recurrence_rule ? "Save every date" : "Save"}</Button>
+        <CloseLink href={closeHref} />
+        <form action={removeEvent} className="ml-auto">
+          <input type="hidden" name="id" value={event.id} />
+          <input type="hidden" name="title" value={event.title} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove"}</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** How many skipped dates to list before "and N more". */
+const SKIPPED_LIMIT = 6;
+
+/** Dates skipped from a repeating event, each with a way to bring it back. */
+function SkippedDates({ event, dates, returnTo }: { event: CalendarEvent; dates: string[]; returnTo: string }) {
+  const shown = dates.slice(-SKIPPED_LIMIT);
+  return (
+    <div className="shrink-0">
+      <h3 className="mb-2 text-lg font-bold text-ink">Skipped dates</h3>
+      <ul className="flex flex-wrap gap-2">
+        {shown.map((date) => (
+          <li key={date}>
+            <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
+              <input type="hidden" name="eventId" value={event.id} />
+              <input type="hidden" name="occurrenceDate" value={date} />
+              <input type="hidden" name="title" value={event.title} />
+              <input type="hidden" name="returnTo" value={returnTo} />
+              <span className="text-base text-ink">{date}</span>
+              <Button variant="secondary" className="border-0">
+                Bring back
+              </Button>
+            </form>
+          </li>
+        ))}
+      </ul>
+      {dates.length > shown.length ? <p className="mt-2 text-base text-ink-muted">and {dates.length - shown.length} earlier</p> : null}
     </div>
   );
 }
@@ -479,7 +516,7 @@ function OccurrenceControls({
   );
 
   return (
-    <div className="mb-8 rounded-[var(--radius-card)] bg-rail p-5">
+    <div className="shrink-0 rounded-[var(--radius-card)] bg-rail p-5">
       <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
       <p className="mb-4 text-base text-ink-muted">Changes here leave the rest of the dates alone.</p>
       <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
@@ -499,7 +536,7 @@ function OccurrenceControls({
           </>
         )}
         <div className="sm:col-span-3">
-          <Button variant="secondary">Move this one</Button>
+          <Button variant="secondary" className="bg-board">Move this one</Button>
         </div>
       </form>
       <div className="mt-4 flex flex-wrap gap-3">
@@ -518,14 +555,14 @@ function OccurrenceControls({
   );
 }
 
-function CloseLink({ href }: { href: string }) {
+function CloseLink({ href, label = "Cancel" }: { href: string; label?: string }) {
   return (
     <Link
       href={href}
       scroll={false}
       className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
     >
-      Cancel
+      {label}
     </Link>
   );
 }

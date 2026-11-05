@@ -6,119 +6,7 @@ import { CardTabs, LengthControl } from "./quick-controls";
 import { PendingSync } from "./pending-sync";
 import type { Layer, Member, SavedView } from "./types";
 
-/** The form fields for adding or editing an event or a layer. */
-
-export type EventDefaults = {
-  title?: string;
-  layerId?: string;
-  startDate?: string;
-  endDate?: string;
-  allDay?: boolean;
-  startTime?: string;
-  endTime?: string;
-  memberId?: string;
-  energyCost?: number;
-  visibility?: string;
-  notes?: string;
-  icon?: string;
-  repeat?: RepeatOptions;
-};
-
-export function EventFields({ layers, members, defaults }: { layers: Layer[]; members: Member[]; defaults: EventDefaults }) {
-  const repeat = defaults.repeat;
-  // Open "More options" straight away if this event already uses any of them.
-  const usesMore = Boolean(
-    defaults.icon ||
-      defaults.notes ||
-      (defaults.endDate && defaults.endDate !== defaults.startDate) ||
-      (defaults.energyCost ?? 1) !== 1 ||
-      (defaults.visibility ?? "everyone") !== "everyone" ||
-      (repeat && repeat.frequency !== "none" && (repeat.interval > 1 || repeat.weekdays.length > 0 || repeat.end !== "never")),
-  );
-
-  return (
-    <>
-      <Field label="What">
-        <Input name="title" defaultValue={defaults.title} required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus={!defaults.title} />
-      </Field>
-      <Field label="Date">
-        <Input name="startDate" type="date" defaultValue={defaults.startDate} required />
-      </Field>
-      <div className="grid grid-cols-2 gap-4 sm:col-span-2">
-        <Field label="Starts at" hint="Leave both times blank for all day.">
-          <Input name="startTime" type="time" defaultValue={defaults.allDay ? "" : defaults.startTime} />
-        </Field>
-        <Field label="Ends at" hint="Optional.">
-          <Input name="endTime" type="time" defaultValue={defaults.allDay ? "" : defaults.endTime} />
-        </Field>
-      </div>
-      <Chips
-        name="memberId"
-        label="Who it's for"
-        className="sm:col-span-2"
-        defaultValue={defaults.memberId ?? ""}
-        options={[
-          { value: "", label: "Everyone" },
-          ...members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} size="sm" /> })),
-        ]}
-      />
-      {layers.length > 1 ? (
-        <Chips
-          name="layerId"
-          label="Layer"
-          className="sm:col-span-2"
-          defaultValue={defaults.layerId ?? layers[0]?.id}
-          options={layers.map((l) => ({
-            value: l.id,
-            label: l.name,
-            leading: <span aria-hidden className="size-4 rounded-full" style={{ background: strong(l.colour) }} />,
-          }))}
-        />
-      ) : (
-        <input type="hidden" name="layerId" value={layers[0]?.id ?? ""} />
-      )}
-      <Chips
-        name="repeatFrequency"
-        label="Repeats"
-        className="sm:col-span-2"
-        defaultValue={repeat?.frequency ?? "none"}
-        options={[
-          { value: "none", label: "No" },
-          { value: "daily", label: "Daily" },
-          { value: "weekly", label: "Weekly" },
-          { value: "monthly", label: "Monthly" },
-          { value: "yearly", label: "Yearly" },
-        ]}
-      />
-      <details open={usesMore} className="group rounded-[var(--radius-card)] border border-frame px-4 sm:col-span-2">
-        <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-ink">
-          More options
-          <span className="ml-2 font-normal text-ink-muted">picture, several days, repeat details, energy, who sees it, notes</span>
-        </summary>
-        <div className="grid gap-4 pb-4 sm:grid-cols-2">
-          <Field label="Picture" hint="One emoji, like 🦷 or 🏒. Leave blank to let Almanac pick from the title.">
-            <Input name="icon" defaultValue={defaults.icon} maxLength={8} placeholder="🗓️" />
-          </Field>
-          <Field label="Ends on" hint="Only for events over several days.">
-            <Input name="endDate" type="date" defaultValue={defaults.endDate === defaults.startDate ? "" : defaults.endDate} />
-          </Field>
-          <RepeatDetails repeat={repeat} />
-          <Chips
-            name="energyCost"
-            label="Energy cost"
-            className="sm:col-span-2"
-            defaultValue={String(defaults.energyCost ?? 1)}
-            options={ENERGY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
-          />
-          <Chips name="visibility" label="Who can see it" className="sm:col-span-2" defaultValue={defaults.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
-          <Field label="Notes" hint="Optional.">
-            <Input name="notes" defaultValue={defaults.notes} maxLength={2000} />
-          </Field>
-        </div>
-      </details>
-    </>
-  );
-}
+/** The form fields for events and layers. */
 
 export function LayerFields({ layer, members }: { layer?: Layer; members: Member[] }) {
   return (
@@ -249,16 +137,40 @@ export type QuickDefaults = {
   memberId?: string;
 };
 
+/** Everything the card can start with when it's editing an existing event. */
+export type CardDefaults = QuickDefaults & {
+  title?: string;
+  icon?: string;
+  notes?: string;
+  layerId?: string;
+  energyCost?: number;
+  visibility?: string;
+  repeat?: RepeatOptions;
+  /** Last day, for all-day events over several days. */
+  endDate?: string;
+};
+
 /**
- * The small "add an event" card: name, day, time and length up front, with
+ * The event card, for adding and editing: name, day, time and length up front, with
  * person buttons and an All day switch. Repeats, several days and the rest
  * are behind tabs. Put it inside a <form className="group ...">.
  */
-export function QuickAddFields({ layers, members, defaults }: { layers: Layer[]; members: Member[]; defaults: QuickDefaults }) {
+export function EventCardFields({
+  layers,
+  members,
+  defaults,
+  adding = false,
+}: {
+  layers: Layer[];
+  members: Member[];
+  defaults: CardDefaults;
+  /** Adding a new event: keep the dashed outline on the timeline in step. */
+  adding?: boolean;
+}) {
   return (
     <>
-      <PendingSync defaults={defaults} />
-      {layers.length > 1 ? null : <input type="hidden" name="layerId" value={layers[0]?.id ?? ""} />}
+      {adding ? <PendingSync defaults={defaults} /> : null}
+      {layers.length > 1 ? null : <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />}
       <CardTabs
         tabs={[
           {
@@ -266,7 +178,7 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
             panel: (
               <>
                 <Field label="What">
-                  <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus />
+                  <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus={adding} defaultValue={defaults.title} />
                 </Field>
                 <div className="grid grid-cols-[1fr_1fr] gap-4">
                   <Field label="Day">
@@ -307,7 +219,7 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
                 <Chips
                   name="repeatFrequency"
                   label="How often"
-                  defaultValue="none"
+                  defaultValue={defaults.repeat?.frequency ?? "none"}
                   options={[
                     { value: "none", label: "No" },
                     { value: "daily", label: "Daily" },
@@ -316,7 +228,7 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
                     { value: "yearly", label: "Yearly" },
                   ]}
                 />
-                <RepeatDetails />
+                <RepeatDetails repeat={defaults.repeat} />
               </>
             ),
           },
@@ -324,7 +236,7 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
             label: "Days",
             panel: (
               <Field label="Runs over several days? Last day" hint="Leave blank if it's just the one day.">
-                <Input name="endDate" type="date" />
+                <Input name="endDate" type="date" defaultValue={defaults.endDate && defaults.endDate !== defaults.date ? defaults.endDate : ""} />
               </Field>
             ),
           },
@@ -334,17 +246,17 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
               <>
                 <div className="grid grid-cols-[8rem_1fr] gap-4">
                   <Field label="Picture">
-                    <Input name="icon" maxLength={8} placeholder="🗓️" />
+                    <Input name="icon" maxLength={8} placeholder="🗓️" defaultValue={defaults.icon} />
                   </Field>
                   <Field label="Notes">
-                    <Input name="notes" maxLength={2000} />
+                    <Input name="notes" maxLength={2000} defaultValue={defaults.notes} />
                   </Field>
                 </div>
                 {layers.length > 1 ? (
                   <Chips
                     name="layerId"
                     label="Layer"
-                    defaultValue={layers[0]?.id}
+                    defaultValue={defaults.layerId ?? layers[0]?.id}
                     options={layers.map((l) => ({
                       value: l.id,
                       label: l.name,
@@ -355,10 +267,10 @@ export function QuickAddFields({ layers, members, defaults }: { layers: Layer[];
                 <Chips
                   name="energyCost"
                   label="Energy cost"
-                  defaultValue="1"
+                  defaultValue={String(defaults.energyCost ?? 1)}
                   options={ENERGY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
                 />
-                <Chips name="visibility" label="Who can see it" defaultValue="everyone" options={VISIBILITY_OPTIONS} />
+                <Chips name="visibility" label="Who can see it" defaultValue={defaults.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
               </>
             ),
           },
