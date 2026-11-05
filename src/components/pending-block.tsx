@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { memberRuns, spanBox } from "@/lib/calendar-layout";
+import { SideHandles } from "./side-handles";
 import { updatePending, usePending, type PendingEvent } from "./pending-store";
 import { useTimelineDrag, type Placement } from "./timeline-drag";
 
@@ -41,6 +43,17 @@ export function PendingSpans({ day, columns, first, last, gap }: { day: string; 
             last={last}
             placement={{ start: pending.start!, minutes: pending.minutes, day, member: run[0] }}
             style={spanBox(c0, c1, columns.length, gap)}
+            sides={{
+              columns,
+              c0,
+              c1,
+              gap,
+              // Everyone is the whole row; otherwise swap this run's people for the new ones.
+              onDone: ([a, b]) => {
+                const next = [...new Set([...pending.members.filter((m) => !run.includes(m)), ...columns.slice(a, b + 1)])];
+                updatePending({ members: columns.every((id) => next.includes(id)) ? [] : next });
+              },
+            }}
             onDrop={(p, from) => {
               const changes: Partial<PendingEvent> = { start: p.start, minutes: p.minutes };
               if (from && p.member && p.member !== from) {
@@ -65,22 +78,28 @@ function Outline({
   placement,
   style,
   onDrop,
+  sides,
 }: {
   first: number;
   last: number;
   placement: Placement;
   style?: React.CSSProperties;
   onDrop: (p: Placement, fromMember?: string) => void;
+  /** On Today: stretch it sideways over more people. */
+  sides?: { columns: string[]; c0: number; c1: number; gap: string; onDone: (range: [number, number]) => void };
 }) {
   const drag = useTimelineDrag({ first, last, placement, onDrop });
+  const [widening, setWidening] = useState<[number, number] | null>(null);
+  const wide = sides && widening ? spanBox(widening[0], widening[1], sides.columns.length, sides.gap) : null;
   return (
     <div
       {...drag.bodyHandlers}
       aria-label={`New event, ${drag.label}. Drag to move it.`}
       className={`absolute z-30 flex cursor-grab touch-none flex-col rounded-[0.875rem] border-2 border-dashed border-accent bg-[color-mix(in_srgb,var(--color-accent)_14%,white)] px-2 py-1 select-none active:cursor-grabbing ${style ? "" : "inset-x-1"}`}
-      style={{ ...style, ...drag.position }}
+      style={{ ...style, ...drag.position, ...wide }}
     >
       <span className="text-sm font-bold text-ink">{drag.label}</span>
+      {sides ? <SideHandles columns={sides.columns} c0={sides.c0} c1={sides.c1} onPreview={setWidening} onDone={sides.onDone} /> : null}
       <ResizeHandle handlers={drag.handleHandlers} />
     </div>
   );

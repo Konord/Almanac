@@ -1,8 +1,10 @@
 "use client";
 
-import { useTransition, type CSSProperties, type ReactNode } from "react";
+import { useState, useTransition, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { rescheduleEvent } from "@/app/calendar/actions";
+import { changeEventPeople, rescheduleEvent } from "@/app/calendar/actions";
+import { spanBox } from "@/lib/calendar-layout";
+import { SideHandles } from "./side-handles";
 import { ResizeHandle } from "./pending-block";
 import { clock, useTimelineDrag } from "./timeline-drag";
 
@@ -34,7 +36,7 @@ export function DraggableEvent({
    * On Today: every person's column in order, and the run of them this
    * bubble covers. Dragging it sideways moves it to the people it lands on.
    */
-  people?: { columns: string[]; run: string[] };
+  people?: { columns: string[]; run: string[]; gap: string };
   start: number;
   minutes: number;
   first: number;
@@ -71,6 +73,19 @@ export function DraggableEvent({
       }),
   });
 
+  // Stretching sideways over more people (Today only).
+  const [widening, setWidening] = useState<[number, number] | null>(null);
+  const c0 = people ? people.columns.indexOf(people.run[0]) : -1;
+  const c1 = people ? c0 + people.run.length - 1 : -1;
+  const wide = people && widening ? spanBox(widening[0], widening[1], people.columns.length, people.gap) : null;
+  const widen = (range: [number, number]) =>
+    startSaving(async () => {
+      if (!people) return;
+      const result = await changeEventPeople({ eventId, remove: people.run, add: people.columns.slice(range[0], range[1] + 1) });
+      if (result.error) window.alert(result.error);
+      else router.refresh();
+    });
+
   return (
     <div
       {...drag.bodyHandlers}
@@ -83,9 +98,10 @@ export function DraggableEvent({
         if (e.key === "Enter") router.push(href, { scroll: false });
       }}
       className={`${className} cursor-grab touch-none select-none active:cursor-grabbing ${drag.dragging ? "z-30 shadow-lg ring-2 ring-ink" : ""} ${saving ? "opacity-70" : ""}`}
-      style={{ ...style, ...drag.position }}
+      style={{ ...style, ...drag.position, ...wide }}
     >
       {children}
+      {people ? <SideHandles columns={people.columns} c0={c0} c1={c1} onPreview={setWidening} onDone={widen} /> : null}
       {drag.dragging ? (
         <span className="absolute right-1 bottom-5 rounded-md bg-ink px-1.5 text-sm font-bold text-board">{drag.label}</span>
       ) : null}

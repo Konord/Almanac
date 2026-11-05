@@ -323,7 +323,7 @@ function PeopleTimeline({
                     big
                     drag={{
                       day: today,
-                      people: { columns: columnIds, run },
+                      people: { columns: columnIds, run, gap: COLUMN_GAP },
                       start: block.startMin,
                       minutes: block.endMin - block.startMin,
                       first,

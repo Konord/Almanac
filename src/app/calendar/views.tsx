@@ -179,7 +179,7 @@ export function EventBlock({
   drag?: {
     day: LocalDate;
     /** On Today: the person columns, and which of them this bubble covers. */
-    people?: { columns: string[]; run: string[] };
+    people?: { columns: string[]; run: string[]; gap: string };
     start: number;
     minutes: number;
     first: number;

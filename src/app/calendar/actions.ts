@@ -531,6 +531,23 @@ async function moveMembers(householdId: string, eventId: string, change: { remov
   return setLinks("event_members", householdId, eventId, ids);
 }
 
+/**
+ * Stretching a bubble on Today over more (or fewer) people. For a
+ * repeating event this changes who every date is for.
+ */
+export async function changeEventPeople(input: { eventId: string; remove: string[]; add: string[] }): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  const supabase = await createClient();
+  const { data: event, error: findError } = await supabase.from("events").select("id, title").eq("id", input.eventId).maybeSingle();
+  if (findError || !event) return { error: "Couldn't find that event." };
+  const error = await moveMembers(household.id, event.id, { remove: input.remove, add: input.add });
+  if (error) return { error };
+  await log(household.id, "event_updated", "event", event.id, event.title);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return {};
+}
+
 // ---------------------------------------------------------------------------
 // Tags and templates
 // ---------------------------------------------------------------------------
