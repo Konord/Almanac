@@ -1,11 +1,14 @@
-import { Avatar, Chips, Field, Input, Select } from "@/components/ui";
-import { PERSON_COLOURS, strong } from "@/lib/colours";
+import Link from "next/link";
+import { Chips, Emoji, Field, Input, Select } from "@/components/ui";
+import { PERSON_COLOURS } from "@/lib/colours";
+import { eventEmoji } from "@/lib/emoji";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import { CardTabs, LengthControl } from "./quick-controls";
 import { PendingSync } from "./pending-sync";
 import { EmojiPicker } from "@/components/emoji-picker";
-import type { Layer, Member, SavedView } from "./types";
+import { Stickers } from "./stickers";
+import type { EventTemplate, Layer, Member, SavedView, Tag } from "./types";
 
 /** The form fields for events and layers. */
 
@@ -135,7 +138,8 @@ export type QuickDefaults = {
   startTime?: string;
   minutes: number;
   allDay: boolean;
-  memberId?: string;
+  memberIds?: string[];
+  tagIds?: string[];
 };
 
 /** Everything the card can start with when it's editing an existing event. */
@@ -159,25 +163,32 @@ export type CardDefaults = QuickDefaults & {
 export function EventCardFields({
   layers,
   members,
+  tags,
   defaults,
   adding = false,
+  templates,
 }: {
   layers: Layer[];
   members: Member[];
+  tags: Tag[];
   defaults: CardDefaults;
   /** Adding a new event: keep the dashed outline on the timeline in step. */
   adding?: boolean;
+  /** Ready-made events to start from (adding only). */
+  templates?: { list: EventTemplate[]; href: (id: string) => string; chosen?: string };
 }) {
   return (
     <>
       {adding ? <PendingSync defaults={defaults} /> : null}
-      {layers.length > 1 ? null : <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />}
+      {/* Tags replace layers on the card; events still quietly belong to one (Connor, 2026-11-05). */}
+      <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />
       <CardTabs
         tabs={[
           {
             label: "Event",
             panel: (
               <>
+                {templates ? <TemplateRow {...templates} /> : null}
                 <div className="flex gap-3">
                   <EmojiPicker initial={defaults.icon} />
                   <div className="min-w-0 flex-1">
@@ -206,15 +217,7 @@ export function EventCardFields({
                     All day
                   </label>
                 </div>
-                <Chips
-                  name="memberId"
-                  label="Who it's for"
-                  defaultValue={defaults.memberId ?? ""}
-                  options={[
-                    { value: "", label: "Everyone" },
-                    ...members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} size="sm" /> })),
-                  ]}
-                />
+                <Stickers members={members} tags={tags} memberIds={defaults.memberIds} tagIds={defaults.tagIds} />
               </>
             ),
           },
@@ -253,18 +256,6 @@ export function EventCardFields({
                 <Field label="Notes">
                   <Input name="notes" maxLength={2000} defaultValue={defaults.notes} />
                 </Field>
-                {layers.length > 1 ? (
-                  <Chips
-                    name="layerId"
-                    label="Layer"
-                    defaultValue={defaults.layerId ?? layers[0]?.id}
-                    options={layers.map((l) => ({
-                      value: l.id,
-                      label: l.name,
-                      leading: <span aria-hidden className="size-4 rounded-full" style={{ background: strong(l.colour) }} />,
-                    }))}
-                  />
-                ) : null}
                 <Chips
                   name="energyCost"
                   label="Energy cost"
@@ -278,5 +269,39 @@ export function EventCardFields({
         ]}
       />
     </>
+  );
+}
+
+/**
+ * Ready-made events across the top of the add card. Tapping one fills in
+ * the card (it reloads the card with ?template=). Templates are saved with
+ * "Save as a template too" when adding, and removed under Tags.
+ */
+function TemplateRow({ list, href, chosen }: { list: EventTemplate[]; href: (id: string) => string; chosen?: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-base font-bold text-ink">Start from</span>
+      {list.length === 0 ? (
+        <span className="text-base text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding one.</span>
+      ) : (
+        <div className="flex min-w-0 flex-wrap gap-2">
+          {list.slice(0, 6).map((t) => (
+            <Link
+              key={t.id}
+              href={href(t.id)}
+              scroll={false}
+              replace
+              aria-current={chosen === t.id ? "true" : undefined}
+              className={`inline-flex min-h-[var(--touch-target)] items-center gap-2 rounded-full border-2 px-4 text-lg ${
+                chosen === t.id ? "border-ink bg-rail font-bold" : "border-frame bg-board"
+              } text-ink`}
+            >
+              <Emoji emoji={t.icon || eventEmoji(null, t.title)} className="size-7" />
+              {t.title}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

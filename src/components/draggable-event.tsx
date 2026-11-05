@@ -57,7 +57,9 @@ export function DraggableEvent({
           date: p.day,
           startTime: clock(p.start),
           minutes: p.minutes,
-          ...(member !== undefined && p.member !== member ? { memberId: p.member === "everyone" ? null : (p.member ?? null) } : {}),
+          ...(member !== undefined && p.member !== member
+            ? { swapMember: { from: member === "everyone" ? null : member, to: p.member === "everyone" ? null : (p.member ?? null) } }
+            : {}),
         });
         if (result.error) {
           drag.clearPreview();

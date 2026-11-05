@@ -75,16 +75,100 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"events": {
+                },"event_members": {
                   Row: {
-                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"icon": string | null,"id": string,"layer_id": string,"member_id": string | null,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
+                    "event_id": string,"household_id": string,"member_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"energy_cost"?: number,"household_id": string,"icon"?: string | null,"id"?: string,"layer_id": string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
+                    "event_id": string,"household_id": string,"member_id": string
                   }
                   Update: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"energy_cost"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"layer_id"?: string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
+                    "event_id"?: string,"household_id"?: string,"member_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_members_event_id_household_id_fkey"
+      columns: ["event_id","household_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "event_members_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_members_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"event_tags": {
+                  Row: {
+                    "event_id": string,"household_id": string,"tag_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "event_id": string,"household_id": string,"tag_id": string
+                  }
+                  Update: {
+                    "event_id"?: string,"household_id"?: string,"tag_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_tags_event_id_household_id_fkey"
+      columns: ["event_id","household_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "event_tags_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_tags_tag_id_household_id_fkey"
+      columns: ["tag_id","household_id"]
+isOneToOne: false
+      referencedRelation: "tags"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"event_templates": {
+                  Row: {
+                    "all_day": boolean,"created_at": string,"household_id": string,"icon": string | null,"id": string,"member_ids": (string)[],"minutes": number,"notes": string | null,"sort_order": number,"start_time": string | null,"tag_ids": (string)[],"title": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "all_day"?: boolean,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"member_ids"?: (string)[],"minutes"?: number,"notes"?: string | null,"sort_order"?: number,"start_time"?: string | null,"tag_ids"?: (string)[],"title": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "all_day"?: boolean,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"member_ids"?: (string)[],"minutes"?: number,"notes"?: string | null,"sort_order"?: number,"start_time"?: string | null,"tag_ids"?: (string)[],"title"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_templates_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"events": {
+                  Row: {
+                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"icon": string | null,"id": string,"layer_id": string,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"energy_cost"?: number,"household_id": string,"icon"?: string | null,"id"?: string,"layer_id": string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"energy_cost"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"layer_id"?: string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
@@ -104,12 +188,6 @@ isOneToOne: false
       columns: ["layer_id","household_id"]
 isOneToOne: false
       referencedRelation: "layers"
-      referencedColumns: ["id","household_id"]
-    },{
-      foreignKeyName: "events_member_id_household_id_fkey"
-      columns: ["member_id","household_id"]
-isOneToOne: false
-      referencedRelation: "members"
       referencedColumns: ["id","household_id"]
     }
                   ]
@@ -161,14 +239,14 @@ isOneToOne: false
                   ]
                 },"members": {
                   Row: {
-                    "birth_year": number | null,"colour": string,"created_at": string,"household_id": string,"id": string,"name": string,"pin_hash": string | null,"role": string,"sort_order": number,"updated_at": string
+                    "birth_year": number | null,"colour": string,"created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"pin_hash": string | null,"role": string,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"household_id": string,"id"?: string,"name": string,"pin_hash"?: string | null,"role": string,"sort_order"?: number,"updated_at"?: string
+                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"pin_hash"?: string | null,"role": string,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"name"?: string,"pin_hash"?: string | null,"role"?: string,"sort_order"?: number,"updated_at"?: string
+                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"pin_hash"?: string | null,"role"?: string,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -283,6 +361,26 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "routine_templates_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"tags": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "tags_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
       referencedRelation: "households"

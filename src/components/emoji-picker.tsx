@@ -25,7 +25,20 @@ function Picture({ emoji, className }: { emoji: string; className: string }) {
  * suggestions for the name and a search box. Sends "icon" with the form
  * (blank = let Almanac guess).
  */
-export function EmojiPicker({ initial }: { initial?: string }) {
+export function EmojiPicker({
+  initial,
+  nameField = "title",
+  letter = false,
+  fullScreen = false,
+}: {
+  initial?: string;
+  /** The form field holding the name, for suggestions. */
+  nameField?: string;
+  /** For a person: with no picture they show the first letter of their name, not a guess. */
+  letter?: boolean;
+  /** Cover the whole screen instead of just the card it sits in. */
+  fullScreen?: boolean;
+}) {
   const [icon, setIcon] = useState(initial ?? "");
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -38,13 +51,13 @@ export function EmojiPicker({ initial }: { initial?: string }) {
   // Follow the name typed in the same form, for the guess and the suggestions.
   useEffect(() => {
     const form = marker.current?.form;
-    const field = form?.elements.namedItem("title") as HTMLInputElement | null;
+    const field = form?.elements.namedItem(nameField) as HTMLInputElement | null;
     if (!field) return;
     const read = () => setTitle(field.value);
     read();
     field.addEventListener("input", read);
     return () => field.removeEventListener("input", read);
-  }, []);
+  }, [nameField]);
 
   const shown = icon || eventEmoji(null, title);
   const pick = (emoji: string) => {
@@ -68,14 +81,18 @@ export function EmojiPicker({ initial }: { initial?: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={icon ? "Change the picture" : "Pick a picture (Almanac is guessing one from the name)"}
+        aria-label={icon ? "Change the picture" : letter ? "Pick a picture (showing the first letter for now)" : "Pick a picture (Almanac is guessing one from the name)"}
         className="flex size-[var(--touch-target)] shrink-0 items-center justify-center self-end rounded-[var(--radius)] border-2 border-frame bg-board hover:border-ink"
       >
-        <Picture emoji={shown} className={`size-9 ${icon ? "" : "opacity-60"}`} />
+        {letter && !icon ? (
+          <span className="text-2xl font-extrabold text-ink-muted">{[...title.trim()][0]?.toUpperCase() ?? "?"}</span>
+        ) : (
+          <Picture emoji={shown} className={`size-9 ${icon ? "" : "opacity-60"}`} />
+        )}
       </button>
 
       {open ? (
-        <div role="dialog" aria-label="Pick a picture" className="absolute inset-0 z-20 flex flex-col gap-4 bg-board px-8 py-6">
+        <div role="dialog" aria-label="Pick a picture" className={`${fullScreen ? "fixed inset-y-0 right-0 z-50 w-full max-w-[46rem] shadow-2xl" : "absolute inset-0 z-20"} flex flex-col gap-4 bg-board px-8 py-6`}>
           <div className="flex items-center gap-3">
             <h3 className="flex-1 text-2xl font-extrabold text-ink">Pick a picture</h3>
             <button
@@ -154,8 +171,14 @@ export function EmojiPicker({ initial }: { initial?: string }) {
                 icon ? "bg-rail text-ink" : "bg-ink text-board"
               }`}
             >
-              <Picture emoji={eventEmoji(null, title)} className="size-7" />
-              Let Almanac pick from the name
+              {letter ? (
+                <>No picture, just the letter</>
+              ) : (
+                <>
+                  <Picture emoji={eventEmoji(null, title)} className="size-7" />
+                  Let Almanac pick from the name
+                </>
+              )}
             </button>
             {pages > 1 ? (
               <div className="ml-auto flex items-center gap-2">

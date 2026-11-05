@@ -36,7 +36,7 @@ export function PeopleRow({
         const { done, total } = dayProgress(data, m.id, date);
         const inner = (
           <>
-            <Avatar name={m.name} colour={m.colour} />
+            <Avatar name={m.name} colour={m.colour} icon={m.icon} />
             <span className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="flex justify-between gap-2 text-lg font-bold text-ink">
                 <span className="truncate">{m.name}</span>

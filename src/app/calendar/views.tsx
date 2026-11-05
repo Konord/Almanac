@@ -34,9 +34,14 @@ export type Adding = {
   addHref: (day: LocalDate, extra?: Record<string, string>) => string;
 };
 
-/** Each event takes its person's colour; events for nobody in particular are "everyone" orange. */
-export function eventColour(event: CalendarItem, memberById: Map<string, Member>): string {
-  return (event.member_id ? memberById.get(event.member_id)?.colour : undefined) ?? EVERYONE_COLOUR;
+/**
+ * Each event takes its (first) person's colour; events for nobody in particular
+ * are "everyone" orange. On Today, pass the column's person so an event for
+ * two people takes each one's colour in their own column.
+ */
+export function eventColour(event: CalendarItem, memberById: Map<string, Member>, column?: string): string {
+  const id = column && event.member_ids.includes(column) ? column : event.member_ids.find((m) => memberById.has(m));
+  return (id ? memberById.get(id)?.colour : undefined) ?? EVERYONE_COLOUR;
 }
 
 function dayBounds(day: LocalDate, timeZone: string) {

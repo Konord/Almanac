@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { choreTiming, starterFirstDue, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
 import { addDays, localDateOf, type LocalDate } from "@/lib/time";
 
-export type ChoreMember = { id: string; name: string; colour: string };
+export type ChoreMember = { id: string; name: string; colour: string; icon: string | null };
 
 export type Chore = ChoreRule & {
   id: string;
@@ -62,7 +62,7 @@ export async function loadChores(today: LocalDate, timeZone: string) {
       .neq("status", "open")
       .gte("completed_on", addDays(today, -HISTORY_DAYS))
       .order("completed_on", { ascending: false }),
-    supabase.from("members").select("id, name, colour").order("sort_order").order("name"),
+    supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
   ]);
   for (const r of [chores, rounds, members]) if (r.error) throw r.error;
 

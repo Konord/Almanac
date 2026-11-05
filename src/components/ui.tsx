@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Alarm, Broom, CalendarBlank, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
-import { strong } from "@/lib/colours";
+import { soft, strong } from "@/lib/colours";
 
 /**
  * Small building blocks shared by every screen, in the locked "bright"
@@ -176,12 +176,36 @@ export function Card({
 }
 
 /** A person's round avatar: their initial on their strong colour. */
-export function Avatar({ name, colour, size = "md" }: { name: string; colour: string | null | undefined; size?: "sm" | "md" }) {
+/**
+ * A person's sticker: the first letter of their name in their colour, or
+ * their own picture (an emoji) on their pastel colour if they chose one.
+ */
+export function Avatar({
+  name,
+  colour,
+  icon,
+  size = "md",
+}: {
+  name: string;
+  colour: string | null | undefined;
+  icon?: string | null;
+  size?: "sm" | "md" | "lg";
+}) {
+  const box = size === "sm" ? "size-7 text-[0.8125rem]" : size === "lg" ? "size-12 text-xl" : "size-11 text-sm";
+  if (icon) {
+    return (
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full border-2 ${box}`}
+        style={{ background: soft(colour), borderColor: strong(colour) }}
+        aria-hidden
+      >
+        <Emoji emoji={icon} className="size-[72%]" />
+      </span>
+    );
+  }
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${
-        size === "sm" ? "size-7 text-[0.8125rem]" : "size-11 text-sm"
-      }`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${box}`}
       style={{ background: strong(colour) }}
       aria-hidden
     >

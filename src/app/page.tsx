@@ -70,7 +70,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, items }, routineData, choreData, todoData] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadChores(today, timeZone),
@@ -90,7 +90,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
-  const { placing, pending } = readAdding(params, household.settings, members);
+  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/");
 
   return (
     <>
@@ -163,7 +163,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       </Link>
 
       {pending ? (
-        <QuickAddSheet pending={pending} layers={layers} members={members} closeHref="/" returnTo="" returnPath="/" />
+        <QuickAddSheet pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
       ) : null}
     </>
   );
@@ -199,10 +199,10 @@ function PeopleTimeline({
   const { timeZone } = household.settings;
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
   const memberIds = new Set(members.map((m) => m.id));
-  const forEveryone = timed.filter((e) => !e.member_id || !memberIds.has(e.member_id));
+  const forEveryone = timed.filter((e) => !e.member_ids.some((id) => memberIds.has(id)));
   // Routines float around each person's own plans and the ones for everyone.
   const routinesFor = new Map(
-    members.map((m) => [m.id, floatingRoutines(routineData, m.id, today, [...timed.filter((e) => e.member_id === m.id), ...forEveryone], timeZone)]),
+    members.map((m) => [m.id, floatingRoutines(routineData, m.id, today, [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone], timeZone)]),
   );
   const placements = [...routinesFor.values()].flat().map((r) => r.placement);
   const range = timelineRange(timed, [today], timeZone);
@@ -212,6 +212,7 @@ function PeopleTimeline({
     id: string;
     name: string;
     colour: string;
+    icon?: string | null;
     items: CalendarItem[];
     progress?: { done: number; total: number };
   }[] = [
@@ -219,7 +220,8 @@ function PeopleTimeline({
       id: m.id,
       name: m.name,
       colour: m.colour,
-      items: timed.filter((e) => e.member_id === m.id),
+      icon: m.icon,
+      items: timed.filter((e) => e.member_ids.includes(m.id)),
       progress: dayProgress(routineData, m.id, today),
     })),
     // While adding, "Everyone" always shows so you can add things for the whole family.
@@ -246,7 +248,7 @@ function PeopleTimeline({
         <div className="flex shrink-0 gap-2.5 pl-16.5">
           {columns.map((c) => (
             <div key={c.id} className="flex min-w-0 flex-1 basis-0 items-center gap-2.5">
-              <Avatar name={c.name} colour={c.colour} />
+              <Avatar name={c.name} colour={c.colour} icon={c.icon} />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex justify-between gap-1 text-base font-bold text-ink">
                   <span className="truncate">{c.name}</span>

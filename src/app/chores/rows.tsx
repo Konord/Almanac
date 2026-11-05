@@ -64,7 +64,7 @@ export function ChoreRow({
         <span className="text-xl leading-[1.1] font-semibold text-ink">{chore.name}</span>
         <span className="truncate text-sm font-semibold text-ink-muted">{choreMeta(chore, today, household)}</span>
       </span>
-      {who ? <Avatar name={who.name} colour={who.colour} size="sm" /> : null}
+      {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
       <form action={skipChore}>
         {hidden}
         <button
@@ -194,7 +194,7 @@ export function TodoRow({
       {todo.due_date && !done ? (
         <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{dayLabel(todo.due_date, today, household)}</span>
       ) : null}
-      {who ? <Avatar name={who.name} colour={who.colour} size="sm" /> : null}
+      {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
     </li>
   );
 }

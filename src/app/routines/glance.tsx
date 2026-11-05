@@ -50,7 +50,7 @@ export function RoutinesGlance({ data, date, household, className = "" }: { data
               <li key={member.id} className="border-b border-panel last:border-0">
                 <Link href={`/routines?member=${member.id}`} className="flex flex-col gap-2.5 py-3.5">
                   <span className="flex items-center gap-3">
-                    <Avatar name={member.name} colour={member.colour} />
+                    <Avatar name={member.name} colour={member.colour} icon={member.icon} />
                     <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                       <span className="flex justify-between gap-2 text-lg font-bold text-ink">
                         <span className="truncate">

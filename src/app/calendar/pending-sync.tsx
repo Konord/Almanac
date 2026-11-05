@@ -12,7 +12,12 @@ import type { QuickDefaults } from "./forms";
  */
 export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
   const marker = useRef<HTMLSpanElement>(null);
+  /** The column the outline was last in, to tell when it's dragged to another person. */
+  const lastMember = useRef<string | null>(null);
   const pending = usePending();
+
+  // (A plain string, so the effect below doesn't re-run each time the page refreshes.)
+  const firstMember = defaults.memberIds?.[0] ?? "everyone";
 
   // Start from where you tapped, and forget it when the card closes.
   useEffect(() => {
@@ -21,10 +26,10 @@ export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
       start: defaults.startTime ? toMinutes(defaults.startTime) : null,
       minutes: defaults.minutes,
       allDay: defaults.allDay,
-      member: defaults.memberId ?? "everyone",
+      member: firstMember,
     });
     return () => setPending(null);
-  }, [defaults.date, defaults.startTime, defaults.minutes, defaults.allDay, defaults.memberId]);
+  }, [defaults.date, defaults.startTime, defaults.minutes, defaults.allDay, firstMember]);
 
   // Card → outline: typing or tapping on the card moves the outline.
   useEffect(() => {
@@ -35,7 +40,11 @@ export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
       if (input.name === "startDate" && input.value) updatePending({ date: input.value });
       if (input.name === "startTime") updatePending({ start: input.value ? toMinutes(input.value) : null });
       if (input.name === "allDay") updatePending({ allDay: input.checked });
-      if (input.name === "memberId") updatePending({ member: input.value || "everyone" });
+      // The outline sits in the first chosen person's column on Today.
+      if (input.name === "memberIds") {
+        const first = form.querySelector<HTMLInputElement>('input[name="memberIds"]:checked');
+        updatePending({ member: first?.value ?? "everyone" });
+      }
     };
     form.addEventListener("change", onChange);
     form.addEventListener("input", onChange);
@@ -57,8 +66,20 @@ export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
     if (start && start.value !== time) start.value = time;
     const allDay = field("allDay");
     if (allDay && allDay.checked !== pending.allDay) allDay.checked = pending.allDay;
-    const who = form.querySelector<HTMLInputElement>(`input[name="memberId"][value="${pending.member === "everyone" ? "" : CSS.escape(pending.member)}"]`);
-    if (who && !who.checked) who.checked = true;
+    // Dragged into another person's column: swap that person in.
+    const before = lastMember.current;
+    lastMember.current = pending.member;
+    // The first time, the card's ticks already come from where you tapped.
+    if (before === null || before === pending.member) return;
+    const box = (id: string) => form.querySelector<HTMLInputElement>(`input[name="memberIds"][value="${CSS.escape(id)}"]`);
+    if (pending.member === "everyone") {
+      form.querySelectorAll<HTMLInputElement>('input[name="memberIds"]').forEach((b) => (b.checked = false));
+    } else {
+      const from = before && before !== "everyone" ? box(before) : null;
+      if (from) from.checked = false;
+      const to = box(pending.member);
+      if (to) to.checked = true;
+    }
   }, [pending]);
 
   return <span ref={marker} hidden />;

@@ -27,6 +27,7 @@ function readMember(formData: FormData) {
   const colour = text(formData, "colour");
   const birthYearText = text(formData, "birthYear");
   const birthYear = birthYearText ? Number(birthYearText) : null;
+  const icon = text(formData, "icon");
 
   if (!name) back("error", "Every member needs a name.");
   if (role !== "parent" && role !== "child") back("error", "Choose parent or child.");
@@ -34,7 +35,8 @@ function readMember(formData: FormData) {
   if (birthYear !== null && (!Number.isInteger(birthYear) || birthYear < 1900 || birthYear > 2100)) {
     back("error", "Birth year should look like 2018.");
   }
-  return { name, role, colour, birth_year: birthYear };
+  if (icon && [...icon].length > 8) back("error", "The picture should be one emoji.");
+  return { name, role, colour, birth_year: birthYear, icon: icon || null };
 }
 
 async function log(action: string, targetType: string, targetId: string, details: Record<string, string> = {}) {

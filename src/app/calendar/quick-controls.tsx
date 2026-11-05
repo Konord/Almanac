@@ -2,17 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { updatePending, usePending } from "@/components/pending-store";
+import { lengthLabel } from "@/lib/quick-times";
 
 /** Ready-made lengths, in minutes. */
 const PRESETS = [30, 60, 120];
-
-/** "1 h 30" style label for a length in minutes. */
-export function lengthLabel(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m}`;
-}
 
 /**
  * How long an event lasts, set with buttons: a few ready-made lengths,

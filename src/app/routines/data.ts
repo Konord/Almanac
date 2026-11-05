@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assignmentsForDay, isRoutineKind, routineProgress, type Progress, type RoutineKind } from "@/lib/routines";
 import type { LocalDate } from "@/lib/time";
 
-export type RoutineMember = { id: string; name: string; role: string; colour: string };
+export type RoutineMember = { id: string; name: string; role: string; colour: string; icon: string | null };
 export type RoutineTemplate = {
   id: string;
   name: string;
@@ -44,7 +44,7 @@ export type RoutineData = {
 export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
   const supabase = await createClient();
   const [members, templates, steps, assignments, checks] = await Promise.all([
-    supabase.from("members").select("id, name, role, colour").order("sort_order").order("name"),
+    supabase.from("members").select("id, name, role, colour, icon").order("sort_order").order("name"),
     supabase.from("routine_templates").select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes").order("sort_order").order("name"),
     supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential").order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, weekdays, on_date, active").order("created_at"),

@@ -39,3 +39,11 @@ function toMinutes(time: string): number {
 function fromMinutes(total: number): LocalTime {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
+
+/** "1 h 30" style label for a length in minutes. */
+export function lengthLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m}`;
+}

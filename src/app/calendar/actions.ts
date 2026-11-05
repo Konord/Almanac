@@ -140,7 +140,7 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     defaultMinutes: readMinutes(formData) ?? settings.defaultEventMinutes,
   });
   if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
-  if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🦷.");
+  if (icon && [...icon].length > 8) back(formData, "error", "The picture should be one emoji, like 🦷.");
   if (![0, 1, 2, 3].includes(energyCost)) back(formData, "error", "Choose an energy cost.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
@@ -163,7 +163,6 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     ends_at: endsAt.toISOString(),
     all_day: allDay,
     timezone: timeZone,
-    member_id: optionalId(formData, "memberId"),
     energy_cost: energyCost,
     visibility,
     notes: notes || null,
@@ -207,6 +206,39 @@ function readRepeat(formData: FormData, startDate: string): string | null {
   return rule;
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The ids ticked on the card's stickers ("memberIds" for people, "tagIds" for tags). */
+function readIds(formData: FormData, key: "memberIds" | "tagIds"): string[] {
+  return [...new Set(formData.getAll(key).map(String).filter((id) => UUID.test(id)))];
+}
+
+/** Makes exactly these people (or tags) belong to an event. */
+async function setLinks(
+  table: "event_members" | "event_tags",
+  householdId: string,
+  eventId: string,
+  ids: string[],
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { error: clearError } = await supabase.from(table).delete().eq("event_id", eventId);
+  if (clearError) return clearError.message;
+  if (ids.length === 0) return null;
+  const { error } =
+    table === "event_members"
+      ? await supabase.from(table).insert(ids.map((id) => ({ event_id: eventId, member_id: id, household_id: householdId })))
+      : await supabase.from(table).insert(ids.map((id) => ({ event_id: eventId, tag_id: id, household_id: householdId })));
+  return error?.message ?? null;
+}
+
+/** Saves an event's people and tags from the card. */
+async function saveStickers(formData: FormData, householdId: string, eventId: string) {
+  const error =
+    (await setLinks("event_members", householdId, eventId, readIds(formData, "memberIds"))) ??
+    (await setLinks("event_tags", householdId, eventId, readIds(formData, "tagIds")));
+  if (error) back(formData, "error", error);
+}
+
 export async function addEvent(formData: FormData) {
   const household = await requireHousehold();
   const event = readEvent(formData, household.settings);
@@ -217,9 +249,29 @@ export async function addEvent(formData: FormData) {
     .select("id")
     .single();
   if (error) back(formData, "error", error.message);
+  await saveStickers(formData, household.id, data.id);
   await log(household.id, "event_added", "event", data.id, event.title);
+  // "Save as a template" next to the Add button.
+  if (formData.get("saveTemplate") === "on") {
+    const startTime = text(formData, "startTime");
+    const { error: templateError } = await supabase.from("event_templates").insert({
+      household_id: household.id,
+      title: event.title,
+      icon: event.icon,
+      start_time: !event.all_day && isLocalTime(startTime) ? startTime : null,
+      minutes: readMinutes(formData) ?? household.settings.defaultEventMinutes,
+      all_day: event.all_day,
+      member_ids: readIds(formData, "memberIds"),
+      tag_ids: readIds(formData, "tagIds"),
+      notes: event.notes,
+      sort_order: 100,
+    });
+    if (templateError) back(formData, "error", `Added ${event.title}, but the template didn't save: ${templateError.message}`);
+    await log(household.id, "template_added", "event_template", data.id, event.title);
+  }
   revalidatePath("/calendar");
-  back(formData, "message", `Added ${event.title}.`);
+  revalidatePath("/");
+  back(formData, "message", formData.get("saveTemplate") === "on" ? `Added ${event.title} and saved it as a template.` : `Added ${event.title}.`);
 }
 
 export async function updateEvent(formData: FormData) {
@@ -229,6 +281,7 @@ export async function updateEvent(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("events").update(event).eq("id", id);
   if (error) back(formData, "error", error.message);
+  await saveStickers(formData, household.id, id);
   await log(household.id, "event_updated", "event", id, event.title);
   revalidatePath("/calendar");
   back(formData, "message", `Saved ${event.title}.`);
@@ -402,7 +455,8 @@ export async function chooseView(formData: FormData) {
  * Moves or stretches an event after it's dragged on the week or Today
  * timeline. A one-off event just changes; for a repeating event only the
  * dragged date moves (like "Move just this one"). Dropping it in another
- * person's column on Today also changes who it's for (one-off events only).
+ * person's column on Today swaps that person in for the one whose column
+ * it came from (one-off events only).
  * Called straight from the browser, so it returns an error instead of redirecting.
  */
 export async function rescheduleEvent(input: {
@@ -411,7 +465,8 @@ export async function rescheduleEvent(input: {
   date: string;
   startTime: string;
   minutes: number;
-  memberId?: string | null;
+  /** Moved between Today's columns; null is the Everyone column. */
+  swapMember?: { from: string | null; to: string | null };
 }): Promise<{ error?: string }> {
   const household = await requireHousehold();
   const { timeZone } = household.settings;
@@ -441,17 +496,74 @@ export async function rescheduleEvent(input: {
     if (error) return { error: error.message };
     await log(household.id, "event_occurrence_moved", "event", eventId, `${event.title} (${occurrenceDate})`);
   } else {
-    const changes: { starts_at: string; ends_at: string; all_day: boolean; member_id?: string | null } = {
-      starts_at: startsAt.toISOString(),
-      ends_at: endsAt.toISOString(),
-      all_day: false,
-    };
-    if (input.memberId !== undefined) changes.member_id = input.memberId;
-    const { error } = await supabase.from("events").update(changes).eq("id", eventId);
+    const { error } = await supabase
+      .from("events")
+      .update({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), all_day: false })
+      .eq("id", eventId);
     if (error) return { error: error.message };
+    const swap = input.swapMember;
+    if (swap) {
+      const { data: rows, error: whoError } = await supabase.from("event_members").select("member_id").eq("event_id", eventId);
+      if (whoError) return { error: whoError.message };
+      // Into the Everyone column: it's for everyone. Otherwise swap the person.
+      const ids = swap.to === null ? [] : [...new Set([...rows.map((r) => r.member_id).filter((id) => id !== swap.from), swap.to])];
+      const linkError = await setLinks("event_members", household.id, eventId, ids.filter((id) => UUID.test(id)));
+      if (linkError) return { error: linkError };
+    }
     await log(household.id, "event_updated", "event", eventId, event.title);
   }
   revalidatePath("/calendar");
   revalidatePath("/");
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// Tags and templates
+// ---------------------------------------------------------------------------
+
+/**
+ * Makes a new tag from the add card's "+ Tag" sticker. Called straight from
+ * the browser, so it returns the new tag (or an error) instead of redirecting.
+ */
+export async function createTag(input: { name: string; icon: string }): Promise<{ tag?: { id: string; name: string; icon: string | null }; error?: string }> {
+  const household = await requireHousehold();
+  const name = input.name.trim();
+  const icon = input.icon.trim() || null;
+  if (!name || name.length > 30) return { error: "A tag needs a name of up to 30 letters." };
+  if (icon && [...icon].length > 8) return { error: "The picture should be one emoji." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tags")
+    .insert({ household_id: household.id, name, icon, sort_order: 100 })
+    .select("id, name, icon")
+    .single();
+  if (error) return { error: error.code === "23505" ? `There's already a tag called ${name}.` : error.message };
+  await log(household.id, "tag_added", "tag", data.id, name);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return { tag: data };
+}
+
+export async function removeTag(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+  const { error } = await supabase.from("tags").delete().eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "tag_removed", "tag", id, name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Removed the ${name} tag.`);
+}
+
+export async function removeTemplate(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+  const { error } = await supabase.from("event_templates").delete().eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "template_removed", "event_template", id, name);
+  revalidatePath("/calendar");
+  back(formData, "message", `Removed the ${name} template.`);
 }

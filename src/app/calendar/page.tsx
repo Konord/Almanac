@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Plus, Stack, X } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
+import { CaretLeft, CaretRight, Plus, Stack, Tag, Trash, X } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
 import { strong } from "@/lib/colours";
@@ -18,6 +18,8 @@ import {
   moveOccurrence,
   removeEvent,
   removeLayer,
+  removeTag,
+  removeTemplate,
   resetOccurrence,
   skipOccurrence,
   updateEvent,
@@ -27,8 +29,10 @@ import { EventCardFields, LayerFields, ViewFields } from "./forms";
 import { ViewChooser } from "./view-chooser";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
 import { VISIBILITY_OPTIONS } from "./options";
-import { deviceView, EVENT_COLUMNS, itemsInView, loadCalendar, profilesFor, rangeOf } from "./data";
-import type { CalendarEvent, CalendarItem, Layer, Member, SavedView } from "./types";
+import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, profilesFor, rangeOf } from "./data";
+import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedView, Tag as TagType } from "./types";
+import { eventEmoji } from "@/lib/emoji";
+import { lengthLabel } from "@/lib/quick-times";
 import { loadRoutines } from "../routines/data";
 import { PeopleRow } from "../routines/people-row";
 import { MonthView, WeekView } from "./views";
@@ -58,11 +62,12 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const editId = firstParam(params.edit);
   const occParam = firstParam(params.occ);
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
-  const panel = firstParam(params.panel) === "layers" ? "layers" : null;
+  const panelParam = firstParam(params.panel);
+  const panel = panelParam === "layers" || panelParam === "tags" ? panelParam : null;
 
   const days = view === "week" ? weekDays(anchor, weekStartsOn) : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, items, exceptions }, routineData] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items, exceptions }, routineData] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
   ]);
@@ -70,7 +75,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const events: CalendarItem[] = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
   const layerById = new Map(layers.map((l) => [l.id, l]));
-  const { placing, pending } = readAdding(params, household.settings, members);
+  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
   // The event being edited might be outside the visible range, so fetch it on its own.
@@ -81,7 +86,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       .select(EVENT_COLUMNS)
       .eq("id", editId)
       .maybeSingle();
-    editing = data;
+    editing = data ? toEvent(data) : null;
   }
 
   // While adding, moving between weeks or views keeps you in adding mode.
@@ -114,6 +119,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={view === "week" ? "Next week" : "Next month"} icon={CaretRight} />
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+          <SoftLink href={href({ panel: "tags", edit: null, add: null })}>
+            <Tag size="1.5rem" aria-hidden />
+            Tags
+          </SoftLink>
           <SoftLink href={href({ panel: "layers", edit: null, add: null })}>
             <Stack size="1.5rem" aria-hidden />
             {savedView ? savedView.name : "Layers"}
@@ -187,13 +196,14 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             household={household}
             layers={layers}
             members={members}
+            tags={tags}
             returnTo={returnTo}
             closeHref={closeHref}
             occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
             occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
             isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
             skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
-            memberName={editing.member_id ? memberById.get(editing.member_id)?.name : undefined}
+            memberName={editing.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(" and ") || undefined}
           />
         </Sheet>
       ) : null}
@@ -202,7 +212,13 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         <QuickAddSheet
           // A day late in the week opens the card on the left, so the day stays in view.
           side={(dayOfWeek(pending.date) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right"}
-          pending={pending} layers={layers} members={members} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
+          pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
+      ) : null}
+
+      {panel === "tags" ? (
+        <Sheet title="Tags and templates" closeHref={closeHref} narrow>
+          <TagsPanel tags={tags} templates={templates} memberById={memberById} tagById={new Map(tags.map((t) => [t.id, t]))} returnTo={returnTo} />
+        </Sheet>
       ) : null}
 
       {panel === "layers" ? (
@@ -349,6 +365,7 @@ function EditEventPanel({
   household,
   layers,
   members,
+  tags,
   returnTo,
   closeHref,
   memberName,
@@ -367,6 +384,7 @@ function EditEventPanel({
   household: Household;
   layers: Layer[];
   members: Member[];
+  tags: TagType[];
   returnTo: string;
   closeHref: string;
   memberName: string | undefined;
@@ -423,6 +441,7 @@ function EditEventPanel({
         <EventCardFields
           layers={layers}
           members={members}
+          tags={tags}
           defaults={{
             title: event.title,
             layerId: event.layer_id,
@@ -431,7 +450,8 @@ function EditEventPanel({
             allDay: event.all_day,
             startTime: event.all_day ? undefined : localTimeOf(start, timeZone),
             minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
-            memberId: event.member_id ?? "",
+            memberIds: event.member_ids,
+            tagIds: event.tag_ids,
             energyCost: event.energy_cost,
             visibility: event.visibility,
             notes: event.notes ?? "",
@@ -585,4 +605,89 @@ function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household:
 
 function visibilityLabel(value: string): string {
   return VISIBILITY_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/**
+ * The tags and templates you've made, with a way to remove each. New ones
+ * are made on the add card ("New tag", and "Save as a template too").
+ */
+function TagsPanel({
+  tags,
+  templates,
+  memberById,
+  tagById,
+  returnTo,
+}: {
+  tags: TagType[];
+  templates: EventTemplate[];
+  memberById: Map<string, Member>;
+  tagById: Map<string, TagType>;
+  returnTo: string;
+}) {
+  const back = `${returnTo}&panel=tags`;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <section className="flex flex-col gap-3">
+        <h3 className="text-2xl font-bold text-ink">Tags</h3>
+        {tags.length === 0 ? <p className="text-lg text-ink-muted">No tags yet. Tap &ldquo;New tag&rdquo; when adding an event.</p> : null}
+        <ul className="grid grid-cols-2 gap-2">
+          {tags.slice(0, 16).map((t) => (
+            <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
+              <Emoji emoji={t.icon || eventEmoji(null, t.name)} className="size-8" />
+              <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{t.name}</span>
+              <form action={removeTag}>
+                <input type="hidden" name="id" value={t.id} />
+                <input type="hidden" name="name" value={t.name} />
+                <input type="hidden" name="returnTo" value={back} />
+                <RemoveButton label={`Remove the ${t.name} tag`} />
+              </form>
+            </li>
+          ))}
+        </ul>
+        {tags.length > 16 ? <p className="text-base text-ink-muted">+ {tags.length - 16} more</p> : null}
+      </section>
+      <section className="flex flex-col gap-3">
+        <h3 className="text-2xl font-bold text-ink">Templates</h3>
+        {templates.length === 0 ? (
+          <p className="text-lg text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding an event.</p>
+        ) : null}
+        <ul className="grid grid-cols-2 gap-2">
+          {templates.slice(0, 8).map((t) => {
+            const who = t.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(", ");
+            const tagNames = t.tag_ids.map((id) => tagById.get(id)?.name).filter(Boolean).join(", ");
+            const when = t.all_day ? "All day" : `${t.start_time ? `${t.start_time}, ` : ""}${lengthLabel(t.minutes)}`;
+            return (
+              <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
+                <Emoji emoji={t.icon || eventEmoji(null, t.title)} className="size-8" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-lg font-bold text-ink">{t.title}</span>
+                  <span className="truncate text-sm text-ink-muted">{[when, who, tagNames].filter(Boolean).join(" · ")}</span>
+                </span>
+                <form action={removeTemplate}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <input type="hidden" name="name" value={t.title} />
+                  <input type="hidden" name="returnTo" value={back} />
+                  <RemoveButton label={`Remove the ${t.title} template`} />
+                </form>
+              </li>
+            );
+          })}
+        </ul>
+        {templates.length > 8 ? <p className="text-base text-ink-muted">+ {templates.length - 8} more</p> : null}
+      </section>
+    </div>
+  );
+}
+
+function RemoveButton({ label }: { label: string }) {
+  return (
+    <button
+      type="submit"
+      aria-label={label}
+      title={label}
+      className="flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-danger"
+    >
+      <Trash size="1.5rem" aria-hidden />
+    </button>
+  );
 }
