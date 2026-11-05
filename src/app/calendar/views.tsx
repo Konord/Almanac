@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Emoji } from "@/components/ui";
-import { EVERYONE_COLOUR, soft } from "@/lib/colours";
+import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import type { Household } from "@/lib/household";
 import { layoutDay, monthOf } from "@/lib/calendar-layout";
@@ -449,8 +449,10 @@ export function WeekView({ household, days, today, events, memberById, href, pro
 // Month view
 // ---------------------------------------------------------------------------
 
-/** How many things a month cell lists before "+ N more". */
+/** How many timed events a month cell lists before "+ N more". */
 const MONTH_CELL_LIMIT = 4;
+/** How many stickers fit beside the date number. */
+const MONTH_STICKER_LIMIT = 4;
 
 export function MonthView({
   household,
@@ -481,13 +483,17 @@ export function MonthView({
         style={{ gridTemplateRows: `repeat(${weeks}, minmax(0, 1fr))` }}
       >
         {days.map((day, i) => {
-          const dayEvents = eventsOnDay(events, day, timeZone).sort((a, b) => {
-            const aAll = isAllDayStyle(a, timeZone) ? 0 : 1;
-            const bAll = isAllDayStyle(b, timeZone) ? 0 : 1;
-            return aAll - bAll || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
-          });
-          const shown = dayEvents.slice(0, MONTH_CELL_LIMIT);
-          const more = dayEvents.length - shown.length;
+          // Connor's sketch (2026-11-05): all-day things are stickers beside the date;
+          // timed events are lines of picture, title in the person's colour, and time.
+          const dayEvents = eventsOnDay(events, day, timeZone);
+          const stickers = dayEvents.filter((e) => isAllDayStyle(e, timeZone));
+          const timed = dayEvents
+            .filter((e) => !isAllDayStyle(e, timeZone))
+            .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+          const shownStickers = stickers.slice(0, MONTH_STICKER_LIMIT);
+          const shown = timed.slice(0, MONTH_CELL_LIMIT);
+          const more = timed.length - shown.length + stickers.length - shownStickers.length;
+          const editHref = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
           const inMonth = monthOf(day) === month;
           const profile = profiles.get(day);
           return (
@@ -505,7 +511,7 @@ export function MonthView({
                   className="absolute inset-0 z-10 hover:bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
                 />
               ) : null}
-              <div className="flex shrink-0 items-center justify-between gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <Link
                   href={href({
                     view: "week",
@@ -521,28 +527,30 @@ export function MonthView({
                 >
                   {Number(day.slice(8))}
                 </Link>
-                {inMonth && profile && profile.kind !== "free" ? <ProfileTag kind={profile.kind} /> : null}
+                {shownStickers.map((e) => (
+                  <Link key={e.id} href={editHref(e)} scroll={false} title={e.title} aria-label={`${e.title}, all day`} className="shrink-0">
+                    <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-8" />
+                  </Link>
+                ))}
+                {inMonth && profile && profile.kind !== "free" ? (
+                  <span className="ml-auto">
+                    <ProfileTag kind={profile.kind} />
+                  </span>
+                ) : null}
               </div>
               {shown.map((e) => (
                 <Link
                   key={e.id}
-                  href={href({
-                    edit: e.series_id,
-                    occ: e.occurrence_date,
-                    add: null,
-                    panel: null,
-                  })}
+                  href={editHref(e)}
                   scroll={false}
-                  className="flex min-h-0 shrink items-center gap-1.5 overflow-hidden rounded-lg px-1.5 py-0.5 text-sm font-bold text-ink"
-                  style={{ background: soft(eventColour(e, memberById)) }}
+                  title={`${e.title}, ${timeRange(e, household)}`}
+                  className="flex min-h-0 shrink items-center gap-1.5 overflow-hidden px-1 text-base font-bold"
                 >
-                  <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-5.5" />
-                  {isAllDayStyle(e, timeZone) ? null : (
-                    <span className="shrink-0 font-semibold text-ink-soft">
-                      {shortTime(new Date(e.starts_at), household)}
-                    </span>
-                  )}
-                  <span className="truncate">{e.title}</span>
+                  <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
+                  <span className="min-w-0 truncate" style={{ color: strong(eventColour(e, memberById)) }}>
+                    {e.title}
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-ink-soft">{shortTime(new Date(e.starts_at), household)}</span>
                 </Link>
               ))}
               {more > 0 ? (
