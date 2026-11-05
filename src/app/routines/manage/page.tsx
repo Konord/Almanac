@@ -1,10 +1,11 @@
 import { Suspense } from "react";
-import { Button, Notice, firstParam } from "@/components/ui";
+import { ArrowLeft, CalendarCheck, ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Button, Card, Notice, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { addRoutine } from "../actions";
 import { loadRoutines } from "../data";
-import { Assignments, NavButton, RoutineFields, TemplateEditor } from "../sections";
+import { Assignments, RoutineFields, TemplateEditor } from "../sections";
 
 /**
  * Setting routines up: who does which routine on which days, and each
@@ -13,11 +14,11 @@ import { Assignments, NavButton, RoutineFields, TemplateEditor } from "../sectio
 export default function ManageRoutinesPage(props: PageProps<"/routines/manage">) {
   return (
     // On a landscape screen each half scrolls on its own, so the page fits.
-    <main className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-4 p-4 sm:p-6 lg:h-dvh lg:max-h-dvh lg:min-h-0 lg:overflow-hidden">
+    <AppFrame section="routines">
       <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
         <Manage searchParams={props.searchParams} />
       </Suspense>
-    </main>
+    </AppFrame>
   );
 }
 
@@ -32,24 +33,26 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-b-4 border-marker-blue pb-3">
-        <NavButton href="/">Home</NavButton>
-        <NavButton href="/routines">Back to checklists</NavButton>
-        <h1 className="text-3xl font-semibold tracking-tight text-ink sm:ml-2">Set up routines</h1>
-      </div>
+      <ScreenHeader title="Set up routines">
+        <SoftLink href="/routines" className="lg:ml-auto">
+          <ArrowLeft size="1.5rem" aria-hidden />
+          Back to checklists
+        </SoftLink>
+      </ScreenHeader>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-2">
-        <section className="flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
-          <h2 className="text-2xl font-semibold text-ink">Who does which routine, when</h2>
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-2">
+        <Card title="Who does which routine, when" icon={CalendarCheck} tint="blue">
+          <div className="mt-2 flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
           <Assignments data={data} household={household} date={today} returnTo={returnTo} />
-        </section>
+          </div>
+        </Card>
 
-        <section className="flex flex-col gap-3 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
-          <h2 className="text-2xl font-semibold text-ink">Routines and their steps</h2>
-          <p className="text-base text-ink-muted">
+        <Card title="Routines and their steps" icon={ListChecks} tint="teal">
+          <div className="mt-2 flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
+          <p className="text-lg text-ink-muted">
             The ready-made routines are a starting point. Change the steps to suit your family. Essential steps are the
             ones kept on low-energy days.
           </p>
@@ -62,8 +65,8 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
               household={household}
             />
           ))}
-          <details className="rounded-[var(--radius)] border-2 border-frame bg-panel/60 p-4">
-            <summary className="cursor-pointer text-lg font-semibold text-ink">+ Make a new routine</summary>
+          <details className="rounded-[var(--radius-card)] bg-rail p-4">
+            <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">+ Make a new routine</summary>
             <form action={addRoutine} className="mt-4 grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="returnTo" value={returnTo} />
               <RoutineFields />
@@ -72,7 +75,8 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
               </div>
             </form>
           </details>
-        </section>
+          </div>
+        </Card>
       </div>
     </>
   );

@@ -1,29 +1,33 @@
-/** The marker colours a member can be shown in (theme token names). */
-export const MEMBER_COLOURS = [
-  { value: "marker-blue", label: "Blue" },
-  { value: "marker-red", label: "Red" },
-  { value: "marker-green", label: "Green" },
-  { value: "marker-black", label: "Black" },
+/**
+ * One colour per person. Each has a strong shade (avatars, progress bars)
+ * and a pastel shade (event blocks). The shades themselves are theme
+ * tokens, so a seasonal theme can tweak them; here we only name them.
+ */
+export const PERSON_COLOURS = [
+  { value: "blue", label: "Blue" },
+  { value: "pink", label: "Pink" },
+  { value: "teal", label: "Teal" },
+  { value: "purple", label: "Purple" },
+  { value: "orange", label: "Orange" },
+  { value: "green", label: "Green" },
+  { value: "slate", label: "Slate" },
 ] as const;
 
-export type MemberColour = (typeof MEMBER_COLOURS)[number]["value"];
+export type PersonColour = (typeof PERSON_COLOURS)[number]["value"];
 
-/** Tailwind needs whole class names written out, so map colour to class. */
-export const MEMBER_COLOUR_CLASS: Record<string, string> = {
-  "marker-blue": "bg-marker-blue",
-  "marker-red": "bg-marker-red",
-  "marker-green": "bg-marker-green",
-  "marker-black": "bg-marker-black",
-};
+/** Things for everyone (no one person) use orange, as in the style guide. */
+export const EVERYONE_COLOUR: PersonColour = "orange";
 
-export function isMemberColour(value: string): value is MemberColour {
-  return MEMBER_COLOURS.some((c) => c.value === value);
+export function isPersonColour(value: string): value is PersonColour {
+  return PERSON_COLOURS.some((c) => c.value === value);
 }
 
-/** Filled "chip" look for calendar items, per marker colour. */
-export const CHIP_CLASS: Record<string, string> = {
-  "marker-blue": "bg-marker-blue text-board",
-  "marker-red": "bg-marker-red text-board",
-  "marker-green": "bg-marker-green text-board",
-  "marker-black": "bg-marker-black text-board",
-};
+/** The strong shade, as a CSS value, e.g. for an avatar background. */
+export function strong(colour: string | null | undefined): string {
+  return `var(--color-person-${isPersonColour(colour ?? "") ? colour : EVERYONE_COLOUR})`;
+}
+
+/** The pastel shade, as a CSS value, e.g. for an event block. */
+export function soft(colour: string | null | undefined): string {
+  return `var(--color-person-${isPersonColour(colour ?? "") ? colour : EVERYONE_COLOUR}-soft)`;
+}

@@ -1,19 +1,19 @@
 import { Suspense } from "react";
-import Link from "next/link";
-import { Button, Field, Input, Notice, PageShell, Panel, Select, firstParam } from "@/components/ui";
+import { GearSix, SignOut, UsersThree, ClockCounterClockwise } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Avatar, Button, Card, Field, Input, Notice, ScreenHeader, Select, firstParam } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { addMember, removeMember, saveSettings, setPin, updateMember } from "./actions";
-import { MEMBER_COLOURS, MEMBER_COLOUR_CLASS } from "@/lib/colours";
+import { PERSON_COLOURS, strong } from "@/lib/colours";
 
 export default function HouseholdPage(props: PageProps<"/household">) {
   return (
-    <PageShell title="Household">
+    <AppFrame section="settings">
       <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
         <HouseholdContent searchParams={props.searchParams} />
       </Suspense>
-    </PageShell>
+    </AppFrame>
   );
 }
 
@@ -57,48 +57,49 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
   const { settings } = household;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-2xl text-ink">{household.name}</p>
-        <div className="flex gap-3">
-          <Link
-            href="/"
-            className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] border-2 border-frame bg-board px-5 text-lg text-ink"
-          >
-            Home
-          </Link>
-          <form action={signOut}>
-            <Button variant="secondary">Sign out</Button>
-          </form>
-        </div>
-      </div>
+    <>
+      <ScreenHeader title="Settings">
+        <span className="text-2xl text-ink-muted lg:text-4xl">{household.name}</span>
+        <form action={signOut} className="lg:ml-auto">
+          <Button variant="secondary">
+            <SignOut size="1.5rem" aria-hidden />
+            Sign out
+          </Button>
+        </form>
+      </ScreenHeader>
 
       {error_ ? <Notice tone="error">{error_}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      <Panel title="People">
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Card title="People" icon={UsersThree} tint="blue">
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
         {members.length === 0 ? (
           <p className="mb-4 text-lg text-ink-muted">No one yet. Add the first person below.</p>
         ) : (
           <ul className="mb-6 flex flex-col gap-4">
             {members.map((member) => (
-              <li key={member.id} className="rounded-[var(--radius)] border-2 border-frame bg-board p-4">
+              <li key={member.id} className="border-b border-frame py-3 last:border-0">
                 <MemberEditor member={member} />
               </li>
             ))}
           </ul>
         )}
 
-        <h3 className="mb-3 text-xl font-semibold text-ink">Add someone</h3>
-        <form action={addMember} className="grid gap-4 sm:grid-cols-2">
-          <MemberFields />
-          <div className="sm:col-span-2">
-            <Button>Add</Button>
-          </div>
-        </form>
-      </Panel>
+        <details className="rounded-[var(--radius-card)] bg-rail p-4">
+          <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">Add someone</summary>
+          <form action={addMember} className="mt-2 grid gap-4 sm:grid-cols-2">
+            <MemberFields />
+            <div className="sm:col-span-2">
+              <Button>Add</Button>
+            </div>
+          </form>
+        </details>
+        </div>
+      </Card>
 
-      <Panel title="Settings">
+      <Card title="Household" icon={GearSix} tint="slate">
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
         <form action={saveSettings} className="grid gap-4 sm:grid-cols-2">
           <Field label="Household name">
             <Input name="householdName" defaultValue={household.name} required maxLength={80} />
@@ -127,8 +128,14 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               <option value="fahrenheit">Fahrenheit</option>
             </Select>
           </Field>
-          <fieldset className="grid gap-4 rounded-[var(--radius)] border-2 border-frame p-4 sm:col-span-2 sm:grid-cols-3">
-            <legend className="px-2 text-lg font-semibold text-ink">Free and busy days</legend>
+          <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-2">
+            <input type="checkbox" name="handwriting" defaultChecked={settings.handwriting} className="size-6 accent-accent" />
+            <span>
+              Show to-dos, meals and notes in <span className="font-hand text-xl font-bold">handwriting</span>
+            </span>
+          </label>
+          <fieldset className="grid gap-4 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2 sm:grid-cols-3">
+            <legend className="px-2 text-lg font-bold text-ink">Free and busy days</legend>
             <p className="text-base text-ink-muted sm:col-span-3">
               The Today screen calls a day free or busy from the events in it. Only time between the start and end of
               the day counts, and only layers set to count toward busy.
@@ -169,9 +176,11 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
             <Button>Save settings</Button>
           </div>
         </form>
-      </Panel>
 
-      <Panel title="Recent activity">
+        <h3 className="mt-8 mb-2 flex items-center gap-2 text-2xl font-bold text-ink">
+          <ClockCounterClockwise size="1.75rem" aria-hidden className="text-ink-muted" />
+          Recent activity
+        </h3>
         {activity && activity.length > 0 ? (
           <ul className="flex flex-col gap-2 text-base text-ink">
             {activity.map((entry) => (
@@ -190,8 +199,10 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
         ) : (
           <p className="text-lg text-ink-muted">Nothing yet.</p>
         )}
-      </Panel>
-    </div>
+        </div>
+      </Card>
+      </div>
+    </>
   );
 }
 
@@ -199,8 +210,8 @@ function MemberEditor({ member }: { member: Member }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <span className={`size-6 rounded-full ${MEMBER_COLOUR_CLASS[member.colour] ?? "bg-marker-black"}`} />
-        <span className="text-xl font-semibold text-ink">{member.name}</span>
+        <Avatar name={member.name} colour={member.colour} />
+        <span className="text-xl font-bold text-ink">{member.name}</span>
         <span className="text-base text-ink-muted">
           {member.role === "parent" ? "Parent" : "Child"}
           {member.role === "parent" ? (member.hasPin ? " · PIN set" : " · no PIN yet") : ""}
@@ -208,7 +219,7 @@ function MemberEditor({ member }: { member: Member }) {
       </div>
 
       <details>
-        <summary className="cursor-pointer text-base text-marker-blue">Edit</summary>
+        <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-accent">Edit</summary>
         <form action={updateMember} className="mt-4 grid gap-4 sm:grid-cols-2">
           <input type="hidden" name="id" value={member.id} />
           <MemberFields member={member} />
@@ -254,15 +265,29 @@ function MemberFields({ member }: { member?: Member }) {
           <option value="child">Child</option>
         </Select>
       </Field>
-      <Field label="Colour">
-        <Select name="colour" defaultValue={member?.colour ?? "marker-blue"}>
-          {MEMBER_COLOURS.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
+      <fieldset className="flex flex-col gap-1.5 sm:col-span-2">
+        <legend className="mb-1.5 text-base font-bold text-ink">Colour</legend>
+        <div className="flex flex-wrap gap-2">
+          {PERSON_COLOURS.map((c) => (
+            <label key={c.value} className="cursor-pointer" title={c.label}>
+              <input
+                type="radio"
+                name="colour"
+                value={c.value}
+                defaultChecked={(member?.colour ?? "blue") === c.value}
+                className="peer sr-only"
+                required
+              />
+              <span
+                className="flex size-[var(--touch-target)] items-center justify-center rounded-full ring-ink ring-offset-2 peer-checked:ring-4 peer-focus-visible:ring-4"
+                style={{ background: strong(c.value) }}
+              >
+                <span className="sr-only">{c.label}</span>
+              </span>
+            </label>
           ))}
-        </Select>
-      </Field>
+        </div>
+      </fieldset>
       <Field label="Birth year" hint="Optional.">
         <Input name="birthYear" type="number" min={1900} max={2100} defaultValue={member?.birth_year ?? undefined} />
       </Field>

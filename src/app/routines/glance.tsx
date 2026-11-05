@@ -1,16 +1,16 @@
 import Link from "next/link";
-import { MEMBER_COLOUR_CLASS } from "@/lib/colours";
+import { ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { Avatar, Card, Emoji, ProgressBar } from "@/components/ui";
 import type { Household } from "@/lib/household";
 import { glanceRoutine, hhmm, isLate, kindForTime } from "@/lib/routines";
 import { localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { dayRoutinesFor, type RoutineData } from "./data";
-import { ProgressBar } from "./progress-bar";
 
 /**
- * The Today screen's routines: each person's next step and progress.
- * Tapping a person opens their full checklist.
+ * The Today screen's routines card: each person's current routine, their
+ * next step and progress. Tapping a person opens their full checklist.
  */
-export function RoutinesGlance({ data, date, household }: { data: RoutineData; date: LocalDate; household: Household }) {
+export function RoutinesGlance({ data, date, household, className = "" }: { data: RoutineData; date: LocalDate; household: Household; className?: string }) {
   const { timeZone, locale } = household.settings;
   const now = localTimeOf(new Date(), timeZone);
   const people = data.members
@@ -18,23 +18,27 @@ export function RoutinesGlance({ data, date, household }: { data: RoutineData; d
     .filter((p) => p.routines.length > 0);
 
   return (
-    <div className="flex flex-col rounded-[var(--radius)] border-2 border-frame bg-board p-5 lg:min-h-0 lg:flex-1">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold text-ink">Routines</h2>
-        <Link href="/routines" className="text-lg text-marker-blue underline">
-          All routines
+    <Card
+      title="Routines"
+      icon={ListChecks}
+      tint="teal"
+      className={className}
+      aside={
+        <Link href="/routines" className="flex min-h-[var(--touch-target)] items-center text-lg font-bold text-accent">
+          Checklists
         </Link>
-      </div>
+      }
+    >
       {people.length === 0 ? (
-        <p className="py-2 text-lg text-ink-muted">
+        <p className="py-2 text-xl text-ink-muted">
           Nobody has a routine today.{" "}
-          <Link href="/routines" className="text-marker-blue underline">
+          <Link href="/routines/manage" className="font-bold text-accent">
             Give someone one
           </Link>
           .
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:min-h-0 lg:grid-cols-1 lg:overflow-y-auto">
+        <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           {people.map(({ member, routines }) => {
             const current = glanceRoutine(
               routines.map((r) => ({ ...r, kind: r.template.kind, complete: r.progress.complete })),
@@ -43,30 +47,29 @@ export function RoutinesGlance({ data, date, household }: { data: RoutineData; d
             const next = current.progress.next;
             const late = next ? isLate(next, now) : false;
             return (
-              <li key={member.id}>
-                <Link
-                  href={`/routines?member=${member.id}`}
-                  className="flex flex-col gap-2 rounded-[var(--radius)] border-2 border-frame p-4 hover:bg-panel"
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-xl font-semibold text-ink">
-                      <span className={`size-4 rounded-full ${MEMBER_COLOUR_CLASS[member.colour] ?? "bg-marker-black"}`} />
-                      {member.name}
-                    </span>
-                    <span className="text-base text-ink-muted">
-                      {current.template.name} · {current.progress.done}/{current.progress.total}
+              <li key={member.id} className="border-b border-panel last:border-0">
+                <Link href={`/routines?member=${member.id}`} className="flex flex-col gap-2.5 py-3.5">
+                  <span className="flex items-center gap-3">
+                    <Avatar name={member.name} colour={member.colour} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <span className="flex justify-between gap-2 text-lg font-bold text-ink">
+                        <span className="truncate">
+                          {member.name} · {current.template.name}
+                        </span>
+                        <span className="shrink-0 font-semibold text-ink-muted">
+                          {current.progress.done}/{current.progress.total}
+                        </span>
+                      </span>
+                      <ProgressBar done={current.progress.done} total={current.progress.total} colour={member.colour} />
                     </span>
                   </span>
-                  <ProgressBar done={current.progress.done} total={current.progress.total} />
                   {next ? (
-                    <span className="flex items-center gap-3">
-                      <span className="text-3xl" aria-hidden>
-                        {next.icon}
-                      </span>
-                      <span className="flex flex-col">
-                        <span className="text-lg text-ink">Next: {next.text}</span>
+                    <span className="flex items-center gap-3.5 pl-14">
+                      <Emoji emoji={next.icon} className="size-10" />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate text-xl font-semibold text-ink">Next: {next.text}</span>
                         {next.target_time ? (
-                          <span className={`text-base ${late ? "font-semibold text-marker-red" : "text-ink-muted"}`}>
+                          <span className={`text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>
                             by{" "}
                             {new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" })
                               .format(zonedToUtc(date, hhmm(next.target_time), timeZone))
@@ -77,7 +80,7 @@ export function RoutinesGlance({ data, date, household }: { data: RoutineData; d
                       </span>
                     </span>
                   ) : (
-                    <span className="text-lg font-semibold text-marker-green">All done ✓</span>
+                    <span className="pl-14 text-xl font-bold text-success">All done ✓</span>
                   )}
                 </Link>
               </li>
@@ -85,6 +88,6 @@ export function RoutinesGlance({ data, date, household }: { data: RoutineData; d
           })}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

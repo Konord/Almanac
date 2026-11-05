@@ -1,40 +1,45 @@
 import { getHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
-import { themeToCssVariables, whiteboardTheme, type Theme, type ThemeTokens } from "./tokens";
+import { brightTheme, themeToCssVariables, type Theme, type ThemeTokens } from "./tokens";
 
 /**
  * Applies the household's active theme from the database by writing its
- * tokens as CSS variables. If anything is missing it quietly keeps the
- * built-in whiteboard theme that the layout already applied.
+ * tokens as CSS variables, plus the handwriting setting. If anything is
+ * missing it quietly keeps the built-in bright theme the layout applied.
  */
 export async function HouseholdTheme() {
   const household = await getHousehold();
   if (!household) return null;
 
+  const rules: string[] = [];
   const supabase = await createClient();
   const { data } = await supabase
     .from("themes")
     .select("slug, name, tokens")
     .eq("slug", household.settings.activeTheme)
     .maybeSingle();
-  if (!data) return null;
+  if (data) {
+    const theme: Theme = { slug: data.slug, name: data.name, tokens: mergeTokens(data.tokens) };
+    rules.push(
+      ...Object.entries(themeToCssVariables(theme))
+        .filter(([, value]) => /^[#a-zA-Z0-9.(),% -]+$/.test(value)) // only plain colour/size values
+        .map(([name, value]) => `${name}: ${value};`),
+    );
+  }
+  // Handwriting off: family-written things use the normal font too.
+  if (!household.settings.handwriting) rules.push("--almanac-font-hand: var(--font-sans);");
 
-  const theme: Theme = { slug: data.slug, name: data.name, tokens: mergeTokens(data.tokens) };
-  const css = Object.entries(themeToCssVariables(theme))
-    .filter(([, value]) => /^[#a-zA-Z0-9.(),% -]+$/.test(value)) // only plain colour/size values
-    .map(([name, value]) => `${name}: ${value};`)
-    .join(" ");
-
-  return <style>{`:root { ${css} }`}</style>;
+  return rules.length ? <style>{`:root { ${rules.join(" ")} }`}</style> : null;
 }
 
 function mergeTokens(raw: unknown): ThemeTokens {
-  const base = whiteboardTheme.tokens;
+  const base = brightTheme.tokens;
   if (!raw || typeof raw !== "object") return base;
   const value = raw as Partial<ThemeTokens>;
   return {
     colors: { ...base.colors, ...(typeof value.colors === "object" ? value.colors : {}) },
     radius: typeof value.radius === "string" ? value.radius : base.radius,
+    radiusCard: typeof value.radiusCard === "string" ? value.radiusCard : base.radiusCard,
     touchTarget: typeof value.touchTarget === "string" ? value.touchTarget : base.touchTarget,
   };
 }

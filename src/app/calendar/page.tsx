@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Button, Field, Input, Notice, Panel, firstParam } from "@/components/ui";
-import { MEMBER_COLOUR_CLASS } from "@/lib/colours";
+import { CaretLeft, CaretRight, Plus, Stack } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Button, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
+import { HeaderClock } from "@/components/header-clock";
+import { Sheet } from "@/components/sheet";
+import { strong } from "@/lib/colours";
 import { addMonths, monthGridDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
@@ -25,24 +28,26 @@ import { EventFields, LayerFields, ViewFields } from "./forms";
 import { ViewChooser } from "./view-chooser";
 import { VISIBILITY_OPTIONS } from "./options";
 import { deviceView, EVENT_COLUMNS, itemsInView, loadCalendar, profilesFor, rangeOf } from "./data";
-import type { CalendarEvent, CalendarItem, Layer, Member } from "./types";
+import type { CalendarEvent, CalendarItem, Layer, Member, SavedView } from "./types";
+import { loadRoutines } from "../routines/data";
+import { PeopleRow } from "../routines/people-row";
 import { MonthView, WeekView } from "./views";
 
 type View = "week" | "month";
 
 export default function CalendarPage(props: PageProps<"/calendar">) {
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-8">
+    <AppFrame section="calendar">
       <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
         <CalendarContent searchParams={props.searchParams} />
       </Suspense>
-    </main>
+    </AppFrame>
   );
 }
 
 async function CalendarContent({ searchParams }: { searchParams: PageProps<"/calendar">["searchParams"] }) {
   const household = await requireHousehold();
-  const { timeZone, weekStartsOn } = household.settings;
+  const { timeZone, weekStartsOn, locale } = household.settings;
   const params = await searchParams;
   const supabase = await createClient();
 
@@ -55,10 +60,14 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const addParam = firstParam(params.add);
   const addDate = addParam && isLocalDate(addParam) ? addParam : undefined;
+  const panel = firstParam(params.panel) === "layers" ? "layers" : null;
 
   const days = view === "week" ? weekDays(anchor, weekStartsOn) : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const { layers, members, views, items, exceptions } = await loadCalendar(rangeStart, rangeEnd);
+  const [{ layers, members, views, items, exceptions }, routineData] = await Promise.all([
+    loadCalendar(rangeStart, rangeEnd),
+    loadRoutines(today),
+  ]);
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
@@ -84,6 +93,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
     return `/calendar?${next.toString()}`;
   };
   const returnTo = `view=${view}&date=${anchor}`;
+  const closeHref = href({ edit: null, occ: null, add: null, panel: null });
 
   const step = (n: number) => (view === "week" ? addDays(anchor, 7 * n) : addMonths(anchor, n));
   const error = firstParam(params.error);
@@ -91,135 +101,157 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
 
   return (
     <>
-      {/* Top bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <NavButton href="/">Home</NavButton>
-          <NavButton href={href({ date: step(-1), edit: null, add: null })} label="Previous">
-            ‹
-          </NavButton>
-          <NavButton href={href({ date: today, edit: null, add: null })}>Today</NavButton>
-          <NavButton href={href({ date: step(1), edit: null, add: null })} label="Next">
-            ›
-          </NavButton>
-          <h1 className="w-full text-2xl font-semibold tracking-tight text-ink sm:ml-2 sm:w-auto sm:text-3xl">{rangeTitle(view, days, anchor, household)}</h1>
-        </div>
+      <ScreenHeader title={rangeTitle(view, days, anchor, household)}>
+        <HeaderClock locale={locale} timeZone={timeZone} />
         <div className="flex items-center gap-2">
-          <div className="flex overflow-hidden rounded-[var(--radius)] border-2 border-frame">
-            {(["week", "month"] as const).map((v) => (
-              <Link
-                key={v}
-                href={href({ view: v, edit: null, add: null })}
-                className={`flex min-h-[var(--touch-target)] items-center px-5 text-lg ${
-                  v === view ? "bg-marker-blue text-board" : "bg-board text-ink"
-                }`}
-              >
-                {v === "week" ? "Week" : "Month"}
-              </Link>
-            ))}
-          </div>
-          <Link
-            href={href({ add: addDate ?? (anchor >= days[0] ? anchor : today), edit: null })}
-            className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-marker-blue px-5 text-lg font-medium text-board"
-          >
-            + Add event
-          </Link>
+          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={view === "week" ? "Previous week" : "Previous month"} icon={CaretLeft} />
+          <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>Today</SoftLink>
+          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={view === "week" ? "Next week" : "Next month"} icon={CaretRight} />
         </div>
-      </div>
+        <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+          <SoftLink href={href({ panel: "layers", edit: null, add: null })}>
+            <Stack size="1.5rem" aria-hidden />
+            {savedView ? savedView.name : "Layers"}
+          </SoftLink>
+          <Segmented
+            label="How much to show"
+            options={[
+              { href: "/", label: "Day", active: false },
+              { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
+              { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
+            ]}
+          />
+        </div>
+      </ScreenHeader>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      {editing ? (
-        <EditEventPanel
-          event={editing}
-          household={household}
-          layers={layers}
-          members={members}
-          returnTo={returnTo}
-          closeHref={href({ edit: null, occ: null })}
-          occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
-          occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
-          isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
-          skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
-          memberName={editing.member_id ? memberById.get(editing.member_id)?.name : undefined}
-        />
-      ) : null}
-
-      {addDate && !editing ? (
-        <Panel title="Add an event">
-          {layers.length === 0 ? (
-            <p className="text-lg text-ink-muted">Add a layer first (at the bottom of the page).</p>
-          ) : (
-            <form action={addEvent} className="grid gap-4 sm:grid-cols-2">
-              <input type="hidden" name="returnTo" value={`view=${view}&date=${addDate}`} />
-              <EventFields layers={layers} members={members} defaults={{ startDate: addDate }} />
-              <div className="flex gap-3 sm:col-span-2">
-                <Button>Add event</Button>
-                <CloseLink href={href({ add: null })} />
-              </div>
-            </form>
-          )}
-        </Panel>
-      ) : null}
-
-      <ViewChooser views={views} current={savedView} returnTo={returnTo} returnPath="/calendar" />
+      {view === "week" ? <PeopleRow data={routineData} date={today} hrefFor={(id) => `/routines?member=${id}`} /> : null}
 
       {view === "week" ? (
-        <WeekView
-          household={household}
-          days={days}
-          today={today}
-          events={events}
-          layerById={layerById}
-          href={href}
-          profiles={profiles}
-        />
+        <WeekView household={household} days={days} today={today} events={events} memberById={memberById} href={href} profiles={profiles} />
       ) : (
         <MonthView
           household={household}
           days={days}
           today={today}
           events={events}
-          layerById={layerById}
+          memberById={memberById}
           href={href}
           profiles={profiles}
           anchor={anchor}
         />
       )}
 
-      {/* Layer key */}
-      <div className="flex flex-wrap items-center gap-4 text-base text-ink">
-        {layers.map((layer) => (
-          <span key={layer.id} className="flex items-center gap-2">
-            <span className={`size-4 rounded-full ${MEMBER_COLOUR_CLASS[layer.colour] ?? "bg-marker-black"}`} />
-            {layer.name}
-          </span>
-        ))}
-      </div>
+      {/* Add button, bottom right */}
+      <Link
+        href={href({ add: anchor >= days[0] && anchor <= days[days.length - 1] ? anchor : days[0], edit: null, panel: null })}
+        scroll={false}
+        aria-label="Add an event"
+        title="Add an event"
+        className="fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full bg-ink text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)]"
+      >
+        <Plus size="2.625rem" weight="bold" aria-hidden />
+      </Link>
 
-      <details className="rounded-[var(--radius)] border-2 border-frame bg-panel/60 p-5">
-        <summary className="cursor-pointer text-xl font-semibold text-ink">Manage layers</summary>
-        <p className="mt-3 mb-4 text-base text-ink-muted">
-          Every event belongs to a layer. To show only some layers on a screen, make a view below.
+      {editing ? (
+        <Sheet title={editing.title} closeHref={closeHref}>
+          <EditEventPanel
+            event={editing}
+            household={household}
+            layers={layers}
+            members={members}
+            returnTo={returnTo}
+            closeHref={closeHref}
+            occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
+            occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
+            isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
+            skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
+            memberName={editing.member_id ? memberById.get(editing.member_id)?.name : undefined}
+          />
+        </Sheet>
+      ) : null}
+
+      {addDate && !editing ? (
+        <Sheet title="Add an event" closeHref={closeHref}>
+          {layers.length === 0 ? (
+            <p className="text-lg text-ink-muted">Add a layer first (under Layers).</p>
+          ) : (
+            <form action={addEvent} className="grid gap-4 sm:grid-cols-2">
+              <input type="hidden" name="returnTo" value={`view=${view}&date=${addDate}`} />
+              <EventFields layers={layers} members={members} defaults={{ startDate: addDate }} />
+              <div className="flex gap-3 sm:col-span-2">
+                <Button>Add event</Button>
+                <CloseLink href={closeHref} />
+              </div>
+            </form>
+          )}
+        </Sheet>
+      ) : null}
+
+      {panel === "layers" ? (
+        <Sheet title="Layers and views" closeHref={closeHref}>
+          <LayersPanel
+            layers={layers}
+            views={views}
+            savedView={savedView}
+            members={members}
+            memberById={memberById}
+            layerById={layerById}
+            returnTo={returnTo}
+          />
+        </Sheet>
+      ) : null}
+    </>
+  );
+}
+
+/** Which layers this screen shows, and adding or changing layers and views. */
+function LayersPanel({
+  layers,
+  views,
+  savedView,
+  members,
+  memberById,
+  layerById,
+  returnTo,
+}: {
+  layers: Layer[];
+  views: SavedView[];
+  savedView: SavedView | null;
+  members: Member[];
+  memberById: Map<string, Member>;
+  layerById: Map<string, Layer>;
+  returnTo: string;
+}) {
+  return (
+    <div className="flex flex-col gap-8">
+      <ViewChooser views={views} current={savedView} returnTo={returnTo} returnPath="/calendar" />
+
+      <section>
+        <h3 className="mb-1 text-2xl font-bold text-ink">Layers</h3>
+        <p className="mb-4 text-lg text-ink-muted">
+          Every event belongs to a layer, like Court or Kids. Blocks on the calendar take the colour of the person
+          they&apos;re for.
         </p>
         <ul className="mb-6 flex flex-col gap-3">
           {layers.map((layer) => (
-            <li key={layer.id} className="rounded-[var(--radius)] border-2 border-frame bg-board p-4">
+            <li key={layer.id} className="rounded-[var(--radius-card)] border border-frame p-4">
               <div className="flex flex-wrap items-center gap-3">
-                <span className={`size-5 rounded-full ${MEMBER_COLOUR_CLASS[layer.colour] ?? "bg-marker-black"}`} />
-                <span className="text-lg font-semibold text-ink">{layer.name}</span>
-                <span className="text-base text-ink-muted">
+                <span className="size-5 rounded-full" style={{ background: strong(layer.colour) }} />
+                <span className="text-xl font-bold text-ink">{layer.name}</span>
+                <span className="text-lg text-ink-muted">
                   {visibilityLabel(layer.visibility)}
                   {layer.owner_member_id ? ` · ${memberById.get(layer.owner_member_id)?.name ?? ""}'s` : ""}
                   {layer.counts_toward_busyness ? "" : " · doesn't count toward busy"}
                 </span>
               </div>
               <details className="mt-2">
-                <summary className="cursor-pointer text-base text-marker-blue">Edit</summary>
-                <form action={updateLayer} className="mt-4 grid gap-4 sm:grid-cols-2">
+                <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-accent">Edit</summary>
+                <form action={updateLayer} className="mt-2 grid gap-4 sm:grid-cols-2">
                   <input type="hidden" name="id" value={layer.id} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
                   <LayerFields layer={layer} members={members} />
                   <div className="sm:col-span-2">
                     <Button>Save layer</Button>
@@ -228,43 +260,45 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
                 <form action={removeLayer} className="mt-4">
                   <input type="hidden" name="id" value={layer.id} />
                   <input type="hidden" name="name" value={layer.name} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
                   <Button variant="danger">Remove {layer.name} and its events</Button>
                 </form>
               </details>
             </li>
           ))}
         </ul>
-        <h3 className="mb-3 text-xl font-semibold text-ink">Add a layer</h3>
-        <form action={addLayer} className="grid gap-4 sm:grid-cols-2">
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <LayerFields members={members} />
-          <div className="sm:col-span-2">
-            <Button>Add layer</Button>
-          </div>
-        </form>
-      </details>
+        <details className="rounded-[var(--radius-card)] bg-rail p-4">
+          <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">Add a layer</summary>
+          <form action={addLayer} className="mt-2 grid gap-4 sm:grid-cols-2">
+            <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
+            <LayerFields members={members} />
+            <div className="sm:col-span-2">
+              <Button>Add layer</Button>
+            </div>
+          </form>
+        </details>
+      </section>
 
-      <details className="rounded-[var(--radius)] border-2 border-frame bg-panel/60 p-5">
-        <summary className="cursor-pointer text-xl font-semibold text-ink">Manage views</summary>
-        <p className="mt-3 mb-4 text-base text-ink-muted">
+      <section>
+        <h3 className="mb-1 text-2xl font-bold text-ink">Views</h3>
+        <p className="mb-4 text-lg text-ink-muted">
           A view is a set of layers, like &ldquo;Court and appointments&rdquo;. Each screen remembers the view you
           picked on it, so the wall can show everything while a phone shows just a few layers.
         </p>
         <ul className="mb-6 flex flex-col gap-3">
           {views.map((v) => (
-            <li key={v.id} className="rounded-[var(--radius)] border-2 border-frame bg-board p-4">
+            <li key={v.id} className="rounded-[var(--radius-card)] border border-frame p-4">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-lg font-semibold text-ink">{v.name}</span>
-                <span className="text-base text-ink-muted">
+                <span className="text-xl font-bold text-ink">{v.name}</span>
+                <span className="text-lg text-ink-muted">
                   {v.layer_ids.map((id) => layerById.get(id)?.name).filter(Boolean).join(", ") || "No layers"}
                 </span>
               </div>
               <details className="mt-2">
-                <summary className="cursor-pointer text-base text-marker-blue">Edit</summary>
-                <form action={updateView} className="mt-4 grid gap-4">
+                <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-accent">Edit</summary>
+                <form action={updateView} className="mt-2 grid gap-4">
                   <input type="hidden" name="id" value={v.id} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
                   <ViewFields layers={layers} view={v} />
                   <div>
                     <Button>Save view</Button>
@@ -273,23 +307,25 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
                 <form action={removeView} className="mt-4">
                   <input type="hidden" name="id" value={v.id} />
                   <input type="hidden" name="name" value={v.name} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
                   <Button variant="danger">Remove the {v.name} view</Button>
                 </form>
               </details>
             </li>
           ))}
         </ul>
-        <h3 className="mb-3 text-xl font-semibold text-ink">Add a view</h3>
-        <form action={addView} className="grid gap-4">
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <ViewFields layers={layers} />
-          <div>
-            <Button>Add view</Button>
-          </div>
-        </form>
-      </details>
-    </>
+        <details className="rounded-[var(--radius-card)] bg-rail p-4">
+          <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">Add a view</summary>
+          <form action={addView} className="mt-2 grid gap-4">
+            <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
+            <ViewFields layers={layers} />
+            <div>
+              <Button>Add view</Button>
+            </div>
+          </form>
+        </details>
+      </section>
+    </div>
   );
 }
 
@@ -325,8 +361,8 @@ function EditEventPanel({
   const endDate = event.all_day ? addDays(localDateOf(end, timeZone), -1) : localDateOf(end, timeZone);
 
   return (
-    <Panel title={`Edit: ${event.title}`}>
-      <p className="-mt-2 mb-4 text-base text-ink-muted">
+    <div>
+      <p className="mb-5 text-lg text-ink-muted">
         {memberName ? `For ${memberName} · ` : ""}
         {describeRule(event.recurrence_rule)}
       </p>
@@ -346,7 +382,7 @@ function EditEventPanel({
           <ul className="flex flex-wrap gap-2">
             {skippedDates.map((date) => (
               <li key={date}>
-                <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board pl-3">
+                <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
                   <input type="hidden" name="eventId" value={event.id} />
                   <input type="hidden" name="occurrenceDate" value={date} />
                   <input type="hidden" name="title" value={event.title} />
@@ -382,6 +418,7 @@ function EditEventPanel({
             energyCost: event.energy_cost,
             visibility: event.visibility,
             notes: event.notes ?? "",
+            icon: event.icon ?? "",
             repeat: parseRule(event.recurrence_rule),
           }}
         />
@@ -396,7 +433,7 @@ function EditEventPanel({
         <input type="hidden" name="returnTo" value={returnTo} />
         <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove event"}</Button>
       </form>
-    </Panel>
+    </div>
   );
 }
 
@@ -432,7 +469,7 @@ function OccurrenceControls({
   );
 
   return (
-    <div className="mb-8 rounded-[var(--radius)] border-2 border-marker-blue bg-board p-4">
+    <div className="mb-8 rounded-[var(--radius-card)] bg-rail p-5">
       <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
       <p className="mb-4 text-base text-ink-muted">Changes here leave the rest of the dates alone.</p>
       <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
@@ -471,23 +508,12 @@ function OccurrenceControls({
   );
 }
 
-function NavButton({ href, children, label }: { href: string; children: React.ReactNode; label?: string }) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="inline-flex min-h-[var(--touch-target)] min-w-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink"
-    >
-      {children}
-    </Link>
-  );
-}
-
 function CloseLink({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] border-2 border-frame bg-board px-5 text-lg text-ink"
+      scroll={false}
+      className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
     >
       Cancel
     </Link>

@@ -14,7 +14,7 @@ select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-1111111
 
 select isnt(public.create_household('House A'), null, 'A login can create its household');
 select throws_ok($$ select public.create_household('Again') $$, 'This login already has a household', 'A login only gets one household');
-select is((select count(*)::int from public.themes), 1, 'A new household gets the whiteboard theme');
+select is((select count(*)::int from public.themes), 1, 'A new household gets the bright theme');
 
 insert into public.members (household_id, name, role)
 values (public.current_household_id(), 'Dad', 'parent'), (public.current_household_id(), 'Kid', 'child');

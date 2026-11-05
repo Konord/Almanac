@@ -7,7 +7,7 @@ export type Layer = {
   visibility: string;
 };
 
-export type Member = { id: string; name: string };
+export type Member = { id: string; name: string; colour: string };
 
 export type CalendarEvent = {
   id: string;
@@ -22,6 +22,8 @@ export type CalendarEvent = {
   notes: string | null;
   timezone: string;
   recurrence_rule: string | null;
+  /** One emoji, or null to guess one from the title. */
+  icon: string | null;
 };
 
 /** One occurrence on the calendar: a one-off event, or one date of a series. */

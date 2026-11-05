@@ -17,6 +17,8 @@ export type HouseholdSettings = {
   /** 0 = Sunday, 1 = Monday */
   weekStartsOn: 0 | 1;
   activeTheme: string;
+  /** Show family-written things (to-dos, meals, notes) in handwriting. */
+  handwriting: boolean;
   /** What counts as a free or busy day (see src/lib/day-profile.ts). */
   dayProfile: DayProfileSettings;
 };
@@ -29,7 +31,8 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   temperatureUnit: "celsius",
   currency: "CAD",
   weekStartsOn: 0,
-  activeTheme: "whiteboard",
+  activeTheme: "bright",
+  handwriting: true,
   dayProfile: DEFAULT_DAY_PROFILE,
 };
 
@@ -50,6 +53,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     currency: pick("currency", (v) => typeof v === "string" && /^[A-Z]{3}$/.test(v)),
     weekStartsOn: pick("weekStartsOn", (v) => v === 0 || v === 1),
     activeTheme: pick("activeTheme", (v) => typeof v === "string" && v.length > 0),
+    handwriting: pick("handwriting", (v) => typeof v === "boolean"),
     dayProfile: parseDayProfile(value.dayProfile),
   };
 }
