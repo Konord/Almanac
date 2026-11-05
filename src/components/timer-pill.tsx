@@ -14,7 +14,7 @@ export function TimerPill() {
   const now = useNow(timers.length > 0);
   const path = usePathname();
   useAlarm(timers, now);
-  if (timers.length === 0 || path.startsWith("/meals/cook")) return null;
+  if (timers.length === 0 || now === 0 || path.startsWith("/meals/cook")) return null;
   return (
     <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2">
       {timers.slice(0, 3).map((t) => {

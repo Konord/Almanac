@@ -69,11 +69,17 @@ export function useTimers(): KitchenTimer[] {
 
 /** The time now, ticking every second while there are timers. */
 export function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
+  // Starts at 0 (the server can't know the time a page is looked at), then ticks.
+  const [now, setNow] = useState(0);
   useEffect(() => {
     if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, [active]);
   return now;
 }
@@ -103,6 +109,7 @@ export function timeLeft(timer: KitchenTimer, now: number): string {
 /** Rings (a few soft beeps, no sound files needed) when a timer reaches zero. */
 export function useAlarm(timers: KitchenTimer[], now: number) {
   useEffect(() => {
+    if (now === 0) return;
     const due = timers.filter((t) => !t.rang && t.endsAt <= now);
     if (due.length === 0) return;
     write(read().map((t) => (due.some((d) => d.id === t.id) ? { ...t, rang: true } : t)));

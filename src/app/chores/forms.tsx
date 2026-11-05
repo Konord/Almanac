@@ -116,7 +116,7 @@ export function ChoreFields({ chore, members }: { chore?: Chore; members: ChoreM
           <option value="outdoor">Outside</option>
         </Select>
       </Field>
-      <Field label="Still show on hard days" hint="Used once energy modes arrive.">
+      <Field label="Still show on hard days" hint="Low and survival days hide the chores that can wait.">
         <Select name="minEnergyMode" defaultValue={chore?.min_energy_mode ?? "normal"}>
           <option value="normal">Only on normal days</option>
           <option value="low">On low days too</option>

@@ -191,7 +191,9 @@ export function TodoRow({
           <span className="min-w-0 flex-1 py-2">{words}</span>
         )}
       </span>
-      {todo.due_date && !done ? (
+      {todo.must_do && !done ? (
+        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
+      ) : todo.due_date && !done ? (
         <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{dayLabel(todo.due_date, today, household)}</span>
       ) : null}
       {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}

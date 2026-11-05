@@ -24,6 +24,8 @@ import type { CalendarItem, Member } from "./calendar/types";
 import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type ChoreWithTiming, type Todo } from "./chores/data";
 import { ChoreRow, TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
+import { loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
+import { EnergySwitch, MealBlock, SurvivalBanner, placeTodayMeals } from "./meals/today";
 import { floatingRoutines, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
@@ -75,12 +77,15 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData, mealBasics, todayMeals] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadChores(today, timeZone),
     loadTodos(),
+    loadMealBasics(),
+    loadMeals(today, today),
   ]);
+  const energyMode = routineData.energyMode;
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
@@ -96,6 +101,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/");
+  // On a survival day, offer to swap the first meal that still needs cooking.
+  const survivalSwap =
+    energyMode === "survival"
+      ? placeTodayMeals(todayMeals, mealBasics, []).find((m) => !m.cooked && !m.backup && m.endMin > minutesIntoDay(now, timeZone))
+      : undefined;
 
   return (
     <>
@@ -104,6 +114,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         {todayProfile ? (
           <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
         ) : null}
+        <EnergySwitch mode={energyMode} date={today} returnTo="/" />
         <div className="lg:ml-auto">
           <Segmented
             label="How much to show"
@@ -126,6 +137,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
+      {survivalSwap ? <SurvivalBanner meal={survivalSwap} /> : null}
       {placing ? <PlacingBar hint="Tap someone's column at a time to add an event for them, or drag down to set how long." cancelHref="/" /> : null}
 
       <div className="flex flex-col gap-6.5 lg:min-h-0 lg:flex-1 lg:flex-row">
@@ -139,12 +151,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           household={household}
           placing={placing}
           pending={pending}
+          meals={todayMeals}
+          mealBasics={mealBasics}
         />
 
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
           <TodoCard
             todos={todosForToday(todoData.todos, today)}
-            chores={dueChores(choreData.chores)}
+            chores={dueChores(choreData.chores, energyMode)}
             members={choreData.members}
             today={today}
             household={household}
@@ -189,6 +203,8 @@ function PeopleTimeline({
   household,
   placing,
   pending,
+  meals,
+  mealBasics,
 }: {
   allDay: CalendarItem[];
   items: CalendarItem[];
@@ -201,6 +217,9 @@ function PeopleTimeline({
   placing: boolean;
   /** The event being added, shown as a dashed outline. */
   pending: QuickDefaults | null;
+  /** Today's planned meals. */
+  meals: Meal[];
+  mealBasics: MealBasics;
 }) {
   const { timeZone } = household.settings;
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
@@ -210,7 +229,18 @@ function PeopleTimeline({
   const routinesFor = new Map(
     members.map((m) => [m.id, floatingRoutines(routineData, m.id, today, [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone], timeZone)]),
   );
-  const placements = [...routinesFor.values()].flat().map((r) => r.placement);
+  // Meals move around the plans of the people eating them.
+  const placedMeals = placeTodayMeals(
+    meals,
+    mealBasics,
+    eventsOnDay(timed, today, timeZone).map((e) => ({
+      startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
+      endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
+      title: e.title,
+      memberIds: e.member_ids.filter((id) => memberIds.has(id)),
+    })),
+  );
+  const placements = [...[...routinesFor.values()].flat().map((r) => r.placement), ...placedMeals];
   const range = timelineRange(timed, [today], timeZone);
   const first = Math.min(range.first, ...placements.map((p) => Math.floor(p.startMin / 60)));
   const last = Math.max(range.last, ...placements.map((p) => Math.ceil(p.endMin / 60)));
@@ -228,8 +258,8 @@ function PeopleTimeline({
       : [{ id: "everyone", name: "Everyone", colour: EVERYONE_COLOUR }];
   const columnIds = columns.map((c) => c.id);
   const colourOf = new Map(columns.map((c) => [c.id, c.colour]));
-  const placedEvents = layoutSpans(
-    sortForDay(eventsOnDay(timed, today, timeZone), timeZone).flatMap((e) =>
+  const placedEvents = layoutSpans([
+    ...sortForDay(eventsOnDay(timed, today, timeZone), timeZone).flatMap((e) =>
       memberRuns(e.member_ids, columnIds).map(([c0, c1]) => ({
         id: `${e.id}|${c0}`,
         startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
@@ -238,7 +268,12 @@ function PeopleTimeline({
         c1,
       })),
     ),
-  );
+    // A meal for everyone (no one picked) spans the whole row.
+    ...placedMeals.flatMap((m) =>
+      memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({ id: `meal:${m.id}|${c0}`, startMin: m.startMin, endMin: m.endMin, c0, c1 })),
+    ),
+  ]);
+  const mealById = new Map(placedMeals.map((m) => [m.id, m]));
   const eventById = new Map(timed.map((e) => [e.id, e]));
   const span = (last - first) * 60;
   const editLink = (e: CalendarItem) =>
@@ -308,10 +343,27 @@ function PeopleTimeline({
           {/* Events sit over the columns so one bubble can span several people. */}
           <div className="pointer-events-none absolute inset-y-0 right-0 left-16.5">
             {placedEvents.map((block) => {
-              const event = eventById.get(block.id.split("|")[0])!;
-              const run = columnIds.slice(block.c0, block.c1 + 1);
               const top = ((block.startMin - first * 60) / span) * 100;
               const height = (Math.max(block.endMin - block.startMin, 30) / span) * 100;
+              if (block.id.startsWith("meal:")) {
+                const meal = mealById.get(block.id.slice(5).split("|")[0])!;
+                return (
+                  <div key={block.id} className="pointer-events-auto">
+                    <MealBlock
+                      meal={meal}
+                      date={today}
+                      household={household}
+                      style={{
+                        top: `calc(${top}% + 3px)`,
+                        height: `calc(${height}% - 6px)`,
+                        ...spanBox(block.c0, block.c1, columns.length, COLUMN_GAP, block.lane, block.lanes),
+                      }}
+                    />
+                  </div>
+                );
+              }
+              const event = eventById.get(block.id.split("|")[0])!;
+              const run = columnIds.slice(block.c0, block.c1 + 1);
               return (
                 <div key={block.id} className="pointer-events-auto">
                   <EventBlock

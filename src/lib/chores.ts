@@ -11,6 +11,18 @@ import { addMonths, dayOfWeek } from "./calendar-layout.ts";
 import { addDays, type LocalDate } from "./time.ts";
 
 export type RepeatUnit = "day" | "week" | "month" | "year";
+export type EnergyMode = "normal" | "low" | "survival";
+
+const ENERGY_LEVEL: Record<EnergyMode, number> = { survival: 0, low: 1, normal: 2 };
+
+/**
+ * Whether a chore shows on a day with this energy mode. A chore's
+ * min_energy_mode is the hardest kind of day it still shows on: "normal"
+ * chores hide on low and survival days, "low" ones hide on survival days.
+ */
+export function showsInMode(minMode: EnergyMode, dayMode: EnergyMode): boolean {
+  return ENERGY_LEVEL[dayMode] >= ENERGY_LEVEL[minMode];
+}
 export type ChoreSize = "small" | "medium" | "big";
 
 export type ChoreRule = {

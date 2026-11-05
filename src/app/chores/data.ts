@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { choreTiming, starterFirstDue, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
+import { choreTiming, showsInMode, starterFirstDue, type EnergyMode, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
 import { addDays, localDateOf, type LocalDate } from "@/lib/time";
 
 export type ChoreMember = { id: string; name: string; colour: string; icon: string | null };
@@ -40,6 +40,8 @@ export type Todo = {
   status: "open" | "done" | "skipped";
   completed_on: LocalDate | null;
   notes: string | null;
+  /** Has to be done today, e.g. putting fresh meat away when dinner was swapped. */
+  must_do: boolean;
 };
 
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
@@ -83,10 +85,10 @@ export async function loadChores(today: LocalDate, timeZone: string) {
   return { chores: list, rounds: roundList, members: (members.data ?? []) as ChoreMember[] };
 }
 
-/** Active chores due now, most overdue first. */
-export function dueChores(chores: ChoreWithTiming[]): ChoreWithTiming[] {
+/** Active chores due now, most overdue first (only the ones for the day's energy). */
+export function dueChores(chores: ChoreWithTiming[], mode: EnergyMode = "normal"): ChoreWithTiming[] {
   return chores
-    .filter((c) => c.active && c.timing.state === "due")
+    .filter((c) => c.active && c.timing.state === "due" && showsInMode(c.min_energy_mode, mode))
     .sort((a, b) => b.timing.daysOverdue - a.timing.daysOverdue || (a.timing.dueOn < b.timing.dueOn ? -1 : 1));
 }
 
@@ -102,7 +104,7 @@ export async function loadTodos() {
     supabase.from("task_lists").select("id, name, icon, visibility").order("sort_order").order("name"),
     supabase
       .from("task_instances")
-      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes")
+      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do")
       .not("list_id", "is", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at"),
@@ -113,5 +115,6 @@ export async function loadTodos() {
 
 /** Open to-dos for the Today screen: no date, or due today or earlier. */
 export function todosForToday(todos: Todo[], today: LocalDate): Todo[] {
-  return todos.filter((t) => t.status === "open" && (!t.due_date || t.due_date <= today));
+  // Must-dos (like putting fresh meat away) come first.
+  return todos.filter((t) => t.status === "open" && (!t.due_date || t.due_date <= today)).sort((a, b) => Number(b.must_do) - Number(a.must_do));
 }

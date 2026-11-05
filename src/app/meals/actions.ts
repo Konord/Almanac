@@ -6,7 +6,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { guessAisle, weekStartOf } from "@/lib/meals";
 import { parseRecipeHtml, parseRecipeText, type ImportedRecipe } from "@/lib/recipe-import";
-import { addDays, isLocalDate, isLocalTime, localDateOf, type LocalDate } from "@/lib/time";
+import { addDays, isLocalDate, isLocalTime, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { isVisibility } from "../calendar/options";
 import { applyPresets, findOrCreateItem, nextFreeDate, seededDatesFrom, syncHeadsUps } from "./shared";
 
@@ -886,7 +886,7 @@ export async function swapMeal(formData: FormData) {
           list_id: list.id,
           meal_id: mealId,
           must_do: true,
-          title: `Put the ${(f.items as unknown as { name: string }).name.toLowerCase()} away (${originalName} moved)`.slice(0, 120),
+          title: `Put the ${(f.items as unknown as { name: string }).name.toLowerCase()} away`.slice(0, 120),
           icon: "🧊",
           due_date: meal.date,
         })),
@@ -938,10 +938,12 @@ export async function swapMeal(formData: FormData) {
   }
   await log(household.id, "meal_swapped", "meal", mealId, { backup: backup.name });
   refresh();
+  const { locale, timeZone } = household.settings;
+  const movedDay = movedTo ? new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(zonedToUtc(movedTo, "12:00", timeZone)) : null;
   back(
     formData,
     "message",
-    `Swapped to ${backup.name}.${movedTo ? ` ${originalName} moved to ${movedTo}.` : ""} Check the to-do list for anything to put away.`,
+    `Swapped to ${backup.name}.${movedDay ? ` ${originalName} moved to ${movedDay}.` : ""} Check the to-do list for anything to put away.`,
     { swap: null, meal: null },
   );
 }
