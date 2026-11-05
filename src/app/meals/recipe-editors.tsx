@@ -1,0 +1,218 @@
+"use client";
+
+import { useState } from "react";
+import { CaretLeft, CaretRight, Plus, Trash, X } from "@phosphor-icons/react";
+import { helperText, spotHelpers, type Helper } from "@/lib/meal-helpers";
+import { saveIngredients, saveSteps } from "./actions";
+
+/*
+ * The recipe card's two editors. Both keep the whole list in the browser,
+ * show it a page at a time (nothing scrolls), and send it all at once
+ * when you tap Save.
+ */
+
+function PageArrows({ page, pages, setPage }: { page: number; pages: number; setPage: (n: number) => void }) {
+  if (pages <= 1) return null;
+  const arrow = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
+  return (
+    <div className="flex items-center gap-3">
+      <button type="button" aria-label="Previous page" className={arrow} disabled={page === 0} onClick={() => setPage(page - 1)}>
+        <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+      </button>
+      <span className="text-lg font-bold text-ink-muted">
+        {page + 1} of {pages}
+      </span>
+      <button type="button" aria-label="Next page" className={arrow} disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>
+        <CaretRight size="1.5rem" weight="bold" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ingredients
+// ---------------------------------------------------------------------------
+
+export type IngredientDraft = { amount: string; unit: string; name: string; note: string; putAway: boolean };
+
+const INGREDIENT_PAGE = 8;
+const cell = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent";
+
+export function IngredientsEditor({ recipeId, initial, returnTo }: { recipeId: string; initial: IngredientDraft[]; returnTo: string }) {
+  const [rows, setRows] = useState<IngredientDraft[]>(initial.length ? initial : [{ amount: "", unit: "", name: "", note: "", putAway: false }]);
+  const [page, setPage] = useState(0);
+  const pages = Math.max(1, Math.ceil(rows.length / INGREDIENT_PAGE));
+  const p = Math.min(page, pages - 1);
+  const from = p * INGREDIENT_PAGE;
+
+  const change = (i: number, patch: Partial<IngredientDraft>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+  const add = () => {
+    setRows((r) => [...r, { amount: "", unit: "", name: "", note: "", putAway: false }]);
+    setPage(Math.floor(rows.length / INGREDIENT_PAGE));
+  };
+
+  return (
+    <form action={saveIngredients} className="flex min-h-0 flex-1 flex-col gap-3">
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="recipeId" value={recipeId} />
+      <input type="hidden" name="rows" value={JSON.stringify(rows)} />
+      <div className="grid grid-cols-[7rem_8rem_minmax(0,1fr)_minmax(0,0.8fr)_10rem_3.5rem] gap-2 text-base font-bold text-ink-muted">
+        <span>Amount</span>
+        <span>Unit</span>
+        <span>Ingredient</span>
+        <span>Note</span>
+        <span title="Fresh things to put away if the meal is swapped">Put away if swapped</span>
+        <span />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {rows.slice(from, from + INGREDIENT_PAGE).map((row, k) => {
+          const i = from + k;
+          return (
+            <div key={i} className="grid grid-cols-[7rem_8rem_minmax(0,1fr)_minmax(0,0.8fr)_10rem_3.5rem] items-center gap-2">
+              <input aria-label="Amount" className={cell} value={row.amount} inputMode="decimal" placeholder="1.5" onChange={(e) => change(i, { amount: e.target.value })} />
+              <input aria-label="Unit" className={cell} value={row.unit} placeholder="cup" maxLength={20} onChange={(e) => change(i, { unit: e.target.value })} />
+              <input aria-label="Ingredient" className={cell} value={row.name} placeholder="Ground beef" maxLength={60} onChange={(e) => change(i, { name: e.target.value })} />
+              <input aria-label="Note" className={cell} value={row.note} placeholder="diced" maxLength={80} onChange={(e) => change(i, { note: e.target.value })} />
+              <button
+                type="button"
+                aria-pressed={row.putAway}
+                onClick={() => change(i, { putAway: !row.putAway })}
+                className={`min-h-[var(--touch-target)] rounded-full border-2 text-base font-bold ${row.putAway ? "border-ink bg-rail text-ink" : "border-frame text-ink-muted"}`}
+              >
+                {row.putAway ? "🧊 Yes" : "No"}
+              </button>
+              <button type="button" aria-label="Remove" onClick={() => setRows((r) => r.filter((_, j) => j !== i))} className="flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-rail">
+                <Trash size="1.375rem" aria-hidden />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex shrink-0 items-center gap-4 border-t border-frame pt-3">
+        <button type="button" onClick={add} className="inline-flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-5 text-lg font-bold text-ink">
+          <Plus size="1.25rem" weight="bold" aria-hidden />
+          Ingredient
+        </button>
+        <PageArrows page={p} pages={pages} setPage={setPage} />
+        <button className="ml-auto inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board">Save ingredients</button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Steps, with the helpers Almanac spots in them
+// ---------------------------------------------------------------------------
+
+export type StepDraft = { text: string; helpers: Helper[] };
+
+const STEP_PAGE = 3;
+const keyOf = (h: Helper) => `${h.kind}|${h.minutes ?? ""}|${h.temperature ?? ""}`;
+
+const HELPER_EMOJI: Record<Helper["kind"], string> = { timer: "⏲️", heads_up: "🔔", oven: "🔥", doneness: "🌡️" };
+
+export function StepsEditor({
+  recipeId,
+  initial,
+  returnTo,
+  temperatureUnit,
+}: {
+  recipeId: string;
+  initial: StepDraft[];
+  returnTo: string;
+  temperatureUnit: "celsius" | "fahrenheit";
+}) {
+  const [steps, setSteps] = useState<(StepDraft & { dismissed: string[] })[]>(
+    (initial.length ? initial : [{ text: "", helpers: [] }]).map((s) => ({ ...s, dismissed: [] })),
+  );
+  const [page, setPage] = useState(0);
+  const pages = Math.max(1, Math.ceil(steps.length / STEP_PAGE));
+  const p = Math.min(page, pages - 1);
+  const from = p * STEP_PAGE;
+
+  const change = (i: number, patch: Partial<StepDraft & { dismissed: string[] }>) => setSteps((s) => s.map((step, j) => (j === i ? { ...step, ...patch } : step)));
+
+  return (
+    <form action={saveSteps} className="flex min-h-0 flex-1 flex-col gap-3">
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="recipeId" value={recipeId} />
+      <input type="hidden" name="steps" value={JSON.stringify(steps.map(({ text, helpers }) => ({ text, helpers })))} />
+      <p className="text-lg text-ink-muted">
+        Almanac spots timers, heads-ups and temperatures in each step. Dotted ones are suggestions: tap to keep them for Cooking mode.
+      </p>
+      <ol className="flex min-h-0 flex-1 flex-col gap-3">
+        {steps.slice(from, from + STEP_PAGE).map((step, k) => {
+          const i = from + k;
+          const kept = new Set(step.helpers.map(keyOf));
+          const suggested = spotHelpers(step.text, temperatureUnit).filter((h) => !kept.has(keyOf(h)) && !step.dismissed.includes(keyOf(h)));
+          return (
+            <li key={i} className="flex min-h-0 flex-1 gap-3 rounded-2xl bg-rail p-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-board text-xl font-extrabold text-ink">{i + 1}</span>
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <textarea
+                  aria-label={`Step ${i + 1}`}
+                  value={step.text}
+                  maxLength={400}
+                  rows={2}
+                  onChange={(e) => change(i, { text: e.target.value })}
+                  className="min-h-0 flex-1 resize-none rounded-[var(--radius)] border-2 border-frame bg-board p-3 text-lg text-ink outline-none focus:border-accent"
+                  placeholder="Bake for 45 minutes at 375°F."
+                />
+                <div className="flex flex-wrap gap-2">
+                  {step.helpers.map((h) => (
+                    <span key={keyOf(h)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-meal pr-1 pl-3 text-base font-bold text-meal-ink">
+                      {HELPER_EMOJI[h.kind]} {helperText(h, temperatureUnit)}
+                      <button
+                        type="button"
+                        aria-label="Remove helper"
+                        onClick={() => change(i, { helpers: step.helpers.filter((x) => keyOf(x) !== keyOf(h)), dismissed: [...step.dismissed, keyOf(h)] })}
+                        className="flex size-9 items-center justify-center rounded-full hover:bg-board/60"
+                      >
+                        <X size="1rem" weight="bold" aria-hidden />
+                      </button>
+                    </span>
+                  ))}
+                  {suggested.map((h) => (
+                    <button
+                      key={keyOf(h)}
+                      type="button"
+                      onClick={() => change(i, { helpers: [...step.helpers, h] })}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-dashed border-meal-ink/60 px-3 text-base font-bold text-meal-ink"
+                    >
+                      {HELPER_EMOJI[h.kind]} {helperText(h, temperatureUnit)} <span className="font-normal">· keep</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col gap-1">
+                <button
+                  type="button"
+                  aria-label="Remove step"
+                  onClick={() => setSteps((s) => s.filter((_, j) => j !== i))}
+                  className="flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-board"
+                >
+                  <Trash size="1.375rem" aria-hidden />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="flex shrink-0 items-center gap-4 border-t border-frame pt-3">
+        <button
+          type="button"
+          onClick={() => {
+            setSteps((s) => [...s, { text: "", helpers: [], dismissed: [] }]);
+            setPage(Math.floor(steps.length / STEP_PAGE));
+          }}
+          className="inline-flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-5 text-lg font-bold text-ink"
+        >
+          <Plus size="1.25rem" weight="bold" aria-hidden />
+          Step
+        </button>
+        <PageArrows page={p} pages={pages} setPage={setPage} />
+        <button className="ml-auto inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board">Save steps</button>
+      </div>
+    </form>
+  );
+}

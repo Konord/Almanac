@@ -49,6 +49,58 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"backup_parts": {
+                  Row: {
+                    "household_id": string,"id": string,"item_id": string,"keep_at_least": number,"on_hand": number,"position": number,"recipe_id": string,"uses": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"id"?: string,"item_id": string,"keep_at_least"?: number,"on_hand"?: number,"position"?: number,"recipe_id": string,"uses"?: number
+                  }
+                  Update: {
+                    "household_id"?: string,"id"?: string,"item_id"?: string,"keep_at_least"?: number,"on_hand"?: number,"position"?: number,"recipe_id"?: string,"uses"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "backup_parts_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "backup_parts_item_id_household_id_fkey"
+      columns: ["item_id","household_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "backup_parts_recipe_id_household_id_fkey"
+      columns: ["recipe_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipes"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"days": {
+                  Row: {
+                    "date": string,"energy_mode": string,"household_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "date": string,"energy_mode"?: string,"household_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "date"?: string,"energy_mode"?: string,"household_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "days_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"event_exceptions": {
                   Row: {
                     "created_at": string,"event_id": string,"household_id": string,"id": string,"new_ends_at": string | null,"new_starts_at": string | null,"original_date": string,"skipped": boolean,"updated_at": string
@@ -205,6 +257,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"items": {
+                  Row: {
+                    "aisle": string,"created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aisle"?: string,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "aisle"?: string,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "items_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"layers": {
                   Row: {
                     "colour": string,"counts_toward_busyness": boolean,"created_at": string,"created_by": string | null,"household_id": string,"id": string,"name": string,"owner_member_id": string | null,"sort_order": number,"type": string,"updated_at": string,"visibility": string
@@ -237,6 +309,194 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"meal_categories": {
+                  Row: {
+                    "active": boolean,"created_at": string,"household_id": string,"icon": string | null,"id": string,"meal_time_ids": (string)[],"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"meal_time_ids"?: (string)[],"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"meal_time_ids"?: (string)[],"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_categories_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meal_members": {
+                  Row: {
+                    "household_id": string,"meal_id": string,"member_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"meal_id": string,"member_id": string
+                  }
+                  Update: {
+                    "household_id"?: string,"meal_id"?: string,"member_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_members_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meal_members_meal_id_household_id_fkey"
+      columns: ["meal_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meals"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meal_members_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"meal_presets": {
+                  Row: {
+                    "category_id": string,"created_at": string,"household_id": string,"id": string,"meal_time_id": string,"weekday": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category_id": string,"created_at"?: string,"household_id": string,"id"?: string,"meal_time_id": string,"weekday": number
+                  }
+                  Update: {
+                    "category_id"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"weekday"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_presets_category_id_household_id_fkey"
+      columns: ["category_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_categories"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meal_presets_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meal_presets_meal_time_id_household_id_fkey"
+      columns: ["meal_time_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_times"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"meal_tags": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"sort_order": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"sort_order"?: number
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_tags_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meal_times": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"show_on_planner": boolean,"sort_order": number,"updated_at": string,"usual_time": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"show_on_planner"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_time"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"show_on_planner"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_time"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_times_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meal_weeks": {
+                  Row: {
+                    "household_id": string,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"week_start": string
+                  }
+                  Update: {
+                    "household_id"?: string,"week_start"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_weeks_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"meals": {
+                  Row: {
+                    "category_id": string | null,"created_at": string,"date": string,"from_preset": boolean,"household_id": string,"id": string,"meal_time_id": string,"recipe_id": string | null,"servings": number | null,"sort_order": number,"status": string,"swapped_for_id": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category_id"?: string | null,"created_at"?: string,"date": string,"from_preset"?: boolean,"household_id": string,"id"?: string,"meal_time_id": string,"recipe_id"?: string | null,"servings"?: number | null,"sort_order"?: number,"status"?: string,"swapped_for_id"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "category_id"?: string | null,"created_at"?: string,"date"?: string,"from_preset"?: boolean,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"recipe_id"?: string | null,"servings"?: number | null,"sort_order"?: number,"status"?: string,"swapped_for_id"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meals_category_id_household_id_fkey"
+      columns: ["category_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_categories"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meals_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meals_meal_time_id_household_id_fkey"
+      columns: ["meal_time_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_times"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meals_recipe_id_household_id_fkey"
+      columns: ["recipe_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipes"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meals_swapped_for_id_household_id_fkey"
+      columns: ["swapped_for_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meals"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"members": {
                   Row: {
                     "birth_year": number | null,"colour": string,"created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"pin_hash": string | null,"role": string,"sort_order": number,"updated_at": string
@@ -251,6 +511,148 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "members_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"recipe_categories": {
+                  Row: {
+                    "category_id": string,"household_id": string,"recipe_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "category_id": string,"household_id": string,"recipe_id": string
+                  }
+                  Update: {
+                    "category_id"?: string,"household_id"?: string,"recipe_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "recipe_categories_category_id_household_id_fkey"
+      columns: ["category_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_categories"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "recipe_categories_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "recipe_categories_recipe_id_household_id_fkey"
+      columns: ["recipe_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipes"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"recipe_ingredients": {
+                  Row: {
+                    "amount": number | null,"household_id": string,"id": string,"item_id": string,"note": string | null,"position": number,"put_away_if_skipped": boolean,"recipe_id": string,"unit": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"household_id": string,"id"?: string,"item_id": string,"note"?: string | null,"position"?: number,"put_away_if_skipped"?: boolean,"recipe_id": string,"unit"?: string | null
+                  }
+                  Update: {
+                    "amount"?: number | null,"household_id"?: string,"id"?: string,"item_id"?: string,"note"?: string | null,"position"?: number,"put_away_if_skipped"?: boolean,"recipe_id"?: string,"unit"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "recipe_ingredients_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "recipe_ingredients_item_id_household_id_fkey"
+      columns: ["item_id","household_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "recipe_ingredients_recipe_id_household_id_fkey"
+      columns: ["recipe_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipes"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"recipe_steps": {
+                  Row: {
+                    "household_id": string,"id": string,"position": number,"recipe_id": string,"text": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"id"?: string,"position"?: number,"recipe_id": string,"text": string
+                  }
+                  Update: {
+                    "household_id"?: string,"id"?: string,"position"?: number,"recipe_id"?: string,"text"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "recipe_steps_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "recipe_steps_recipe_id_household_id_fkey"
+      columns: ["recipe_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipes"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"recipe_tags": {
+                  Row: {
+                    "household_id": string,"recipe_id": string,"tag_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"recipe_id": string,"tag_id": string
+                  }
+                  Update: {
+                    "household_id"?: string,"recipe_id"?: string,"tag_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "recipe_tags_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "recipe_tags_recipe_id_household_id_fkey"
+      columns: ["recipe_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipes"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "recipe_tags_tag_id_household_id_fkey"
+      columns: ["tag_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_tags"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"recipes": {
+                  Row: {
+                    "created_at": string,"hands_on_minutes": number | null,"household_id": string,"icon": string | null,"id": string,"is_backup": boolean,"last_cooked_on": string | null,"name": string,"notes": string | null,"premade": boolean,"serves": number,"source_url": string | null,"total_minutes": number | null,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"hands_on_minutes"?: number | null,"household_id": string,"icon"?: string | null,"id"?: string,"is_backup"?: boolean,"last_cooked_on"?: string | null,"name": string,"notes"?: string | null,"premade"?: boolean,"serves"?: number,"source_url"?: string | null,"total_minutes"?: number | null,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"hands_on_minutes"?: number | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"is_backup"?: boolean,"last_cooked_on"?: string | null,"name"?: string,"notes"?: string | null,"premade"?: boolean,"serves"?: number,"source_url"?: string | null,"total_minutes"?: number | null,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "recipes_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
       referencedRelation: "households"
@@ -367,6 +769,64 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"shopping_list": {
+                  Row: {
+                    "amount": number | null,"backup_part_id": string | null,"checked": boolean,"checked_at": string | null,"created_at": string,"detail": string | null,"household_id": string,"id": string,"item_id": string,"source": string,"status": string,"unit": string | null,"week_of": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"backup_part_id"?: string | null,"checked"?: boolean,"checked_at"?: string | null,"created_at"?: string,"detail"?: string | null,"household_id": string,"id"?: string,"item_id": string,"source"?: string,"status"?: string,"unit"?: string | null,"week_of": string
+                  }
+                  Update: {
+                    "amount"?: number | null,"backup_part_id"?: string | null,"checked"?: boolean,"checked_at"?: string | null,"created_at"?: string,"detail"?: string | null,"household_id"?: string,"id"?: string,"item_id"?: string,"source"?: string,"status"?: string,"unit"?: string | null,"week_of"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "shopping_list_backup_part_id_household_id_fkey"
+      columns: ["backup_part_id","household_id"]
+isOneToOne: false
+      referencedRelation: "backup_parts"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "shopping_list_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "shopping_list_item_id_household_id_fkey"
+      columns: ["item_id","household_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"step_helpers": {
+                  Row: {
+                    "household_id": string,"id": string,"kind": string,"label": string | null,"minutes": number | null,"step_id": string,"temperature": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"id"?: string,"kind": string,"label"?: string | null,"minutes"?: number | null,"step_id": string,"temperature"?: number | null
+                  }
+                  Update: {
+                    "household_id"?: string,"id"?: string,"kind"?: string,"label"?: string | null,"minutes"?: number | null,"step_id"?: string,"temperature"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "step_helpers_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "step_helpers_step_id_household_id_fkey"
+      columns: ["step_id","household_id"]
+isOneToOne: false
+      referencedRelation: "recipe_steps"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"tags": {
                   Row: {
                     "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string
@@ -389,14 +849,14 @@ isOneToOne: false
                   ]
                 },"task_instances": {
                   Row: {
-                    "actual_minutes": number | null,"assignee_id": string | null,"completed_at": string | null,"completed_by": string | null,"completed_on": string | null,"created_at": string,"due_date": string | null,"household_id": string,"icon": string | null,"id": string,"list_id": string | null,"notes": string | null,"status": string,"template_id": string | null,"title": string | null,"updated_at": string,"visibility": string
+                    "actual_minutes": number | null,"assignee_id": string | null,"completed_at": string | null,"completed_by": string | null,"completed_on": string | null,"created_at": string,"due_date": string | null,"household_id": string,"icon": string | null,"id": string,"list_id": string | null,"meal_id": string | null,"must_do": boolean,"notes": string | null,"status": string,"template_id": string | null,"title": string | null,"updated_at": string,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "actual_minutes"?: number | null,"assignee_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"completed_on"?: string | null,"created_at"?: string,"due_date"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"list_id"?: string | null,"notes"?: string | null,"status"?: string,"template_id"?: string | null,"title"?: string | null,"updated_at"?: string,"visibility"?: string
+                    "actual_minutes"?: number | null,"assignee_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"completed_on"?: string | null,"created_at"?: string,"due_date"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"list_id"?: string | null,"meal_id"?: string | null,"must_do"?: boolean,"notes"?: string | null,"status"?: string,"template_id"?: string | null,"title"?: string | null,"updated_at"?: string,"visibility"?: string
                   }
                   Update: {
-                    "actual_minutes"?: number | null,"assignee_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"completed_on"?: string | null,"created_at"?: string,"due_date"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"list_id"?: string | null,"notes"?: string | null,"status"?: string,"template_id"?: string | null,"title"?: string | null,"updated_at"?: string,"visibility"?: string
+                    "actual_minutes"?: number | null,"assignee_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"completed_on"?: string | null,"created_at"?: string,"due_date"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"list_id"?: string | null,"meal_id"?: string | null,"must_do"?: boolean,"notes"?: string | null,"status"?: string,"template_id"?: string | null,"title"?: string | null,"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
@@ -422,6 +882,12 @@ isOneToOne: false
       columns: ["list_id","household_id"]
 isOneToOne: false
       referencedRelation: "task_lists"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "task_instances_meal_fk"
+      columns: ["meal_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meals"
       referencedColumns: ["id","household_id"]
     },{
       foreignKeyName: "task_instances_template_id_household_id_fkey"
@@ -517,6 +983,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"weekly_buys": {
+                  Row: {
+                    "amount": number | null,"created_at": string,"every_weeks": number,"household_id": string,"id": string,"item_id": string,"last_week": string | null,"unit": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"created_at"?: string,"every_weeks"?: number,"household_id": string,"id"?: string,"item_id": string,"last_week"?: string | null,"unit"?: string | null
+                  }
+                  Update: {
+                    "amount"?: number | null,"created_at"?: string,"every_weeks"?: number,"household_id"?: string,"id"?: string,"item_id"?: string,"last_week"?: string | null,"unit"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "weekly_buys_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "weekly_buys_item_id_household_id_fkey"
+      columns: ["item_id","household_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -527,6 +1019,9 @@ isOneToOne: false
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_layers":
+{ Args: { "target_household": string }; Returns: undefined
+                           },
+"add_starter_meals":
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_routines":

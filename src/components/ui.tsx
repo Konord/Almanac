@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { Alarm, Broom, CalendarBlank, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { Alarm, Broom, CalendarBlank, ForkKnife, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
 import { soft, strong } from "@/lib/colours";
@@ -19,7 +19,7 @@ import { soft, strong } from "@/lib/colours";
 // The app frame: icon rail on the left, the screen on the right
 // ---------------------------------------------------------------------------
 
-export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "settings";
+export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "settings";
 
 const RAIL: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "today", href: "/", label: "Today", icon: House },
@@ -27,6 +27,7 @@ const RAIL: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "chores", href: "/chores", label: "Chores", icon: Broom },
   { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
   { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
+  { section: "meals", href: "/meals", label: "Meals", icon: ForkKnife },
 ];
 
 const RAIL_BOTTOM: { section: Section; href: string; label: string; icon: Icon }[] = [
