@@ -153,3 +153,95 @@ export function eventEmoji(icon: string | null | undefined, title: string): stri
   if (icon && icon.trim()) return icon.trim();
   return GUESSES.find(([pattern]) => pattern.test(title))?.[1] ?? "📅";
 }
+
+// ---------------------------------------------------------------------------
+// Picking a picture: suggestions from a title, and search by name
+// ---------------------------------------------------------------------------
+
+export type EmojiChoice = {
+  emoji: string;
+  /** A short name, e.g. "ice hockey". */
+  name: string;
+  /** Words it can be found by: its name plus words from the title guesses. */
+  words: string[];
+};
+
+/** Extra search words for some pictures, beyond their file names. */
+const EXTRA_WORDS: Record<string, string[]> = {
+  "🎒": ["school", "bag"],
+  "💼": ["work", "office", "meeting", "job"],
+  "📅": ["calendar", "date", "event"],
+  "🏡": ["home", "house", "work from home", "wfh"],
+  "🩺": ["doctor", "appointment", "checkup"],
+  "🥽": ["swim", "swimming", "pool"],
+  "👟": ["run", "gym", "sports", "walk"],
+  "🎵": ["music", "piano", "lesson", "band"],
+  "🍽": ["dinner", "lunch", "meal", "restaurant"],
+  "💇": ["haircut", "hair", "barber", "salon"],
+  "🐶": ["dog", "vet", "pet"],
+  "✈": ["flight", "trip", "travel", "vacation"],
+  "🚗": ["car", "drive", "pickup", "dropoff"],
+  "⚖": ["court", "lawyer", "legal"],
+  "🧽": ["clean", "cleaning", "chores"],
+  "🎂": ["birthday", "cake"],
+  "🎉": ["party", "celebrate"],
+  "🍿": ["movie", "film"],
+  "🛒": ["groceries", "shopping", "store"],
+  "🛏": ["bed", "sleep", "nap"],
+  "📚": ["books", "library", "homework", "reading"],
+  "🧺": ["laundry", "basket"],
+};
+
+/** Every picture we have, once each (some emoji share a picture). */
+export const EMOJI_CHOICES: EmojiChoice[] = (() => {
+  const seen = new Set<string>();
+  const choices: EmojiChoice[] = [];
+  for (const [emoji, file] of Object.entries(FILES)) {
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const name = file.replace(/[_-]/g, " ");
+    const words = new Set([name, ...name.split(" "), ...(EXTRA_WORDS[emoji] ?? [])]);
+    choices.push({ emoji, name, words: [...words] });
+  }
+  return choices;
+})();
+
+/** Everyday pictures to offer when the title doesn't suggest anything. */
+const EVERYDAY = ["📅", "💼", "🏡", "🍽", "🚗", "🎉", "⭐", "🩺", "🎒", "🛒", "👟", "🎂"];
+
+function choiceFor(emoji: string): EmojiChoice | undefined {
+  const file = FILES[plain(emoji)];
+  return EMOJI_CHOICES.find((c) => FILES[c.emoji] === file);
+}
+
+/**
+ * A short list of pictures for a title: the one Almanac would guess first,
+ * then any whose name or words appear in the title, then everyday ones.
+ * Each comes with the reason it was suggested.
+ */
+export function suggestEmoji(title: string, limit = 6): (EmojiChoice & { why: string })[] {
+  const result: (EmojiChoice & { why: string })[] = [];
+  const add = (choice: EmojiChoice | undefined, why: string) => {
+    if (choice && !result.some((r) => r.emoji === choice.emoji) && result.length < limit) result.push({ ...choice, why });
+  };
+  const text = title.toLowerCase();
+  for (const [pattern, emoji] of GUESSES) {
+    const match = pattern.exec(title);
+    if (match) add(choiceFor(emoji), `"${match[0].toLowerCase()}"`);
+  }
+  for (const choice of EMOJI_CHOICES) {
+    const word = choice.words.find((w) => w.length > 2 && new RegExp(`\\b${w}`, "i").test(text));
+    if (word) add(choice, `"${word}"`);
+  }
+  for (const emoji of EVERYDAY) add(choiceFor(emoji), "everyday");
+  return result;
+}
+
+/** Pictures whose name or words start with what's typed (then ones that contain it). */
+export function searchEmoji(query: string, limit = 18): EmojiChoice[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return EMOJI_CHOICES.slice(0, limit);
+  const starts = EMOJI_CHOICES.filter((c) => c.words.some((w) => w.startsWith(q)));
+  const contains = EMOJI_CHOICES.filter((c) => !starts.includes(c) && c.words.some((w) => w.includes(q)));
+  return [...starts, ...contains].slice(0, limit);
+}

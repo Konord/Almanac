@@ -4,6 +4,7 @@ import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import { CardTabs, LengthControl } from "./quick-controls";
 import { PendingSync } from "./pending-sync";
+import { EmojiPicker } from "@/components/emoji-picker";
 import type { Layer, Member, SavedView } from "./types";
 
 /** The form fields for events and layers. */
@@ -177,9 +178,14 @@ export function EventCardFields({
             label: "Event",
             panel: (
               <>
-                <Field label="What">
-                  <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus={adding} defaultValue={defaults.title} />
-                </Field>
+                <div className="flex gap-3">
+                  <EmojiPicker initial={defaults.icon} />
+                  <div className="min-w-0 flex-1">
+                    <Field label="What">
+                      <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus={adding} defaultValue={defaults.title} />
+                    </Field>
+                  </div>
+                </div>
                 <div className="grid grid-cols-[1fr_1fr] gap-4">
                   <Field label="Day">
                     <Input name="startDate" type="date" defaultValue={defaults.date} required />
@@ -244,14 +250,9 @@ export function EventCardFields({
             label: "More",
             panel: (
               <>
-                <div className="grid grid-cols-[8rem_1fr] gap-4">
-                  <Field label="Picture">
-                    <Input name="icon" maxLength={8} placeholder="🗓️" defaultValue={defaults.icon} />
-                  </Field>
-                  <Field label="Notes">
-                    <Input name="notes" maxLength={2000} defaultValue={defaults.notes} />
-                  </Field>
-                </div>
+                <Field label="Notes">
+                  <Input name="notes" maxLength={2000} defaultValue={defaults.notes} />
+                </Field>
                 {layers.length > 1 ? (
                   <Chips
                     name="layerId"
