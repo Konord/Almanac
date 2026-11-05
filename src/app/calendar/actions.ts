@@ -136,7 +136,8 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     endDate: endDateInput,
     startTime: text(formData, "startTime"),
     endTime: text(formData, "endTime"),
-    defaultMinutes: settings.defaultEventMinutes,
+    // The quick-add card sends a length; the full form uses the usual length.
+    defaultMinutes: readMinutes(formData) ?? settings.defaultEventMinutes,
   });
   if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
   if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🦷.");
@@ -168,6 +169,12 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     notes: notes || null,
     icon: icon || null,
   };
+}
+
+/** A length in minutes from the quick-add card, if it sent a sensible one. */
+function readMinutes(formData: FormData): number | null {
+  const minutes = Number(text(formData, "minutes"));
+  return Number.isInteger(minutes) && minutes >= 5 && minutes <= 24 * 60 ? minutes : null;
 }
 
 const FREQUENCIES: RepeatFrequency[] = ["none", "daily", "weekly", "monthly", "yearly"];

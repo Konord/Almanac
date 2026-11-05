@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarDots, ListChecks, SunHorizon } from "@phosphor-icons/react/dist/ssr";
+import { CalendarDots, ListChecks, Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
 import {
   AppFrame,
   Avatar,
@@ -27,9 +27,13 @@ import { loadRoutines, type RoutineData } from "./routines/data";
 import { floatingRoutines, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
+import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
+import { PlaceOnTimeline } from "@/components/place-on-timeline";
+import type { QuickDefaults } from "./calendar/forms";
 import {
   DayBlocks,
   HourLines,
+  PendingBlock,
   NowLine,
   eventsOnDay,
   isAllDayStyle,
@@ -86,6 +90,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
+  const { placing, pending } = readAdding(params, household.settings, members);
 
   return (
     <>
@@ -116,6 +121,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
+      {placing ? <PlacingBar hint="Tap someone's column at a time to add an event for them, or drag down to set how long." cancelHref="/" /> : null}
 
       <div className="flex flex-col gap-6.5 lg:min-h-0 lg:flex-1 lg:flex-row">
         <PeopleTimeline
@@ -126,6 +132,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           today={today}
           now={now}
           household={household}
+          placing={placing}
+          pending={pending}
         />
 
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -140,6 +148,23 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           <ComingUp days={days.slice(1, 6)} shown={shown} profiles={profiles} household={household} />
         </div>
       </div>
+
+      {/* Add button, bottom right: starts adding mode, or cancels it. */}
+      <Link
+        href={placing ? "/" : "/?placing=1"}
+        scroll={false}
+        aria-label={placing ? "Stop adding" : "Add an event"}
+        title={placing ? "Stop adding" : "Add an event"}
+        className={`fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)] ${
+          placing ? "bg-accent" : "bg-ink"
+        }`}
+      >
+        {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
+      </Link>
+
+      {pending ? (
+        <QuickAddSheet pending={pending} layers={layers} members={members} closeHref="/" returnTo="" returnPath="/" />
+      ) : null}
     </>
   );
 }
@@ -156,6 +181,8 @@ function PeopleTimeline({
   today,
   now,
   household,
+  placing,
+  pending,
 }: {
   allDay: CalendarItem[];
   items: CalendarItem[];
@@ -164,6 +191,10 @@ function PeopleTimeline({
   today: LocalDate;
   now: Date;
   household: Household;
+  /** Adding mode: each column becomes a place to tap. */
+  placing: boolean;
+  /** The event being added, shown as a dashed outline. */
+  pending: QuickDefaults | null;
 }) {
   const { timeZone } = household.settings;
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
@@ -191,7 +222,8 @@ function PeopleTimeline({
       items: timed.filter((e) => e.member_id === m.id),
       progress: dayProgress(routineData, m.id, today),
     })),
-    ...(forEveryone.length > 0 || members.length === 0
+    // While adding, "Everyone" always shows so you can add things for the whole family.
+    ...(forEveryone.length > 0 || members.length === 0 || placing
       ? [
           {
             id: "everyone",
@@ -275,6 +307,17 @@ function PeopleTimeline({
                 linkFor={editLink}
                 big
               />
+              {/* The dashed outline only shows in the column of the person it's for. */}
+              <PendingBlock pending={pending && (pending.memberId ?? "everyone") === c.id ? pending : null} day={today} first={first} last={last} />
+              {placing ? (
+                <PlaceOnTimeline
+                  href={`/?add=${today}&who=${c.id}`}
+                  first={first}
+                  last={last}
+                  defaultMinutes={household.settings.defaultEventMinutes}
+                  label={`Add an event for ${c.name}`}
+                />
+              ) : null}
             </div>
           ))}
           <div className="pointer-events-none absolute inset-y-0 right-0 left-14.5">

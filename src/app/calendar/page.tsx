@@ -1,17 +1,16 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Plus, Stack } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, Plus, Stack, X } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
 import { strong } from "@/lib/colours";
-import { addMonths, monthGridDays, weekDays } from "@/lib/calendar-layout";
+import { addMonths, dayOfWeek, monthGridDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import {
-  addEvent,
   addLayer,
   addView,
   removeView,
@@ -26,6 +25,7 @@ import {
 } from "./actions";
 import { EventFields, LayerFields, ViewFields } from "./forms";
 import { ViewChooser } from "./view-chooser";
+import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
 import { VISIBILITY_OPTIONS } from "./options";
 import { deviceView, EVENT_COLUMNS, itemsInView, loadCalendar, profilesFor, rangeOf } from "./data";
 import type { CalendarEvent, CalendarItem, Layer, Member, SavedView } from "./types";
@@ -58,8 +58,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const editId = firstParam(params.edit);
   const occParam = firstParam(params.occ);
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
-  const addParam = firstParam(params.add);
-  const addDate = addParam && isLocalDate(addParam) ? addParam : undefined;
   const panel = firstParam(params.panel) === "layers" ? "layers" : null;
 
   const days = view === "week" ? weekDays(anchor, weekStartsOn) : monthGridDays(anchor, weekStartsOn);
@@ -72,6 +70,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const events: CalendarItem[] = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
   const layerById = new Map(layers.map((l) => [l.id, l]));
+  const { placing, pending } = readAdding(params, household.settings, members);
   const memberById = new Map(members.map((m) => [m.id, m]));
 
   // The event being edited might be outside the visible range, so fetch it on its own.
@@ -85,7 +84,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
     editing = data;
   }
 
-  const current: Record<string, string | null> = { view, date: anchor };
+  // While adding, moving between weeks or views keeps you in adding mode.
+  const current: Record<string, string | null> = { view, date: anchor, placing: placing ? "1" : null };
   const href = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
     const merged: Record<string, string | null> = { ...current, ...changes };
@@ -93,7 +93,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
     return `/calendar?${next.toString()}`;
   };
   const returnTo = `view=${view}&date=${anchor}`;
-  const closeHref = href({ edit: null, occ: null, add: null, panel: null });
+  const closeHref = href({ edit: null, occ: null, add: null, panel: null, placing: null });
+  /** Where tapping a day or time while adding goes (start and length get added for a time). */
+  const addHref = (day: LocalDate, extra: Record<string, string> = {}) => href({ add: day, edit: null, panel: null, placing: null, ...extra });
 
   const step = (n: number) => (view === "week" ? addDays(anchor, 7 * n) : addMonths(anchor, n));
   const error = firstParam(params.error);
@@ -126,11 +128,26 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
+      {placing ? (
+        <PlacingBar
+          hint={view === "week" ? "Tap a time to add an event there, or drag down to set how long. Tap a day's name for all day." : "Tap a day to add an event on it."}
+          cancelHref={closeHref}
+        />
+      ) : null}
 
       {view === "week" ? <PeopleRow data={routineData} date={today} hrefFor={(id) => `/routines?member=${id}`} /> : null}
 
       {view === "week" ? (
-        <WeekView household={household} days={days} today={today} events={events} memberById={memberById} href={href} profiles={profiles} />
+        <WeekView
+          household={household}
+          days={days}
+          today={today}
+          events={events}
+          memberById={memberById}
+          href={href}
+          profiles={profiles}
+          adding={{ placing, pending, addHref }}
+        />
       ) : (
         <MonthView
           household={household}
@@ -141,18 +158,21 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           href={href}
           profiles={profiles}
           anchor={anchor}
+          adding={{ placing, pending, addHref }}
         />
       )}
 
-      {/* Add button, bottom right */}
+      {/* Add button, bottom right: starts adding mode, or cancels it. */}
       <Link
-        href={href({ add: anchor >= days[0] && anchor <= days[days.length - 1] ? anchor : days[0], edit: null, panel: null })}
+        href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
         scroll={false}
-        aria-label="Add an event"
-        title="Add an event"
-        className="fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full bg-ink text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)]"
+        aria-label={placing ? "Stop adding" : "Add an event"}
+        title={placing ? "Stop adding" : "Add an event"}
+        className={`fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)] ${
+          placing ? "bg-accent" : "bg-ink"
+        }`}
       >
-        <Plus size="2.625rem" weight="bold" aria-hidden />
+        {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
       </Link>
 
       {editing ? (
@@ -173,21 +193,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         </Sheet>
       ) : null}
 
-      {addDate && !editing ? (
-        <Sheet title="Add an event" closeHref={closeHref}>
-          {layers.length === 0 ? (
-            <p className="text-lg text-ink-muted">Add a layer first (under Layers).</p>
-          ) : (
-            <form action={addEvent} className="grid gap-4 sm:grid-cols-2">
-              <input type="hidden" name="returnTo" value={`view=${view}&date=${addDate}`} />
-              <EventFields layers={layers} members={members} defaults={{ startDate: addDate }} />
-              <div className="flex gap-3 sm:col-span-2">
-                <Button>Add event</Button>
-                <CloseLink href={closeHref} />
-              </div>
-            </form>
-          )}
-        </Sheet>
+      {pending && !editing ? (
+        <QuickAddSheet
+          // A day late in the week opens the card on the left, so the day stays in view.
+          side={(dayOfWeek(pending.date) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right"}
+          pending={pending} layers={layers} members={members} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
       ) : null}
 
       {panel === "layers" ? (

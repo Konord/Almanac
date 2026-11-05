@@ -8,6 +8,8 @@ import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@
 import type { DayProfile } from "@/lib/day-profile";
 import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Member } from "./types";
+import type { QuickDefaults } from "./forms";
+import { PlaceOnTimeline } from "@/components/place-on-timeline";
 
 type ViewProps = {
   household: Household;
@@ -19,6 +21,15 @@ type ViewProps = {
   href: (changes: Record<string, string | null>) => string;
   /** Each day's free/busy profile. */
   profiles: Map<LocalDate, DayProfile>;
+  /** Adding by placing: whether we're in adding mode, and the event being added. */
+  adding?: Adding;
+};
+
+export type Adding = {
+  placing: boolean;
+  pending: QuickDefaults | null;
+  /** Where tapping a day goes while adding. */
+  addHref: (day: LocalDate, extra?: Record<string, string>) => string;
 };
 
 /** Each event takes its person's colour; events for nobody in particular are "everyone" orange. */
@@ -267,11 +278,26 @@ export function nowPercent(now: Date, first: number, last: number, timeZone: str
   return ((minutesIntoDay(now, timeZone) - first * 60) / ((last - first) * 60)) * 100;
 }
 
+/** A dashed outline where the event you're adding will go. */
+export function PendingBlock({ pending, day, first, last }: { pending: QuickDefaults | null | undefined; day: LocalDate; first: number; last: number }) {
+  if (!pending || pending.date !== day || pending.allDay || !pending.startTime) return null;
+  const [h, m] = pending.startTime.split(":").map(Number);
+  const span = (last - first) * 60;
+  const top = ((h * 60 + m - first * 60) / span) * 100;
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-1 z-10 rounded-[0.875rem] border-2 border-dashed border-accent bg-[color-mix(in_srgb,var(--color-accent)_12%,white)]"
+      style={{ top: `${top}%`, height: `${(pending.minutes / span) * 100}%` }}
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Week view
 // ---------------------------------------------------------------------------
 
-export function WeekView({ household, days, today, events, memberById, href, profiles }: ViewProps) {
+export function WeekView({ household, days, today, events, memberById, href, profiles, adding }: ViewProps) {
   const { timeZone } = household.settings;
   const { first, last } = timelineRange(events, days, timeZone);
   const now = new Date();
@@ -291,9 +317,9 @@ export function WeekView({ household, days, today, events, memberById, href, pro
             return (
               <div key={day} className="flex min-w-0 flex-1 basis-0 flex-col gap-2 px-1">
                 <Link
-                  href={href({ add: day, edit: null, panel: null })}
+                  href={adding ? adding.addHref(day, { allday: "1" }) : href({ add: day, allday: "1", edit: null, panel: null })}
                   scroll={false}
-                  title="Add something on this day"
+                  title="Add an all-day event on this day"
                   className="flex h-12.5 items-center gap-2 rounded-xl pl-2.5 text-2xl font-bold text-ink hover:bg-rail lg:text-3xl"
                 >
                   {weekdayLabel(day, household)}
@@ -358,6 +384,16 @@ export function WeekView({ household, days, today, events, memberById, href, pro
               {day === today ? (
                 <NowLine percent={nowPercent(now, first, last, timeZone)} label={`Now, ${shortTime(now, household)}`} />
               ) : null}
+              <PendingBlock pending={adding?.pending} day={day} first={first} last={last} />
+              {adding?.placing ? (
+                <PlaceOnTimeline
+                  href={adding.addHref(day)}
+                  first={first}
+                  last={last}
+                  defaultMinutes={household.settings.defaultEventMinutes}
+                  label={`Add an event on ${weekdayLabel(day, household, "long")}`}
+                />
+              ) : null}
             </div>
           ))}
         </div>
@@ -382,6 +418,7 @@ export function MonthView({
   href,
   profiles,
   anchor,
+  adding,
 }: ViewProps & { anchor: LocalDate }) {
   const { timeZone } = household.settings;
   const month = monthOf(anchor);
@@ -413,10 +450,18 @@ export function MonthView({
           return (
             <div
               key={day}
-              className={`flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden border-frame p-1.5 ${i % 7 === 0 ? "" : "border-l"} ${
+              className={`relative flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden border-frame p-1.5 ${i % 7 === 0 ? "" : "border-l"} ${
                 i >= 7 ? "border-t" : ""
-              } ${inMonth ? "bg-board" : "bg-rail"}`}
+              } ${inMonth ? "bg-board" : "bg-rail"} ${adding?.pending?.date === day ? "outline-3 -outline-offset-3 outline-accent" : ""}`}
             >
+              {adding?.placing ? (
+                <Link
+                  href={adding.addHref(day, { allday: "1" })}
+                  scroll={false}
+                  aria-label={`Add an event on ${weekdayLabel(day, household, "long")} ${Number(day.slice(8))}`}
+                  className="absolute inset-0 z-10 hover:bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)]"
+                />
+              ) : null}
               <div className="flex shrink-0 items-center justify-between gap-1">
                 <Link
                   href={href({

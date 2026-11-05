@@ -2,6 +2,7 @@ import { Avatar, Chips, Field, Input, Select } from "@/components/ui";
 import { PERSON_COLOURS, strong } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
+import { ExtraTabs, LengthControl } from "./quick-controls";
 import type { Layer, Member, SavedView } from "./types";
 
 /** The form fields for adding or editing an event or a layer. */
@@ -232,6 +233,123 @@ export function ViewFields({ layers, view }: { layers: Layer[]; view?: SavedView
           ))}
         </div>
       </fieldset>
+    </>
+  );
+}
+
+/** What the quick-add card starts with, from where you tapped. */
+export type QuickDefaults = {
+  date: string;
+  startTime?: string;
+  minutes: number;
+  allDay: boolean;
+  memberId?: string;
+};
+
+/**
+ * The small "add an event" card: name, day, time and length up front, with
+ * person buttons and an All day switch. Repeats, several days and the rest
+ * are behind tabs. Put it inside a <form className="group ...">.
+ */
+export function QuickAddFields({ layers, members, defaults }: { layers: Layer[]; members: Member[]; defaults: QuickDefaults }) {
+  return (
+    <>
+      <Field label="What">
+        <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus />
+      </Field>
+      <div className="grid grid-cols-[1fr_auto] items-end gap-4">
+        <Field label="Day">
+          <Input name="startDate" type="date" defaultValue={defaults.date} required />
+        </Field>
+        <label className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
+          <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-5 accent-ink" />
+          All day
+        </label>
+      </div>
+      {/* Hidden while All day is ticked. */}
+      <div className="grid gap-4 group-has-[input[name=allDay]:checked]:hidden">
+        <Field label="Starts at">
+          <Input name="startTime" type="time" step={900} defaultValue={defaults.startTime ?? ""} required={false} />
+        </Field>
+        <LengthControl initial={defaults.minutes} />
+      </div>
+      <Chips
+        name="memberId"
+        label="Who it's for"
+        defaultValue={defaults.memberId ?? ""}
+        options={[
+          { value: "", label: "Everyone" },
+          ...members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} size="sm" /> })),
+        ]}
+      />
+      {layers.length > 1 ? null : <input type="hidden" name="layerId" value={layers[0]?.id ?? ""} />}
+      <ExtraTabs
+        tabs={[
+          {
+            label: "Repeats",
+            panel: (
+              <>
+                <Chips
+                  name="repeatFrequency"
+                  label="How often"
+                  className="sm:col-span-2"
+                  defaultValue="none"
+                  options={[
+                    { value: "none", label: "No" },
+                    { value: "daily", label: "Daily" },
+                    { value: "weekly", label: "Weekly" },
+                    { value: "monthly", label: "Monthly" },
+                    { value: "yearly", label: "Yearly" },
+                  ]}
+                />
+                <RepeatDetails />
+              </>
+            ),
+          },
+          {
+            label: "Several days",
+            panel: (
+              <Field label="Ends on" hint="The last day it runs. Leave blank for one day.">
+                <Input name="endDate" type="date" />
+              </Field>
+            ),
+          },
+          {
+            label: "More",
+            panel: (
+              <>
+                <Field label="Picture" hint="One emoji. Leave blank to let Almanac pick from the name.">
+                  <Input name="icon" maxLength={8} placeholder="🗓️" />
+                </Field>
+                <Field label="Notes" hint="Optional.">
+                  <Input name="notes" maxLength={2000} />
+                </Field>
+                {layers.length > 1 ? (
+                  <Chips
+                    name="layerId"
+                    label="Layer"
+                    className="sm:col-span-2"
+                    defaultValue={layers[0]?.id}
+                    options={layers.map((l) => ({
+                      value: l.id,
+                      label: l.name,
+                      leading: <span aria-hidden className="size-4 rounded-full" style={{ background: strong(l.colour) }} />,
+                    }))}
+                  />
+                ) : null}
+                <Chips
+                  name="energyCost"
+                  label="Energy cost"
+                  className="sm:col-span-2"
+                  defaultValue="1"
+                  options={ENERGY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
+                />
+                <Chips name="visibility" label="Who can see it" className="sm:col-span-2" defaultValue="everyone" options={VISIBILITY_OPTIONS} />
+              </>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }
