@@ -289,6 +289,96 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"task_instances": {
+                  Row: {
+                    "actual_minutes": number | null,"assignee_id": string | null,"completed_at": string | null,"completed_by": string | null,"completed_on": string | null,"created_at": string,"due_date": string | null,"household_id": string,"icon": string | null,"id": string,"list_id": string | null,"notes": string | null,"status": string,"template_id": string | null,"title": string | null,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "actual_minutes"?: number | null,"assignee_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"completed_on"?: string | null,"created_at"?: string,"due_date"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"list_id"?: string | null,"notes"?: string | null,"status"?: string,"template_id"?: string | null,"title"?: string | null,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "actual_minutes"?: number | null,"assignee_id"?: string | null,"completed_at"?: string | null,"completed_by"?: string | null,"completed_on"?: string | null,"created_at"?: string,"due_date"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"list_id"?: string | null,"notes"?: string | null,"status"?: string,"template_id"?: string | null,"title"?: string | null,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "task_instances_assignee_id_household_id_fkey"
+      columns: ["assignee_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "task_instances_completed_by_household_id_fkey"
+      columns: ["completed_by","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "task_instances_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "task_instances_list_id_household_id_fkey"
+      columns: ["list_id","household_id"]
+isOneToOne: false
+      referencedRelation: "task_lists"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "task_instances_template_id_household_id_fkey"
+      columns: ["template_id","household_id"]
+isOneToOne: false
+      referencedRelation: "task_templates"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"task_lists": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "task_lists_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"task_templates": {
+                  Row: {
+                    "active": boolean,"created_at": string,"default_assignee_id": string | null,"est_minutes": number | null,"household_id": string,"icon": string | null,"id": string,"location": string,"min_energy_mode": string,"name": string,"notes": string | null,"preferred_weekday": number | null,"premade": boolean,"repeat_every": number,"repeat_unit": string,"season_end": string | null,"season_start": string | null,"size": string,"sort_order": number,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"default_assignee_id"?: string | null,"est_minutes"?: number | null,"household_id": string,"icon"?: string | null,"id"?: string,"location"?: string,"min_energy_mode"?: string,"name": string,"notes"?: string | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"size"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"default_assignee_id"?: string | null,"est_minutes"?: number | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"location"?: string,"min_energy_mode"?: string,"name"?: string,"notes"?: string | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"size"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "task_templates_default_assignee_id_household_id_fkey"
+      columns: ["default_assignee_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "task_templates_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"themes": {
                   Row: {
                     "active_from": string | null,"active_until": string | null,"created_at": string,"decorations": NonNullable<Json>,"household_id": string,"id": string,"name": string,"slug": string,"tokens": NonNullable<Json>,"updated_at": string
@@ -335,7 +425,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "add_starter_layers":
+            "add_starter_chores":
+{ Args: { "target_household": string }; Returns: undefined
+                           },
+"add_starter_layers":
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_routines":

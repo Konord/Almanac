@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ArrowLeft, CalendarCheck, ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { Alarm, ArrowLeft, CalendarCheck } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Notice, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
@@ -50,7 +50,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
           </div>
         </Card>
 
-        <Card title="Routines and their steps" icon={ListChecks} tint="teal">
+        <Card title="Routines and their steps" icon={Alarm} tint="teal">
           <div className="mt-2 flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
           <p className="text-lg text-ink-muted">
             The ready-made routines are a starting point. Change the steps to suit your family. Essential steps are the

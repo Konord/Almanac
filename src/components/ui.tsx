@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { CalendarBlank, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { Alarm, Broom, CalendarBlank, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
 import { strong } from "@/lib/colours";
@@ -19,12 +19,14 @@ import { strong } from "@/lib/colours";
 // The app frame: icon rail on the left, the screen on the right
 // ---------------------------------------------------------------------------
 
-export type Section = "today" | "calendar" | "routines" | "settings";
+export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "settings";
 
 const RAIL: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "today", href: "/", label: "Today", icon: House },
   { section: "calendar", href: "/calendar", label: "Calendar", icon: CalendarBlank },
-  { section: "routines", href: "/routines", label: "Routines", icon: ListChecks },
+  { section: "chores", href: "/chores", label: "Chores", icon: Broom },
+  { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
+  { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
 ];
 
 const RAIL_BOTTOM: { section: Section; href: string; label: string; icon: Icon }[] = [
@@ -271,12 +273,12 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 const inputClass =
   "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink outline-none focus:border-accent";
 
-export function Input(props: ComponentProps<"input">) {
-  return <input className={inputClass} {...props} />;
+export function Input({ className = "", ...props }: ComponentProps<"input">) {
+  return <input className={`${inputClass} ${className}`} {...props} />;
 }
 
-export function Select(props: ComponentProps<"select">) {
-  return <select className={inputClass} {...props} />;
+export function Select({ className = "", ...props }: ComponentProps<"select">) {
+  return <select className={`${inputClass} ${className}`} {...props} />;
 }
 
 export function Notice({ tone, children }: { tone: "error" | "success"; children: ReactNode }) {

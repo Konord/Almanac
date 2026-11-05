@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarDots, SunHorizon } from "@phosphor-icons/react/dist/ssr";
+import { CalendarDots, ListChecks, SunHorizon } from "@phosphor-icons/react/dist/ssr";
 import {
   AppFrame,
   Avatar,
@@ -21,6 +21,8 @@ import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
 import { PROFILE_COLOUR, ProfileTag } from "./calendar/profile-tag";
 import type { CalendarItem, Member } from "./calendar/types";
+import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type ChoreWithTiming, type Todo } from "./chores/data";
+import { ChoreRow, TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
@@ -63,9 +65,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, items }, routineData] = await Promise.all([
+  const [{ layers, members, views, items }, routineData, choreData, todoData] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
+    loadChores(today),
+    loadTodos(),
   ]);
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
@@ -86,6 +90,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     <>
       <ScreenHeader title={longDate}>
         <HeaderClock locale={locale} timeZone={timeZone} />
+        {todayProfile ? (
+          <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
+        ) : null}
         <div className="lg:ml-auto">
           <Segmented
             label="How much to show"
@@ -111,6 +118,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       <div className="flex flex-col gap-6.5 lg:min-h-0 lg:flex-1 lg:flex-row">
         <PeopleTimeline
+          allDay={todayItems.filter((e) => isAllDayStyle(e, timeZone))}
           items={todayItems}
           members={members}
           routineData={routineData}
@@ -120,17 +128,15 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         />
 
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
-          {todayProfile ? (
-            <DayCard
-              profile={todayProfile}
-              label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))}
-              household={household}
-              allDay={todayItems.filter((e) => isAllDayStyle(e, timeZone))}
-              today={today}
-            />
-          ) : null}
+          <TodoCard
+            todos={todosForToday(todoData.todos, today)}
+            chores={dueChores(choreData.chores)}
+            members={choreData.members}
+            today={today}
+            household={household}
+          />
           <RoutinesGlance data={routineData} date={today} household={household} className="lg:row-span-2" />
-          <ComingUp days={days.slice(1)} shown={shown} profiles={profiles} household={household} />
+          <ComingUp days={days.slice(1, 6)} shown={shown} profiles={profiles} household={household} />
         </div>
       </div>
     </>
@@ -142,6 +148,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
  * things that aren't for anyone in particular).
  */
 function PeopleTimeline({
+  allDay,
   items,
   members,
   routineData,
@@ -149,6 +156,7 @@ function PeopleTimeline({
   now,
   household,
 }: {
+  allDay: CalendarItem[];
   items: CalendarItem[];
   members: Member[];
   routineData: RoutineData;
@@ -217,6 +225,21 @@ function PeopleTimeline({
             </div>
           ))}
         </div>
+        {allDay.length > 0 ? (
+          <div className="mt-4 flex shrink-0 gap-2 overflow-hidden pl-16.5" aria-label="All day">
+            {allDay.map((e) => (
+              <Link
+                key={e.id}
+                href={editLink(e)}
+                className="flex h-10 min-w-0 items-center gap-2 rounded-xl px-3 text-sm font-bold text-ink"
+                style={{ background: soft(EVERYONE_COLOUR) }}
+              >
+                <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-7" />
+                <span className="truncate">{e.title}</span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
         <div className="relative mt-6.5 mb-1 flex min-h-0 flex-1 gap-2.5 pl-16.5">
           <HourLines first={first} last={last} />
           {columns.map((c) => (
@@ -243,20 +266,8 @@ function PeopleTimeline({
   );
 }
 
-/** The "Free Thursday" / "Busy evening" card, with anything all-day. */
-function DayCard({
-  profile,
-  label,
-  household,
-  allDay,
-  today,
-}: {
-  profile: DayProfile;
-  label: string;
-  household: Household;
-  allDay: CalendarItem[];
-  today: LocalDate;
-}) {
+/** "Busy Thursday" next to the clock; the detail shows when you hover or hold. */
+function DayPill({ profile, label, household, today }: { profile: DayProfile; label: string; household: Household; today: LocalDate }) {
   const { timeZone, dayProfile } = household.settings;
   const time = (t: string) => clockTime(zonedToUtc(today, t, timeZone), household);
   // Times like "9 p.m." already end in a full stop, so don't add a second.
@@ -269,36 +280,79 @@ function DayCard({
         : profile.busyMinutes === 0
           ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`
           : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`;
-
+  const colour = PROFILE_COLOUR[profile.kind];
   return (
-    <Card title="Today" icon={SunHorizon} tint="orange">
-      <p className="mt-2 text-4xl font-extrabold tracking-tight" style={{ color: PROFILE_COLOUR[profile.kind] }}>
-        {label}
-      </p>
-      <p className="mt-1.5 text-xl text-ink">{sentence(detail)}</p>
-      {allDay.length > 0 ? (
-        <ul className="mt-4 flex flex-col gap-2 lg:min-h-0 lg:overflow-y-auto">
-          {allDay.map((e) => (
-            <li key={e.id}>
-              <Link
-                href={`/calendar?view=week&date=${today}&edit=${e.series_id}${e.occurrence_date ? `&occ=${e.occurrence_date}` : ""}`}
-                className="flex min-h-[var(--touch-target)] items-center gap-3 rounded-2xl px-3 text-xl font-bold text-ink"
-                style={{ background: soft(EVERYONE_COLOUR) }}
-              >
-                <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-9" />
-                <span className="truncate">{e.title}</span>
-                <span className="ml-auto shrink-0 text-sm font-semibold text-ink-soft">All day</span>
-              </Link>
-            </li>
+    <Link
+      href="/household"
+      title={sentence(detail)}
+      className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-full px-4.5 text-xl font-extrabold whitespace-nowrap"
+      style={{ color: colour, background: `color-mix(in srgb, ${colour} 12%, white)` }}
+    >
+      <SunHorizon size="1.75rem" aria-hidden />
+      {label}
+    </Link>
+  );
+}
+
+/** How many things the To-do card lists before "and N more". */
+const TODO_CARD_LIMIT = 4;
+
+/** To-dos for today (or with no day) and chores that are due. */
+function TodoCard({
+  todos,
+  chores,
+  members,
+  today,
+  household,
+}: {
+  todos: Todo[];
+  chores: ChoreWithTiming[];
+  members: ChoreMember[];
+  today: LocalDate;
+  household: Household;
+}) {
+  const memberById = new Map(members.map((m) => [m.id, m]));
+  const shownTodos = todos.slice(0, TODO_CARD_LIMIT);
+  const shownChores = chores.slice(0, Math.max(0, TODO_CARD_LIMIT - shownTodos.length));
+  const moreTodos = todos.length - shownTodos.length;
+  const moreChores = chores.length - shownChores.length;
+  return (
+    <Card
+      title="To-do"
+      icon={ListChecks}
+      tint="blue"
+      aside={
+        <Link href="/lists" className="flex min-h-[var(--touch-target)] items-center text-lg font-bold text-accent">
+          Lists
+        </Link>
+      }
+    >
+      {todos.length + chores.length === 0 ? (
+        <p className="py-3 text-xl text-ink-muted">Nothing to do today.</p>
+      ) : (
+        <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+          {shownTodos.map((t) => (
+            <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo="/" />
+          ))}
+          {shownChores.map((c) => (
+            <ChoreRow key={c.id} chore={c} members={memberById} today={today} household={household} returnTo="/" />
           ))}
         </ul>
+      )}
+      {moreTodos + moreChores > 0 ? (
+        <p className="mt-auto flex gap-4 pt-1 text-lg font-bold">
+          {moreTodos > 0 ? (
+            <Link href="/lists" className="text-accent">
+              +{moreTodos} more to-do{moreTodos === 1 ? "" : "s"}
+            </Link>
+          ) : null}
+          {moreChores > 0 ? (
+            <Link href="/chores" className="text-accent">
+              +{moreChores} chore{moreChores === 1 ? "" : "s"} due
+            </Link>
+          ) : null}
+        </p>
       ) : null}
-      <p className="mt-auto pt-3 text-sm text-ink-muted">
-        {sentence(`Free and busy count ${time(dayProfile.dayStarts)} to ${time(dayProfile.dayEnds)}`)}{" "}
-        <Link href="/household" className="font-bold text-accent">
-          Change
-        </Link>
-      </p>
     </Card>
   );
 }
@@ -318,7 +372,7 @@ function ComingUp({
   const { timeZone } = household.settings;
   return (
     <Card title="Coming up" icon={CalendarDots} tint="purple">
-      <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
         {days.map((day) => {
           const dayItems = sortForDay(eventsOnDay(shown, day, timeZone), timeZone);
           const profile = profiles.get(day);
