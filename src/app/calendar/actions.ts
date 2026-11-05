@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isMemberColour } from "@/lib/colours";
+import { isPersonColour } from "@/lib/colours";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { buildRule, isValidRule, type RepeatEnd, type RepeatFrequency } from "@/lib/recurrence";
@@ -21,7 +21,7 @@ import { VIEW_COOKIE } from "./data";
 function back(formData: FormData, kind: "error" | "message", text: string): never {
   const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
   const params = new URLSearchParams();
-  for (const key of ["view", "date"]) {
+  for (const key of ["view", "date", "panel"]) {
     const value = from.get(key);
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
@@ -59,7 +59,7 @@ function readLayer(formData: FormData) {
   const colour = text(formData, "colour");
   const visibility = text(formData, "visibility");
   if (!name) back(formData, "error", "A layer needs a name.");
-  if (!isMemberColour(colour)) back(formData, "error", "Choose a colour.");
+  if (!isPersonColour(colour)) back(formData, "error", "Choose a colour.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this layer.");
   return {
     name,
@@ -124,6 +124,7 @@ function readEvent(formData: FormData, timeZone: string) {
   const energyCost = Number(text(formData, "energyCost"));
   const visibility = text(formData, "visibility");
   const notes = text(formData, "notes");
+  const icon = text(formData, "icon");
 
   if (!title) back(formData, "error", "An event needs a title.");
   if (!layerId) back(formData, "error", "Choose a layer.");
@@ -132,6 +133,7 @@ function readEvent(formData: FormData, timeZone: string) {
   if (!allDay && (!isLocalTime(startTime) || !isLocalTime(endTime))) {
     back(formData, "error", "Add a start and end time, or tick All day.");
   }
+  if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🦷.");
   if (![0, 1, 2, 3].includes(energyCost)) back(formData, "error", "Choose an energy cost.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
@@ -156,6 +158,7 @@ function readEvent(formData: FormData, timeZone: string) {
     energy_cost: energyCost,
     visibility,
     notes: notes || null,
+    icon: icon || null,
   };
 }
 

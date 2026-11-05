@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Notice, Panel, firstParam } from "@/components/ui";
-import { MEMBER_COLOUR_CLASS } from "@/lib/colours";
+import { CaretLeft, CaretRight, Check, GearSix } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Card, Emoji, IconLink, Notice, Panel, ProgressBar, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
+import { HeaderClock } from "@/components/header-clock";
 import { requireHousehold, type Household } from "@/lib/household";
 import { isLate } from "@/lib/routines";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { toggleStep } from "./actions";
-import { NavButton, clock } from "./sections";
-import { ProgressBar } from "./progress-bar";
+import { clock } from "./sections";
+import { PeopleRow } from "./people-row";
 import { dayRoutinesFor, loadRoutines, type DayRoutine, type RoutineMember, type RoutineStep } from "./data";
 
 /**
@@ -17,13 +18,12 @@ import { dayRoutinesFor, loadRoutines, type DayRoutine, type RoutineMember, type
  */
 export default function RoutinesPage(props: PageProps<"/routines">) {
   return (
-    // On a landscape wall screen the checklist fills one screen; long
-    // routines scroll inside their own column.
-    <main className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-4 p-4 sm:p-6 lg:h-dvh lg:max-h-dvh lg:min-h-0 lg:overflow-hidden">
+    // On a landscape wall screen the checklist fills one screen.
+    <AppFrame section="routines">
       <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
         <Routines searchParams={props.searchParams} />
       </Suspense>
-    </main>
+    </AppFrame>
   );
 }
 
@@ -60,20 +60,18 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b-4 border-marker-blue pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <NavButton href="/">Home</NavButton>
-          <NavButton href={here({ date: addDays(date, -1) })} label="Previous day">
-            ‹
-          </NavButton>
-          <NavButton href={here({ date: null })}>Today</NavButton>
-          <NavButton href={here({ date: addDays(date, 1) })} label="Next day">
-            ›
-          </NavButton>
-          <h1 className="w-full text-3xl font-semibold tracking-tight text-ink sm:ml-2 sm:w-auto">Routines · {dayTitle}</h1>
+      <ScreenHeader title={dayTitle}>
+        <HeaderClock locale={locale} timeZone={timeZone} />
+        <div className="flex items-center gap-2">
+          <IconLink href={here({ date: addDays(date, -1) })} label="Previous day" icon={CaretLeft} />
+          <SoftLink href={here({ date: null })}>Today</SoftLink>
+          <IconLink href={here({ date: addDays(date, 1) })} label="Next day" icon={CaretRight} />
         </div>
-        <NavButton href="/routines/manage">Set up routines</NavButton>
-      </div>
+        <SoftLink href="/routines/manage" className="lg:ml-auto">
+          <GearSix size="1.5rem" aria-hidden />
+          Set up routines
+        </SoftLink>
+      </ScreenHeader>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -81,7 +79,7 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
       {data.members.length === 0 ? (
         <Notice tone="error">
           Add the people in your household first, on{" "}
-          <Link href="/household" className="underline">
+          <Link href="/household" className="font-bold underline">
             Household &amp; people
           </Link>
           .
@@ -89,28 +87,7 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
       ) : null}
 
       {/* Whose checklist */}
-      <div className="flex flex-wrap gap-2" aria-label="Whose routines">
-        {data.members.map((m) => {
-          const routines = dayRoutinesFor(data, m.id, date);
-          const done = routines.reduce((n, r) => n + r.progress.done, 0);
-          const total = routines.reduce((n, r) => n + r.progress.total, 0);
-          const active = member?.id === m.id;
-          return (
-            <Link
-              key={m.id}
-              href={here({ member: m.id })}
-              aria-current={active ? "page" : undefined}
-              className={`flex min-h-[var(--touch-target)] items-center gap-3 rounded-full border-2 px-4 text-lg ${
-                active ? "border-marker-blue bg-marker-blue text-board" : "border-frame bg-board text-ink"
-              }`}
-            >
-              <span className={`size-4 rounded-full ring-2 ring-board ${MEMBER_COLOUR_CLASS[m.colour] ?? "bg-marker-black"}`} />
-              {m.name}
-              <span className={active ? "text-board/80" : "text-ink-muted"}>{total ? `${done}/${total}` : "none"}</span>
-            </Link>
-          );
-        })}
-      </div>
+      <PeopleRow data={data} date={date} hrefFor={(id) => here({ member: id })} activeId={member?.id} />
 
       {member ? (
         <Checklist
@@ -154,7 +131,7 @@ function Checklist({
       <Panel>
         <p className="text-lg text-ink-muted">
           {member.name} has no routines on this day.{" "}
-          <Link href="/routines/manage" className="text-marker-blue underline">
+          <Link href="/routines/manage" className="font-bold text-accent">
             Give them one
           </Link>
           .
@@ -163,20 +140,21 @@ function Checklist({
     );
   }
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-[minmax(0,1fr)] lg:grid-cols-3">
+    <div className="grid gap-5 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-[minmax(0,1fr)] lg:grid-cols-3">
       {routines.map(({ template, steps, progress, doneIds }) => (
-        <section key={template.id} className="flex flex-col rounded-[var(--radius)] border-2 border-frame bg-board p-4 lg:min-h-0">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <h2 className="text-2xl font-semibold text-ink">
-              {template.name}
-              {progress.complete ? " ✓" : ""}
-            </h2>
-            <span className="text-lg text-ink-muted">
-              {progress.done} of {progress.total}
+        <Card
+          key={template.id}
+          title={template.name}
+          aside={
+            <span className={`text-lg font-bold ${progress.complete ? "text-success" : "text-ink-muted"}`}>
+              {progress.complete ? "All done ✓" : `${progress.done}/${progress.total}`}
             </span>
+          }
+        >
+          <div className="mt-2 mb-1">
+            <ProgressBar done={progress.done} total={progress.total} colour={member.colour} />
           </div>
-          <ProgressBar done={progress.done} total={progress.total} />
-          <ul className="mt-2 flex flex-col lg:min-h-0 lg:overflow-y-auto">
+          <ul className="mt-1 flex flex-col lg:min-h-0 lg:overflow-y-auto">
             {steps.map((step) => {
               const done = doneIds.has(step.id);
               return (
@@ -194,7 +172,7 @@ function Checklist({
               );
             })}
           </ul>
-        </section>
+        </Card>
       ))}
     </div>
   );
@@ -220,7 +198,7 @@ function StepRow({
   returnTo: string;
 }) {
   return (
-    <li className="border-t border-frame/70 first:border-t-0">
+    <li>
       <form action={toggleStep}>
         <input type="hidden" name="memberId" value={memberId} />
         <input type="hidden" name="stepId" value={step.id} />
@@ -229,30 +207,31 @@ function StepRow({
         <input type="hidden" name="returnTo" value={returnTo} />
         <button
           aria-pressed={done}
-          className="flex min-h-14 w-full items-center gap-3 py-1.5 text-left"
+          className="flex min-h-16 w-full items-center gap-3.5 py-1 text-left"
           title={done ? "Tap to untick" : "Tap when done"}
         >
-          <span
-            className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 text-xl ${
-              done ? "border-marker-green bg-marker-green text-board" : "border-frame bg-board"
-            }`}
-            aria-hidden
-          >
-            {done ? "✓" : ""}
-          </span>
-          <span className="w-10 shrink-0 text-center text-3xl" aria-hidden>
-            {step.icon}
-          </span>
+          <Emoji emoji={step.icon} className="size-10" faded={done} />
+          {step.icon ? null : <span className="size-10 shrink-0" aria-hidden />}
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className={`text-xl ${done ? "text-ink-muted line-through" : "font-semibold text-ink"}`}>{step.text}</span>
+            <span className={`text-xl leading-[1.1] font-semibold ${done ? "text-ink-muted" : "text-ink"}`}>
+              {step.text}
+              {step.essential ? <span className="sr-only"> (essential)</span> : null}
+            </span>
             {step.target_time ? (
-              <span className={`text-base ${late ? "font-semibold text-marker-red" : "text-ink-muted"}`}>
+              <span className={`text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>
                 by {clock(step.target_time, household)}
                 {late ? " · running late" : ""}
               </span>
             ) : null}
           </span>
-          {step.essential ? <span className="text-sm text-ink-muted">essential</span> : null}
+          <span
+            className={`flex size-8.5 shrink-0 items-center justify-center rounded-full text-white ${
+              done ? "bg-success" : "border-[2.5px] border-check-border"
+            }`}
+            aria-hidden
+          >
+            {done ? <Check size="1.125rem" weight="bold" /> : null}
+          </span>
         </button>
       </form>
     </li>

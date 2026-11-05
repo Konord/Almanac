@@ -20,7 +20,7 @@ export function ViewChooser({
   const options = [{ id: "", name: "Everything" }, ...views];
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label="Which layers this screen shows">
-      <span className="text-base text-ink-muted">Showing:</span>
+      <span className="w-full text-xl font-bold text-ink">This screen shows</span>
       {options.map((option) => {
         const active = (current?.id ?? "") === option.id;
         return (
@@ -30,8 +30,8 @@ export function ViewChooser({
             <input type="hidden" name="returnPath" value={returnPath} />
             <button
               aria-pressed={active}
-              className={`min-h-[var(--touch-target)] rounded-full border-2 px-4 text-base ${
-                active ? "border-marker-blue bg-marker-blue text-board" : "border-frame bg-board text-ink"
+              className={`min-h-[var(--touch-target)] rounded-2xl px-5 text-lg font-bold ${
+                active ? "bg-ink text-board" : "bg-rail text-ink hover:bg-panel"
               }`}
             >
               {option.name}

@@ -77,14 +77,14 @@ isOneToOne: false
                   ]
                 },"events": {
                   Row: {
-                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"id": string,"layer_id": string,"member_id": string | null,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
+                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"icon": string | null,"id": string,"layer_id": string,"member_id": string | null,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"energy_cost"?: number,"household_id": string,"id"?: string,"layer_id": string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"energy_cost"?: number,"household_id": string,"icon"?: string | null,"id"?: string,"layer_id": string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
                   }
                   Update: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"energy_cost"?: number,"household_id"?: string,"id"?: string,"layer_id"?: string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"energy_cost"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"layer_id"?: string,"member_id"?: string | null,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
@@ -340,6 +340,9 @@ isOneToOne: false
                            },
 "add_starter_routines":
 { Args: { "target_household": string }; Returns: undefined
+                           },
+"bright_theme_tokens":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "create_household":
 { Args: { "household_name": string }; Returns: string

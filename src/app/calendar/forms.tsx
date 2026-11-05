@@ -1,5 +1,5 @@
 import { Field, Input, Select } from "@/components/ui";
-import { MEMBER_COLOURS } from "@/lib/colours";
+import { PERSON_COLOURS } from "@/lib/colours";
 import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import type { Layer, Member, SavedView } from "./types";
@@ -18,6 +18,7 @@ export type EventDefaults = {
   energyCost?: number;
   visibility?: string;
   notes?: string;
+  icon?: string;
   repeat?: RepeatOptions;
 };
 
@@ -26,6 +27,9 @@ export function EventFields({ layers, members, defaults }: { layers: Layer[]; me
     <>
       <Field label="What">
         <Input name="title" defaultValue={defaults.title} required maxLength={120} />
+      </Field>
+      <Field label="Picture" hint="One emoji, like 🦷 or 🏒. Leave blank to let Almanac pick from the title.">
+        <Input name="icon" defaultValue={defaults.icon} maxLength={8} placeholder="🗓️" />
       </Field>
       <Field label="Layer">
         <Select name="layerId" defaultValue={defaults.layerId ?? layers[0]?.id}>
@@ -49,7 +53,7 @@ export function EventFields({ layers, members, defaults }: { layers: Layer[]; me
         <Input name="endTime" type="time" defaultValue={defaults.endTime} />
       </Field>
       <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-2">
-        <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-6 accent-marker-blue" />
+        <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-6 accent-accent" />
         All day (times are ignored)
       </label>
       <RepeatFields repeat={defaults.repeat} />
@@ -95,8 +99,8 @@ export function LayerFields({ layer, members }: { layer?: Layer; members: Member
         <Input name="name" defaultValue={layer?.name} required maxLength={40} />
       </Field>
       <Field label="Colour">
-        <Select name="colour" defaultValue={layer?.colour ?? "marker-blue"}>
-          {MEMBER_COLOURS.map((c) => (
+        <Select name="colour" defaultValue={layer?.colour ?? "blue"}>
+          {PERSON_COLOURS.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
             </option>
@@ -127,7 +131,7 @@ export function LayerFields({ layer, members }: { layer?: Layer; members: Member
           type="checkbox"
           name="countsTowardBusyness"
           defaultChecked={layer?.counts_toward_busyness ?? true}
-          className="size-6 accent-marker-blue"
+          className="size-6 accent-accent"
         />
         Events here make a day count as busy
       </label>
@@ -167,7 +171,7 @@ function RepeatFields({ repeat }: { repeat?: RepeatOptions }) {
                 name="repeatWeekdays"
                 value={i}
                 defaultChecked={repeat?.weekdays.includes(i)}
-                className="size-5 accent-marker-blue"
+                className="size-5 accent-accent"
               />
               {label}
             </label>
@@ -214,7 +218,7 @@ export function ViewFields({ layers, view }: { layers: Layer[]; view?: SavedView
                 name="layerIds"
                 value={layer.id}
                 defaultChecked={view?.layer_ids.includes(layer.id)}
-                className="size-5 accent-marker-blue"
+                className="size-5 accent-accent"
               />
               {layer.name}
             </label>

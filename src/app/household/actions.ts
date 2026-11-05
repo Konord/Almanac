@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { DEFAULT_SETTINGS, isTimeZone, requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalTime } from "@/lib/time";
-import { MEMBER_COLOURS, type MemberColour } from "@/lib/colours";
+import { isPersonColour } from "@/lib/colours";
 
 /*
  * Every action re-checks who is signed in (requireHousehold) instead of
@@ -30,11 +30,11 @@ function readMember(formData: FormData) {
 
   if (!name) back("error", "Every member needs a name.");
   if (role !== "parent" && role !== "child") back("error", "Choose parent or child.");
-  if (!MEMBER_COLOURS.some((c) => c.value === colour)) back("error", "Choose a colour.");
+  if (!isPersonColour(colour)) back("error", "Choose a colour.");
   if (birthYear !== null && (!Number.isInteger(birthYear) || birthYear < 1900 || birthYear > 2100)) {
     back("error", "Birth year should look like 2018.");
   }
-  return { name, role, colour: colour as MemberColour, birth_year: birthYear };
+  return { name, role, colour, birth_year: birthYear };
 }
 
 async function log(action: string, targetType: string, targetId: string, details: Record<string, string> = {}) {
@@ -153,6 +153,7 @@ export async function saveSettings(formData: FormData) {
     weekStartsOn,
     units,
     temperatureUnit,
+    handwriting: formData.get("handwriting") === "on",
     dayProfile,
   };
 

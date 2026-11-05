@@ -11,7 +11,7 @@ import type { CalendarEvent, CalendarItem, Layer, Member, SavedView } from "./ty
  */
 
 export const EVENT_COLUMNS =
-  "id, title, layer_id, starts_at, ends_at, all_day, member_id, energy_cost, visibility, notes, timezone, recurrence_rule";
+  "id, title, layer_id, starts_at, ends_at, all_day, member_id, energy_cost, visibility, notes, timezone, recurrence_rule, icon";
 
 /** The cookie that remembers which saved view this screen (browser) shows. */
 export const VIEW_COOKIE = "almanac-view";
@@ -34,7 +34,7 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
       .select("id, name, colour, owner_member_id, counts_toward_busyness, visibility")
       .order("sort_order")
       .order("name"),
-    supabase.from("members").select("id, name").order("role", { ascending: false }).order("name"),
+    supabase.from("members").select("id, name, colour").order("role", { ascending: false }).order("name"),
     supabase.from("views").select("id, name, layer_ids").order("sort_order").order("name"),
     supabase
       .from("events")

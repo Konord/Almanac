@@ -1,6 +1,4 @@
-import Link from "next/link";
-import { Button, Field, Input, Select } from "@/components/ui";
-import { MEMBER_COLOUR_CLASS } from "@/lib/colours";
+import { Avatar, Button, Emoji, Field, Input, Select } from "@/components/ui";
 import type { Household } from "@/lib/household";
 import { KIND_LABEL, KIND_ORDER, hhmm } from "@/lib/routines";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
@@ -39,14 +37,14 @@ export function Assignments({
   const days = weekdayNames(household);
 
   return (
-    <div className="rounded-[var(--radius)] border-2 border-frame bg-panel/60 p-5">
+    <div>
       <div className="flex flex-col gap-4">
         {data.members.map((m) => {
           const mine = data.assignments.filter((a) => a.member_id === m.id);
           return (
-            <div key={m.id} className="rounded-[var(--radius)] border-2 border-frame bg-board p-4">
-              <h3 className="mb-2 flex items-center gap-2 text-lg font-semibold text-ink">
-                <span className={`size-4 rounded-full ${MEMBER_COLOUR_CLASS[m.colour] ?? "bg-marker-black"}`} />
+            <div key={m.id} className="rounded-[var(--radius-card)] border border-frame p-4">
+              <h3 className="mb-2 flex items-center gap-3 text-xl font-bold text-ink">
+                <Avatar name={m.name} colour={m.colour} size="sm" />
                 {m.name}
               </h3>
               {mine.length === 0 ? (
@@ -116,7 +114,7 @@ export function Assignments({
         <fieldset className="flex flex-col gap-2 sm:col-span-2">
           <legend className="mb-1.5 text-base font-medium text-ink">When</legend>
           <label className="flex items-center gap-3 text-lg text-ink">
-            <input type="radio" name="when" value="weekdays" defaultChecked className="size-5 accent-marker-blue" />
+            <input type="radio" name="when" value="weekdays" defaultChecked className="size-5 accent-accent" />
             Every week on
           </label>
           <div className="flex flex-wrap gap-2 pl-8">
@@ -125,7 +123,7 @@ export function Assignments({
             ))}
           </div>
           <label className="mt-2 flex flex-wrap items-center gap-3 text-lg text-ink">
-            <input type="radio" name="when" value="date" className="size-5 accent-marker-blue" />
+            <input type="radio" name="when" value="date" className="size-5 accent-accent" />
             Just on
             <Input name="onDate" type="date" defaultValue={date} />
           </label>
@@ -154,16 +152,17 @@ export function TemplateEditor({
   household: Household;
 }) {
   return (
-    <details className="rounded-[var(--radius)] border-2 border-frame bg-board p-4">
-      <summary className="cursor-pointer text-lg text-ink">
-        <span className="font-semibold">{template.name}</span>{" "}
+    <details className="rounded-[var(--radius-card)] border border-frame p-4">
+      <summary className="flex min-h-[var(--touch-target)] cursor-pointer flex-wrap items-center gap-x-2 text-lg text-ink">
+        <span className="flex items-center gap-1">{steps.slice(0, 3).map((s) => <Emoji key={s.id} emoji={s.icon} className="size-7" />)}</span>
+        <span className="font-bold">{template.name}</span>{" "}
         <span className="text-ink-muted">
           · {KIND_LABEL[template.kind]} · {audienceLabel(template.audience)} · {steps.length} steps
         </span>
       </summary>
       <ol className="mt-4 flex flex-col gap-3">
         {steps.map((step, i) => (
-          <li key={step.id} className="rounded-[var(--radius)] border border-frame p-3">
+          <li key={step.id} className="rounded-2xl bg-rail p-3">
             <form action={updateStep} className="grid items-end gap-3 sm:grid-cols-[5rem_1fr_9rem_auto_auto]">
               <input type="hidden" name="id" value={step.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -247,7 +246,7 @@ function StepFields({ step }: { step?: RoutineStep }) {
         <Input name="targetTime" type="time" defaultValue={step?.target_time ? hhmm(step.target_time) : ""} />
       </Field>
       <label className="flex min-h-[var(--touch-target)] items-center gap-2 text-base text-ink">
-        <input type="checkbox" name="essential" defaultChecked={step?.essential} className="size-5 accent-marker-blue" />
+        <input type="checkbox" name="essential" defaultChecked={step?.essential} className="size-5 accent-accent" />
         Essential
       </label>
     </>
@@ -295,24 +294,13 @@ export function RoutineFields({ template }: { template?: RoutineTemplate }) {
 
 function CheckChip({ name, value, label }: { name: string; value: string; label: string }) {
   return (
-    <label className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base text-ink">
-      <input type="checkbox" name={name} value={value} className="size-5 accent-marker-blue" />
+    <label className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-3 text-base text-ink">
+      <input type="checkbox" name={name} value={value} className="size-5 accent-accent" />
       {label}
     </label>
   );
 }
 
-export function NavButton({ href, children, label }: { href: string; children: React.ReactNode; label?: string }) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="inline-flex min-h-[var(--touch-target)] min-w-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink"
-    >
-      {children}
-    </Link>
-  );
-}
 
 /** "07:45:00" → "7:45 a.m." in the household's locale. */
 export function clock(time: string, household: Household): string {
