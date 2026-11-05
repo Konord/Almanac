@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MagnifyingGlass, X } from "@phosphor-icons/react";
-import { emojiImage, eventEmoji, searchEmoji, suggestEmoji, type EmojiChoice } from "@/lib/emoji";
+import { CaretLeft, CaretRight, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { EMOJI_GROUPS, emojiImage, emojiPage, eventEmoji, searchEmoji, suggestEmoji, type EmojiChoice } from "@/lib/emoji";
 
-/** How many search results fit without scrolling (3 rows of 6). */
-const RESULT_LIMIT = 18;
+/** How many pictures fit on one page without scrolling (6 rows of 7). */
+const PER_PAGE = 42;
+
+/** The tabs: suggestions for the name, then each group, each shown by a picture. */
+const TABS: { label: string; emoji: string }[] = [
+  { label: "Ideas", emoji: "✨" },
+  ...EMOJI_GROUPS.map((label, i) => ({ label, emoji: ["😀", "🧑", "🐶", "🍎", "⚽", "🏡", "💡", "✅"][i] })),
+];
 
 function Picture({ emoji, className }: { emoji: string; className: string }) {
   const src = emojiImage(emoji);
@@ -24,6 +30,9 @@ export function EmojiPicker({ initial }: { initial?: string }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [query, setQuery] = useState("");
+  /** 0 = Suggested, then 1 + the group number. */
+  const [tab, setTab] = useState(0);
+  const [page, setPage] = useState(0);
   const marker = useRef<HTMLInputElement>(null);
 
   // Follow the name typed in the same form, for the guess and the suggestions.
@@ -42,7 +51,16 @@ export function EmojiPicker({ initial }: { initial?: string }) {
     setIcon(emoji);
     setOpen(false);
     setQuery("");
+    setTab(0);
+    setPage(0);
   };
+
+  // What the grid shows: search results, a tab's page, or nothing (Suggested has its own).
+  const q = query.trim();
+  const found = q ? searchEmoji(q, 10_000) : null;
+  const browsing = found ? null : tab > 0 ? emojiPage(tab - 1, page, PER_PAGE) : null;
+  const pages = found ? Math.max(1, Math.ceil(found.length / PER_PAGE)) : (browsing?.pages ?? 1);
+  const shownPage = Math.min(page, pages - 1);
 
   return (
     <>
@@ -74,29 +92,61 @@ export function EmojiPicker({ initial }: { initial?: string }) {
             <MagnifyingGlass size="1.5rem" aria-hidden className="text-ink-muted" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(0);
+              }}
               placeholder="Search, e.g. hockey, dog, cake"
               className="min-w-0 flex-1 bg-transparent text-lg text-ink outline-none"
               autoFocus
             />
           </label>
 
-          {query.trim() ? (
-            <Grid label={`Matching "${query.trim()}"`} choices={searchEmoji(query, RESULT_LIMIT)} current={icon} onPick={pick} empty="Nothing by that name yet." />
-          ) : (
-            <>
+          <div role="tablist" className="flex shrink-0 gap-1 rounded-[var(--radius)] bg-rail p-1">
+            {TABS.map((t, i) => (
+              <button
+                key={t.label}
+                type="button"
+                role="tab"
+                aria-selected={!q && tab === i}
+                onClick={() => {
+                  setTab(i);
+                  setPage(0);
+                  setQuery("");
+                }}
+                className={`flex min-h-[var(--touch-target)] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[calc(var(--radius)-0.25rem)] py-1 ${
+                  !q && tab === i ? "bg-board text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                <Picture emoji={t.emoji} className="size-7" />
+                <span className="w-full truncate text-center text-xs font-bold">{t.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="min-h-0 flex-1">
+            {found ? (
+              <Grid
+                label={`Matching "${q}"`}
+                choices={found.slice(shownPage * PER_PAGE, (shownPage + 1) * PER_PAGE)}
+                current={icon}
+                onPick={pick}
+                empty="Nothing by that name. Try another word, or look through the tabs."
+              />
+            ) : browsing ? (
+              <Grid label={EMOJI_GROUPS[tab - 1]} choices={browsing.choices} current={icon} onPick={pick} />
+            ) : (
               <Grid
                 label={title.trim() ? `Suggested for "${title.trim()}"` : "Suggested"}
-                choices={suggestEmoji(title)}
+                choices={suggestEmoji(title, 14)}
                 current={icon}
                 onPick={pick}
                 showWhy
               />
-              <Grid label="A few more (search to find others)" choices={searchEmoji("", 12)} current={icon} onPick={pick} />
-            </>
-          )}
+            )}
+          </div>
 
-          <div className="mt-auto flex gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <button
               type="button"
               onClick={() => pick("")}
@@ -107,6 +157,31 @@ export function EmojiPicker({ initial }: { initial?: string }) {
               <Picture emoji={eventEmoji(null, title)} className="size-7" />
               Let Almanac pick from the name
             </button>
+            {pages > 1 ? (
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.max(shownPage - 1, 0))}
+                  disabled={shownPage === 0}
+                  aria-label="Previous page"
+                  className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink disabled:opacity-40"
+                >
+                  <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+                </button>
+                <span className="min-w-[4.5rem] text-center text-lg font-bold text-ink" aria-live="polite">
+                  {shownPage + 1} of {pages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.min(shownPage + 1, pages - 1))}
+                  disabled={shownPage === pages - 1}
+                  aria-label="Next page"
+                  className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink disabled:opacity-40"
+                >
+                  <CaretRight size="1.5rem" weight="bold" aria-hidden />
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -133,7 +208,7 @@ function Grid({
     <section className="flex flex-col gap-2">
       <h4 className="text-base font-bold text-ink">{label}</h4>
       {choices.length === 0 ? <p className="text-lg text-ink-muted">{empty}</p> : null}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-7 gap-1.5">
         {choices.map((c) => (
           <button
             key={c.emoji}
@@ -141,12 +216,12 @@ function Grid({
             onClick={() => onPick(c.emoji)}
             aria-pressed={current === c.emoji}
             title={c.name}
-            className={`flex min-w-0 flex-col items-center gap-1 rounded-[var(--radius)] border-2 px-1 py-2 ${
+            className={`flex min-w-0 flex-col items-center gap-1 rounded-[var(--radius)] border-2 px-1 py-1.5 ${
               current === c.emoji ? "border-ink bg-rail" : "border-transparent hover:bg-rail"
             }`}
           >
             <Picture emoji={c.emoji} className="size-10" />
-            <span className="w-full truncate text-center text-sm text-ink-soft">{showWhy && c.why && c.why !== "everyday" ? c.why : c.name}</span>
+            <span className="line-clamp-2 min-h-[2lh] w-full text-center text-xs leading-tight break-words text-ink-soft">{showWhy && c.why && c.why !== "everyday" ? c.why : c.name}</span>
           </button>
         ))}
       </div>

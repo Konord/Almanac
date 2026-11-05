@@ -2,101 +2,15 @@
  * Pictures for content (events, routine steps, meals) are emoji, drawn
  * with Microsoft's Fluent 3D emoji images bundled in public/emoji/.
  * An emoji we don't have a picture for is shown as the normal emoji.
- * Free of other imports so `node --test` can run the tests.
+ * Only imports plain .ts files so `node --test` can run the tests.
  */
 
-/** Emoji → image file name in public/emoji (without ".png"). */
-const FILES: Record<string, string> = {
-  "🎒": "backpack",
-  "⚖": "balance_scale",
-  "🦇": "bat",
-  "🎂": "birthday_cake",
-  "📚": "books",
-  "🥣": "bowl_with_spoon",
-  "💼": "briefcase",
-  "📅": "calendar",
-  "📆": "calendar",
-  "🕯": "candle",
-  "🎄": "christmas_tree",
-  "🌧": "cloud_with_rain",
-  "🍂": "fallen_leaf",
-  "👻": "ghost",
-  "🥽": "goggles",
-  "🏡": "house_with_garden",
-  "🏠": "house_with_garden",
-  "🏒": "ice_hockey",
-  "🎃": "jack-o-lantern",
-  "🍁": "maple_leaf",
-  "🥞": "pancakes",
-  "🎉": "party_popper",
-  "🍕": "pizza",
-  "👟": "running_shoe",
-  "❄": "snowflake",
-  "⛄": "snowman",
-  "☃": "snowman",
-  "🕸": "spider_web",
-  "⭐": "star",
-  "🌥": "sun_behind_cloud",
-  "⛅": "sun_behind_cloud",
-  "👕": "t-shirt",
-  "🌮": "taco",
-  "🦷": "tooth",
-  "🪥": "toothbrush",
-  "🎁": "wrapped_gift",
-  "🍎": "red_apple",
-  "🍽": "fork_and_knife_with_plate",
-  "🎮": "video_game",
-  "📖": "open_book",
-  "😴": "sleeping_face",
-  "🚽": "toilet",
-  "🛁": "bathtub",
-  "🛏": "bed",
-  "🧥": "coat",
-  "🧸": "teddy_bear",
-  "🧺": "basket",
-  "🧼": "soap",
-  "🧽": "sponge",
-  "⚽": "soccer_ball",
-  "🎵": "musical_note",
-  "🩺": "stethoscope",
-  "🏫": "school",
-  "✈": "airplane",
-  "🚗": "automobile",
-  "🛒": "shopping_cart",
-  "🍿": "popcorn",
-  "🐶": "dog_face",
-  "✨": "sparkles",
-  "🏥": "hospital",
-  "💇": "person_getting_haircut",
-  "🥪": "sandwich",
-  "💧": "droplet",
-  "🔒": "locked",
-  "🧹": "broom",
-  "🗑": "wastebasket",
-  "🪴": "potted_plant",
-  "🚿": "shower",
-  "🧊": "ice",
-  "🪟": "window",
-  "🔥": "fire",
-  "🛞": "wheel",
-  "🔋": "battery",
-  "🌱": "seedling",
-  "⛱": "umbrella_on_ground",
-  "🧂": "salt",
-  "🍳": "cooking",
-  "🫖": "teapot",
-  "🛋": "couch_and_lamp",
-  "🧦": "socks",
-  "🧰": "toolbox",
-  "🪜": "ladder",
-  "📝": "memo",
-  "📌": "pushpin",
-  "✅": "check_mark_button",
-  "🛠": "hammer_and_wrench",
-  "✉": "envelope",
-  "📞": "telephone_receiver",
-  "📦": "package",
-};
+import { EMOJI_DATA, EMOJI_GROUPS } from "./emoji-data.ts";
+
+export { EMOJI_GROUPS };
+
+/** Emoji → image file in public/emoji (e.g. "pizza.png"). */
+const FILES: Record<string, string> = Object.fromEntries(EMOJI_DATA.map(([emoji, file]) => [emoji, file]));
 
 /** Drops the invisible "show as emoji" marker (U+FE0F) so 🛏️ and 🛏 match. */
 function plain(emoji: string): string {
@@ -107,7 +21,7 @@ function plain(emoji: string): string {
 export function emojiImage(emoji: string | null | undefined): string | null {
   if (!emoji) return null;
   const file = FILES[plain(emoji)];
-  return file ? `/emoji/${file}.png` : null;
+  return file ? `/emoji/${file}` : null;
 }
 
 /** Words in an event's title → a picture, used when the event has none. */
@@ -162,11 +76,13 @@ export type EmojiChoice = {
   emoji: string;
   /** A short name, e.g. "ice hockey". */
   name: string;
-  /** Words it can be found by: its name plus words from the title guesses. */
+  /** Which tab it lives in: an index into EMOJI_GROUPS. */
+  group: number;
+  /** Words it can be found by: its name, Unicode's keywords, and our own. */
   words: string[];
 };
 
-/** Extra search words for some pictures, beyond their file names. */
+/** Extra search words for family-calendar things, beyond the standard ones. */
 const EXTRA_WORDS: Record<string, string[]> = {
   "🎒": ["school", "bag"],
   "💼": ["work", "office", "meeting", "job"],
@@ -190,28 +106,24 @@ const EXTRA_WORDS: Record<string, string[]> = {
   "🛏": ["bed", "sleep", "nap"],
   "📚": ["books", "library", "homework", "reading"],
   "🧺": ["laundry", "basket"],
+  "🍕": ["pizza day"],
+  "🦷": ["dentist"],
+  "🏒": ["hockey"],
 };
 
-/** Every picture we have, once each (some emoji share a picture). */
-export const EMOJI_CHOICES: EmojiChoice[] = (() => {
-  const seen = new Set<string>();
-  const choices: EmojiChoice[] = [];
-  for (const [emoji, file] of Object.entries(FILES)) {
-    if (seen.has(file)) continue;
-    seen.add(file);
-    const name = file.replace(/[_-]/g, " ");
-    const words = new Set([name, ...name.split(" "), ...(EXTRA_WORDS[emoji] ?? [])]);
-    choices.push({ emoji, name, words: [...words] });
-  }
-  return choices;
-})();
+/** Every picture we have, in the standard emoji order. */
+export const EMOJI_CHOICES: EmojiChoice[] = EMOJI_DATA.map(([emoji, , name, group, extra]) => {
+  const words = new Set([name, ...name.split(" "), ...extra.split(" ").filter(Boolean), ...(EXTRA_WORDS[emoji] ?? [])]);
+  return { emoji, name, group, words: [...words] };
+});
+
+const BY_EMOJI = new Map(EMOJI_CHOICES.map((c) => [c.emoji, c]));
 
 /** Everyday pictures to offer when the title doesn't suggest anything. */
 const EVERYDAY = ["📅", "💼", "🏡", "🍽", "🚗", "🎉", "⭐", "🩺", "🎒", "🛒", "👟", "🎂"];
 
 function choiceFor(emoji: string): EmojiChoice | undefined {
-  const file = FILES[plain(emoji)];
-  return EMOJI_CHOICES.find((c) => FILES[c.emoji] === file);
+  return BY_EMOJI.get(plain(emoji));
 }
 
 /**
@@ -224,24 +136,54 @@ export function suggestEmoji(title: string, limit = 6): (EmojiChoice & { why: st
   const add = (choice: EmojiChoice | undefined, why: string) => {
     if (choice && !result.some((r) => r.emoji === choice.emoji) && result.length < limit) result.push({ ...choice, why });
   };
-  const text = title.toLowerCase();
   for (const [pattern, emoji] of GUESSES) {
     const match = pattern.exec(title);
     if (match) add(choiceFor(emoji), `"${match[0].toLowerCase()}"`);
   }
-  for (const choice of EMOJI_CHOICES) {
-    const word = choice.words.find((w) => w.length > 2 && new RegExp(`\\b${w}`, "i").test(text));
-    if (word) add(choice, `"${word}"`);
+  // Whole words of the title that name a picture ("dog", "cake").
+  const titleWords = title.toLowerCase().match(/[a-z']{3,}/g) ?? [];
+  for (const word of titleWords) {
+    const named = EMOJI_CHOICES.find((c) => c.name === word) ?? EMOJI_CHOICES.find((c) => c.name.split(" ").includes(word));
+    add(named ?? EMOJI_CHOICES.find((c) => c.words.includes(word)), `"${word}"`);
   }
   for (const emoji of EVERYDAY) add(choiceFor(emoji), "everyday");
   return result;
 }
 
-/** Pictures whose name or words start with what's typed (then ones that contain it). */
-export function searchEmoji(query: string, limit = 18): EmojiChoice[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return EMOJI_CHOICES.slice(0, limit);
-  const starts = EMOJI_CHOICES.filter((c) => c.words.some((w) => w.startsWith(q)));
-  const contains = EMOJI_CHOICES.filter((c) => !starts.includes(c) && c.words.some((w) => w.includes(q)));
-  return [...starts, ...contains].slice(0, limit);
+/**
+ * Pictures matching what's typed, best first: the name starts with it, then
+ * a word starts with it, then it appears anywhere. Every typed word has to
+ * match. Optionally only one tab (group).
+ */
+export function searchEmoji(query: string, limit = 18, group?: number): EmojiChoice[] {
+  const pool = group === undefined ? EMOJI_CHOICES : EMOJI_CHOICES.filter((c) => c.group === group);
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return pool.slice(0, limit);
+  const q = terms.join(" ");
+  // A term matches a word it starts, or appears inside the name ("cake" in "cupcake").
+  const matches = (c: EmojiChoice, t: string) => c.name.includes(t) || c.words.some((w) => w.startsWith(t));
+  const score = (c: EmojiChoice): number => {
+    if (!terms.every((t) => matches(c, t))) return -1;
+    if (c.name === q) return 0;
+    // Our own family-calendar words ("hockey" is ice hockey) come before the rest.
+    if ((EXTRA_WORDS[c.emoji] ?? []).some((w) => w.startsWith(q))) return 1;
+    if (c.name.startsWith(q)) return 2;
+    if (c.name.split(" ").some((w) => w.startsWith(terms[0]))) return 3;
+    if (terms.every((t) => c.words.some((w) => w.startsWith(t)))) return 4;
+    return 5;
+  };
+  return pool
+    .map((c, i) => ({ c, s: score(c), i }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => a.s - b.s || a.i - b.i)
+    .slice(0, limit)
+    .map((x) => x.c);
+}
+
+/** One page of a tab's pictures, for browsing without a search. */
+export function emojiPage(group: number, page: number, perPage: number): { choices: EmojiChoice[]; pages: number } {
+  const all = EMOJI_CHOICES.filter((c) => c.group === group);
+  const pages = Math.max(1, Math.ceil(all.length / perPage));
+  const p = Math.min(Math.max(page, 0), pages - 1);
+  return { choices: all.slice(p * perPage, (p + 1) * perPage), pages };
 }
