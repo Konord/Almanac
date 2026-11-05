@@ -268,6 +268,12 @@ export function RoutineFields({ template }: { template?: RoutineTemplate }) {
           ))}
         </Select>
       </Field>
+      <Field label="Usual time" hint="Optional. Leave empty to use the step times.">
+        <Input name="usualStart" type="time" defaultValue={template?.usual_start?.slice(0, 5) ?? ""} />
+      </Field>
+      <Field label="About how many minutes" hint="Optional. It moves around plans on the calendar.">
+        <Input name="usualMinutes" type="number" min={5} max={240} defaultValue={template?.usual_minutes ?? ""} />
+      </Field>
       <Field label="Written for">
         <Select name="audience" defaultValue={template?.audience ?? "everyone"}>
           <option value="everyone">Anyone</option>

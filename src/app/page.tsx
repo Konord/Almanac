@@ -24,6 +24,7 @@ import type { CalendarItem, Member } from "./calendar/types";
 import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type ChoreWithTiming, type Todo } from "./chores/data";
 import { ChoreRow, TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
+import { floatingRoutines, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
 import {
@@ -68,7 +69,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const [{ layers, members, views, items }, routineData, choreData, todoData] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
-    loadChores(today),
+    loadChores(today, timeZone),
     loadTodos(),
   ]);
   const savedView = await deviceView(views);
@@ -166,9 +167,16 @@ function PeopleTimeline({
 }) {
   const { timeZone } = household.settings;
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
-  const { first, last } = timelineRange(timed, [today], timeZone);
   const memberIds = new Set(members.map((m) => m.id));
   const forEveryone = timed.filter((e) => !e.member_id || !memberIds.has(e.member_id));
+  // Routines float around each person's own plans and the ones for everyone.
+  const routinesFor = new Map(
+    members.map((m) => [m.id, floatingRoutines(routineData, m.id, today, [...timed.filter((e) => e.member_id === m.id), ...forEveryone], timeZone)]),
+  );
+  const placements = [...routinesFor.values()].flat().map((r) => r.placement);
+  const range = timelineRange(timed, [today], timeZone);
+  const first = Math.min(range.first, ...placements.map((p) => Math.floor(p.startMin / 60)));
+  const last = Math.max(range.last, ...placements.map((p) => Math.ceil(p.endMin / 60)));
   const columns: {
     id: string;
     name: string;
@@ -244,6 +252,18 @@ function PeopleTimeline({
           <HourLines first={first} last={last} />
           {columns.map((c) => (
             <div key={c.id} className="relative min-w-0 flex-1 basis-0">
+              {(routinesFor.get(c.id) ?? []).map((r) => (
+                <RoutineBlock
+                  key={r.assignment.id}
+                  routine={r}
+                  memberId={c.id}
+                  colour={c.colour}
+                  date={today}
+                  first={first}
+                  last={last}
+                  household={household}
+                />
+              ))}
               <DayBlocks
                 events={c.items}
                 day={today}

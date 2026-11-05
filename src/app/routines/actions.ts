@@ -63,7 +63,14 @@ function readRoutine(formData: FormData) {
   if (!isRoutineKind(kind)) back(formData, "error", "Choose when the routine happens.");
   if (!["kid", "adult", "everyone"].includes(audience)) back(formData, "error", "Choose who the routine is for.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this routine.");
-  return { name, kind, audience, visibility };
+  const usualStart = text(formData, "usualStart");
+  if (usualStart && !isLocalTime(usualStart)) back(formData, "error", "The usual time should look like 7:30 p.m.");
+  const minutesText = text(formData, "usualMinutes");
+  const usualMinutes = minutesText ? Number(minutesText) : null;
+  if (usualMinutes !== null && !(Number.isInteger(usualMinutes) && usualMinutes >= 5 && usualMinutes <= 240)) {
+    back(formData, "error", "How long should be between 5 and 240 minutes.");
+  }
+  return { name, kind, audience, visibility, usual_start: usualStart || null, usual_minutes: usualMinutes };
 }
 
 export async function addRoutine(formData: FormData) {

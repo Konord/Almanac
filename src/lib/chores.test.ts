@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, type ChoreRule } from "./chores.ts";
+import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, starterFirstDue, type ChoreRule } from "./chores.ts";
 
 const rule = (extra: Partial<ChoreRule> = {}): ChoreRule => ({
   repeat_every: 1,
@@ -127,4 +127,20 @@ test("how often, in words", () => {
   assert.equal(describeRepeat(rule()), "Every week");
   assert.equal(describeRepeat(rule({ repeat_every: 3, repeat_unit: "month" })), "Every 3 months");
   assert.equal(describeRepeat(tires, "Oct 15 – Nov 30"), "Once a year, Oct 15 – Nov 30");
+});
+
+test("starter chores come due spread over their first interval", () => {
+  const added = "2026-11-01";
+  const weekly = Array.from({ length: 40 }, (_, i) => starterFirstDue(`chore-${i}`, added, { repeat_every: 1, repeat_unit: "week" }));
+  assert.ok(weekly.every((d) => d >= added && d <= "2026-11-07"));
+  assert.ok(new Set(weekly).size >= 4, "not all on one day");
+  const yearly = starterFirstDue("x", added, { repeat_every: 1, repeat_unit: "year" });
+  assert.ok(yearly <= "2026-11-28", "never more than four weeks away");
+  assert.equal(starterFirstDue("same", added, { repeat_every: 1, repeat_unit: "month" }), starterFirstDue("same", added, { repeat_every: 1, repeat_unit: "month" }));
+});
+
+test("a never-done chore with a first day waits for it", () => {
+  const t = choreTiming(rule({ first_due: "2026-11-09" }), [], TODAY);
+  assert.equal(t.dueOn, "2026-11-09");
+  assert.notEqual(t.state, "due");
 });

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { choreTiming, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
-import { addDays, type LocalDate } from "@/lib/time";
+import { choreTiming, starterFirstDue, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
+import { addDays, localDateOf, type LocalDate } from "@/lib/time";
 
 export type ChoreMember = { id: string; name: string; colour: string };
 
@@ -16,6 +16,8 @@ export type Chore = ChoreRule & {
   notes: string | null;
   active: boolean;
   visibility: string;
+  premade: boolean;
+  created_at: string;
 };
 
 export type Round = {
@@ -43,13 +45,13 @@ export type Todo = {
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
 
 const CHORE_COLUMNS =
-  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, season_start, season_end, location, min_energy_mode, default_assignee_id, notes, active, visibility";
+  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, season_start, season_end, location, min_energy_mode, default_assignee_id, notes, active, visibility, premade, created_at";
 
 /** How far back chore history is read (long enough for yearly chores). */
 const HISTORY_DAYS = 400;
 
 /** All chores with when each is next due. */
-export async function loadChores(today: LocalDate) {
+export async function loadChores(today: LocalDate, timeZone: string) {
   const supabase = await createClient();
   const [chores, rounds, members] = await Promise.all([
     supabase.from("task_templates").select(CHORE_COLUMNS).order("sort_order").order("name"),
@@ -71,7 +73,12 @@ export async function loadChores(today: LocalDate) {
   const list: ChoreWithTiming[] = ((chores.data ?? []) as unknown as Chore[]).map((c) => ({
     ...c,
     repeat_unit: c.repeat_unit as RepeatUnit,
-    timing: choreTiming(c, byChore.get(c.id) ?? [], today),
+    timing: choreTiming(
+      // Starter chores come due a few at a time instead of all on day one.
+      c.premade && !c.season_start ? { ...c, first_due: starterFirstDue(c.id, localDateOf(new Date(c.created_at), timeZone), c) } : c,
+      byChore.get(c.id) ?? [],
+      today,
+    ),
   }));
   return { chores: list, rounds: roundList, members: (members.data ?? []) as ChoreMember[] };
 }
