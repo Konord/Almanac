@@ -1,9 +1,10 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { Alarm, Broom, CalendarBlank, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
+import { Alarm, Broom, CalendarBlank, ForkKnife, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
 import { soft, strong } from "@/lib/colours";
+import { TimerPill } from "./timer-pill";
 
 /**
  * Small building blocks shared by every screen, in the locked "bright"
@@ -19,7 +20,7 @@ import { soft, strong } from "@/lib/colours";
 // The app frame: icon rail on the left, the screen on the right
 // ---------------------------------------------------------------------------
 
-export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "settings";
+export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "settings";
 
 const RAIL: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "today", href: "/", label: "Today", icon: House },
@@ -27,6 +28,7 @@ const RAIL: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "chores", href: "/chores", label: "Chores", icon: Broom },
   { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
   { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
+  { section: "meals", href: "/meals", label: "Meals", icon: ForkKnife },
 ];
 
 const RAIL_BOTTOM: { section: Section; href: string; label: string; icon: Icon }[] = [
@@ -60,6 +62,7 @@ export function AppFrame({ section, children }: { section: Section; children: Re
       <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 sm:p-6 lg:min-h-0 lg:pt-5.5 lg:pr-8.5 lg:pb-6 lg:pl-7.5">
         {children}
       </main>
+      <TimerPill />
     </div>
   );
 }

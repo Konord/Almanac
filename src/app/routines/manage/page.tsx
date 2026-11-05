@@ -26,7 +26,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
   const household = await requireHousehold();
   const params = await searchParams;
   const today = localDateOf(new Date(), household.settings.timeZone);
-  const data = await loadRoutines(today);
+  const data = await loadRoutines(today, { allSteps: true });
   const returnTo = "/routines/manage";
   const error = firstParam(params.error);
   const message = firstParam(params.message);
