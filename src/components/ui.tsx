@@ -4,6 +4,7 @@ import { Alarm, Broom, CalendarBlank, ForkKnife, GearSix, House, ListChecks } fr
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
 import { soft, strong } from "@/lib/colours";
+import { TimerPill } from "./timer-pill";
 
 /**
  * Small building blocks shared by every screen, in the locked "bright"
@@ -61,6 +62,7 @@ export function AppFrame({ section, children }: { section: Section; children: Re
       <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 sm:p-6 lg:min-h-0 lg:pt-5.5 lg:pr-8.5 lg:pb-6 lg:pl-7.5">
         {children}
       </main>
+      <TimerPill />
     </div>
   );
 }
