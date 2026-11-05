@@ -9,6 +9,8 @@ import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./c
 import { PROFILE_CLASS, ProfileTag } from "./calendar/profile-tag";
 import type { CalendarItem, Layer, Member } from "./calendar/types";
 import { ViewChooser } from "./calendar/view-chooser";
+import { loadRoutines } from "./routines/data";
+import { RoutinesGlance } from "./routines/glance";
 import { eventsOnDay, isAllDayStyle, shortTime, weekdayLabel } from "./calendar/views";
 
 /** How many days the "Coming up" strip shows after today. */
@@ -20,7 +22,9 @@ const COMING_UP_DAYS = 6;
  */
 export default function Home(props: PageProps<"/">) {
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-8">
+    // On a landscape wall screen (lg and up) the page fills exactly one screen
+    // and long lists scroll inside their own panels instead.
+    <main className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-4 p-4 sm:p-6 lg:h-dvh lg:max-h-dvh lg:min-h-0 lg:overflow-hidden">
       <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
         <Today searchParams={props.searchParams} />
       </Suspense>
@@ -37,7 +41,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const { layers, members, views, items } = await loadCalendar(rangeStart, rangeEnd);
+  const [{ layers, members, views, items }, routineData] = await Promise.all([
+    loadCalendar(rangeStart, rangeEnd),
+    loadRoutines(today),
+  ]);
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
@@ -53,15 +60,16 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-4 border-b-4 border-marker-blue pb-4">
-        <div>
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b-4 border-marker-blue pb-3">
+        <div className="flex flex-wrap items-baseline gap-x-4">
+          <h1 className="text-4xl font-semibold tracking-tight text-ink">{longDate}</h1>
           <p className="text-xl text-ink-muted">{household.name}</p>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink sm:text-5xl">{longDate}</h1>
         </div>
         <nav className="flex flex-wrap gap-2">
           <NavLink href="/calendar" primary>
             Calendar
           </NavLink>
+          <NavLink href="/routines">Routines</NavLink>
           <NavLink href="/household">Household &amp; people</NavLink>
         </nav>
       </header>
@@ -71,8 +79,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       <ViewChooser views={views} current={savedView} returnTo="" returnPath="/" />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <section className="flex min-w-0 flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
+        <section className="flex min-w-0 flex-col gap-4 lg:min-h-0">
           {todayProfile ? (
             <ProfileCard
               profile={todayProfile}
@@ -81,7 +89,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             />
           ) : null}
 
-          <div className="rounded-[var(--radius)] border-2 border-frame bg-board p-5">
+          <div className="flex flex-col rounded-[var(--radius)] border-2 border-frame bg-board p-5 lg:min-h-0 lg:flex-1">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-2xl font-semibold text-ink">Today&apos;s plan</h2>
               <Link
@@ -94,6 +102,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             {todayItems.length === 0 ? (
               <p className="py-6 text-center text-xl text-ink-muted">Nothing on the calendar today.</p>
             ) : (
+              <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
               <TodayList
                 items={todayItems}
                 now={now}
@@ -102,11 +111,16 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
                 layerById={layerById}
                 memberById={memberById}
               />
+              </div>
             )}
           </div>
         </section>
 
-        <section className="flex min-w-0 flex-col gap-3">
+        <section className="flex min-w-0 flex-col lg:min-h-0">
+          <RoutinesGlance data={routineData} date={today} household={household} />
+        </section>
+
+        <section className="flex min-w-0 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
           <h2 className="text-2xl font-semibold text-ink">Coming up</h2>
           <ul className="flex flex-col gap-2">
             {days.slice(1).map((day) => {
@@ -116,7 +130,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
                 <li key={day}>
                   <Link
                     href={`/calendar?view=week&date=${day}`}
-                    className="flex flex-col gap-1 rounded-[var(--radius)] border-2 border-frame bg-board px-4 py-3 hover:bg-panel"
+                    className="flex min-h-[var(--touch-target)] flex-col justify-center gap-0.5 rounded-[var(--radius)] border-2 border-frame bg-board px-4 py-2 hover:bg-panel"
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="text-lg font-semibold text-ink">
@@ -156,19 +170,21 @@ function ProfileCard({ profile, label, household }: { profile: DayProfile; label
   const { timeZone, dayProfile } = household.settings;
   const today = localDateOf(new Date(), timeZone);
   const time = (t: string) => clockTime(zonedToUtc(today, t, timeZone), household);
+  // Times like "9 p.m." already end in a full stop, so don't add a second.
+  const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
   const detail =
     profile.kind === "busy_evening"
-      ? `${formatMinutes(profile.eveningMinutes)} of plans after ${time(dayProfile.eveningStarts)}, and ${formatMinutes(profile.freeMinutes)} free overall.`
+      ? `${formatMinutes(profile.eveningMinutes)} of plans after ${time(dayProfile.eveningStarts)}, and ${formatMinutes(profile.freeMinutes)} free overall`
       : profile.kind === "busy"
-        ? `${formatMinutes(profile.busyMinutes)} of plans, leaving ${formatMinutes(profile.freeMinutes)} free.`
+        ? `${formatMinutes(profile.busyMinutes)} of plans, leaving ${formatMinutes(profile.freeMinutes)} free`
         : profile.busyMinutes === 0
-          ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}.`
-          : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}.`;
+          ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`
+          : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`;
 
   return (
-    <div className={`rounded-[var(--radius)] border-4 bg-board p-6 ${PROFILE_CLASS[profile.kind]}`}>
-      <p className="text-5xl font-semibold tracking-tight sm:text-6xl">{label}</p>
-      <p className="mt-2 text-xl text-ink">{detail}</p>
+    <div className={`rounded-[var(--radius)] border-4 bg-board p-5 ${PROFILE_CLASS[profile.kind]}`}>
+      <p className="text-5xl font-semibold tracking-tight">{label}</p>
+      <p className="mt-2 text-xl text-ink">{sentence(detail)}</p>
     </div>
   );
 }

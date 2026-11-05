@@ -179,6 +179,116 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"routine_assignments": {
+                  Row: {
+                    "active": boolean,"created_at": string,"household_id": string,"id": string,"member_id": string,"on_date": string | null,"template_id": string,"updated_at": string,"weekdays": (number)[] | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"household_id": string,"id"?: string,"member_id": string,"on_date"?: string | null,"template_id": string,"updated_at"?: string,"weekdays"?: (number)[] | null
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"household_id"?: string,"id"?: string,"member_id"?: string,"on_date"?: string | null,"template_id"?: string,"updated_at"?: string,"weekdays"?: (number)[] | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "routine_assignments_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "routine_assignments_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "routine_assignments_template_id_household_id_fkey"
+      columns: ["template_id","household_id"]
+isOneToOne: false
+      referencedRelation: "routine_templates"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"routine_checks": {
+                  Row: {
+                    "check_date": string,"done_at": string,"household_id": string,"id": string,"member_id": string,"step_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "check_date": string,"done_at"?: string,"household_id": string,"id"?: string,"member_id": string,"step_id": string
+                  }
+                  Update: {
+                    "check_date"?: string,"done_at"?: string,"household_id"?: string,"id"?: string,"member_id"?: string,"step_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "routine_checks_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "routine_checks_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "routine_checks_step_id_household_id_fkey"
+      columns: ["step_id","household_id"]
+isOneToOne: false
+      referencedRelation: "routine_steps"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"routine_steps": {
+                  Row: {
+                    "created_at": string,"essential": boolean,"household_id": string,"icon": string | null,"id": string,"position": number,"target_time": string | null,"template_id": string,"text": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"essential"?: boolean,"household_id": string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id": string,"text": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"essential"?: boolean,"household_id"?: string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id"?: string,"text"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "routine_steps_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "routine_steps_template_id_household_id_fkey"
+      columns: ["template_id","household_id"]
+isOneToOne: false
+      referencedRelation: "routine_templates"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"routine_templates": {
+                  Row: {
+                    "audience": string,"created_at": string,"household_id": string,"id": string,"kind": string,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "audience"?: string,"created_at"?: string,"household_id": string,"id"?: string,"kind"?: string,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "audience"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"kind"?: string,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "routine_templates_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"themes": {
                   Row: {
                     "active_from": string | null,"active_until": string | null,"created_at": string,"decorations": NonNullable<Json>,"household_id": string,"id": string,"name": string,"slug": string,"tokens": NonNullable<Json>,"updated_at": string
@@ -226,6 +336,9 @@ isOneToOne: false
           }
           Functions: {
             "add_starter_layers":
+{ Args: { "target_household": string }; Returns: undefined
+                           },
+"add_starter_routines":
 { Args: { "target_household": string }; Returns: undefined
                            },
 "create_household":
