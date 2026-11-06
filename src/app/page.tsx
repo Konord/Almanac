@@ -36,6 +36,7 @@ import { PlaceAcrossPeople } from "@/components/place-across-people";
 import { PendingSpans } from "@/components/pending-block";
 import { layoutSpans, memberRuns, spanBox } from "@/lib/calendar-layout";
 import type { QuickDefaults } from "./calendar/forms";
+import { syncEventAndChoreHeadsUps } from "./heads-ups/sync";
 import {
   EventBlock,
   HourLines,
@@ -77,6 +78,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const now = new Date();
   const today = localDateOf(now, timeZone);
 
+  // Heads-ups due soon become to-dos before the lists are read.
+  await syncEventAndChoreHeadsUps(household);
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData, mealBasics, todayMeals, energyMode] = await Promise.all([

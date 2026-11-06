@@ -11,6 +11,7 @@ import { addList, addTodo, clearDone, removeList, removeTodo, updateList, update
 import { loadTodos, type ChoreMember } from "../chores/data";
 import { TodoFields } from "../chores/forms";
 import { TodoRow } from "../chores/rows";
+import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
 
 /**
  * To-do lists. Each to-do can have a day and a person, both optional.
@@ -31,6 +32,8 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const params = await searchParams;
   const { locale, timeZone } = household.settings;
   const today = localDateOf(new Date(), timeZone);
+  // Heads-ups due soon become to-dos before the lists are read.
+  await syncEventAndChoreHeadsUps(household);
   const supabase = await createClient();
   const [{ lists, todos }, { data: memberRows }] = await Promise.all([
     loadTodos(),

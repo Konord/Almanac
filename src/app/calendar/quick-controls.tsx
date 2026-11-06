@@ -57,8 +57,8 @@ export function LengthControl({ initial }: { initial: number }) {
  * scroll. Every tab stays in the form (just hidden), so whatever you set
  * in one is still sent when you press Add.
  */
-export function CardTabs({ tabs }: { tabs: { label: string; panel: ReactNode }[] }) {
-  const [open, setOpen] = useState(0);
+export function CardTabs({ tabs, initial = 0 }: { tabs: { label: string; panel: ReactNode }[]; initial?: number }) {
+  const [open, setOpen] = useState(initial);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5">
       <div className="flex shrink-0 gap-1 rounded-[var(--radius)] bg-rail p-1" role="tablist">

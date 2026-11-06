@@ -305,10 +305,18 @@ export async function toggleTodo(formData: FormData) {
 }
 
 export async function removeTodo(formData: FormData) {
-  await requireHousehold();
+  const household = await requireHousehold();
   const id = text(formData, "id");
   const supabase = await createClient();
-  const { error } = await supabase.from("task_instances").delete().eq("id", id).not("list_id", "is", null);
+  // A heads-up's to-do is set aside instead, so it isn't made again.
+  const today = localDateOf(new Date(), household.settings.timeZone);
+  const { error: skipError } = await supabase
+    .from("task_instances")
+    .update({ status: "skipped", completed_on: today, completed_at: new Date().toISOString() })
+    .eq("id", id)
+    .not("heads_up_id", "is", null);
+  if (skipError) back(formData, "error", skipError.message);
+  const { error } = await supabase.from("task_instances").delete().eq("id", id).not("list_id", "is", null).is("heads_up_id", null);
   if (error) back(formData, "error", error.message);
   refresh();
   back(formData, "message", "Removed the to-do.");
@@ -316,10 +324,17 @@ export async function removeTodo(formData: FormData) {
 
 /** Clears the done to-dos off a list. */
 export async function clearDone(formData: FormData) {
-  await requireHousehold();
+  const household = await requireHousehold();
   const listId = text(formData, "listId");
   const supabase = await createClient();
-  const { error } = await supabase.from("task_instances").delete().eq("list_id", listId).eq("status", "done");
+  // Heads-up to-dos stay until their day has passed, so they aren't made again.
+  const today = localDateOf(new Date(), household.settings.timeZone);
+  const { error } = await supabase
+    .from("task_instances")
+    .delete()
+    .eq("list_id", listId)
+    .eq("status", "done")
+    .or(`heads_up_id.is.null,heads_up_for.lt.${today}`);
   if (error) back(formData, "error", error.message);
   refresh();
   back(formData, "message", "Cleared the done ones.");

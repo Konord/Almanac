@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Chips, Emoji, Field, Input, Select } from "@/components/ui";
 import { PERSON_COLOURS } from "@/lib/colours";
@@ -167,11 +168,17 @@ export function EventCardFields({
   defaults,
   adding = false,
   templates,
+  headsUps,
+  initialTab,
 }: {
   layers: Layer[];
   members: Member[];
   tags: Tag[];
   defaults: CardDefaults;
+  /** Editing only: the event's heads-ups, on their own tab. */
+  headsUps?: ReactNode;
+  /** Which tab to open on (by its name). */
+  initialTab?: string;
   /** Adding a new event: keep the dashed outline on the timeline in step. */
   adding?: boolean;
   /** Ready-made events to start from (adding only). */
@@ -183,6 +190,7 @@ export function EventCardFields({
       {/* Tags replace layers on the card; events still quietly belong to one (Connor, 2026-11-05). */}
       <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />
       <CardTabs
+        initial={initialTab === "heads-ups" ? 4 : 0}
         tabs={[
           {
             label: "Event",
@@ -266,6 +274,7 @@ export function EventCardFields({
               </>
             ),
           },
+          ...(headsUps ? [{ label: "Heads-ups", panel: headsUps }] : []),
         ]}
       />
     </>
