@@ -193,3 +193,18 @@ export function starterFirstDue(id: string, addedOn: LocalDate, rule: Pick<Chore
   for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return addDays(addedOn, hash % spread);
 }
+
+/**
+ * Survival days don't count against chores. A chore that fell due on (or
+ * waited through) a survival day moves to the next day that wasn't one,
+ * and the days it "waited" leave survival days out, so a hard stretch
+ * never makes chores look overdue afterwards.
+ */
+export function setAsideSurvivalDays(timing: ChoreTiming, survivalDays: ReadonlySet<LocalDate>, today: LocalDate): ChoreTiming {
+  if (timing.state !== "due" || survivalDays.size === 0) return timing;
+  let dueOn = timing.dueOn;
+  while (dueOn < today && survivalDays.has(dueOn)) dueOn = addDays(dueOn, 1);
+  let waited = 0;
+  for (let d = dueOn; d < today; d = addDays(d, 1)) if (!survivalDays.has(d)) waited++;
+  return { ...timing, dueOn, daysOverdue: waited };
+}

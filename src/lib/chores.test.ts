@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, showsInMode, starterFirstDue, type ChoreRule } from "./chores.ts";
+import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, setAsideSurvivalDays, showsInMode, starterFirstDue, type ChoreRule } from "./chores.ts";
 
 const rule = (extra: Partial<ChoreRule> = {}): ChoreRule => ({
   repeat_every: 1,
@@ -151,4 +151,21 @@ test("energy modes hide the chores that can wait", () => {
   assert.equal(showsInMode("low", "low"), true);
   assert.equal(showsInMode("low", "survival"), false);
   assert.equal(showsInMode("survival", "survival"), true);
+});
+
+test("survival days don't make chores overdue", () => {
+  // Due Mon Nov 2; Mon and Tue were survival days; today is Thu Nov 5.
+  const t = choreTiming(rule(), [{ status: "done", completed_on: "2026-10-26" }], TODAY);
+  assert.equal(t.daysOverdue, 3);
+  const moved = setAsideSurvivalDays(t, new Set(["2026-11-02", "2026-11-03"]), TODAY);
+  assert.equal(moved.dueOn, "2026-11-04");
+  assert.equal(moved.daysOverdue, 1);
+  // A survival day in the middle doesn't count as waiting.
+  const middle = setAsideSurvivalDays(t, new Set(["2026-11-03"]), TODAY);
+  assert.equal(middle.dueOn, "2026-11-02");
+  assert.equal(middle.daysOverdue, 2);
+  // Nothing changes for chores not yet due, or without survival days.
+  const later = choreTiming(rule(), [{ status: "done", completed_on: "2026-11-01" }], TODAY);
+  assert.equal(setAsideSurvivalDays(later, new Set(["2026-11-02"]), TODAY), later);
+  assert.equal(setAsideSurvivalDays(t, new Set(), TODAY), t);
 });

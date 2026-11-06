@@ -98,11 +98,14 @@ export function MealBlock({ meal, date, household, style }: { meal: TodayMeal; d
   );
 }
 
-/** Normal / Low / Survival for today, in the Today header. */
+/**
+ * Normal / Survival for today, in the Today header. (The design doc's
+ * Low mode is on hold: Connor chose just these two for now.)
+ */
 export function EnergySwitch({ mode, date, returnTo }: { mode: EnergyMode; date: LocalDate; returnTo: string }) {
   return (
     <div role="group" aria-label="Today's energy" className="flex gap-1 rounded-2xl bg-panel p-1">
-      {(["normal", "low", "survival"] as const).map((m) => (
+      {(["normal", "survival"] as const).map((m) => (
         <form key={m} action={setEnergyMode}>
           <input type="hidden" name="returnTo" value={returnTo} />
           <input type="hidden" name="date" value={date} />

@@ -54,7 +54,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
           <div className="mt-2 flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
           <p className="text-lg text-ink-muted">
             The ready-made routines are a starting point. Change the steps to suit your family. Essential steps are the
-            ones kept on low-energy days.
+            ones kept on survival days.
           </p>
           {data.templates.map((t) => (
             <TemplateEditor

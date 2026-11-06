@@ -143,7 +143,7 @@ function readChore(formData: FormData) {
     back(formData, "error", "Pick the start and end of the season.");
   }
   if (!["indoor", "outdoor"].includes(location)) back(formData, "error", "Choose indoor or outdoor.");
-  if (!["normal", "low", "survival"].includes(minEnergy)) back(formData, "error", "Choose an energy level.");
+  if (!["normal", "survival"].includes(minEnergy)) back(formData, "error", "Choose an energy level.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this chore.");
   const weekday = weekdayText === "" ? null : Number(weekdayText);
   if (weekday !== null && !(weekday >= 0 && weekday <= 6)) back(formData, "error", "Choose a day of the week.");

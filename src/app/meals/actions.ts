@@ -956,12 +956,12 @@ export async function setEnergyMode(formData: FormData) {
   const household = await requireHousehold();
   const date = text(formData, "date");
   const mode = text(formData, "mode");
-  if (!isLocalDate(date) || !["normal", "low", "survival"].includes(mode)) back(formData, "error", "Pick a mode.");
+  if (!isLocalDate(date) || !["normal", "survival"].includes(mode)) back(formData, "error", "Pick a mode.");
   const supabase = await createClient();
   const { error } = await supabase.from("days").upsert({ household_id: household.id, date, energy_mode: mode }, { onConflict: "household_id,date" });
   if (error) back(formData, "error", error.message);
   await log(household.id, "energy_mode_set", "day", household.id, { date, mode });
   refresh();
-  const words = { normal: "Normal day.", low: "Low day: just the lighter things.", survival: "Survival day: only the essentials." } as const;
+  const words = { normal: "Back to a normal day.", survival: "Survival day: just meals, must-dos and the essentials. Everything else waits." } as const;
   back(formData, "message", words[mode as keyof typeof words]);
 }

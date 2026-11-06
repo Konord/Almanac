@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarDots, ListChecks, Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
+import { CalendarDots, Lifebuoy, ListChecks, Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
 import {
   AppFrame,
   Avatar,
@@ -24,8 +24,9 @@ import type { CalendarItem, Member } from "./calendar/types";
 import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type ChoreWithTiming, type Todo } from "./chores/data";
 import { ChoreRow, TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
-import { loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
-import { EnergySwitch, MealBlock, SurvivalBanner, placeTodayMeals } from "./meals/today";
+import { loadBackupParts, loadMealBasics, loadMeals, readyCount, type Meal, type MealBasics } from "./meals/data";
+import { setEnergyMode } from "./meals/actions";
+import { EnergySwitch, MealBlock, SurvivalBanner, placeTodayMeals, type TodayMeal } from "./meals/today";
 import { floatingRoutines, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
@@ -107,6 +108,18 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       ? placeTodayMeals(todayMeals, mealBasics, []).find((m) => !m.cooked && !m.backup && m.endMin > minutesIntoDay(now, timeZone))
       : undefined;
 
+  // A survival day keeps only must-dos, dated to-dos and survival chores;
+  // "Show anyway" (?all=1) brings the rest back for today.
+  const survival = energyMode === "survival";
+  const showAll = survival && firstParam(params.all) === "1";
+  const todayTodos = todosForToday(todoData.todos, today, showAll ? "normal" : energyMode);
+  const todayChores = dueChores(choreData.chores, showAll ? "normal" : energyMode);
+  const waiting = {
+    todos: todosForToday(todoData.todos, today).length - todayTodos.length,
+    chores: dueChores(choreData.chores).length - todayChores.length,
+  };
+  const backupsReady = survival ? backupMealsReady(mealBasics, await loadBackupParts()) : 0;
+
   return (
     <>
       <ScreenHeader title={longDate}>
@@ -157,14 +170,27 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
           <TodoCard
-            todos={todosForToday(todoData.todos, today)}
-            chores={dueChores(choreData.chores, energyMode)}
+            todos={todayTodos}
+            chores={todayChores}
             members={choreData.members}
             today={today}
             household={household}
+            waiting={survival && !showAll ? waiting.todos + waiting.chores : 0}
+            showingAll={showAll}
           />
           <RoutinesGlance data={routineData} date={today} household={household} className="lg:row-span-2" />
-          <ComingUp days={days.slice(1, 6)} shown={shown} profiles={profiles} household={household} />
+          {/* On a survival day "Coming up" swaps for the survival card: tomorrow can wait. */}
+          {survival ? (
+            <SurvivalCard
+              meals={placeTodayMeals(todayMeals, mealBasics, [])}
+              backupsReady={backupsReady}
+              waiting={waiting}
+              today={today}
+              household={household}
+            />
+          ) : (
+            <ComingUp days={days.slice(1, 6)} shown={shown} profiles={profiles} household={household} />
+          )}
         </div>
       </div>
 
@@ -454,12 +480,18 @@ function TodoCard({
   members,
   today,
   household,
+  waiting,
+  showingAll,
 }: {
   todos: Todo[];
   chores: ChoreWithTiming[];
   members: ChoreMember[];
   today: LocalDate;
   household: Household;
+  /** On a survival day: how many to-dos and chores are set aside until tomorrow. */
+  waiting: number;
+  /** On a survival day: the set-aside ones are showing anyway. */
+  showingAll: boolean;
 }) {
   const memberById = new Map(members.map((m) => [m.id, m]));
   const shownTodos = todos.slice(0, TODO_CARD_LIMIT);
@@ -478,7 +510,7 @@ function TodoCard({
       }
     >
       {todos.length + chores.length === 0 ? (
-        <p className="py-3 text-xl text-ink-muted">Nothing to do today.</p>
+        <p className="py-3 text-xl text-ink-muted">{waiting > 0 ? "Nothing that can't wait." : "Nothing to do today."}</p>
       ) : (
         <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
           {shownTodos.map((t) => (
@@ -489,8 +521,8 @@ function TodoCard({
           ))}
         </ul>
       )}
-      {moreTodos + moreChores > 0 ? (
-        <p className="mt-auto flex gap-4 pt-1 text-lg font-bold">
+      {moreTodos + moreChores > 0 || waiting > 0 || showingAll ? (
+        <p className="mt-auto flex flex-wrap gap-x-4 pt-1 text-lg font-bold">
           {moreTodos > 0 ? (
             <Link href="/lists" className="text-accent">
               +{moreTodos} more to-do{moreTodos === 1 ? "" : "s"}
@@ -499,6 +531,16 @@ function TodoCard({
           {moreChores > 0 ? (
             <Link href="/chores" className="text-accent">
               +{moreChores} chore{moreChores === 1 ? "" : "s"} due
+            </Link>
+          ) : null}
+          {waiting > 0 ? (
+            <Link href="/?all=1" scroll={false} className="text-ink-muted">
+              {waiting} waiting for tomorrow · <span className="text-accent">Show anyway</span>
+            </Link>
+          ) : null}
+          {showingAll ? (
+            <Link href="/" scroll={false} className="text-accent">
+              Just the essentials
             </Link>
           ) : null}
         </p>
@@ -556,6 +598,97 @@ function ComingUp({
       </ul>
     </Card>
   );
+}
+
+/** How many backup meals have every part on hand for at least one go. */
+function backupMealsReady(basics: MealBasics, parts: Awaited<ReturnType<typeof loadBackupParts>>): number {
+  return basics.recipes.filter((r) => r.is_backup && readyCount(parts.filter((p) => p.recipe_id === r.id)) > 0).length;
+}
+
+/** How many survival-card rows show today's meals before "+N more". */
+const SURVIVAL_MEAL_ROWS = 2;
+
+/**
+ * Takes the place of "Coming up" on a survival day: today's meals, how
+ * many backup meals are ready, what's waiting for tomorrow, and a way
+ * back to a normal day.
+ */
+function SurvivalCard({
+  meals,
+  backupsReady,
+  waiting,
+  today,
+  household,
+}: {
+  meals: TodayMeal[];
+  backupsReady: number;
+  waiting: { todos: number; chores: number };
+  today: LocalDate;
+  household: Household;
+}) {
+  const shownMeals = meals.slice(0, SURVIVAL_MEAL_ROWS);
+  const moreMeals = meals.length - shownMeals.length;
+  const waitingWords = [
+    waiting.chores > 0 ? `${waiting.chores} chore${waiting.chores === 1 ? "" : "s"}` : null,
+    waiting.todos > 0 ? `${waiting.todos} to-do${waiting.todos === 1 ? "" : "s"}` : null,
+  ].filter(Boolean);
+  const row = "flex min-h-16 items-center gap-3.5 border-b border-panel py-1.5 last:border-0";
+  return (
+    <Card
+      title="Survival day"
+      icon={Lifebuoy}
+      tint="orange"
+      aside={
+        <form action={setEnergyMode}>
+          <input type="hidden" name="returnTo" value="/" />
+          <input type="hidden" name="date" value={today} />
+          <input type="hidden" name="mode" value="normal" />
+          <button className="flex min-h-[var(--touch-target)] items-center text-lg font-bold text-accent">Back to normal</button>
+        </form>
+      }
+    >
+      <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+        {shownMeals.length === 0 ? (
+          <li className={row}>
+            <Emoji emoji="🍽️" className="size-10" />
+            <Link href="/meals" className="min-w-0 flex-1 truncate text-xl font-semibold text-ink-muted">
+              No meals planned. Pick something easy
+            </Link>
+          </li>
+        ) : (
+          shownMeals.map((m) => (
+            <li key={m.id} className={row}>
+              <Emoji emoji={m.icon} className="size-10" />
+              <span className={`min-w-0 flex-1 truncate text-xl font-semibold ${m.cooked ? "text-ink-muted line-through" : "text-ink"}`}>
+                {m.name}
+                {moreMeals > 0 && m === shownMeals.at(-1) ? <span className="text-ink-muted"> +{moreMeals}</span> : null}
+              </span>
+              {m.backup ? <span className="shrink-0 rounded-full bg-meal px-2.5 py-1 text-sm font-extrabold text-meal-ink">Backup</span> : null}
+              <span className="w-20 shrink-0 text-right text-sm font-bold text-ink-muted">{minutesLabel(m.startMin, household)}</span>
+            </li>
+          ))
+        )}
+        <li className={row}>
+          <Emoji emoji="🧊" className="size-10" />
+          <Link href="/meals/backups" className="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
+            {backupsReady === 0 ? "No backup meals ready" : `${backupsReady} backup meal${backupsReady === 1 ? "" : "s"} ready`}
+          </Link>
+        </li>
+        <li className={row}>
+          <Emoji emoji="😴" className="size-10" />
+          <span className="min-w-0 flex-1 truncate text-xl font-semibold text-ink-muted">
+            {waitingWords.length ? `${waitingWords.join(" and ")} wait for tomorrow` : "Nothing set aside today"}
+          </span>
+        </li>
+      </ul>
+    </Card>
+  );
+}
+
+/** Minutes into the day as a clock time, like "5:30 p.m." (in the household's locale). */
+function minutesLabel(minutes: number, household: Household): string {
+  const date = new Date(Date.UTC(2000, 0, 1, Math.floor(minutes / 60), minutes % 60));
+  return new Intl.DateTimeFormat(household.settings.locale, { timeZone: "UTC", hour: "numeric", minute: "2-digit" }).format(date).replace(":00", "");
 }
 
 /** A time for sentences, like "5 p.m." or "5:30 p.m." (in the household's locale). */

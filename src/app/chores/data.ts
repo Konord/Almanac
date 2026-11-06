@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { choreTiming, showsInMode, starterFirstDue, type EnergyMode, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
+import { choreTiming, setAsideSurvivalDays, showsInMode, starterFirstDue, type EnergyMode, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
 import { addDays, localDateOf, type LocalDate } from "@/lib/time";
 
 export type ChoreMember = { id: string; name: string; colour: string; icon: string | null };
@@ -55,7 +55,7 @@ const HISTORY_DAYS = 400;
 /** All chores with when each is next due. */
 export async function loadChores(today: LocalDate, timeZone: string) {
   const supabase = await createClient();
-  const [chores, rounds, members] = await Promise.all([
+  const [chores, rounds, members, survival] = await Promise.all([
     supabase.from("task_templates").select(CHORE_COLUMNS).order("sort_order").order("name"),
     supabase
       .from("task_instances")
@@ -65,8 +65,11 @@ export async function loadChores(today: LocalDate, timeZone: string) {
       .gte("completed_on", addDays(today, -HISTORY_DAYS))
       .order("completed_on", { ascending: false }),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
+    // Past survival days, which don't count against chores.
+    supabase.from("days").select("date").eq("energy_mode", "survival").gte("date", addDays(today, -HISTORY_DAYS)).lt("date", today),
   ]);
-  for (const r of [chores, rounds, members]) if (r.error) throw r.error;
+  for (const r of [chores, rounds, members, survival]) if (r.error) throw r.error;
+  const survivalDays = new Set((survival.data ?? []).map((d) => d.date as LocalDate));
 
   const roundList = (rounds.data ?? []) as Round[];
   const byChore = new Map<string, Round[]>();
@@ -75,10 +78,14 @@ export async function loadChores(today: LocalDate, timeZone: string) {
   const list: ChoreWithTiming[] = ((chores.data ?? []) as unknown as Chore[]).map((c) => ({
     ...c,
     repeat_unit: c.repeat_unit as RepeatUnit,
-    timing: choreTiming(
-      // Starter chores come due a few at a time instead of all on day one.
-      c.premade && !c.season_start ? { ...c, first_due: starterFirstDue(c.id, localDateOf(new Date(c.created_at), timeZone), c) } : c,
-      byChore.get(c.id) ?? [],
+    timing: setAsideSurvivalDays(
+      choreTiming(
+        // Starter chores come due a few at a time instead of all on day one.
+        c.premade && !c.season_start ? { ...c, first_due: starterFirstDue(c.id, localDateOf(new Date(c.created_at), timeZone), c) } : c,
+        byChore.get(c.id) ?? [],
+        today,
+      ),
+      survivalDays,
       today,
     ),
   }));
@@ -113,8 +120,15 @@ export async function loadTodos() {
   return { lists: (lists.data ?? []) as TaskList[], todos: (todos.data ?? []) as Todo[] };
 }
 
-/** Open to-dos for the Today screen: no date, or due today or earlier. */
-export function todosForToday(todos: Todo[], today: LocalDate): Todo[] {
-  // Must-dos (like putting fresh meat away) come first.
-  return todos.filter((t) => t.status === "open" && (!t.due_date || t.due_date <= today)).sort((a, b) => Number(b.must_do) - Number(a.must_do));
+/**
+ * Open to-dos for the Today screen: no date, or due today or earlier.
+ * On a survival day only must-dos and to-dos due by today stay; the rest
+ * wait (they're back tomorrow).
+ */
+export function todosForToday(todos: Todo[], today: LocalDate, mode: EnergyMode = "normal"): Todo[] {
+  return todos
+    .filter((t) => t.status === "open" && (!t.due_date || t.due_date <= today))
+    .filter((t) => mode !== "survival" || t.must_do || t.due_date !== null)
+    // Must-dos (like putting fresh meat away) come first.
+    .sort((a, b) => Number(b.must_do) - Number(a.must_do));
 }
