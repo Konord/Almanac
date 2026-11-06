@@ -130,7 +130,7 @@ function readChore(formData: FormData) {
   const seasonStart = monthDay("seasonStart");
   const seasonEnd = monthDay("seasonEnd");
   const location = text(formData, "location") || "indoor";
-  const minEnergy = text(formData, "minEnergyMode") || "normal";
+  const importance = text(formData, "importance") || "normal";
   const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
 
@@ -143,7 +143,7 @@ function readChore(formData: FormData) {
     back(formData, "error", "Pick the start and end of the season.");
   }
   if (!["indoor", "outdoor"].includes(location)) back(formData, "error", "Choose indoor or outdoor.");
-  if (!["normal", "survival"].includes(minEnergy)) back(formData, "error", "Choose an energy level.");
+  if (!["low", "normal", "high"].includes(importance)) back(formData, "error", "Choose how important it is.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this chore.");
   const weekday = weekdayText === "" ? null : Number(weekdayText);
   if (weekday !== null && !(weekday >= 0 && weekday <= 6)) back(formData, "error", "Choose a day of the week.");
@@ -159,7 +159,7 @@ function readChore(formData: FormData) {
     season_start: seasonal ? seasonStart : null,
     season_end: seasonal ? seasonEnd : null,
     location,
-    min_energy_mode: minEnergy,
+    importance,
     default_assignee_id: text(formData, "assigneeId") || null,
     visibility,
     notes: notes || null,

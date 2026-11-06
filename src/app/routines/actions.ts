@@ -123,7 +123,7 @@ function readStep(formData: FormData) {
   if (!stepText) back(formData, "error", "A step needs some words.");
   if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🪥.");
   if (targetTime && !isLocalTime(targetTime)) back(formData, "error", "The target time should look like 07:45.");
-  return { text: stepText, icon, target_time: targetTime, essential: formData.get("essential") === "on" };
+  return { text: stepText, icon, target_time: targetTime };
 }
 
 export async function addStep(formData: FormData) {

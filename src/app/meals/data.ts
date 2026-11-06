@@ -5,7 +5,7 @@ import { addDays, type LocalDate } from "@/lib/time";
  * Reading Meals from the database. Writing lives in actions.ts.
  */
 
-export type EnergyMode = "normal" | "low" | "survival";
+export type EnergyMode = "normal" | "survival";
 
 export type MealTime = { id: string; name: string; icon: string | null; usual_time: string; show_on_planner: boolean; sort_order: number };
 export type MealCategory = {
@@ -198,7 +198,7 @@ export async function energyModeOn(date: LocalDate): Promise<EnergyMode> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("days").select("energy_mode").eq("date", date).maybeSingle();
   if (error) throw error;
-  return (data?.energy_mode as EnergyMode | undefined) ?? "normal";
+  return data?.energy_mode === "survival" ? "survival" : "normal";
 }
 
 /** Energy modes for a run of days. */

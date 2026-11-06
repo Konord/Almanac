@@ -26,7 +26,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
   const household = await requireHousehold();
   const params = await searchParams;
   const today = localDateOf(new Date(), household.settings.timeZone);
-  const data = await loadRoutines(today, { allSteps: true });
+  const data = await loadRoutines(today);
   const returnTo = "/routines/manage";
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -53,8 +53,7 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
         <Card title="Routines and their steps" icon={Alarm} tint="teal">
           <div className="mt-2 flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
           <p className="text-lg text-ink-muted">
-            The ready-made routines are a starting point. Change the steps to suit your family. Essential steps are the
-            ones kept on survival days.
+            The ready-made routines are a starting point. Change the steps to suit your family.
           </p>
           {data.templates.map((t) => (
             <TemplateEditor

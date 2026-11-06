@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Broom, Plus } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Avatar, Button, Card, Emoji, Notice, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
-import { SIZE_LABEL, describeRepeat } from "@/lib/chores";
+import { IMPORTANCE_LABEL, SIZE_LABEL, describeRepeat } from "@/lib/chores";
 import { requireHousehold, type Household } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { addChore, removeChore, setChoreActive, updateChore } from "../actions";
@@ -152,5 +152,6 @@ function repeatText(c: ChoreWithTiming, household: Household): string {
   const parts = [describeRepeat(c, c.season_start && c.season_end ? `${fmt(c.season_start)} – ${fmt(c.season_end)}` : undefined)];
   if (c.preferred_weekday !== null) parts.push(WEEKDAY_SHORT[c.preferred_weekday]);
   parts.push(SIZE_LABEL[c.size]);
+  if (c.importance !== "normal") parts.push(IMPORTANCE_LABEL[c.importance]);
   return parts.join(" · ");
 }

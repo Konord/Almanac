@@ -38,40 +38,26 @@ export type RoutineData = {
   assignments: RoutineAssignment[];
   /** "memberId:stepId" for each step ticked on the date. */
   checked: Set<string>;
-  /** The day's energy mode: low and survival days show only essential steps. */
-  energyMode: "normal" | "low" | "survival";
 };
 
-/**
- * Everything about routines, plus the ticks for one date. `allSteps` keeps every step even
- * on a low or survival day (for setting routines up).
- */
-export async function loadRoutines(date: LocalDate, { allSteps: keepAll = false }: { allSteps?: boolean } = {}): Promise<RoutineData> {
+/** Everything about routines, plus the ticks for one date. */
+export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
   const supabase = await createClient();
-  const [members, templates, steps, assignments, checks, day] = await Promise.all([
+  const [members, templates, steps, assignments, checks] = await Promise.all([
     supabase.from("members").select("id, name, role, colour, icon").order("sort_order").order("name"),
     supabase.from("routine_templates").select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes").order("sort_order").order("name"),
     supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential").order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, weekdays, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),
-    supabase.from("days").select("energy_mode").eq("date", date).maybeSingle(),
   ]);
-  for (const r of [members, templates, steps, assignments, checks, day]) if (r.error) throw r.error;
-
-  // On low and survival days, routines keep just their essential steps
-  // (a routine with none marked keeps them all).
-  const energyMode = (day.data?.energy_mode ?? "normal") as "normal" | "low" | "survival";
-  const allSteps = steps.data ?? [];
-  const hasEssential = new Set(allSteps.filter((s) => s.essential).map((s) => s.template_id));
-  const daySteps = energyMode === "normal" || keepAll ? allSteps : allSteps.filter((s) => s.essential || !hasEssential.has(s.template_id));
+  for (const r of [members, templates, steps, assignments, checks]) if (r.error) throw r.error;
 
   return {
     members: members.data ?? [],
     templates: (templates.data ?? []).map((t) => ({ ...t, kind: isRoutineKind(t.kind) ? t.kind : "daily" })),
-    steps: daySteps,
+    steps: steps.data ?? [],
     assignments: assignments.data ?? [],
     checked: new Set((checks.data ?? []).map((c) => `${c.member_id}:${c.step_id}`)),
-    energyMode,
   };
 }
 

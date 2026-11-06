@@ -26,6 +26,13 @@ export function ChoreFields({ chore, members }: { chore?: Chore; members: ChoreM
           <option value="big">Big (a proper job)</option>
         </Select>
       </Field>
+      <Field label="How important" hint="The Survival button won't skip important chores unless you tick them.">
+        <Select name="importance" defaultValue={chore?.importance ?? "normal"}>
+          <option value="low">Can wait</option>
+          <option value="normal">Normal</option>
+          <option value="high">Important</option>
+        </Select>
+      </Field>
       <Field label="About how many minutes" hint="Optional.">
         <Input name="estMinutes" type="number" min={1} max={1440} defaultValue={chore?.est_minutes ?? ""} />
       </Field>
@@ -114,12 +121,6 @@ export function ChoreFields({ chore, members }: { chore?: Chore; members: ChoreM
         <Select name="location" defaultValue={chore?.location ?? "indoor"}>
           <option value="indoor">Inside</option>
           <option value="outdoor">Outside</option>
-        </Select>
-      </Field>
-      <Field label="Still show on survival days" hint="Survival days hide the chores that can wait. They come back the next normal day.">
-        <Select name="minEnergyMode" defaultValue={chore?.min_energy_mode ?? "normal"}>
-          <option value="normal">No, it can wait</option>
-          <option value="survival">Yes, even on survival days</option>
         </Select>
       </Field>
       <Field label="Who can see it">

@@ -919,14 +919,14 @@ isOneToOne: false
                   ]
                 },"task_templates": {
                   Row: {
-                    "active": boolean,"created_at": string,"default_assignee_id": string | null,"est_minutes": number | null,"household_id": string,"icon": string | null,"id": string,"location": string,"min_energy_mode": string,"name": string,"notes": string | null,"preferred_weekday": number | null,"premade": boolean,"repeat_every": number,"repeat_unit": string,"season_end": string | null,"season_start": string | null,"size": string,"sort_order": number,"updated_at": string,"visibility": string
+                    "active": boolean,"created_at": string,"default_assignee_id": string | null,"est_minutes": number | null,"household_id": string,"icon": string | null,"id": string,"importance": string,"location": string,"name": string,"notes": string | null,"preferred_weekday": number | null,"premade": boolean,"repeat_every": number,"repeat_unit": string,"season_end": string | null,"season_start": string | null,"size": string,"sort_order": number,"updated_at": string,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"created_at"?: string,"default_assignee_id"?: string | null,"est_minutes"?: number | null,"household_id": string,"icon"?: string | null,"id"?: string,"location"?: string,"min_energy_mode"?: string,"name": string,"notes"?: string | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"size"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "active"?: boolean,"created_at"?: string,"default_assignee_id"?: string | null,"est_minutes"?: number | null,"household_id": string,"icon"?: string | null,"id"?: string,"importance"?: string,"location"?: string,"name": string,"notes"?: string | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"size"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
                   }
                   Update: {
-                    "active"?: boolean,"created_at"?: string,"default_assignee_id"?: string | null,"est_minutes"?: number | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"location"?: string,"min_energy_mode"?: string,"name"?: string,"notes"?: string | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"size"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "active"?: boolean,"created_at"?: string,"default_assignee_id"?: string | null,"est_minutes"?: number | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"importance"?: string,"location"?: string,"name"?: string,"notes"?: string | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"size"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
