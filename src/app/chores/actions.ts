@@ -356,7 +356,24 @@ export async function removeTodo(formData: FormData) {
     .eq("id", id)
     .not("heads_up_id", "is", null);
   if (skipError) back(formData, "error", skipError.message);
-  const { error } = await supabase.from("task_instances").delete().eq("id", id).not("list_id", "is", null).is("heads_up_id", null);
+  // A chore's to-do counts as skipping the chore this round. It leaves the
+  // list but stays in the chore's history, so it isn't made again at once.
+  const { error: choreError } = await supabase
+    .from("task_instances")
+    .update({ status: "skipped", completed_on: today, completed_at: new Date().toISOString(), list_id: null })
+    .eq("id", id)
+    .eq("status", "open")
+    .not("template_id", "is", null);
+  if (choreError) back(formData, "error", choreError.message);
+  const { error: doneChoreError } = await supabase.from("task_instances").update({ list_id: null }).eq("id", id).not("template_id", "is", null);
+  if (doneChoreError) back(formData, "error", doneChoreError.message);
+  const { error } = await supabase
+    .from("task_instances")
+    .delete()
+    .eq("id", id)
+    .not("list_id", "is", null)
+    .is("heads_up_id", null)
+    .is("template_id", null);
   if (error) back(formData, "error", error.message);
   refresh();
   back(formData, "message", "Removed the to-do.");
@@ -369,11 +386,21 @@ export async function clearDone(formData: FormData) {
   const supabase = await createClient();
   // Heads-up to-dos stay until their day has passed, so they aren't made again.
   const today = localDateOf(new Date(), household.settings.timeZone);
+  // Done chore to-dos are the chores' history (when each was last done), so
+  // they leave the list but are kept.
+  const { error: choreError } = await supabase
+    .from("task_instances")
+    .update({ list_id: null })
+    .eq("list_id", listId)
+    .neq("status", "open")
+    .not("template_id", "is", null);
+  if (choreError) back(formData, "error", choreError.message);
   const { error } = await supabase
     .from("task_instances")
     .delete()
     .eq("list_id", listId)
     .eq("status", "done")
+    .is("template_id", null)
     .or(`heads_up_id.is.null,heads_up_for.lt.${today}`);
   if (error) back(formData, "error", error.message);
   refresh();
@@ -412,6 +439,15 @@ export async function removeList(formData: FormData) {
   const id = text(formData, "id");
   const name = text(formData, "name");
   const supabase = await createClient();
+  // Keep the chores' history: done chore to-dos leave the list instead of
+  // going with it. Open ones are made again on another list.
+  const { error: choreError } = await supabase
+    .from("task_instances")
+    .update({ list_id: null })
+    .eq("list_id", id)
+    .neq("status", "open")
+    .not("template_id", "is", null);
+  if (choreError) back(formData, "error", choreError.message);
   const { error } = await supabase.from("task_lists").delete().eq("id", id);
   if (error) back(formData, "error", error.message);
   refresh();
