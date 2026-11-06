@@ -1,4 +1,5 @@
-import { Field, Input, Select } from "@/components/ui";
+import { Chips, Field, Input, Select } from "@/components/ui";
+import { FEATURE_LINKS } from "@/lib/todos";
 import { VISIBILITY_OPTIONS } from "../calendar/options";
 import type { Chore, ChoreMember } from "./data";
 
@@ -148,7 +149,18 @@ export function TodoFields({
 }: {
   members: ChoreMember[];
   lists?: { id: string; name: string }[];
-  todo?: { title: string; icon: string | null; due_date: string | null; assignee_id: string | null; notes: string | null; list_id: string };
+  todo?: {
+    title: string;
+    icon: string | null;
+    due_date: string | null;
+    assignee_id: string | null;
+    notes: string | null;
+    list_id: string;
+    date_kind: "due" | "start";
+    at_time: string | null;
+    lead_days: number | null;
+    link: string | null;
+  };
   showList?: boolean;
 }) {
   return (
@@ -159,8 +171,33 @@ export function TodoFields({
       <Field label="Picture" hint="Optional: one emoji.">
         <Input name="icon" defaultValue={todo?.icon ?? ""} maxLength={8} />
       </Field>
-      <Field label="For a day" hint="Optional.">
+      <Field label="Day" hint="Optional.">
         <Input name="dueDate" type="date" defaultValue={todo?.due_date ?? ""} />
+      </Field>
+      <Chips
+        name="dateKind"
+        label="That day is"
+        options={[
+          { value: "due", label: "Done by then" },
+          { value: "start", label: "When it starts" },
+        ]}
+        defaultValue={todo?.date_kind ?? "due"}
+      />
+      <Field label="Starts at" hint="Optional, for one that starts on its day.">
+        <Input name="atTime" type="time" defaultValue={todo?.at_time?.slice(0, 5) ?? ""} />
+      </Field>
+      <Field label="Show it ahead (days)" hint="For one done by a day. Empty: show it all along.">
+        <Input name="leadDays" type="number" min={0} max={60} defaultValue={todo?.lead_days ?? ""} />
+      </Field>
+      <Field label="Opens" hint="Optional: tapping it goes there.">
+        <Select name="link" defaultValue={todo?.link ?? ""}>
+          <option value="">Nothing</option>
+          {FEATURE_LINKS.map((l) => (
+            <option key={l.path} value={l.path}>
+              {l.label}
+            </option>
+          ))}
+        </Select>
       </Field>
       <Field label="For someone" hint="Optional.">
         <Select name="assigneeId" defaultValue={todo?.assignee_id ?? ""}>

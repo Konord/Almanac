@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
-import { isLocalDate, localDateOf } from "@/lib/time";
+import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
+import { isFeatureLink } from "@/lib/todos";
 import { isVisibility } from "../calendar/options";
 
 /*
@@ -226,10 +227,23 @@ function readTodo(formData: FormData) {
   if (!title) back(formData, "error", "Write what needs doing.");
   if (title.length > 120) back(formData, "error", "Keep it under 120 letters.");
   if (dueDate && !isLocalDate(dueDate)) back(formData, "error", "That date doesn't look right.");
+  const dateKind = text(formData, "dateKind") === "start" ? "start" : "due";
+  const atTime = text(formData, "atTime");
+  if (atTime && !isLocalTime(atTime)) back(formData, "error", "The time should look like 9:30 a.m.");
+  const leadText = text(formData, "leadDays");
+  const leadDays = leadText === "" ? null : Number(leadText);
+  if (leadDays !== null && !(Number.isInteger(leadDays) && leadDays >= 0 && leadDays <= 60)) back(formData, "error", "Show it between 0 and 60 days before.");
+  const link = text(formData, "link");
+  if (link && !isFeatureLink(link)) back(formData, "error", "Choose a part of the app for it to open.");
   return {
     title,
     icon: readIcon(formData),
     due_date: dueDate || null,
+    date_kind: dateKind,
+    // Only a to-do that starts on a day can have a time.
+    at_time: dueDate && dateKind === "start" && atTime ? atTime : null,
+    lead_days: dateKind === "due" ? leadDays : null,
+    link: link || null,
     assignee_id: text(formData, "assigneeId") || null,
     notes: text(formData, "notes") || null,
   };

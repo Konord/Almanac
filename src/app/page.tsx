@@ -13,7 +13,7 @@ import {
   firstParam,
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
-import { EVERYONE_COLOUR, soft } from "@/lib/colours";
+import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
 import { EATING_MINUTES } from "@/lib/meals";
@@ -157,6 +157,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           pending={pending}
           meals={todayMeals}
           mealBasics={mealBasics}
+          timedTodos={todoData.todos.filter((t) => t.status === "open" && t.date_kind === "start" && t.due_date === today && t.at_time)}
         />
 
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -213,6 +214,7 @@ function PeopleTimeline({
   pending,
   meals,
   mealBasics,
+  timedTodos,
 }: {
   allDay: CalendarItem[];
   items: CalendarItem[];
@@ -228,6 +230,8 @@ function PeopleTimeline({
   /** Today's planned meals. */
   meals: Meal[];
   mealBasics: MealBasics;
+  /** To-dos that start at a time today: points on the timeline, no length. */
+  timedTodos: Todo[];
 }) {
   const { timeZone } = household.settings;
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
@@ -408,6 +412,20 @@ function PeopleTimeline({
                     }}
                   />
                 </div>
+              );
+            })}
+            {timedTodos.map((t) => {
+              const minute = Number(t.at_time!.slice(0, 2)) * 60 + Number(t.at_time!.slice(3, 5));
+              if (minute < first * 60 || minute > last * 60) return null;
+              const c = t.assignee_id ? columnIds.indexOf(t.assignee_id) : -1;
+              return (
+                <TodoPoint
+                  key={t.id}
+                  todo={t}
+                  top={((minute - first * 60) / span) * 100}
+                  box={c >= 0 ? spanBox(c, c, columns.length, COLUMN_GAP) : spanBox(0, columns.length - 1, columns.length, COLUMN_GAP)}
+                  colour={c >= 0 ? columns[c].colour : EVERYONE_COLOUR}
+                />
               );
             })}
             <div className="pointer-events-auto">
@@ -597,4 +615,19 @@ function sortForDay(items: CalendarItem[], timeZone: string): CalendarItem[] {
     const bAll = isAllDayStyle(b, timeZone) ? 0 : 1;
     return aAll - bAll || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
   });
+}
+
+/** A to-do at a time: a point on the line, not a block (it has no length). Tapping opens its list. */
+function TodoPoint({ todo, top, box, colour }: { todo: Todo; top: number; box: { left: string; width: string }; colour: string }) {
+  return (
+    <Link
+      href={todo.link ?? `/lists?list=${todo.list_id}`}
+      title={todo.title}
+      className="pointer-events-auto absolute z-[2] flex h-8 -translate-y-1/2 items-center gap-1.5 overflow-hidden"
+      style={{ top: `${top}%`, ...box }}
+    >
+      <span className="size-3.5 shrink-0 rounded-full border-[3px] bg-board" style={{ borderColor: strong(colour) }} aria-hidden />
+      <span className="min-w-0 truncate rounded-lg bg-board/90 px-1.5 font-hand text-xl leading-none text-ink">{todo.title}</span>
+    </Link>
+  );
 }

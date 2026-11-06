@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowCounterClockwise, Check } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, ArrowRight, Check } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji } from "@/components/ui";
 import { IMPORTANCE_LABEL, SIZE_LABEL, daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
+import { carriedOver, linkLabel } from "@/lib/todos";
 import { markChoreDone, skipChore, toggleTodo, undoRound } from "./actions";
 import type { ChoreMember, ChoreWithTiming, Round, Todo } from "./data";
 
@@ -17,6 +18,19 @@ export function dayLabel(date: LocalDate, today: LocalDate, household: Household
   const noon = zonedToUtc(date, "12:00", timeZone);
   if (gap > 1 && gap < 7) return new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(noon);
   return new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" }).format(noon);
+}
+
+/** "by Fri", "Tue 9 a.m.", "from Tue" (still open after its day). */
+export function todoWhen(todo: Pick<Todo, "due_date" | "date_kind" | "at_time" | "status">, today: LocalDate, household: Household): string {
+  if (!todo.due_date) return "";
+  const day = dayLabel(todo.due_date, today, household);
+  if (carriedOver(todo, today)) return `from ${day}`;
+  if (todo.date_kind === "due") return `by ${day}`;
+  if (!todo.at_time) return day;
+  const time = new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, hour: "numeric", minute: "2-digit" })
+    .format(zonedToUtc(todo.due_date, todo.at_time.slice(0, 5), household.settings.timeZone))
+    .replace(":00", "");
+  return `${day} ${time}`;
 }
 
 /** dayLabel for the middle of a sentence: "done today", "done Nov 3". */
@@ -159,9 +173,10 @@ export function TodoRow({
 }) {
   const who = todo.assignee_id ? members.get(todo.assignee_id) : undefined;
   const done = todo.status === "done";
-  const late = !done && todo.due_date !== null && todo.due_date < today;
+  const late = !done && carriedOver(todo, today);
+  const opens = linkLabel(todo.link);
   const words = (
-    <span className={`font-hand text-2xl leading-[1.1] ${done ? "text-ink-muted line-through" : "text-ink"}`}>{todo.title}</span>
+    <span className={`line-clamp-2 font-hand text-2xl leading-[1.1] break-words ${done ? "text-ink-muted line-through" : "text-ink"}`}>{todo.title}</span>
   );
   return (
     <li className="flex min-h-19 items-center gap-3.5 border-b border-panel last:border-0">
@@ -195,7 +210,17 @@ export function TodoRow({
       {todo.must_do && !done ? (
         <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
       ) : todo.due_date && !done ? (
-        <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{dayLabel(todo.due_date, today, household)}</span>
+        <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{todoWhen(todo, today, household)}</span>
+      ) : null}
+      {opens && todo.link && !done ? (
+        <Link
+          href={todo.link}
+          className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-ink"
+          title={`Open ${opens}`}
+          aria-label={`Open ${opens}`}
+        >
+          <ArrowRight size="1.25rem" weight="bold" aria-hidden />
+        </Link>
       ) : null}
       {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
     </li>

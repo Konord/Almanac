@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { choreTiming, starterFirstDue, type ChoreImportance, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
 import { addDays, localDateOf, type LocalDate } from "@/lib/time";
+import { showsOn, sortForToday, type DateKind } from "@/lib/todos";
 
 export type ChoreMember = { id: string; name: string; colour: string; icon: string | null };
 
@@ -42,6 +43,12 @@ export type Todo = {
   notes: string | null;
   /** Has to be done today, e.g. putting fresh meat away when dinner was swapped. */
   must_do: boolean;
+  /** "due": done by due_date. "start": on due_date (and at_time). */
+  date_kind: DateKind;
+  at_time: string | null;
+  lead_days: number | null;
+  /** A part of the app it opens, e.g. "/meals". */
+  link: string | null;
 };
 
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
@@ -104,7 +111,7 @@ export async function loadTodos() {
     supabase.from("task_lists").select("id, name, icon, visibility").order("sort_order").order("name"),
     supabase
       .from("task_instances")
-      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do")
+      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link")
       .not("list_id", "is", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at"),
@@ -113,8 +120,10 @@ export async function loadTodos() {
   return { lists: (lists.data ?? []) as TaskList[], todos: (todos.data ?? []) as Todo[] };
 }
 
-/** Open to-dos for the Today screen: no date, or due today or earlier. */
+/** Open to-dos for the Today screen (see src/lib/todos.ts for when each shows). */
 export function todosForToday(todos: Todo[], today: LocalDate): Todo[] {
-  // Must-dos (like putting fresh meat away) come first.
-  return todos.filter((t) => t.status === "open" && (!t.due_date || t.due_date <= today)).sort((a, b) => Number(b.must_do) - Number(a.must_do));
+  return sortForToday(
+    todos.filter((t) => showsOn(t, today)),
+    today,
+  );
 }
