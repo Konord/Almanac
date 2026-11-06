@@ -8,7 +8,8 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
-import { loadTodos, type ChoreMember } from "../chores/data";
+import { loadChores, loadTodos, type ChoreMember } from "../chores/data";
+import { syncChoreTodos } from "../chores/blocks";
 import { TodoFields } from "../chores/forms";
 import { TodoRow } from "../chores/rows";
 import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
@@ -34,6 +35,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const today = localDateOf(new Date(), timeZone);
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
+  await syncChoreTodos(household, (await loadChores(today, timeZone)).chores);
   const supabase = await createClient();
   const [{ lists, todos }, { data: memberRows }] = await Promise.all([
     loadTodos(),

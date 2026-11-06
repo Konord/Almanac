@@ -15,6 +15,8 @@ export type Chore = ChoreRule & {
   importance: ChoreImportance;
   default_assignee_id: string | null;
   notes: string | null;
+  /** A part of the app its to-dos open, e.g. "/meals". */
+  link: string | null;
   active: boolean;
   visibility: string;
   premade: boolean;
@@ -49,12 +51,18 @@ export type Todo = {
   lead_days: number | null;
   /** A part of the app it opens, e.g. "/meals". */
   link: string | null;
+  /** Set when a chore made this to-do. */
+  template_id: string | null;
+  /** How long it takes (a chore's to-do carries the chore's minutes). */
+  minutes: number | null;
+  /** Swapped out of a chore block: not put back in one before this date. */
+  not_before: LocalDate | null;
 };
 
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
 
 const CHORE_COLUMNS =
-  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, repeat_from, start_date, snap, only_months, only_seasons, season_start, season_end, location, importance, default_assignee_id, notes, active, visibility, premade, created_at";
+  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, repeat_from, start_date, snap, only_months, only_seasons, season_start, season_end, location, importance, default_assignee_id, notes, link, active, visibility, premade, created_at";
 
 /** How far back chore history is read (long enough for yearly chores). */
 const HISTORY_DAYS = 400;
@@ -111,7 +119,7 @@ export async function loadTodos() {
     supabase.from("task_lists").select("id, name, icon, visibility").order("sort_order").order("name"),
     supabase
       .from("task_instances")
-      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link")
+      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, minutes, not_before")
       .not("list_id", "is", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at"),

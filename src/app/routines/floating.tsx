@@ -3,7 +3,7 @@ import { ArrowsClockwise, CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
-import { placeRoutines, toMinutes, wantedSlot, type Busy, type DayAnchors, type Placement } from "@/lib/routine-placement";
+import { DAY_END, placeRoutines, toMinutes, wantedSlot, type Busy, type DayAnchors, type Placement } from "@/lib/routine-placement";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { loadCalendar, rangeOf } from "../calendar/data";
 import { eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime } from "../calendar/views";
@@ -33,6 +33,26 @@ export function floatingRoutines(
   flexMinutes: number,
   meals: DayMeal[] = [],
 ): FloatingRoutine[] {
+  return floatingDay(data, memberId, date, events, timeZone, flexMinutes, meals).routines;
+}
+
+/** Something else that floats with the routines, like a chore block: where it would like to be. */
+export type FloatingExtra = { id: string; start: number; minutes: number; loose: boolean };
+
+/**
+ * Like floatingRoutines, with other floating things (chore blocks) placed
+ * in the same pass, so routines and chore time keep out of each other's way.
+ */
+export function floatingDay(
+  data: RoutineData,
+  memberId: string,
+  date: LocalDate,
+  events: CalendarItem[],
+  timeZone: string,
+  flexMinutes: number,
+  meals: DayMeal[] = [],
+  extras: FloatingExtra[] = [],
+): { routines: FloatingRoutine[]; extras: Placement[] } {
   const routines = dayRoutinesFor(data, memberId, date);
   const myMeals = meals.filter((m) => m.memberIds.length === 0 || m.memberIds.includes(memberId));
   const busy: Busy[] = [
@@ -56,17 +76,24 @@ export function floatingRoutines(
     },
   };
   const placements = placeRoutines(
-    routines.map((r) => ({
-      id: r.assignment.id,
-      ...wantedSlot(r.template, r.steps.map((s) => s.target_time), anchors, flexMinutes),
-    })),
+    [
+      ...routines.map((r) => ({
+        id: r.assignment.id,
+        ...wantedSlot(r.template, r.steps.map((s) => s.target_time), anchors, flexMinutes),
+      })),
+      // Chore time moves either way, like a routine at a set time.
+      ...extras.map((x) => ({ id: x.id, start: x.start, minutes: x.minutes, direction: "both" as const, band: x.loose ? DAY_END : flexMinutes })),
+    ],
     busy,
   );
-  return routines.map((r, i) => ({ ...r, placement: placements[i] }));
+  return {
+    routines: routines.map((r, i) => ({ ...r, placement: placements[i] })),
+    extras: placements.slice(routines.length),
+  };
 }
 
 /** "7:00" for minutes since midnight, in the household's clock style. */
-function clock(minutes: number, date: LocalDate, household: Household): string {
+export function clock(minutes: number, date: LocalDate, household: Household): string {
   const hh = String(Math.floor(minutes / 60) % 24).padStart(2, "0");
   const mm = String(minutes % 60).padStart(2, "0");
   return shortTime(zonedToUtc(date, `${hh}:${mm}`, household.settings.timeZone), household);
