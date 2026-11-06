@@ -111,6 +111,8 @@ export async function undoRound(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 const UNITS = ["day", "week", "month", "year"];
+const SNAPS = ["none", "weekday", "first_of_month", "last_of_month", "first_of_season", "last_of_season"];
+const SEASON_NAMES = ["spring", "summer", "fall", "winter"];
 const MONTH_DAY = /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
 
 function readChore(formData: FormData) {
@@ -121,7 +123,14 @@ function readChore(formData: FormData) {
   const every = Number(text(formData, "repeatEvery") || "1");
   const unit = text(formData, "repeatUnit");
   const weekdayText = text(formData, "preferredWeekday");
-  const seasonal = formData.get("seasonal") === "on";
+  // "Only in": any time, some seasons, some months, or once a year between two dates.
+  const onlyIn = text(formData, "onlyIn") || "any";
+  const seasonal = onlyIn === "dates";
+  const repeatFrom = text(formData, "repeatFrom") === "date" ? "date" : "done";
+  const startDate = text(formData, "startDate");
+  const snap = text(formData, "snap") || "none";
+  const onlySeasons = formData.getAll("onlySeasons").map(String).filter((s) => SEASON_NAMES.includes(s));
+  const onlyMonths = formData.getAll("onlyMonths").map(Number).filter((m) => Number.isInteger(m) && m >= 1 && m <= 12);
   // The season comes in as a month and a day for each end, e.g. 10 and 15.
   const monthDay = (prefix: string) => {
     const m = Number(text(formData, `${prefix}Month`));
@@ -148,6 +157,12 @@ function readChore(formData: FormData) {
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this chore.");
   const weekday = weekdayText === "" ? null : Number(weekdayText);
   if (weekday !== null && !(weekday >= 0 && weekday <= 6)) back(formData, "error", "Choose a day of the week.");
+  if (!SNAPS.includes(snap)) back(formData, "error", "Choose where it lands.");
+  if (!seasonal && snap !== "none" && weekday === null) back(formData, "error", "Pick which day of the week it lands on.");
+  if (!seasonal && repeatFrom === "date" && !isLocalDate(startDate)) back(formData, "error", "Pick the date it counts from.");
+  if (onlyIn === "seasons" && onlySeasons.length === 0) back(formData, "error", "Pick at least one season.");
+  if (onlyIn === "months" && onlyMonths.length === 0) back(formData, "error", "Pick at least one month.");
+  const snapped = !seasonal && snap !== "none";
 
   return {
     name,
@@ -156,7 +171,12 @@ function readChore(formData: FormData) {
     est_minutes: est,
     repeat_every: seasonal ? 1 : every,
     repeat_unit: seasonal ? "year" : unit,
-    preferred_weekday: seasonal ? null : weekday,
+    preferred_weekday: snapped ? weekday : null,
+    snap: snapped ? snap : "none",
+    repeat_from: seasonal ? "done" : repeatFrom,
+    start_date: !seasonal && repeatFrom === "date" ? startDate : null,
+    only_seasons: onlyIn === "seasons" ? onlySeasons : null,
+    only_months: onlyIn === "months" ? onlyMonths : null,
     season_start: seasonal ? seasonStart : null,
     season_end: seasonal ? seasonEnd : null,
     location,

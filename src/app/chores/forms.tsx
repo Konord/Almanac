@@ -1,4 +1,8 @@
+import type { ReactNode } from "react";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { Chips, Field, Input, Select } from "@/components/ui";
+import { SEASONS, snapOf, type ChoreSnap } from "@/lib/chores";
+import { CardTabs } from "../calendar/quick-controls";
 import { FEATURE_LINKS } from "@/lib/todos";
 import { VISIBILITY_OPTIONS } from "../calendar/options";
 import type { Chore, ChoreMember } from "./data";
@@ -6,137 +10,257 @@ import type { Chore, ChoreMember } from "./data";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-/** The fields for adding or editing a chore. */
-export function ChoreFields({ chore, members }: { chore?: Chore; members: ChoreMember[] }) {
-  const seasonal = Boolean(chore?.season_start);
+const SNAP_OPTIONS: { value: ChoreSnap; label: string }[] = [
+  { value: "none", label: "Any day" },
+  { value: "weekday", label: "The nearest" },
+  { value: "first_of_month", label: "First of the month:" },
+  { value: "last_of_month", label: "Last of the month:" },
+  { value: "first_of_season", label: "First of the season:" },
+  { value: "last_of_season", label: "Last of the season:" },
+];
+
+function onlyInOf(chore?: Chore): string {
+  if (chore?.season_start) return "dates";
+  if (chore?.only_seasons?.length) return "seasons";
+  if (chore?.only_months?.length) return "months";
+  return "any";
+}
+
+/**
+ * The fields for adding or editing a chore, on tabs so nothing scrolls:
+ * the chore itself, when it comes back (the rule builder), when in the
+ * year it's allowed, the rest, and (when editing) its heads-ups.
+ * Put it inside a <form className="group ...">: some fields show or hide
+ * with the choices made.
+ */
+export function ChoreFields({
+  chore,
+  members,
+  headsUps,
+  initialTab,
+}: {
+  chore?: Chore;
+  members: ChoreMember[];
+  headsUps?: ReactNode;
+  initialTab?: string;
+}) {
   const [startMonth, startDay] = (chore?.season_start ?? "10-01").split("-").map(Number);
   const [endMonth, endDay] = (chore?.season_end ?? "10-31").split("-").map(Number);
+  const snap = chore ? snapOf(chore) : "none";
 
   return (
-    <>
-      <Field label="Chore">
-        <Input name="name" defaultValue={chore?.name} required maxLength={80} placeholder="Clean the fridge" />
-      </Field>
-      <Field label="Picture" hint="One emoji, like 🧹 or 🧊.">
-        <Input name="icon" defaultValue={chore?.icon ?? ""} maxLength={8} placeholder="🧹" />
-      </Field>
-      <Field label="Size">
-        <Select name="size" defaultValue={chore?.size ?? "small"}>
-          <option value="small">Small (a few minutes)</option>
-          <option value="medium">Medium</option>
-          <option value="big">Big (a proper job)</option>
-        </Select>
-      </Field>
-      <Field label="How important" hint="The Survival button won't skip important chores unless you tick them.">
-        <Select name="importance" defaultValue={chore?.importance ?? "normal"}>
-          <option value="low">Can wait</option>
-          <option value="normal">Normal</option>
-          <option value="high">Important</option>
-        </Select>
-      </Field>
-      <Field label="About how many minutes" hint="Optional.">
-        <Input name="estMinutes" type="number" min={1} max={1440} defaultValue={chore?.est_minutes ?? ""} />
-      </Field>
-
-      <fieldset className="grid gap-4 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2 sm:grid-cols-3">
-        <legend className="px-2 text-lg font-bold text-ink">How often</legend>
-        <Field label="Every">
-          <Input name="repeatEvery" type="number" min={1} max={365} defaultValue={chore?.repeat_every ?? 1} />
-        </Field>
-        <Field label="Unit">
-          <Select name="repeatUnit" defaultValue={chore?.repeat_unit ?? "week"}>
-            <option value="day">Days</option>
-            <option value="week">Weeks</option>
-            <option value="month">Months</option>
-            <option value="year">Years</option>
-          </Select>
-        </Field>
-        <Field label="Best day" hint="Optional, e.g. Saturday is cleaning day.">
-          <Select name="preferredWeekday" defaultValue={chore?.preferred_weekday === null || chore?.preferred_weekday === undefined ? "" : String(chore.preferred_weekday)}>
-            <option value="">Any day</option>
-            {WEEKDAYS.map((d, i) => (
-              <option key={d} value={i}>
-                {d}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <p className="text-base text-ink-muted sm:col-span-3">
-          It comes back that long after it was last done or skipped, so a missed week never piles up.
-        </p>
-        <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-3">
-          <input type="checkbox" name="seasonal" defaultChecked={seasonal} className="size-6 accent-accent" />
-          Seasonal instead: once a year, between these dates
-        </label>
-        <div className="grid grid-cols-2 gap-3 sm:col-span-3 sm:grid-cols-4">
-          <Field label="From">
-            <Select name="seasonStartMonth" defaultValue={String(startMonth)}>
-              {MONTHS.map((m, i) => (
-                <option key={m} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Day">
-            <Select name="seasonStartDay" defaultValue={String(startDay)}>
-              {Array.from({ length: 31 }, (_, i) => (
-                <option key={i} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="To">
-            <Select name="seasonEndMonth" defaultValue={String(endMonth)}>
-              {MONTHS.map((m, i) => (
-                <option key={m} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Day">
-            <Select name="seasonEndDay" defaultValue={String(endDay)}>
-              {Array.from({ length: 31 }, (_, i) => (
-                <option key={i} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-      </fieldset>
-
-      <Field label="Who usually does it" hint="Optional.">
-        <Select name="assigneeId" defaultValue={chore?.default_assignee_id ?? ""}>
-          <option value="">Whoever&apos;s free</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Inside or outside">
-        <Select name="location" defaultValue={chore?.location ?? "indoor"}>
-          <option value="indoor">Inside</option>
-          <option value="outdoor">Outside</option>
-        </Select>
-      </Field>
-      <Field label="Who can see it">
-        <Select name="visibility" defaultValue={chore?.visibility ?? "everyone"}>
-          {VISIBILITY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Notes" hint="Optional, e.g. which filter to buy.">
-        <Input name="notes" defaultValue={chore?.notes ?? ""} maxLength={2000} />
-      </Field>
-    </>
+    <CardTabs
+      initial={initialTab === "heads-ups" ? 4 : 0}
+      tabs={[
+        {
+          label: "Chore",
+          panel: (
+            <>
+              <div className="flex gap-3">
+                <EmojiPicker initial={chore?.icon ?? ""} nameField="name" />
+                <div className="min-w-0 flex-1">
+                  <Field label="Chore">
+                    <Input name="name" defaultValue={chore?.name} required maxLength={80} placeholder="Clean the fridge" />
+                  </Field>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Size">
+                  <Select name="size" defaultValue={chore?.size ?? "small"}>
+                    <option value="small">Small (a few minutes)</option>
+                    <option value="medium">Medium</option>
+                    <option value="big">Big (a proper job)</option>
+                  </Select>
+                </Field>
+                <Field label="How important">
+                  <Select name="importance" defaultValue={chore?.importance ?? "normal"}>
+                    <option value="low">Can wait</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">Important (Survival keeps it)</option>
+                  </Select>
+                </Field>
+                <Field label="About how many minutes">
+                  <Input name="estMinutes" type="number" min={1} max={1440} defaultValue={chore?.est_minutes ?? ""} />
+                </Field>
+                <Field label="Who usually does it">
+                  <Select name="assigneeId" defaultValue={chore?.default_assignee_id ?? ""}>
+                    <option value="">Whoever&apos;s free</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            </>
+          ),
+        },
+        {
+          label: "When",
+          panel: (
+            <>
+              <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+                <Chips
+                  name="repeatFrom"
+                  label="Counts from"
+                  defaultValue={chore?.repeat_from ?? "done"}
+                  options={[
+                    { value: "done", label: "When it was last done" },
+                    { value: "date", label: "A set date" },
+                  ]}
+                />
+                <div className="invisible group-has-[input[name=repeatFrom][value=date]:checked]:visible">
+                  <Input name="startDate" type="date" aria-label="The date it counts from" defaultValue={chore?.start_date ?? ""} />
+                </div>
+              </div>
+              <div className="flex items-end gap-4">
+                <Field label="Every">
+                  <Input name="repeatEvery" type="number" min={1} max={365} defaultValue={chore?.repeat_every ?? 1} className="w-24" />
+                </Field>
+                <Chips
+                  name="repeatUnit"
+                  label="&nbsp;"
+                  defaultValue={chore?.repeat_unit ?? "week"}
+                  options={[
+                    { value: "day", label: "Days" },
+                    { value: "week", label: "Weeks" },
+                    { value: "month", label: "Months" },
+                    { value: "year", label: "Years" },
+                  ]}
+                />
+              </div>
+              <div className="flex items-end gap-4">
+                <Field label="Lands on">
+                  <Select name="snap" defaultValue={snap}>
+                    {SNAP_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <div className="group-has-[select[name=snap]_option[value=none]:checked]:invisible">
+                  <Select name="preferredWeekday" aria-label="Day of the week" defaultValue={String(chore?.preferred_weekday ?? 6)}>
+                    {WEEKDAYS.map((d, i) => (
+                      <option key={d} value={i}>
+                        {d}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+              <p className="text-base text-ink-muted">
+                From when it was last done, a missed one never piles up. A set date keeps a steady schedule, like every other
+                Monday.
+              </p>
+            </>
+          ),
+        },
+        {
+          label: "Only in",
+          panel: (
+            <>
+              <Chips
+                name="onlyIn"
+                label="Only at some times of year?"
+                defaultValue={onlyInOf(chore)}
+                options={[
+                  { value: "any", label: "Any time" },
+                  { value: "seasons", label: "Some seasons" },
+                  { value: "months", label: "Some months" },
+                  { value: "dates", label: "Once a year, between dates" },
+                ]}
+              />
+              <div className="hidden group-has-[input[name=onlyIn][value=seasons]:checked]:block">
+                <Chips
+                  name="onlySeasons"
+                  label="Seasons (spring from Mar 20, summer Jun 21, fall Sep 22, winter Dec 21)"
+                  multiple
+                  defaultValue={chore?.only_seasons ?? []}
+                  options={SEASONS.map((x) => ({ value: x.season, label: x.label }))}
+                />
+              </div>
+              <div className="hidden group-has-[input[name=onlyIn][value=months]:checked]:block">
+                <Chips
+                  name="onlyMonths"
+                  label="Months"
+                  multiple
+                  defaultValue={(chore?.only_months ?? []).map(String)}
+                  options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m.slice(0, 3) }))}
+                />
+              </div>
+              <div className="hidden grid-cols-4 gap-3 group-has-[input[name=onlyIn][value=dates]:checked]:grid">
+                <Field label="From">
+                  <Select name="seasonStartMonth" defaultValue={String(startMonth)}>
+                    {MONTHS.map((m, i) => (
+                      <option key={m} value={i + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Day">
+                  <Select name="seasonStartDay" defaultValue={String(startDay)}>
+                    {Array.from({ length: 31 }, (_, i) => (
+                      <option key={i} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="To">
+                  <Select name="seasonEndMonth" defaultValue={String(endMonth)}>
+                    {MONTHS.map((m, i) => (
+                      <option key={m} value={i + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Day">
+                  <Select name="seasonEndDay" defaultValue={String(endDay)}>
+                    {Array.from({ length: 31 }, (_, i) => (
+                      <option key={i} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            </>
+          ),
+        },
+        {
+          label: "More",
+          panel: (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Inside or outside">
+                  <Select name="location" defaultValue={chore?.location ?? "indoor"}>
+                    <option value="indoor">Inside</option>
+                    <option value="outdoor">Outside</option>
+                  </Select>
+                </Field>
+                <Field label="Who can see it">
+                  <Select name="visibility" defaultValue={chore?.visibility ?? "everyone"}>
+                    {VISIBILITY_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+              <Field label="Notes" hint="Optional, e.g. which filter to buy.">
+                <Input name="notes" defaultValue={chore?.notes ?? ""} maxLength={2000} />
+              </Field>
+            </>
+          ),
+        },
+        ...(headsUps ? [{ label: "Heads-ups", panel: headsUps }] : []),
+      ]}
+    />
   );
 }
 

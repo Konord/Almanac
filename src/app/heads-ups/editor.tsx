@@ -29,7 +29,10 @@ export function HeadsUpEditor({
   source,
   returnTo,
   what,
+  example = "Pack the hockey bag",
 }: {
+  /** A placeholder for the new heads-up. */
+  example?: string;
   headsUps: HeadsUp[];
   source: { eventId: string } | { choreId: string };
   /** The page to come back to, opened on this tab. */
@@ -78,7 +81,7 @@ export function HeadsUpEditor({
           <div className="flex items-end gap-3">
             <label className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="text-base font-bold text-ink">New heads-up</span>
-              <Input name="huLabel" maxLength={80} placeholder="Pack the hockey bag" />
+              <Input name="huLabel" maxLength={80} placeholder={example} />
             </label>
             <label className="flex w-24 shrink-0 flex-col gap-1.5">
               <span className="text-base font-bold text-ink">How long</span>

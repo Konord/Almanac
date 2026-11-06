@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, starterFirstDue, type ChoreRule } from "./chores.ts";
+import { addInterval, choreTiming, daysBetween, describeRepeat, describeRule, seasonOf, seasonWindow, snapDate, starterFirstDue, type ChoreRule } from "./chores.ts";
 
 const rule = (extra: Partial<ChoreRule> = {}): ChoreRule => ({
   repeat_every: 1,
@@ -143,4 +143,53 @@ test("a never-done chore with a first day waits for it", () => {
   const t = choreTiming(rule({ first_due: "2026-11-09" }), [], TODAY);
   assert.equal(t.dueOn, "2026-11-09");
   assert.notEqual(t.state, "due");
+});
+
+test("seasons start on the solstices and equinoxes", () => {
+  assert.equal(seasonOf("2026-12-21").season, "winter");
+  assert.equal(seasonOf("2026-12-20").season, "fall");
+  assert.deepEqual(seasonOf("2027-02-10"), { season: "winter", start: "2026-12-21", end: "2027-03-19" });
+  assert.equal(seasonOf("2026-06-21").end, "2026-09-21");
+});
+
+test("snap to the first or last Saturday of the month or season", () => {
+  assert.equal(snapDate("2026-11-18", "first_of_month", 6), "2026-11-07");
+  assert.equal(snapDate("2026-11-18", "last_of_month", 6), "2026-11-28");
+  assert.equal(snapDate("2026-11-18", "first_of_season", 6), "2026-09-26");
+  assert.equal(snapDate("2026-11-18", "last_of_season", 0), "2026-12-20");
+});
+
+test("monthly on the first Saturday, counted from when it was done", () => {
+  const r = rule({ repeat_unit: "month", preferred_weekday: 6, snap: "first_of_month" });
+  assert.equal(choreTiming(r, [{ status: "done", completed_on: "2026-11-07" }], TODAY).dueOn, "2026-12-05");
+  // Done late in the month: still the next month's first Saturday, not this one again.
+  assert.equal(choreTiming(r, [{ status: "done", completed_on: "2026-10-30" }], TODAY).dueOn, "2026-11-07");
+  // Never done: this month's first Saturday has gone, so next month's.
+  assert.equal(choreTiming(r, [], "2026-11-10").dueOn, "2026-12-05");
+});
+
+test("a set schedule counts from its start date, not from when it was done", () => {
+  const r = rule({ repeat_every: 2, repeat_from: "date", start_date: "2026-10-01" });
+  // Oct 1, Oct 15, Oct 29, Nov 12…
+  assert.equal(choreTiming(r, [{ status: "done", completed_on: "2026-10-31" }], TODAY).dueOn, "2026-11-12");
+  // Missed a couple: only the newest one is due, it doesn't pile up.
+  const missed = choreTiming(r, [{ status: "done", completed_on: "2026-10-02" }], TODAY);
+  assert.equal(missed.dueOn, "2026-10-29");
+  assert.equal(missed.state, "due");
+});
+
+test("only in summer: waits for summer, on the nearest Saturday inside it", () => {
+  const r = rule({ repeat_every: 2, preferred_weekday: 6, only_seasons: ["summer"] });
+  const t = choreTiming(r, [{ status: "done", completed_on: "2026-09-12" }], TODAY);
+  assert.equal(t.dueOn, "2027-06-26");
+});
+
+test("only in some months", () => {
+  const r = rule({ repeat_unit: "month", only_months: [4, 5, 6, 7, 8, 9, 10] });
+  assert.equal(choreTiming(r, [{ status: "done", completed_on: "2026-10-20" }], TODAY).dueOn, "2027-04-01");
+});
+
+test("the rule in words", () => {
+  const r = rule({ repeat_every: 2, preferred_weekday: 6, snap: "last_of_month", only_seasons: ["summer"] });
+  assert.equal(describeRule(r), "Every 2 weeks, on the last Saturday of the month, only in summer");
 });
