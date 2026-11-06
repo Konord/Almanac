@@ -844,18 +844,33 @@ export async function adjustOnHand(formData: FormData) {
  */
 export async function swapMeal(formData: FormData) {
   const household = await requireHousehold();
-  const mealId = text(formData, "mealId");
-  const backupId = text(formData, "backupId");
-  const moveIt = formData.get("move") === "on";
+  const result = await swapCore(household, text(formData, "mealId"), text(formData, "backupId"), formData.get("move") === "on");
+  if ("error" in result) back(formData, "error", result.error);
+  refresh();
+  const { locale, timeZone } = household.settings;
+  const movedDay = result.movedTo ? new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(zonedToUtc(result.movedTo, "12:00", timeZone)) : null;
+  back(
+    formData,
+    "message",
+    `Swapped to ${result.backupName}.${movedDay ? ` ${result.originalName} moved to ${movedDay}.` : ""} Check the to-do list for anything to put away.`,
+    { swap: null, meal: null },
+  );
+}
+
+type Household = Awaited<ReturnType<typeof requireHousehold>>;
+type SwapResult = { error: string } | { backupName: string; originalName: string; movedTo: LocalDate | null };
+
+/** The swap itself (shared by the Swap card and the Survival button). Not a server action. */
+async function swapCore(household: Household, mealId: string, backupId: string, moveIt: boolean): Promise<SwapResult> {
   const supabase = await createClient();
   const { data: meal, error } = await supabase
     .from("meals")
     .select("id, date, meal_time_id, category_id, recipe_id, servings, meal_members(member_id), recipes(name)")
     .eq("id", mealId)
     .single();
-  if (error) back(formData, "error", error.message);
-  const { data: backup } = await supabase.from("recipes").select("id, name, icon").eq("id", backupId).single();
-  if (!backup) back(formData, "error", "Pick a backup meal.");
+  if (error) return { error: error.message };
+  const { data: backup } = await supabase.from("recipes").select("id, name, icon").eq("id", backupId).eq("is_backup", true).maybeSingle();
+  if (!backup) return { error: "Pick a backup meal." };
 
   // The backup takes the meal's place, for the same people.
   const { data: added, error: addError } = await supabase
@@ -863,7 +878,7 @@ export async function swapMeal(formData: FormData) {
     .insert({ household_id: household.id, date: meal.date, meal_time_id: meal.meal_time_id, recipe_id: backup.id, sort_order: 0 })
     .select("id")
     .single();
-  if (addError) back(formData, "error", addError.message);
+  if (addError) return { error: addError.message };
   const people = (meal.meal_members ?? []).map((m) => m.member_id);
   if (people.length) await supabase.from("meal_members").insert(people.map((member_id) => ({ meal_id: added.id, member_id, household_id: household.id })));
   await supabase.from("meals").update({ status: "swapped", swapped_for_id: added.id }).eq("id", mealId);
@@ -937,31 +952,51 @@ export async function swapMeal(formData: FormData) {
     }
   }
   await log(household.id, "meal_swapped", "meal", mealId, { backup: backup.name });
-  refresh();
-  const { locale, timeZone } = household.settings;
-  const movedDay = movedTo ? new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(zonedToUtc(movedTo, "12:00", timeZone)) : null;
-  back(
-    formData,
-    "message",
-    `Swapped to ${backup.name}.${movedDay ? ` ${originalName} moved to ${movedDay}.` : ""} Check the to-do list for anything to put away.`,
-    { swap: null, meal: null },
-  );
+  return { backupName: backup.name, originalName, movedTo };
 }
 
 // ---------------------------------------------------------------------------
 // Energy modes
 // ---------------------------------------------------------------------------
 
-export async function setEnergyMode(formData: FormData) {
+/**
+ * The Survival button: in one go, swaps the meals you picked for backup
+ * meals and skips the chores you ticked, then notes the day as a survival
+ * day (for history; it doesn't change anything else on screen). Routines
+ * and to-dos are left alone.
+ */
+export async function survivalRescue(formData: FormData) {
   const household = await requireHousehold();
-  const date = text(formData, "date");
-  const mode = text(formData, "mode");
-  if (!isLocalDate(date) || !["normal", "low", "survival"].includes(mode)) back(formData, "error", "Pick a mode.");
+  const today = localDateOf(new Date(), household.settings.timeZone);
   const supabase = await createClient();
-  const { error } = await supabase.from("days").upsert({ household_id: household.id, date, energy_mode: mode }, { onConflict: "household_id,date" });
+
+  const swapped: string[] = [];
+  for (const mealId of formData.getAll("mealId").map(String)) {
+    const backupId = text(formData, `backup-${mealId}`);
+    if (!backupId || backupId === "keep") continue;
+    const result = await swapCore(household, mealId, backupId, formData.get(`move-${mealId}`) === "on");
+    if ("error" in result) back(formData, "error", result.error);
+    swapped.push(result.backupName);
+  }
+
+  // Skipping a chore starts its clock again, like the Skip button on Chores.
+  const skips = [...new Set(formData.getAll("skip").map(String).filter(Boolean))];
+  if (skips.length) {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("task_instances")
+      .insert(skips.map((template_id) => ({ household_id: household.id, template_id, status: "skipped", completed_on: today, completed_at: now })));
+    if (error) back(formData, "error", error.message);
+  }
+
+  const { error } = await supabase.from("days").upsert({ household_id: household.id, date: today, energy_mode: "survival" }, { onConflict: "household_id,date" });
   if (error) back(formData, "error", error.message);
-  await log(household.id, "energy_mode_set", "day", household.id, { date, mode });
+  await log(household.id, "survival_day", "day", household.id, { date: today, swapped: swapped.join(", "), skipped: String(skips.length) });
   refresh();
-  const words = { normal: "Normal day.", low: "Low day: just the lighter things.", survival: "Survival day: only the essentials." } as const;
-  back(formData, "message", words[mode as keyof typeof words]);
+
+  const said = [
+    swapped.length ? `Swapped to ${swapped.join(" and ")}.` : null,
+    skips.length ? `Skipped ${skips.length} chore${skips.length === 1 ? "" : "s"}.` : null,
+  ].filter(Boolean);
+  back(formData, "message", said.length ? `${said.join(" ")} Take it easy.` : "Nothing changed. Take it easy.", { survival: null });
 }

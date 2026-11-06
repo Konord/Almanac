@@ -144,6 +144,5 @@ export function linker(base: string, current: Record<string, string | null | und
 
 export const ENERGY_LOOK = {
   normal: { label: "Normal", emoji: "🔋" },
-  low: { label: "Low", emoji: "🪫" },
   survival: { label: "Survival", emoji: "🛟" },
 } as const;

@@ -24,8 +24,9 @@ import type { CalendarItem, Member } from "./calendar/types";
 import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type ChoreWithTiming, type Todo } from "./chores/data";
 import { ChoreRow, TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
-import { loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
-import { EnergySwitch, MealBlock, SurvivalBanner, placeTodayMeals } from "./meals/today";
+import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
+import { MealBlock, SurvivalButton, placeTodayMeals } from "./meals/today";
+import { SurvivalCard } from "./survival-card";
 import { floatingRoutines, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
@@ -77,15 +78,15 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData, mealBasics, todayMeals] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData, mealBasics, todayMeals, energyMode] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadChores(today, timeZone),
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, today),
+    energyModeOn(today),
   ]);
-  const energyMode = routineData.energyMode;
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
@@ -101,11 +102,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/");
-  // On a survival day, offer to swap the first meal that still needs cooking.
-  const survivalSwap =
-    energyMode === "survival"
-      ? placeTodayMeals(todayMeals, mealBasics, []).find((m) => !m.cooked && !m.backup && m.endMin > minutesIntoDay(now, timeZone))
-      : undefined;
+  // The Survival card (?survival=1): meals still to cook, and chores due.
+  const survivalOpen = firstParam(params.survival) === "1" && !placing;
+  const survivalParts = survivalOpen ? await loadBackupParts() : [];
+  const mealsToCook = survivalOpen
+    ? placeTodayMeals(todayMeals, mealBasics, [])
+        .filter((m) => !m.cooked && !m.backup && m.endMin > minutesIntoDay(now, timeZone))
+        .sort((a, b) => a.startMin - b.startMin)
+    : [];
 
   return (
     <>
@@ -114,7 +118,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         {todayProfile ? (
           <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
         ) : null}
-        <EnergySwitch mode={energyMode} date={today} returnTo="/" />
+        <SurvivalButton used={energyMode === "survival"} href="/?survival=1" />
         <div className="lg:ml-auto">
           <Segmented
             label="How much to show"
@@ -137,7 +141,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
-      {survivalSwap ? <SurvivalBanner meal={survivalSwap} /> : null}
       {placing ? <PlacingBar hint="Tap someone's column at a time to add an event for them, or drag down to set how long." cancelHref="/" /> : null}
 
       <div className="flex flex-col gap-6.5 lg:min-h-0 lg:flex-1 lg:flex-row">
@@ -158,7 +161,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
           <TodoCard
             todos={todosForToday(todoData.todos, today)}
-            chores={dueChores(choreData.chores, energyMode)}
+            chores={dueChores(choreData.chores)}
             members={choreData.members}
             today={today}
             household={household}
@@ -180,6 +183,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       >
         {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
       </Link>
+
+      {survivalOpen ? (
+        <SurvivalCard meals={mealsToCook} basics={mealBasics} parts={survivalParts} chores={dueChores(choreData.chores)} closeHref="/" />
+      ) : null}
 
       {pending ? (
         <QuickAddSheet pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />

@@ -245,10 +245,6 @@ function StepFields({ step }: { step?: RoutineStep }) {
       <Field label="Done by">
         <Input name="targetTime" type="time" defaultValue={step?.target_time ? hhmm(step.target_time) : ""} />
       </Field>
-      <label className="flex min-h-[var(--touch-target)] items-center gap-2 text-base text-ink">
-        <input type="checkbox" name="essential" defaultChecked={step?.essential} className="size-5 accent-accent" />
-        Essential
-      </label>
     </>
   );
 }

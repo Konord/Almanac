@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { choreTiming, showsInMode, starterFirstDue, type EnergyMode, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
+import { choreTiming, starterFirstDue, type ChoreImportance, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
 import { addDays, localDateOf, type LocalDate } from "@/lib/time";
 
 export type ChoreMember = { id: string; name: string; colour: string; icon: string | null };
@@ -11,7 +11,7 @@ export type Chore = ChoreRule & {
   size: ChoreSize;
   est_minutes: number | null;
   location: "indoor" | "outdoor";
-  min_energy_mode: "normal" | "low" | "survival";
+  importance: ChoreImportance;
   default_assignee_id: string | null;
   notes: string | null;
   active: boolean;
@@ -47,7 +47,7 @@ export type Todo = {
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
 
 const CHORE_COLUMNS =
-  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, season_start, season_end, location, min_energy_mode, default_assignee_id, notes, active, visibility, premade, created_at";
+  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, season_start, season_end, location, importance, default_assignee_id, notes, active, visibility, premade, created_at";
 
 /** How far back chore history is read (long enough for yearly chores). */
 const HISTORY_DAYS = 400;
@@ -85,10 +85,10 @@ export async function loadChores(today: LocalDate, timeZone: string) {
   return { chores: list, rounds: roundList, members: (members.data ?? []) as ChoreMember[] };
 }
 
-/** Active chores due now, most overdue first (only the ones for the day's energy). */
-export function dueChores(chores: ChoreWithTiming[], mode: EnergyMode = "normal"): ChoreWithTiming[] {
+/** Active chores due now, most overdue first. */
+export function dueChores(chores: ChoreWithTiming[]): ChoreWithTiming[] {
   return chores
-    .filter((c) => c.active && c.timing.state === "due" && showsInMode(c.min_energy_mode, mode))
+    .filter((c) => c.active && c.timing.state === "due")
     .sort((a, b) => b.timing.daysOverdue - a.timing.daysOverdue || (a.timing.dueOn < b.timing.dueOn ? -1 : 1));
 }
 

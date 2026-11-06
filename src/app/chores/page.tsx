@@ -6,7 +6,6 @@ import { daysBetween } from "@/lib/chores";
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { dueChores, loadChores, soonChores } from "./data";
-import { energyModeOn } from "../meals/data";
 import { ChoreRow, RoundRow, SoonRow } from "./rows";
 
 /** How many days back "Done lately" looks. */
@@ -34,7 +33,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
   const { chores, rounds, members } = await loadChores(today, timeZone);
   const memberById = new Map(members.map((m) => [m.id, m]));
   const choreById = new Map(chores.map((c) => [c.id, c]));
-  const due = dueChores(chores, await energyModeOn(today));
+  const due = dueChores(chores);
   const soon = soonChores(chores);
   const recent = rounds.filter((r) => daysBetween(r.completed_on, today) <= RECENT_DAYS);
   const error = firstParam(params.error);

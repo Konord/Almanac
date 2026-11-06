@@ -215,7 +215,6 @@ function StepRow({
           <span className="flex min-w-0 flex-1 flex-col">
             <span className={`text-xl leading-[1.1] font-semibold ${done ? "text-ink-muted" : "text-ink"}`}>
               {step.text}
-              {step.essential ? <span className="sr-only"> (essential)</span> : null}
             </span>
             {step.target_time ? (
               <span className={`text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>

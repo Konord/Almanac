@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, showsInMode, starterFirstDue, type ChoreRule } from "./chores.ts";
+import { addInterval, choreTiming, daysBetween, describeRepeat, seasonWindow, starterFirstDue, type ChoreRule } from "./chores.ts";
 
 const rule = (extra: Partial<ChoreRule> = {}): ChoreRule => ({
   repeat_every: 1,
@@ -143,12 +143,4 @@ test("a never-done chore with a first day waits for it", () => {
   const t = choreTiming(rule({ first_due: "2026-11-09" }), [], TODAY);
   assert.equal(t.dueOn, "2026-11-09");
   assert.notEqual(t.state, "due");
-});
-
-test("energy modes hide the chores that can wait", () => {
-  assert.equal(showsInMode("normal", "normal"), true);
-  assert.equal(showsInMode("normal", "low"), false);
-  assert.equal(showsInMode("low", "low"), true);
-  assert.equal(showsInMode("low", "survival"), false);
-  assert.equal(showsInMode("survival", "survival"), true);
 });

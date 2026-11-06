@@ -11,19 +11,10 @@ import { addMonths, dayOfWeek } from "./calendar-layout.ts";
 import { addDays, type LocalDate } from "./time.ts";
 
 export type RepeatUnit = "day" | "week" | "month" | "year";
-export type EnergyMode = "normal" | "low" | "survival";
-
-const ENERGY_LEVEL: Record<EnergyMode, number> = { survival: 0, low: 1, normal: 2 };
-
-/**
- * Whether a chore shows on a day with this energy mode. A chore's
- * min_energy_mode is the hardest kind of day it still shows on: "normal"
- * chores hide on low and survival days, "low" ones hide on survival days.
- */
-export function showsInMode(minMode: EnergyMode, dayMode: EnergyMode): boolean {
-  return ENERGY_LEVEL[dayMode] >= ENERGY_LEVEL[minMode];
-}
 export type ChoreSize = "small" | "medium" | "big";
+
+/** How much a chore matters, beside its size. Important ones aren't skipped on a survival day unless you choose to. */
+export type ChoreImportance = "low" | "normal" | "high";
 
 export type ChoreRule = {
   repeat_every: number;
@@ -64,6 +55,8 @@ export type ChoreTiming = {
 export const SOON_DAYS = 14;
 
 export const SIZE_LABEL: Record<ChoreSize, string> = { small: "Small", medium: "Medium", big: "Big" };
+
+export const IMPORTANCE_LABEL: Record<ChoreImportance, string> = { low: "Can wait", normal: "Normal", high: "Important" };
 
 export const UNIT_LABEL: Record<RepeatUnit, [string, string]> = {
   day: ["day", "days"],

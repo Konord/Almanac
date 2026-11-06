@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowCounterClockwise, Check } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji } from "@/components/ui";
-import { SIZE_LABEL, daysBetween } from "@/lib/chores";
+import { IMPORTANCE_LABEL, SIZE_LABEL, daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { markChoreDone, skipChore, toggleTodo, undoRound } from "./actions";
@@ -25,9 +25,10 @@ export function dayPhrase(date: LocalDate, today: LocalDate, household: Househol
   return ["Today", "Tomorrow", "Yesterday"].includes(label) ? label.toLowerCase() : label;
 }
 
-/** "Medium · 40 min · waiting 9 days" */
+/** "Important · Medium · 40 min · waiting 9 days" */
 export function choreMeta(chore: ChoreWithTiming, today: LocalDate, household: Household): string {
   const parts = [SIZE_LABEL[chore.size]];
+  if (chore.importance !== "normal") parts.unshift(IMPORTANCE_LABEL[chore.importance]);
   if (chore.est_minutes) parts.push(`${chore.est_minutes} min`);
   if (chore.timing.window && chore.timing.state === "due") parts.push(`in season until ${dayLabel(chore.timing.window.end, today, household)}`);
   else if (chore.timing.daysOverdue >= 2) parts.push(`waiting ${chore.timing.daysOverdue} days`);
