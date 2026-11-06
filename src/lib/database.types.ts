@@ -397,16 +397,36 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"households": {
+                },"household_logins": {
                   Row: {
-                    "auth_user_id": string | null,"created_at": string,"id": string,"name": string,"settings": NonNullable<Json>,"updated_at": string
+                    "auth_user_id": string,"chosen_at": string,"created_at": string,"household_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "auth_user_id"?: string | null,"created_at"?: string,"id"?: string,"name": string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                    "auth_user_id": string,"chosen_at"?: string,"created_at"?: string,"household_id": string
                   }
                   Update: {
-                    "auth_user_id"?: string | null,"created_at"?: string,"id"?: string,"name"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                    "auth_user_id"?: string,"chosen_at"?: string,"created_at"?: string,"household_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "household_logins_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"households": {
+                  Row: {
+                    "created_at": string,"id": string,"name": string,"settings": NonNullable<Json>,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"name": string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"name"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -1322,11 +1342,22 @@ isOneToOne: false
 "current_household_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
+"delete_household":
+{ Args: { "confirm_name": string,"target": string }; Returns: undefined
+                           },
 "member_has_pin":
 { Args: { "member_id": string }; Returns: boolean
                            },
+"my_households":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "created_at": string,"id": string,"is_current": boolean,"name": string
+            }[]
+                           },
 "set_member_pin":
 { Args: { "member_id": string,"pin": string }; Returns: undefined
+                           },
+"switch_household":
+{ Args: { "target": string }; Returns: undefined
                            },
 "verify_member_pin":
 { Args: { "member_id": string,"pin": string }; Returns: boolean

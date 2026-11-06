@@ -1,6 +1,6 @@
 import { Suspense } from "react";
-import { GearSix, SignOut, UsersThree, ClockCounterClockwise } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Avatar, Button, Card, Field, Input, Notice, ScreenHeader, Select, firstParam } from "@/components/ui";
+import { GearSix, HouseLine, SignOut, UsersThree, ClockCounterClockwise } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Avatar, Button, Card, Field, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
@@ -61,8 +61,12 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
   return (
     <>
       <ScreenHeader title="Settings">
-        <span className="text-2xl text-ink-muted lg:text-4xl">{household.name}</span>
-        <form action={signOut} className="lg:ml-auto">
+        <span className="min-w-0 truncate text-2xl text-ink-muted lg:text-4xl">{household.name}</span>
+        <SoftLink href="/households" className="lg:ml-auto">
+          <HouseLine size="1.5rem" aria-hidden />
+          Switch or add household
+        </SoftLink>
+        <form action={signOut}>
           <Button variant="secondary">
             <SignOut size="1.5rem" aria-hidden />
             Sign out
