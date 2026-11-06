@@ -81,6 +81,64 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"day_overrides": {
+                  Row: {
+                    "bed_time": string | null,"created_at": string,"date": string,"day_type_id": string | null,"household_id": string,"id": string,"member_id": string,"updated_at": string,"wake_time": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bed_time"?: string | null,"created_at"?: string,"date": string,"day_type_id"?: string | null,"household_id": string,"id"?: string,"member_id": string,"updated_at"?: string,"wake_time"?: string | null
+                  }
+                  Update: {
+                    "bed_time"?: string | null,"created_at"?: string,"date"?: string,"day_type_id"?: string | null,"household_id"?: string,"id"?: string,"member_id"?: string,"updated_at"?: string,"wake_time"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "day_overrides_day_type_id_household_id_fkey"
+      columns: ["day_type_id","household_id"]
+isOneToOne: false
+      referencedRelation: "day_types"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "day_overrides_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "day_overrides_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"day_types": {
+                  Row: {
+                    "bed_time": string,"created_at": string,"household_id": string,"icon": string | null,"id": string,"member_id": string,"name": string,"sort_order": number,"updated_at": string,"wake_time": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bed_time"?: string,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"member_id": string,"name": string,"sort_order"?: number,"updated_at"?: string,"wake_time"?: string
+                  }
+                  Update: {
+                    "bed_time"?: string,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"member_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string,"wake_time"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "day_types_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "day_types_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"days": {
                   Row: {
                     "date": string,"energy_mode": string,"household_id": string,"updated_at": string
@@ -499,17 +557,23 @@ isOneToOne: false
                   ]
                 },"members": {
                   Row: {
-                    "birth_year": number | null,"colour": string,"created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"pin_hash": string | null,"role": string,"sort_order": number,"updated_at": string
+                    "birth_year": number | null,"colour": string,"created_at": string,"current_week_plan_id": string | null,"household_id": string,"icon": string | null,"id": string,"name": string,"pin_hash": string | null,"role": string,"rotation_start": string | null,"sort_order": number,"updated_at": string,"week_plans_rotate": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"pin_hash"?: string | null,"role": string,"sort_order"?: number,"updated_at"?: string
+                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"current_week_plan_id"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"pin_hash"?: string | null,"role": string,"rotation_start"?: string | null,"sort_order"?: number,"updated_at"?: string,"week_plans_rotate"?: boolean
                   }
                   Update: {
-                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"pin_hash"?: string | null,"role"?: string,"sort_order"?: number,"updated_at"?: string
+                    "birth_year"?: number | null,"colour"?: string,"created_at"?: string,"current_week_plan_id"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"pin_hash"?: string | null,"role"?: string,"rotation_start"?: string | null,"sort_order"?: number,"updated_at"?: string,"week_plans_rotate"?: boolean
                   }
                   Relationships: [
                     {
+      foreignKeyName: "members_current_week_plan_id_fkey"
+      columns: ["current_week_plan_id"]
+isOneToOne: false
+      referencedRelation: "week_plans"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "members_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
@@ -661,17 +725,23 @@ isOneToOne: false
                   ]
                 },"routine_assignments": {
                   Row: {
-                    "active": boolean,"created_at": string,"household_id": string,"id": string,"member_id": string,"on_date": string | null,"template_id": string,"updated_at": string,"weekdays": (number)[] | null
+                    "active": boolean,"created_at": string,"day_type_id": string | null,"household_id": string,"id": string,"member_id": string,"on_date": string | null,"template_id": string,"updated_at": string,"weekdays": (number)[] | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"created_at"?: string,"household_id": string,"id"?: string,"member_id": string,"on_date"?: string | null,"template_id": string,"updated_at"?: string,"weekdays"?: (number)[] | null
+                    "active"?: boolean,"created_at"?: string,"day_type_id"?: string | null,"household_id": string,"id"?: string,"member_id": string,"on_date"?: string | null,"template_id": string,"updated_at"?: string,"weekdays"?: (number)[] | null
                   }
                   Update: {
-                    "active"?: boolean,"created_at"?: string,"household_id"?: string,"id"?: string,"member_id"?: string,"on_date"?: string | null,"template_id"?: string,"updated_at"?: string,"weekdays"?: (number)[] | null
+                    "active"?: boolean,"created_at"?: string,"day_type_id"?: string | null,"household_id"?: string,"id"?: string,"member_id"?: string,"on_date"?: string | null,"template_id"?: string,"updated_at"?: string,"weekdays"?: (number)[] | null
                   }
                   Relationships: [
                     {
+      foreignKeyName: "routine_assignments_day_type_id_household_id_fkey"
+      columns: ["day_type_id","household_id"]
+isOneToOne: false
+      referencedRelation: "day_types"
+      referencedColumns: ["id","household_id"]
+    },{
       foreignKeyName: "routine_assignments_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
@@ -723,6 +793,38 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"routine_ends": {
+                  Row: {
+                    "end_date": string,"ended_at": string,"household_id": string,"id": string,"member_id": string,"template_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "end_date": string,"ended_at"?: string,"household_id": string,"id"?: string,"member_id": string,"template_id": string
+                  }
+                  Update: {
+                    "end_date"?: string,"ended_at"?: string,"household_id"?: string,"id"?: string,"member_id"?: string,"template_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "routine_ends_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "routine_ends_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "routine_ends_template_id_household_id_fkey"
+      columns: ["template_id","household_id"]
+isOneToOne: false
+      referencedRelation: "routine_templates"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"routine_steps": {
                   Row: {
                     "created_at": string,"essential": boolean,"household_id": string,"icon": string | null,"id": string,"position": number,"target_time": string | null,"template_id": string,"text": string,"updated_at": string
@@ -751,17 +853,23 @@ isOneToOne: false
                   ]
                 },"routine_templates": {
                   Row: {
-                    "audience": string,"created_at": string,"household_id": string,"id": string,"kind": string,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
+                    "anchor": string,"anchor_meal_time_id": string | null,"anchor_offset": number,"audience": string,"created_at": string,"household_id": string,"id": string,"kind": string,"loose": boolean,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "audience"?: string,"created_at"?: string,"household_id": string,"id"?: string,"kind"?: string,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
+                    "anchor"?: string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"household_id": string,"id"?: string,"kind"?: string,"loose"?: boolean,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Update: {
-                    "audience"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"kind"?: string,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
+                    "anchor"?: string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"kind"?: string,"loose"?: boolean,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "routine_templates_anchor_meal_time_id_fkey"
+      columns: ["anchor_meal_time_id"]
+isOneToOne: false
+      referencedRelation: "meal_times"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "routine_templates_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
@@ -983,6 +1091,64 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"week_plan_days": {
+                  Row: {
+                    "day_type_id": string,"household_id": string,"week_plan_id": string,"weekday": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "day_type_id": string,"household_id": string,"week_plan_id": string,"weekday": number
+                  }
+                  Update: {
+                    "day_type_id"?: string,"household_id"?: string,"week_plan_id"?: string,"weekday"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "week_plan_days_day_type_id_household_id_fkey"
+      columns: ["day_type_id","household_id"]
+isOneToOne: false
+      referencedRelation: "day_types"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "week_plan_days_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "week_plan_days_week_plan_id_household_id_fkey"
+      columns: ["week_plan_id","household_id"]
+isOneToOne: false
+      referencedRelation: "week_plans"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"week_plans": {
+                  Row: {
+                    "created_at": string,"household_id": string,"id": string,"member_id": string,"name": string,"sort_order": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"id"?: string,"member_id": string,"name": string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"id"?: string,"member_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "week_plans_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "week_plans_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"weekly_buys": {
                   Row: {
                     "amount": number | null,"created_at": string,"every_weeks": number,"household_id": string,"id": string,"item_id": string,"last_week": string | null,"unit": string | null
@@ -1015,7 +1181,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "add_starter_chores":
+            "add_day_types_for":
+{ Args: { "target_member": string }; Returns: undefined
+                           },
+"add_starter_chores":
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_layers":

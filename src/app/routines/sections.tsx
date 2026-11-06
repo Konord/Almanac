@@ -1,137 +1,243 @@
-import { Avatar, Button, Emoji, Field, Input, Select } from "@/components/ui";
+import Link from "next/link";
+import { ArrowDown, ArrowUp, Trash } from "@phosphor-icons/react/dist/ssr";
+import { Button, Emoji, Field, Input, Select } from "@/components/ui";
+import type { DayType, WeekPlan } from "@/lib/day-types";
 import type { Household } from "@/lib/household";
 import { KIND_LABEL, KIND_ORDER, hhmm } from "@/lib/routines";
-import { zonedToUtc, type LocalDate } from "@/lib/time";
+import { zonedToUtc } from "@/lib/time";
 import { VISIBILITY_OPTIONS } from "../calendar/options";
 import {
-  addAssignment,
+  addStep,
+  addWeekPlan,
+  chooseWeekPlan,
   moveStep,
-  removeAssignment,
+  removeDayType,
   removeRoutine,
   removeStep,
-  setAssignmentActive,
+  removeWeekPlan,
+  saveDayType,
+  saveWeekPlan,
   updateRoutine,
-  addStep,
   updateStep,
 } from "./actions";
-import type { RoutineData, RoutineStep, RoutineTemplate } from "./data";
+import type { RoutineData, RoutineMember, RoutineStep, RoutineTemplate } from "./data";
 
-/* Pieces shared by the routines checklist and the "Set up routines" page. */
+/* Pieces for the "Set up routines" page. Nothing here scrolls: long lists page. */
 
 // ---------------------------------------------------------------------------
-// Who does what
+// Days: kinds of day and the week
 // ---------------------------------------------------------------------------
 
-export function Assignments({
-  data,
-  household,
-  date,
-  returnTo,
+/** Small tappable chips (radio or checkbox) for tight spaces. */
+export function MiniChips({
+  name,
+  options,
+  chosen,
+  multiple = false,
+  label,
 }: {
-  data: RoutineData;
-  household: Household;
-  date: LocalDate;
-  returnTo: string;
+  name: string;
+  options: { value: string; label: string; icon?: string | null }[];
+  chosen: ReadonlySet<string>;
+  multiple?: boolean;
+  label: string;
 }) {
-  const templateById = new Map(data.templates.map((t) => [t.id, t]));
-  const days = weekdayNames(household);
-
   return (
-    <div>
-      <div className="flex flex-col gap-4">
-        {data.members.map((m) => {
-          const mine = data.assignments.filter((a) => a.member_id === m.id);
+    <fieldset className="flex min-w-0 flex-wrap gap-1.5">
+      <legend className="sr-only">{label}</legend>
+      {options.map((o) => (
+        <label
+          key={o.value}
+          className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border-2 border-frame bg-board px-3 text-base text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent"
+        >
+          <input type={multiple ? "checkbox" : "radio"} name={name} value={o.value} defaultChecked={chosen.has(o.value)} className="sr-only" required={!multiple} />
+          {o.icon ? <Emoji emoji={o.icon} className="size-6" /> : null}
+          {o.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/** One person's week: which kind of day each weekday is, and their week plans. */
+export function WeekEditor({
+  member,
+  data,
+  plan,
+  household,
+  today,
+  returnTo,
+  planHref,
+}: {
+  member: RoutineMember;
+  data: RoutineData;
+  plan: WeekPlan;
+  household: Household;
+  today: string;
+  returnTo: string;
+  planHref: (planId: string) => string;
+}) {
+  const plans = data.weekPlans.filter((p) => p.member_id === member.id);
+  const types = data.dayTypes.filter((t) => t.member_id === member.id);
+  const days = weekdayNames(household, "long");
+  const isCurrent = !member.week_plans_rotate && (member.current_week_plan_id === plan.id || (!member.current_week_plan_id && plans[0]?.id === plan.id));
+  const status = member.week_plans_rotate ? "The weeks take turns" : isCurrent ? "This is the week in use" : "Not in use";
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {plans.length > 1
+          ? plans.map((p) => (
+              <Link
+                key={p.id}
+                href={planHref(p.id)}
+                aria-current={p.id === plan.id ? "page" : undefined}
+                className={`flex min-h-11 items-center rounded-xl px-3.5 text-base font-bold ${p.id === plan.id ? "bg-ink text-board" : "bg-rail text-ink"}`}
+              >
+                {p.name}
+              </Link>
+            ))
+          : null}
+        <span className="text-base font-semibold text-ink-muted">{status}</span>
+      </div>
+      <form action={saveWeekPlan} className="flex min-h-0 flex-1 flex-col gap-2">
+        <input type="hidden" name="planId" value={plan.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <div className="flex items-center gap-3">
+          <span className="w-28 shrink-0 text-base font-bold text-ink">Name</span>
+          <Input name="name" defaultValue={plan.name} maxLength={30} className="min-h-11 flex-1 text-base" />
+        </div>
+        {days.map(({ value, label }) => {
+          const chosen = data.weekPlanDays.find((d) => d.week_plan_id === plan.id && d.weekday === value)?.day_type_id;
           return (
-            <div key={m.id} className="rounded-[var(--radius-card)] border border-frame p-4">
-              <h3 className="mb-2 flex items-center gap-3 text-xl font-bold text-ink">
-                <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" />
-                {m.name}
-              </h3>
-              {mine.length === 0 ? (
-                <p className="text-base text-ink-muted">No routines yet.</p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {mine.map((a) => (
-                    <li key={a.id} className="flex flex-wrap items-center gap-3">
-                      <span className={`text-base ${a.active ? "text-ink" : "text-ink-muted line-through"}`}>
-                        <strong>{templateById.get(a.template_id)?.name ?? "?"}</strong> ·{" "}
-                        {a.on_date ? `just on ${a.on_date}` : describeWeekdays(a.weekdays ?? [], days)}
-                      </span>
-                      <form action={setAssignmentActive}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="active" value={String(!a.active)} />
-                        <input type="hidden" name="returnTo" value={returnTo} />
-                        <Button variant="secondary" className="min-h-10 px-3 text-base">
-                          {a.active ? "Pause" : "Resume"}
-                        </Button>
-                      </form>
-                      <form action={removeAssignment}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <input type="hidden" name="returnTo" value={returnTo} />
-                        <Button variant="danger" className="min-h-10 px-3 text-base">
-                          Remove
-                        </Button>
-                      </form>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div key={value} className="flex items-center gap-3">
+              <span className="w-28 shrink-0 text-base font-bold text-ink">{label}</span>
+              <MiniChips
+                name={`day${value}`}
+                label={`${label} is a`}
+                options={types.map((t) => ({ value: t.id, label: t.name, icon: t.icon }))}
+                chosen={new Set(chosen ? [chosen] : [])}
+              />
             </div>
           );
         })}
-      </div>
-
-      <h3 className="mt-6 mb-1 text-xl font-semibold text-ink">Give someone a routine</h3>
-      <p className="mb-4 text-base text-ink-muted">
-        Pick days of the week, or one date to swap a routine in for just that day (it replaces their usual routine of the
-        same kind, e.g. a weekend morning on a snow day).
-      </p>
-      <form action={addAssignment} className="grid gap-4 sm:grid-cols-2">
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Field label="Routine">
-          <Select name="templateId" required>
-            {KIND_ORDER.map((kind) => (
-              <optgroup key={kind} label={KIND_LABEL[kind]}>
-                {data.templates
-                  .filter((t) => t.kind === kind)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </Select>
-        </Field>
-        <fieldset className="flex flex-col gap-1.5">
-          <legend className="mb-1.5 text-base font-medium text-ink">Who</legend>
-          <div className="flex flex-wrap gap-2">
-            {data.members.map((m) => (
-              <CheckChip key={m.id} name="memberIds" value={m.id} label={m.name} />
-            ))}
-          </div>
-        </fieldset>
-        <fieldset className="flex flex-col gap-2 sm:col-span-2">
-          <legend className="mb-1.5 text-base font-medium text-ink">When</legend>
-          <label className="flex items-center gap-3 text-lg text-ink">
-            <input type="radio" name="when" value="weekdays" defaultChecked className="size-5 accent-accent" />
-            Every week on
-          </label>
-          <div className="flex flex-wrap gap-2 pl-8">
-            {days.map(({ value, label }) => (
-              <CheckChip key={value} name="weekdays" value={String(value)} label={label} />
-            ))}
-          </div>
-          <label className="mt-2 flex flex-wrap items-center gap-3 text-lg text-ink">
-            <input type="radio" name="when" value="date" className="size-5 accent-accent" />
-            Just on
-            <Input name="onDate" type="date" defaultValue={date} />
-          </label>
-        </fieldset>
-        <div className="sm:col-span-2">
-          <Button>Give routine</Button>
+        <div>
+          <Button className="min-h-11">Save the week</Button>
         </div>
       </form>
+      <div className="flex flex-wrap items-center gap-2 border-t border-frame pt-3">
+        {!isCurrent || member.week_plans_rotate ? (
+          <form action={chooseWeekPlan}>
+            <WeekPlanHidden member={member} plan={plan} returnTo={returnTo} today={today} />
+            <Button variant="secondary" className="min-h-11 text-base">Use this week</Button>
+          </form>
+        ) : null}
+        {plans.length > 1 && !member.week_plans_rotate ? (
+          <form action={chooseWeekPlan}>
+            <WeekPlanHidden member={member} plan={plan} returnTo={returnTo} today={today} />
+            <input type="hidden" name="rotate" value="true" />
+            <Button variant="secondary" className="min-h-11 text-base" title="This week uses the one shown; the others follow in turn.">
+              Take turns each week
+            </Button>
+          </form>
+        ) : null}
+        {plans.length > 1 ? (
+          <form action={removeWeekPlan}>
+            <input type="hidden" name="id" value={plan.id} />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <Button variant="danger" className="min-h-11 text-base">Remove</Button>
+          </form>
+        ) : null}
+        <form action={addWeekPlan} className="ml-auto flex items-center gap-2">
+          <input type="hidden" name="memberId" value={member.id} />
+          <input type="hidden" name="copyFrom" value={plan.id} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <Input name="name" placeholder="e.g. Night shift week" maxLength={30} required className="min-h-11 w-56 text-base" />
+          <Button variant="secondary" className="min-h-11 text-base">+ Week</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function WeekPlanHidden({ member, plan, returnTo, today }: { member: RoutineMember; plan: WeekPlan; returnTo: string; today: string }) {
+  return (
+    <>
+      <input type="hidden" name="memberId" value={member.id} />
+      <input type="hidden" name="planId" value={plan.id} />
+      <input type="hidden" name="today" value={today} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+    </>
+  );
+}
+
+/** A kind of day: its name, wake-up and bedtime, and its routines. */
+export function DayTypeForm({
+  dayType,
+  member,
+  templates,
+  chosen,
+  canRemove,
+  returnTo,
+}: {
+  dayType?: DayType;
+  member: RoutineMember;
+  templates: RoutineTemplate[];
+  chosen: ReadonlySet<string>;
+  canRemove: boolean;
+  returnTo: string;
+}) {
+  const formId = `day-type-${dayType?.id ?? "new"}`;
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-rail p-3">
+      <form id={formId} action={saveDayType} className="grid grid-cols-[4.5rem_1fr_8.5rem_8.5rem] items-end gap-2">
+        <input type="hidden" name="id" value={dayType?.id ?? ""} />
+        <input type="hidden" name="memberId" value={member.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <Field label="Picture">
+          <Input name="icon" defaultValue={dayType?.icon ?? ""} maxLength={16} placeholder="🏫" className="min-h-11 px-2 text-base" />
+        </Field>
+        <Field label="Kind of day">
+          <Input name="name" defaultValue={dayType?.name} required maxLength={30} placeholder="e.g. Night shift" className="min-h-11 text-base" />
+        </Field>
+        <Field label="Wake-up">
+          <Input name="wake" type="time" defaultValue={hhmm(dayType?.wake_time ?? "07:00")} required className="min-h-11 px-2 text-base" />
+        </Field>
+        <Field label="Bedtime">
+          <Input name="bed" type="time" defaultValue={hhmm(dayType?.bed_time ?? "21:30")} required className="min-h-11 px-2 text-base" />
+        </Field>
+      </form>
+      <div className="flex items-start gap-2">
+        <span className="mt-2.5 shrink-0 text-base font-bold text-ink">Routines</span>
+        <div className="min-w-0 flex-1">
+          {/* The chips belong to the form above (form= attribute), so one Save covers everything. */}
+          <fieldset className="flex flex-wrap gap-1.5">
+            <legend className="sr-only">Routines on this kind of day</legend>
+            {templates.map((t) => (
+              <label
+                key={t.id}
+                className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border-2 border-frame bg-board px-3 text-base text-ink select-none has-checked:border-ink has-checked:bg-board has-checked:font-bold"
+              >
+                <input type="checkbox" form={formId} name="templateIds" value={t.id} defaultChecked={chosen.has(t.id)} className="size-4 accent-accent" />
+                {t.name}
+              </label>
+            ))}
+          </fieldset>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button form={formId} className="min-h-11 text-base">
+          {dayType ? "Save" : "Add this kind of day"}
+        </Button>
+        {dayType && canRemove ? (
+          <form action={removeDayType}>
+            <input type="hidden" name="id" value={dayType.id} />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <Button variant="danger" className="min-h-11 text-base">
+              Remove
+            </Button>
+          </form>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -140,122 +246,173 @@ export function Assignments({
 // Editing routines and steps
 // ---------------------------------------------------------------------------
 
-export function TemplateEditor({
+/** A routine's steps, a page at a time, each on one line. */
+export function StepsEditor({
   template,
   steps,
+  page,
+  perPage,
   returnTo,
-  household,
+  pageHref,
 }: {
   template: RoutineTemplate;
   steps: RoutineStep[];
+  page: number;
+  perPage: number;
   returnTo: string;
-  household: Household;
+  pageHref: (page: number) => string;
 }) {
+  const shown = steps.slice(page * perPage, page * perPage + perPage);
+  const pages = Math.max(1, Math.ceil(steps.length / perPage));
   return (
-    <details className="rounded-[var(--radius-card)] border border-frame p-4">
-      <summary className="flex min-h-[var(--touch-target)] cursor-pointer flex-wrap items-center gap-x-2 text-lg text-ink">
-        <span className="flex items-center gap-1">{steps.slice(0, 3).map((s) => <Emoji key={s.id} emoji={s.icon} className="size-7" />)}</span>
-        <span className="font-bold">{template.name}</span>{" "}
-        <span className="text-ink-muted">
-          · {KIND_LABEL[template.kind]} · {audienceLabel(template.audience)} · {steps.length} steps
-        </span>
-      </summary>
-      <ol className="mt-4 flex flex-col gap-3">
-        {steps.map((step, i) => (
-          <li key={step.id} className="rounded-2xl bg-rail p-3">
-            <form action={updateStep} className="grid items-end gap-3 sm:grid-cols-[5rem_1fr_9rem_auto_auto]">
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-[4.5rem_1fr_8.5rem_auto] gap-2 px-2 text-sm font-bold text-ink-muted">
+        <span>Picture</span>
+        <span>Step</span>
+        <span>Done by</span>
+        <span />
+      </div>
+      {shown.map((step, i) => {
+        const index = page * perPage + i;
+        return (
+          <div key={step.id} className="flex items-center gap-2 rounded-2xl bg-rail p-2">
+            <form action={updateStep} className="grid min-w-0 flex-1 grid-cols-[4.5rem_1fr_8.5rem_auto] items-center gap-2">
               <input type="hidden" name="id" value={step.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <StepFields step={step} />
-              <Button variant="secondary">Save</Button>
+              <Button variant="secondary" className="min-h-11 bg-board px-3 text-base">
+                Save
+              </Button>
             </form>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <form action={moveStep}>
-                <input type="hidden" name="id" value={step.id} />
-                <input type="hidden" name="direction" value="up" />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <Button variant="secondary" className="min-h-10 px-3 text-base" disabled={i === 0} aria-label={`Move ${step.text} up`}>
-                  ↑
-                </Button>
-              </form>
-              <form action={moveStep}>
-                <input type="hidden" name="id" value={step.id} />
-                <input type="hidden" name="direction" value="down" />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <Button
-                  variant="secondary"
-                  className="min-h-10 px-3 text-base"
-                  disabled={i === steps.length - 1}
-                  aria-label={`Move ${step.text} down`}
-                >
-                  ↓
-                </Button>
-              </form>
-              <form action={removeStep}>
-                <input type="hidden" name="id" value={step.id} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <Button variant="danger" className="min-h-10 px-3 text-base">
-                  Remove step
-                </Button>
-              </form>
-              {step.target_time ? (
-                <span className="self-center text-sm text-ink-muted">by {clock(step.target_time, household)}</span>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      <h4 className="mt-5 mb-2 text-lg font-semibold text-ink">Add a step</h4>
-      <form action={addStep} className="grid items-end gap-3 sm:grid-cols-[5rem_1fr_9rem_auto_auto]">
+            <StepButton action={moveStep} id={step.id} returnTo={returnTo} direction="up" disabled={index === 0} label={`Move ${step.text} up`}>
+              <ArrowUp size="1.25rem" weight="bold" aria-hidden />
+            </StepButton>
+            <StepButton action={moveStep} id={step.id} returnTo={returnTo} direction="down" disabled={index === steps.length - 1} label={`Move ${step.text} down`}>
+              <ArrowDown size="1.25rem" weight="bold" aria-hidden />
+            </StepButton>
+            <StepButton action={removeStep} id={step.id} returnTo={returnTo} label={`Remove ${step.text}`} danger>
+              <Trash size="1.25rem" weight="bold" aria-hidden />
+            </StepButton>
+          </div>
+        );
+      })}
+      <form action={addStep} className="grid grid-cols-[4.5rem_1fr_8.5rem_auto] items-center gap-2 rounded-2xl border-2 border-dashed border-frame p-2">
         <input type="hidden" name="templateId" value={template.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <StepFields />
-        <Button>Add step</Button>
+        <Button className="min-h-11 px-3 text-base">Add step</Button>
       </form>
-
-      <h4 className="mt-6 mb-2 text-lg font-semibold text-ink">Routine details</h4>
-      <form action={updateRoutine} className="grid gap-4 sm:grid-cols-2">
-        <input type="hidden" name="id" value={template.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <RoutineFields template={template} />
-        <div className="sm:col-span-2">
-          <Button variant="secondary">Save details</Button>
+      {pages > 1 ? (
+        <div className="flex items-center gap-3 text-base font-bold">
+          {page > 0 ? (
+            <Link href={pageHref(page - 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3.5 text-ink">
+              ‹ Earlier steps
+            </Link>
+          ) : null}
+          <span className="text-ink-muted">
+            Steps {page * perPage + 1}–{Math.min(steps.length, page * perPage + perPage)} of {steps.length}
+          </span>
+          {page < pages - 1 ? (
+            <Link href={pageHref(page + 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3.5 text-ink">
+              More steps ›
+            </Link>
+          ) : null}
         </div>
-      </form>
-      <form action={removeRoutine} className="mt-4">
-        <input type="hidden" name="id" value={template.id} />
-        <input type="hidden" name="name" value={template.name} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Button variant="danger">Remove {template.name}</Button>
-      </form>
-    </details>
+      ) : null}
+    </div>
+  );
+}
+
+function StepButton({
+  action,
+  id,
+  returnTo,
+  direction,
+  disabled,
+  label,
+  danger,
+  children,
+}: {
+  action: (formData: FormData) => Promise<void>;
+  id: string;
+  returnTo: string;
+  direction?: "up" | "down";
+  disabled?: boolean;
+  label: string;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <form action={action}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      {direction ? <input type="hidden" name="direction" value={direction} /> : null}
+      <button
+        disabled={disabled}
+        aria-label={label}
+        title={label}
+        className={`flex size-11 items-center justify-center rounded-xl bg-board disabled:opacity-30 ${danger ? "text-danger" : "text-ink"}`}
+      >
+        {children}
+      </button>
+    </form>
   );
 }
 
 function StepFields({ step }: { step?: RoutineStep }) {
   return (
     <>
-      <Field label="Picture">
-        <Input name="icon" defaultValue={step?.icon ?? ""} maxLength={16} placeholder="🪥" />
-      </Field>
-      <Field label="Step">
-        <Input name="text" defaultValue={step?.text} required maxLength={80} />
-      </Field>
-      <Field label="Done by">
-        <Input name="targetTime" type="time" defaultValue={step?.target_time ? hhmm(step.target_time) : ""} />
-      </Field>
+      <Input name="icon" defaultValue={step?.icon ?? ""} maxLength={16} placeholder="🪥" aria-label="Picture" className="min-h-11 bg-board px-2 text-base" />
+      <Input name="text" defaultValue={step?.text} required maxLength={80} placeholder="e.g. Brush teeth" aria-label="Step" className="min-h-11 bg-board text-base" />
+      <Input
+        name="targetTime"
+        type="time"
+        defaultValue={step?.target_time ? hhmm(step.target_time) : ""}
+        aria-label="Done by"
+        className="min-h-11 bg-board px-2 text-base"
+      />
     </>
   );
 }
 
-export function RoutineFields({ template }: { template?: RoutineTemplate }) {
+/** The routine's details form, including what it follows (its anchor). */
+export function RoutineDetails({ template, mealTimes, returnTo }: { template: RoutineTemplate; mealTimes: { id: string; name: string }[]; returnTo: string }) {
+  return (
+    <>
+      <form action={updateRoutine} className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3">
+        <input type="hidden" name="id" value={template.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <RoutineFields template={template} mealTimes={mealTimes} />
+        <div className="col-span-full flex gap-2">
+          <Button>Save details</Button>
+        </div>
+      </form>
+      <form action={removeRoutine} className="mt-3">
+        <input type="hidden" name="id" value={template.id} />
+        <input type="hidden" name="name" value={template.name} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <Button variant="danger" className="min-h-11 text-base">
+          Remove {template.name}
+        </Button>
+      </form>
+    </>
+  );
+}
+
+export const ANCHOR_LABEL = {
+  wake: "After wake-up",
+  bed: "Ends by bedtime",
+  meal: "After a meal",
+  clock: "At a set time",
+} as const;
+
+export function RoutineFields({ template, mealTimes }: { template?: RoutineTemplate; mealTimes: { id: string; name: string }[] }) {
   return (
     <>
       <Field label="Name">
         <Input name="name" defaultValue={template?.name} required maxLength={60} placeholder="e.g. Swim night" />
       </Field>
-      <Field label="When">
+      <Field label="Part of the day">
         <Select name="kind" defaultValue={template?.kind ?? "morning"}>
           {KIND_ORDER.map((kind) => (
             <option key={kind} value={kind}>
@@ -264,10 +421,32 @@ export function RoutineFields({ template }: { template?: RoutineTemplate }) {
           ))}
         </Select>
       </Field>
-      <Field label="Usual time" hint="Optional. Leave empty to use the step times.">
+      <Field label="It follows">
+        <Select name="anchor" defaultValue={template?.anchor ?? "wake"}>
+          {(Object.keys(ANCHOR_LABEL) as (keyof typeof ANCHOR_LABEL)[]).map((a) => (
+            <option key={a} value={a}>
+              {ANCHOR_LABEL[a]}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Which meal" hint="For “After a meal”.">
+        <Select name="anchorMealTimeId" defaultValue={template?.anchor_meal_time_id ?? ""}>
+          <option value="">—</option>
+          {mealTimes.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="Gap (minutes)" hint="After wake-up or the meal; before bed.">
+        <Input name="anchorOffset" type="number" min={0} max={240} defaultValue={template?.anchor_offset ?? 0} />
+      </Field>
+      <Field label="Set time" hint="For “At a set time”. Empty: its step times.">
         <Input name="usualStart" type="time" defaultValue={template?.usual_start?.slice(0, 5) ?? ""} />
       </Field>
-      <Field label="About how many minutes" hint="Optional. It moves around plans on the calendar.">
+      <Field label="About how many minutes" hint="Empty: from its step times.">
         <Input name="usualMinutes" type="number" min={5} max={240} defaultValue={template?.usual_minutes ?? ""} />
       </Field>
       <Field label="Written for">
@@ -286,23 +465,34 @@ export function RoutineFields({ template }: { template?: RoutineTemplate }) {
           ))}
         </Select>
       </Field>
+      <label className="col-span-full flex min-h-11 items-center gap-3 text-lg text-ink">
+        <input type="checkbox" name="loose" defaultChecked={template?.loose ?? false} className="size-6 accent-accent" />
+        <span>
+          <strong>Loose:</strong> it can move anywhere later in the day when plans get in the way (otherwise up to an hour).
+        </span>
+      </label>
     </>
   );
+}
+
+/** "After wake-up", "After Dinner, +10 min", "7:30". */
+export function anchorSummary(template: RoutineTemplate, mealTimes: { id: string; name: string }[], household: Household): string {
+  const gap = template.anchor_offset ? `, ${template.anchor === "bed" ? "" : "+"}${template.anchor_offset} min` : "";
+  switch (template.anchor) {
+    case "wake":
+      return `After wake-up${gap}`;
+    case "bed":
+      return template.anchor_offset ? `Ends ${template.anchor_offset} min before bed` : "Ends by bedtime";
+    case "meal":
+      return `After ${mealTimes.find((m) => m.id === template.anchor_meal_time_id)?.name ?? "a meal"}${gap}`;
+    case "clock":
+      return template.usual_start ? `At ${clock(template.usual_start, household)}` : "At its step times";
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Small pieces
 // ---------------------------------------------------------------------------
-
-function CheckChip({ name, value, label }: { name: string; value: string; label: string }) {
-  return (
-    <label className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-3 text-base text-ink">
-      <input type="checkbox" name={name} value={value} className="size-5 accent-accent" />
-      {label}
-    </label>
-  );
-}
-
 
 /** "07:45:00" → "7:45 a.m." in the household's locale. */
 export function clock(time: string, household: Household): string {
@@ -312,28 +502,12 @@ export function clock(time: string, household: Household): string {
 }
 
 /** Weekdays in the household's order (Sunday or Monday first). */
-function weekdayNames(household: Household): { value: number; label: string }[] {
+export function weekdayNames(household: Household, style: "short" | "long" = "short"): { value: number; label: string }[] {
   const { locale, weekStartsOn } = household.settings;
-  const fmt = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
+  const fmt = new Intl.DateTimeFormat(locale, { weekday: style, timeZone: "UTC" });
   // 2026-11-01 was a Sunday.
   return Array.from({ length: 7 }, (_, i) => {
     const value = (weekStartsOn + i) % 7;
     return { value, label: fmt.format(new Date(Date.UTC(2026, 10, 1 + value))) };
   });
 }
-
-function describeWeekdays(weekdays: number[], names: { value: number; label: string }[]): string {
-  const set = new Set(weekdays);
-  if (set.size === 7) return "every day";
-  if (set.size === 5 && [1, 2, 3, 4, 5].every((d) => set.has(d))) return "weekdays";
-  if (set.size === 2 && set.has(0) && set.has(6)) return "weekends";
-  return names
-    .filter((n) => set.has(n.value))
-    .map((n) => n.label)
-    .join(", ");
-}
-
-function audienceLabel(audience: string): string {
-  return audience === "kid" ? "for kids" : audience === "adult" ? "for adults" : "for anyone";
-}
-

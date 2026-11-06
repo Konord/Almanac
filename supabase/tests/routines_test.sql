@@ -23,21 +23,23 @@ select is(
 );
 
 select lives_ok(
-  $$ insert into public.routine_assignments (household_id, template_id, member_id, weekdays)
-     values (public.current_household_id(), current_setting('test.bedtime')::uuid, current_setting('test.ava')::uuid, '{0,1,2,3,4}') $$,
-  'A routine can be given to someone on certain weekdays'
+  $$ insert into public.routine_assignments (household_id, template_id, member_id, day_type_id)
+     values (public.current_household_id(), current_setting('test.bedtime')::uuid, current_setting('test.ava')::uuid,
+       (select id from public.day_types where member_id = current_setting('test.ava')::uuid and name = 'Weekday')) $$,
+  'A routine can be given to one of someone''s kinds of day'
 );
 
 select throws_ok(
-  $$ insert into public.routine_assignments (household_id, template_id, member_id, weekdays, on_date)
-     values (public.current_household_id(), current_setting('test.bedtime')::uuid, current_setting('test.ava')::uuid, '{1}', '2026-11-05') $$,
-  '23514', null, 'An assignment is weekdays or one date, not both'
+  $$ insert into public.routine_assignments (household_id, template_id, member_id, day_type_id, on_date)
+     values (public.current_household_id(), current_setting('test.bedtime')::uuid, current_setting('test.ava')::uuid,
+       (select id from public.day_types where member_id = current_setting('test.ava')::uuid limit 1), '2026-11-05') $$,
+  '23514', null, 'An assignment is a kind of day or one date, not both'
 );
 
 select throws_ok(
   $$ insert into public.routine_assignments (household_id, template_id, member_id, weekdays)
-     values (public.current_household_id(), current_setting('test.bedtime')::uuid, current_setting('test.ava')::uuid, '{7}') $$,
-  '23514', null, 'Weekdays run from 0 (Sunday) to 6 (Saturday)'
+     values (public.current_household_id(), current_setting('test.bedtime')::uuid, current_setting('test.ava')::uuid, '{1}') $$,
+  '23514', null, 'Routines are no longer given out by picked weekdays'
 );
 
 select lives_ok(

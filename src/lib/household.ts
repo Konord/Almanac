@@ -23,6 +23,8 @@ export type HouseholdSettings = {
   dayProfile: DayProfileSettings;
   /** How long a new event lasts when only a start time is given. */
   defaultEventMinutes: number;
+  /** How far a routine may move to get around an event (unless it's loose). */
+  routineFlexMinutes: number;
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   handwriting: true,
   dayProfile: DEFAULT_DAY_PROFILE,
   defaultEventMinutes: 60,
+  routineFlexMinutes: 60,
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -59,6 +62,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     handwriting: pick("handwriting", (v) => typeof v === "boolean"),
     dayProfile: parseDayProfile(value.dayProfile),
     defaultEventMinutes: pick("defaultEventMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 5 && v <= 24 * 60),
+    routineFlexMinutes: pick("routineFlexMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 6 * 60),
   };
 }
 

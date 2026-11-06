@@ -3,17 +3,26 @@ import { ArrowsClockwise, CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
-import { placeRoutines, usualSlot, type Busy, type Placement } from "@/lib/routine-placement";
+import { placeRoutines, toMinutes, wantedSlot, type Busy, type DayAnchors, type Placement } from "@/lib/routine-placement";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
-import { isAllDayStyle, minutesIntoDay, shortTime } from "../calendar/views";
+import { loadCalendar, rangeOf } from "../calendar/data";
+import { eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime } from "../calendar/views";
+import { loadMealBasics, loadMeals } from "../meals/data";
+import { placeTodayMeals } from "../meals/today";
+import { EATING_MINUTES } from "@/lib/meals";
 import type { CalendarItem } from "../calendar/types";
-import { dayRoutinesFor, type DayRoutine, type RoutineData } from "./data";
+import { dayRoutinesFor, personDay, type DayRoutine, type RoutineData } from "./data";
 
 export type FloatingRoutine = DayRoutine & { placement: Placement };
 
+/** A meal on the day, as routines see it: when it's eaten, and by whom. */
+export type DayMeal = { mealTimeId: string; eatStart: number; endMin: number; memberIds: string[]; title: string };
+
 /**
  * One person's routines for a day, placed around their plans (their own
- * events and ones for everyone). See src/lib/routine-placement.ts.
+ * events and ones for everyone) and the meals they eat. Each routine
+ * starts from its anchor: wake-up, bedtime, a meal or a set time.
+ * See src/lib/routine-placement.ts.
  */
 export function floatingRoutines(
   data: RoutineData,
@@ -21,20 +30,35 @@ export function floatingRoutines(
   date: LocalDate,
   events: CalendarItem[],
   timeZone: string,
+  flexMinutes: number,
+  meals: DayMeal[] = [],
 ): FloatingRoutine[] {
   const routines = dayRoutinesFor(data, memberId, date);
-  const busy: Busy[] = events
-    .filter((e) => !isAllDayStyle(e, timeZone))
-    .map((e) => ({
-      startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
-      endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
-      title: e.title,
-    }));
+  const myMeals = meals.filter((m) => m.memberIds.length === 0 || m.memberIds.includes(memberId));
+  const busy: Busy[] = [
+    ...events
+      .filter((e) => !isAllDayStyle(e, timeZone))
+      .map((e) => ({
+        startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
+        endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
+        title: e.title,
+      })),
+    // Meals are heavy: routines move around them, not the other way.
+    ...myMeals.map((m) => ({ startMin: m.eatStart, endMin: m.endMin, title: m.title })),
+  ];
+  const day = personDay(data, memberId, date);
+  const anchors: DayAnchors = {
+    wake: toMinutes(day.wake),
+    bed: toMinutes(day.bed),
+    mealEnd: (id) => {
+      const ends = myMeals.filter((m) => m.mealTimeId === id).map((m) => m.endMin);
+      return ends.length > 0 ? Math.max(...ends) : null;
+    },
+  };
   const placements = placeRoutines(
     routines.map((r) => ({
       id: r.assignment.id,
-      kind: r.template.kind,
-      ...usualSlot(r.template, r.steps.map((s) => s.target_time)),
+      ...wantedSlot(r.template, r.steps.map((s) => s.target_time), anchors, flexMinutes),
     })),
     busy,
   );
@@ -124,5 +148,35 @@ export function RoutineBlock({
         </span>
       )}
     </Link>
+  );
+}
+
+/**
+ * Everyone's routines placed on a date, around that day's events and
+ * meals (for screens other than Today, which works this out itself).
+ */
+export async function routinesPlacedOn(data: RoutineData, date: LocalDate, household: Household): Promise<Map<string, FloatingRoutine[]>> {
+  const { timeZone } = household.settings;
+  const { rangeStart, rangeEnd } = rangeOf([date], timeZone);
+  const [{ items }, meals, basics] = await Promise.all([loadCalendar(rangeStart, rangeEnd), loadMeals(date, date), loadMealBasics()]);
+  const memberIds = new Set(data.members.map((m) => m.id));
+  const timed = eventsOnDay(items, date, timeZone).filter((e) => !isAllDayStyle(e, timeZone));
+  const forEveryone = timed.filter((e) => !e.member_ids.some((id) => memberIds.has(id)));
+  const placedMeals = placeTodayMeals(
+    meals,
+    basics,
+    timed.map((e) => ({
+      startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
+      endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
+      title: e.title,
+      memberIds: e.member_ids.filter((id) => memberIds.has(id)),
+    })),
+  );
+  const dayMeals = placedMeals.map((m) => ({ mealTimeId: m.mealTimeId, eatStart: m.endMin - EATING_MINUTES, endMin: m.endMin, memberIds: m.memberIds, title: m.name }));
+  return new Map(
+    data.members.map((m) => [
+      m.id,
+      floatingRoutines(data, m.id, date, [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone], timeZone, household.settings.routineFlexMinutes, dayMeals),
+    ]),
   );
 }

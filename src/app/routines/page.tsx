@@ -5,11 +5,13 @@ import { AppFrame, Card, Emoji, IconLink, Notice, Panel, ProgressBar, ScreenHead
 import { HeaderClock } from "@/components/header-clock";
 import { requireHousehold, type Household } from "@/lib/household";
 import { isLate } from "@/lib/routines";
+import { toMinutes } from "@/lib/routine-placement";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { toggleStep } from "./actions";
+import { endRoutine, setDay, toggleStep } from "./actions";
+import { routinesPlacedOn } from "./floating";
 import { clock } from "./sections";
 import { PeopleRow } from "./people-row";
-import { dayRoutinesFor, loadRoutines, type DayRoutine, type RoutineMember, type RoutineStep } from "./data";
+import { dayRoutinesFor, loadRoutines, personDay, type DayRoutine, type RoutineData, type RoutineMember, type RoutineStep } from "./data";
 
 /**
  * Routines: checklists for each person (morning, after school, bedtime).
@@ -45,6 +47,7 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
     null;
   const error = firstParam(params.error);
   const message = firstParam(params.message);
+  const placed = await routinesPlacedOn(data, date, household);
 
   const here = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
@@ -89,10 +92,17 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
       {/* Whose checklist */}
       <PeopleRow data={data} date={date} hrefFor={(id) => here({ member: id })} activeId={member?.id} />
 
+      {member ? <DayBar data={data} member={member} date={date} dayTitle={dayTitle.split(",")[0]} returnTo={returnTo} /> : null}
+
       {member ? (
         <Checklist
           member={member}
           routines={dayRoutinesFor(data, member.id, date)}
+          page={Math.max(0, Number(firstParam(params.rpage) ?? 0) || 0)}
+          pageHref={(p) => here({ rpage: p ? String(p) : null })}
+          endsAt={new Map((placed.get(member.id) ?? []).map((r) => [r.template.id, r.placement.endMin]))}
+          ended={data.ended}
+          isPast={date < today}
           date={date}
           isToday={date === today}
           now={localTimeOf(now, timeZone)}
@@ -109,9 +119,16 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
 // The checklist
 // ---------------------------------------------------------------------------
 
+const PER_PAGE = 4;
+
 function Checklist({
   member,
   routines,
+  page,
+  pageHref,
+  endsAt,
+  ended,
+  isPast,
   date,
   isToday,
   now,
@@ -120,6 +137,13 @@ function Checklist({
 }: {
   member: RoutineMember;
   routines: DayRoutine[];
+  page: number;
+  pageHref: (page: number) => string;
+  /** When each routine's time is up today (minutes since midnight). */
+  endsAt: Map<string, number>;
+  /** "memberId:templateId" for routines ended early. */
+  ended: Set<string>;
+  isPast: boolean;
   date: LocalDate;
   isToday: boolean;
   now: string;
@@ -140,21 +164,41 @@ function Checklist({
     );
   }
   return (
-    <div className="grid gap-5 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-[minmax(0,1fr)] lg:grid-cols-3">
-      {routines.map(({ template, steps, progress, doneIds }) => (
+    <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
+    {/* One row of up to four routines; more than that turn into pages, so nothing scrolls. */}
+    <div
+      className="grid gap-5 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-[minmax(0,1fr)]"
+      style={{ gridTemplateColumns: `repeat(${Math.min(PER_PAGE, Math.max(routines.length, 3))}, minmax(0, 1fr))` }}
+    >
+      {routines.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE).map(({ template, steps, progress, doneIds }) => {
+        const endedEarly = ended.has(`${member.id}:${template.id}`);
+        // A routine is over once it's ended, its time is up, or the day has passed.
+        const over = !progress.complete && (isPast || endedEarly || (isToday && toMinutes(now) >= (endsAt.get(template.id) ?? 24 * 60)));
+        const missed = over ? progress.total - progress.done : 0;
+        return (
         <Card
           key={template.id}
           title={template.name}
           aside={
-            <span className={`text-lg font-bold ${progress.complete ? "text-success" : "text-ink-muted"}`}>
-              {progress.complete ? "All done ✓" : `${progress.done}/${progress.total}`}
-            </span>
+            progress.complete ? (
+              <span className="text-lg font-bold text-success">All done ✓</span>
+            ) : over ? (
+              <span className="flex items-center gap-2">
+                <span className="text-base font-bold text-ink-muted">{missed} missed</span>
+                {endedEarly && isToday ? <EndButton member={member} templateId={template.id} date={date} returnTo={returnTo} reopen /> : null}
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span className="text-lg font-bold text-ink-muted">{`${progress.done}/${progress.total}`}</span>
+                {isToday && progress.done > 0 ? <EndButton member={member} templateId={template.id} date={date} returnTo={returnTo} /> : null}
+              </span>
+            )
           }
         >
           <div className="mt-2 mb-1">
             <ProgressBar done={progress.done} total={progress.total} colour={member.colour} />
           </div>
-          <ul className="mt-1 flex flex-col lg:min-h-0 lg:overflow-y-auto">
+          <ul className="mt-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
             {steps.map((step) => {
               const done = doneIds.has(step.id);
               return (
@@ -162,7 +206,8 @@ function Checklist({
                   key={step.id}
                   step={step}
                   done={done}
-                  late={isToday && !done && isLate(step, now)}
+                  late={isToday && !done && !over && isLate(step, now)}
+                  missed={over && !done}
                   memberId={member.id}
                   templateId={template.id}
                   date={date}
@@ -173,7 +218,26 @@ function Checklist({
             })}
           </ul>
         </Card>
-      ))}
+        );
+      })}
+    </div>
+    {routines.length > PER_PAGE ? (
+      <div className="flex shrink-0 items-center gap-3 text-base font-bold">
+        {Array.from({ length: Math.ceil(routines.length / PER_PAGE) }, (_, i) => (
+          <Link
+            key={i}
+            href={pageHref(i)}
+            aria-current={i === page ? "page" : undefined}
+            className={`flex min-h-11 items-center rounded-xl px-3.5 ${i === page ? "bg-ink text-board" : "bg-rail text-ink"}`}
+          >
+            {routines
+              .slice(i * PER_PAGE, i * PER_PAGE + PER_PAGE)
+              .map((r) => r.template.name)
+              .join(", ")}
+          </Link>
+        ))}
+      </div>
+    ) : null}
     </div>
   );
 }
@@ -182,6 +246,7 @@ function StepRow({
   step,
   done,
   late,
+  missed,
   memberId,
   templateId,
   date,
@@ -191,6 +256,8 @@ function StepRow({
   step: RoutineStep;
   done: boolean;
   late: boolean;
+  /** The routine is over and this wasn't ticked. It can still be ticked. */
+  missed: boolean;
   memberId: string;
   templateId: string;
   date: LocalDate;
@@ -213,10 +280,12 @@ function StepRow({
           <Emoji emoji={step.icon} className="size-10" faded={done} />
           {step.icon ? null : <span className="size-10 shrink-0" aria-hidden />}
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className={`text-xl leading-[1.1] font-semibold ${done ? "text-ink-muted" : "text-ink"}`}>
+            <span className={`text-xl leading-[1.1] font-semibold ${done || missed ? "text-ink-muted" : "text-ink"}`}>
               {step.text}
             </span>
-            {step.target_time ? (
+            {missed ? (
+              <span className="text-sm font-bold text-ink-muted">Missed · tap if it got done</span>
+            ) : step.target_time ? (
               <span className={`text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>
                 by {clock(step.target_time, household)}
                 {late ? " · running late" : ""}
@@ -234,5 +303,76 @@ function StepRow({
         </button>
       </form>
     </li>
+  );
+}
+
+function EndButton({ member, templateId, date, returnTo, reopen = false }: { member: RoutineMember; templateId: string; date: LocalDate; returnTo: string; reopen?: boolean }) {
+  return (
+    <form action={endRoutine}>
+      <input type="hidden" name="memberId" value={member.id} />
+      <input type="hidden" name="templateId" value={templateId} />
+      <input type="hidden" name="date" value={date} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      {reopen ? <input type="hidden" name="reopen" value="true" /> : null}
+      <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-base font-bold text-ink" title={reopen ? "Carry on with it" : "Finish it now; anything unticked counts as missed"}>
+        {reopen ? "Reopen" : "End"}
+      </button>
+    </form>
+  );
+}
+
+/** What kind of day it is for this person, with their wake-up and bedtime. Tap a kind of day to switch just this date. */
+function DayBar({ data, member, date, dayTitle, returnTo }: { data: RoutineData; member: RoutineMember; date: LocalDate; dayTitle: string; returnTo: string }) {
+  const day = personDay(data, member.id, date);
+  const types = data.dayTypes.filter((t) => t.member_id === member.id);
+  const override = data.overrides.find((o) => o.member_id === member.id && o.date === date);
+  const hidden = (
+    <>
+      <input type="hidden" name="memberId" value={member.id} />
+      <input type="hidden" name="date" value={date} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+    </>
+  );
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-2" aria-label="Kind of day">
+      <span className="mr-1 text-lg font-bold text-ink">
+        {member.name}&rsquo;s {dayTitle} is a
+      </span>
+      {types.map((t) => {
+        const active = t.id === day.dayType?.id;
+        return (
+          <form key={t.id} action={setDay}>
+            {hidden}
+            <input type="hidden" name="dayTypeId" value={t.id} />
+            <button
+              aria-pressed={active}
+              className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 px-3.5 text-base ${active ? "border-ink bg-rail font-bold text-ink" : "border-frame bg-board text-ink"}`}
+            >
+              {t.icon ? <Emoji emoji={t.icon} className="size-6" /> : null}
+              {t.name}
+            </button>
+          </form>
+        );
+      })}
+      <form action={setDay} className="flex items-center gap-2 lg:ml-auto">
+        {hidden}
+        <label className="flex items-center gap-1.5 text-base font-bold text-ink">
+          Up
+          <input name="wake" type="time" defaultValue={day.wake} className="min-h-11 rounded-xl border-2 border-frame bg-board px-2 text-base" />
+        </label>
+        <label className="flex items-center gap-1.5 text-base font-bold text-ink">
+          Bed
+          <input name="bed" type="time" defaultValue={day.bed} className="min-h-11 rounded-xl border-2 border-frame bg-board px-2 text-base" />
+        </label>
+        <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-base font-bold text-ink">Set for this day</button>
+      </form>
+      {override ? (
+        <form action={setDay}>
+          {hidden}
+          <input type="hidden" name="reset" value="true" />
+          <button className="flex min-h-11 items-center rounded-xl px-2 text-base font-bold text-accent">Back to usual</button>
+        </form>
+      ) : null}
+    </div>
   );
 }

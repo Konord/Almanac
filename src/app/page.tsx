@@ -16,6 +16,7 @@ import { HeaderClock } from "@/components/header-clock";
 import { EVERYONE_COLOUR, soft } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
+import { EATING_MINUTES } from "@/lib/meals";
 import { requireHousehold, type Household } from "@/lib/household";
 import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
@@ -232,10 +233,6 @@ function PeopleTimeline({
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
   const memberIds = new Set(members.map((m) => m.id));
   const forEveryone = timed.filter((e) => !e.member_ids.some((id) => memberIds.has(id)));
-  // Routines float around each person's own plans and the ones for everyone.
-  const routinesFor = new Map(
-    members.map((m) => [m.id, floatingRoutines(routineData, m.id, today, [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone], timeZone)]),
-  );
   // Meals move around the plans of the people eating them.
   const placedMeals = placeTodayMeals(
     meals,
@@ -246,6 +243,22 @@ function PeopleTimeline({
       title: e.title,
       memberIds: e.member_ids.filter((id) => memberIds.has(id)),
     })),
+  );
+  // Routines float around each person's own plans, the ones for everyone, and their meals.
+  const dayMeals = placedMeals.map((m) => ({ mealTimeId: m.mealTimeId, eatStart: m.endMin - EATING_MINUTES, endMin: m.endMin, memberIds: m.memberIds, title: m.name }));
+  const routinesFor = new Map(
+    members.map((m) => [
+      m.id,
+      floatingRoutines(
+        routineData,
+        m.id,
+        today,
+        [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone],
+        timeZone,
+        household.settings.routineFlexMinutes,
+        dayMeals,
+      ),
+    ]),
   );
   const placements = [...[...routinesFor.values()].flat().map((r) => r.placement), ...placedMeals];
   const range = timelineRange(timed, [today], timeZone);

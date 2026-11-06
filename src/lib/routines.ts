@@ -1,4 +1,3 @@
-import { dayOfWeek } from "./calendar-layout.ts";
 import type { LocalDate, LocalTime } from "./time.ts";
 
 /*
@@ -24,32 +23,30 @@ export type AssignmentLike = {
   id: string;
   template_id: string;
   member_id: string;
-  /** 0 = Sunday ... 6 = Saturday; null for a one-date assignment. */
-  weekdays: number[] | null;
+  /** The day type it belongs to; null for a one-date swap. */
+  day_type_id: string | null;
   on_date: string | null;
   active: boolean;
 };
 
 /**
- * The assignments a person has on a date.
+ * The assignments a person has on a date, given their day type that day.
  *
- * Weekday assignments apply on their weekdays. A one-date assignment is a
- * swap: it replaces that person's weekday routines of the same kind for that
- * day only (e.g. "Weekend morning" on a snow day instead of "School morning").
+ * A routine belongs to day types ("Weekday", "Weekend"). A one-date
+ * assignment is a swap: it replaces that person's routines of the same
+ * kind for that day only.
  */
 export function assignmentsForDay<T extends AssignmentLike>(
   assignments: T[],
   memberId: string,
   date: LocalDate,
+  dayTypeId: string | null,
   kindOf: (templateId: string) => RoutineKind | undefined,
 ): T[] {
   const mine = assignments.filter((a) => a.active && a.member_id === memberId);
   const oneDay = mine.filter((a) => a.on_date === date);
   const swappedKinds = new Set(oneDay.map((a) => kindOf(a.template_id)));
-  const weekday = dayOfWeek(date);
-  const regular = mine.filter(
-    (a) => a.weekdays?.includes(weekday) && !swappedKinds.has(kindOf(a.template_id)),
-  );
+  const regular = mine.filter((a) => dayTypeId !== null && a.day_type_id === dayTypeId && !swappedKinds.has(kindOf(a.template_id)));
 
   const seen = new Set<string>();
   return [...regular, ...oneDay]

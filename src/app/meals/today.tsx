@@ -15,6 +15,7 @@ import { mealIcon, mealName, type Meal, type MealBasics } from "./data";
 
 export type TodayMeal = {
   id: string;
+  mealTimeId: string;
   name: string;
   icon: string;
   /** Who it's for; empty means everyone. */
@@ -48,9 +49,10 @@ export function placeTodayMeals(
     const busy: Busy[] = events
       .filter((e) => e.memberIds.length === 0 || (m.member_ids.length > 0 && e.memberIds.some((id) => m.member_ids.includes(id))))
       .map(({ startMin, endMin, title }) => ({ startMin, endMin, title }));
-    const [placed] = m.status === "cooked" ? [{ startMin: slot.start, endMin: slot.start + slot.minutes, movedFor: null }] : placeRoutines([{ id: m.id, kind: "daily", start: slot.start, minutes: slot.minutes }], busy);
+    const [placed] = m.status === "cooked" ? [{ startMin: slot.start, endMin: slot.start + slot.minutes, movedFor: null }] : placeRoutines([{ id: m.id, start: slot.start, minutes: slot.minutes, direction: "later" }], busy);
     return {
       id: m.id,
+      mealTimeId: m.meal_time_id,
       name: mealName(m, recipes, categories),
       icon: mealIcon(m, recipes, categories),
       memberIds: m.member_ids,

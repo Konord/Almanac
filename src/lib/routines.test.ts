@@ -14,49 +14,48 @@ const a = (id: string, template_id: string, extra: Partial<AssignmentLike>): Ass
   id,
   template_id,
   member_id: "ava",
-  weekdays: null,
+  day_type_id: null,
   on_date: null,
   active: true,
   ...extra,
 });
 
 const ava = [
-  a("1", "school", { weekdays: [1, 2, 3, 4, 5] }),
-  a("2", "weekend", { weekdays: [0, 6] }),
-  a("3", "bedtime", { weekdays: [0, 1, 2, 3, 4, 5, 6] }),
-  a("4", "afterSchool", { weekdays: [1, 2, 3, 4, 5] }),
+  a("1", "school", { day_type_id: "weekday" }),
+  a("2", "weekend", { day_type_id: "weekend" }),
+  a("3", "bedtime", { day_type_id: "weekday" }),
+  a("3b", "bedtime", { day_type_id: "weekend" }),
+  a("4", "afterSchool", { day_type_id: "weekday" }),
 ];
 
-test("weekday routines apply on their days, morning to bedtime", () => {
-  // 2026-11-04 is a Wednesday.
-  assert.deepEqual(assignmentsForDay(ava, "ava", "2026-11-04", kindOf).map((x) => x.template_id), ["school", "afterSchool", "bedtime"]);
-  // 2026-11-07 is a Saturday.
-  assert.deepEqual(assignmentsForDay(ava, "ava", "2026-11-07", kindOf).map((x) => x.template_id), ["weekend", "bedtime"]);
+test("a day type's routines apply, morning to bedtime", () => {
+  assert.deepEqual(assignmentsForDay(ava, "ava", "2026-11-04", "weekday", kindOf).map((x) => x.template_id), ["school", "afterSchool", "bedtime"]);
+  assert.deepEqual(assignmentsForDay(ava, "ava", "2026-11-07", "weekend", kindOf).map((x) => x.template_id), ["weekend", "bedtime"]);
 });
 
 test("a one-date routine swaps out the same kind for that day only", () => {
   const snowDay = [...ava, a("5", "weekend", { on_date: "2026-11-04" })];
   assert.deepEqual(
-    assignmentsForDay(snowDay, "ava", "2026-11-04", kindOf).map((x) => x.template_id),
+    assignmentsForDay(snowDay, "ava", "2026-11-04", "weekday", kindOf).map((x) => x.template_id),
     ["weekend", "afterSchool", "bedtime"],
   );
   // Thursday is unchanged.
   assert.deepEqual(
-    assignmentsForDay(snowDay, "ava", "2026-11-05", kindOf).map((x) => x.template_id),
+    assignmentsForDay(snowDay, "ava", "2026-11-05", "weekday", kindOf).map((x) => x.template_id),
     ["school", "afterSchool", "bedtime"],
   );
 });
 
 test("other people's and paused routines are left out", () => {
-  const mixed = [...ava, a("6", "bedtime", { member_id: "sam", weekdays: [3] })];
-  assert.equal(assignmentsForDay(mixed, "sam", "2026-11-04", kindOf).length, 1);
+  const mixed = [...ava, a("6", "bedtime", { member_id: "sam", day_type_id: "samday" })];
+  assert.equal(assignmentsForDay(mixed, "sam", "2026-11-04", "samday", kindOf).length, 1);
   const paused = ava.map((x) => ({ ...x, active: x.template_id !== "bedtime" }));
-  assert.ok(!assignmentsForDay(paused, "ava", "2026-11-04", kindOf).some((x) => x.template_id === "bedtime"));
+  assert.ok(!assignmentsForDay(paused, "ava", "2026-11-04", "weekday", kindOf).some((x) => x.template_id === "bedtime"));
 });
 
 test("the same routine is only listed once", () => {
   const twice = [...ava, a("7", "bedtime", { on_date: "2026-11-04" })];
-  assert.equal(assignmentsForDay(twice, "ava", "2026-11-04", kindOf).filter((x) => x.template_id === "bedtime").length, 1);
+  assert.equal(assignmentsForDay(twice, "ava", "2026-11-04", "weekday", kindOf).filter((x) => x.template_id === "bedtime").length, 1);
 });
 
 const steps = [
