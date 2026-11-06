@@ -16,7 +16,6 @@ import { HeaderClock } from "@/components/header-clock";
 import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
-import { EATING_MINUTES } from "@/lib/meals";
 import { requireHousehold, type Household } from "@/lib/household";
 import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
@@ -26,7 +25,7 @@ import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type
 import { TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
-import { MealBlock, SurvivalButton, placeTodayMeals } from "./meals/today";
+import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals } from "./meals/today";
 import { SurvivalCard } from "./survival-card";
 import { clock, floatingDay, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
@@ -270,7 +269,7 @@ function PeopleTimeline({
     })),
   );
   // Routines float around each person's own plans, the ones for everyone, and their meals.
-  const dayMeals = placedMeals.map((m) => ({ mealTimeId: m.mealTimeId, eatStart: m.endMin - EATING_MINUTES, endMin: m.endMin, memberIds: m.memberIds, title: m.name }));
+  const dayMeals = mealsForRoutines(placedMeals);
   // Chore blocks float with them, in the columns of the people doing them (everyone's if nobody's picked).
   const blocksOf = (memberId: string) => choreBlocks.filter((d) => d.block.member_ids.length === 0 || d.block.member_ids.includes(memberId));
   const dayFor = new Map(
@@ -322,10 +321,22 @@ function PeopleTimeline({
         c1,
       })),
     ),
-    // A meal for everyone (no one picked) spans the whole row.
-    ...placedMeals.flatMap((m) =>
-      memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({ id: `meal:${m.id}|${c0}`, startMin: m.startMin, endMin: m.endMin, c0, c1 })),
-    ),
+    // A meal for everyone (no one picked) spans the whole row. With a cook,
+    // the prep is in the cook's column and the rest in the eaters'.
+    ...placedMeals.flatMap((m) => {
+      const cook = m.cookId ? columnIds.indexOf(m.cookId) : -1;
+      const prep = cook >= 0 ? [{ id: `meal:${m.id}|prep`, startMin: m.startMin, endMin: m.eatStart, c0: cook, c1: cook }] : [];
+      return [
+        ...prep,
+        ...memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({
+          id: `meal:${m.id}|${c0}`,
+          startMin: cook >= 0 ? m.eatStart : m.startMin,
+          endMin: m.endMin,
+          c0,
+          c1,
+        })),
+      ];
+    }),
   ]);
   const mealById = new Map(placedMeals.map((m) => [m.id, m]));
   const eventById = new Map(timed.map((e) => [e.id, e]));
@@ -411,11 +422,13 @@ function PeopleTimeline({
               const top = ((block.startMin - first * 60) / span) * 100;
               const height = (Math.max(block.endMin - block.startMin, 30) / span) * 100;
               if (block.id.startsWith("meal:")) {
-                const meal = mealById.get(block.id.slice(5).split("|")[0])!;
+                const [mealId, which] = block.id.slice(5).split("|");
+                const meal = mealById.get(mealId)!;
                 return (
                   <div key={block.id} className="pointer-events-auto">
                     <MealBlock
                       meal={meal}
+                      part={which === "prep" ? "prep" : meal.cookId && columnIds.includes(meal.cookId) ? "eat" : "whole"}
                       date={today}
                       household={household}
                       style={{

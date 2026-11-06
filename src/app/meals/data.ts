@@ -45,6 +45,8 @@ export type Meal = {
   from_preset: boolean;
   /** Who it's for; empty means everyone. */
   member_ids: string[];
+  /** Who's cooking it; null means not decided. */
+  cook_id: string | null;
 };
 export type Preset = { id: string; weekday: number; meal_time_id: string; category_id: string };
 export type MealMember = { id: string; name: string; colour: string; icon: string | null };
@@ -120,7 +122,7 @@ export async function loadMeals(from: LocalDate, to: LocalDate): Promise<Meal[]>
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("meals")
-    .select("id, date, meal_time_id, category_id, recipe_id, servings, status, swapped_for_id, from_preset, sort_order, meal_members(member_id)")
+    .select("id, date, meal_time_id, category_id, recipe_id, servings, status, swapped_for_id, from_preset, sort_order, cook_id, meal_members(member_id)")
     .gte("date", from)
     .lte("date", to)
     .order("sort_order")
@@ -136,6 +138,7 @@ export async function loadMeals(from: LocalDate, to: LocalDate): Promise<Meal[]>
     status: m.status as Meal["status"],
     swapped_for_id: m.swapped_for_id,
     from_preset: m.from_preset,
+    cook_id: m.cook_id,
     member_ids: (m.meal_members ?? []).map((x) => x.member_id),
   }));
 }

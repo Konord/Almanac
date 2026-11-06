@@ -90,7 +90,7 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   const supabase = await createClient();
   const { data: meal, error } = await supabase
     .from("meals")
-    .select("id, date, status, recipe_id, meal_times(usual_time), recipes(name, icon)")
+    .select("id, date, status, recipe_id, cook_id, meal_times(usual_time), recipes(name, icon)")
     .eq("id", mealId)
     .maybeSingle();
   if (error) throw error;
@@ -124,6 +124,8 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
         title: `${h.label ?? "Get ready"} (${recipe?.name ?? "dinner"})`.slice(0, 120),
         icon: recipe?.icon ?? "🍽️",
         due_date: when.date,
+        // The cook's job, if there is one yet.
+        assignee_id: meal.cook_id,
         date_kind: "start",
         at_time: when.time,
       };

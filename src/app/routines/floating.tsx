@@ -8,8 +8,7 @@ import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { loadCalendar, rangeOf } from "../calendar/data";
 import { eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime } from "../calendar/views";
 import { loadMealBasics, loadMeals } from "../meals/data";
-import { placeTodayMeals } from "../meals/today";
-import { EATING_MINUTES } from "@/lib/meals";
+import { mealsForRoutines, placeTodayMeals } from "../meals/today";
 import type { CalendarItem } from "../calendar/types";
 import { dayRoutinesFor, personDay, type DayRoutine, type RoutineData } from "./data";
 
@@ -199,7 +198,7 @@ export async function routinesPlacedOn(data: RoutineData, date: LocalDate, house
       memberIds: e.member_ids.filter((id) => memberIds.has(id)),
     })),
   );
-  const dayMeals = placedMeals.map((m) => ({ mealTimeId: m.mealTimeId, eatStart: m.endMin - EATING_MINUTES, endMin: m.endMin, memberIds: m.memberIds, title: m.name }));
+  const dayMeals = mealsForRoutines(placedMeals);
   return new Map(
     data.members.map((m) => [
       m.id,
