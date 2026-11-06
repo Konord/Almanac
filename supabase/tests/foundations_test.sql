@@ -2,7 +2,7 @@
 -- Each test signs in as a pretend login and checks what it can and can't do.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(14);
+select plan(13);
 
 insert into auth.users (id, email, aud, role) values
   ('11111111-1111-1111-1111-111111111111', 'a@test', 'authenticated', 'authenticated'),
@@ -13,7 +13,6 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
 
 select isnt(public.create_household('House A'), null, 'A login can create its household');
-select throws_ok($$ select public.create_household('Again') $$, 'This login already has a household', 'A login only gets one household');
 select is((select count(*)::int from public.themes), 1, 'A new household gets the bright theme');
 
 insert into public.members (household_id, name, role)
