@@ -162,12 +162,18 @@ export async function pickVariant(formData: FormData) {
   backQuietly(formData, { meal: text(formData, "keepOpen") ? mealId : null });
 }
 
-/** Who a meal is for. Everyone ticked (or nobody) means everyone. */
+/** Who a meal is for (everyone ticked, or nobody, means everyone), and who cooks it. */
 export async function setMealPeople(formData: FormData) {
   const household = await requireHousehold();
   const mealId = text(formData, "mealId");
   const chosen = formData.getAll("memberIds").map(String).filter(Boolean);
   const supabase = await createClient();
+  // Who's cooking (or nobody yet): they get the prep time on their timeline.
+  if (formData.has("cookId")) {
+    const { error: cookError } = await supabase.from("meals").update({ cook_id: text(formData, "cookId") || null }).eq("id", mealId);
+    if (cookError) back(formData, "error", cookError.message);
+    await syncHeadsUps(household.id, mealId, household.settings.timeZone);
+  }
   const { count } = await supabase.from("members").select("id", { count: "exact", head: true });
   await supabase.from("meal_members").delete().eq("meal_id", mealId);
   if (chosen.length > 0 && chosen.length < (count ?? 0)) {
@@ -865,7 +871,7 @@ async function swapCore(household: Household, mealId: string, backupId: string, 
   const supabase = await createClient();
   const { data: meal, error } = await supabase
     .from("meals")
-    .select("id, date, meal_time_id, category_id, recipe_id, servings, meal_members(member_id), recipes(name)")
+    .select("id, date, meal_time_id, category_id, recipe_id, servings, cook_id, meal_members(member_id), recipes(name)")
     .eq("id", mealId)
     .single();
   if (error) return { error: error.message };
@@ -875,7 +881,7 @@ async function swapCore(household: Household, mealId: string, backupId: string, 
   // The backup takes the meal's place, for the same people.
   const { data: added, error: addError } = await supabase
     .from("meals")
-    .insert({ household_id: household.id, date: meal.date, meal_time_id: meal.meal_time_id, recipe_id: backup.id, sort_order: 0 })
+    .insert({ household_id: household.id, date: meal.date, meal_time_id: meal.meal_time_id, recipe_id: backup.id, cook_id: meal.cook_id, sort_order: 0 })
     .select("id")
     .single();
   if (addError) return { error: addError.message };

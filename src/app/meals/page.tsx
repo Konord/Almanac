@@ -205,6 +205,15 @@ function MealCard({
               defaultValue={meal.member_ids}
               options={basics.members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" /> }))}
             />
+            <Chips
+              name="cookId"
+              label="Who's cooking? (they get the prep time)"
+              defaultValue={meal.cook_id ?? ""}
+              options={[
+                { value: "", label: "Not decided" },
+                ...basics.members.map((m) => ({ value: m.id, label: m.name, leading: <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" /> })),
+              ]}
+            />
             <Button variant="secondary" className="self-start">
               Save who
             </Button>

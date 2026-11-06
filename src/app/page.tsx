@@ -13,7 +13,7 @@ import {
   firstParam,
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
-import { EVERYONE_COLOUR, soft } from "@/lib/colours";
+import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold, type Household } from "@/lib/household";
@@ -21,13 +21,13 @@ import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
 import { PROFILE_COLOUR, ProfileTag } from "./calendar/profile-tag";
 import type { CalendarItem, Member } from "./calendar/types";
-import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type ChoreWithTiming, type Todo } from "./chores/data";
-import { ChoreRow, TodoRow } from "./chores/rows";
+import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type Todo } from "./chores/data";
+import { TodoRow } from "./chores/rows";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
-import { MealBlock, SurvivalButton, placeTodayMeals } from "./meals/today";
+import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals } from "./meals/today";
 import { SurvivalCard } from "./survival-card";
-import { floatingRoutines, RoutineBlock } from "./routines/floating";
+import { clock, floatingDay, RoutineBlock } from "./routines/floating";
 import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
@@ -35,6 +35,11 @@ import { PlaceAcrossPeople } from "@/components/place-across-people";
 import { PendingSpans } from "@/components/pending-block";
 import { layoutSpans, memberRuns, spanBox } from "@/lib/calendar-layout";
 import type { QuickDefaults } from "./calendar/forms";
+import { syncEventAndChoreHeadsUps } from "./heads-ups/sync";
+import { CHORE_LIST_LIMIT, loadBlocks, planChores, syncChoreTodos, type PlannedTodo } from "./chores/blocks";
+import { ChoreBlockOnTimeline } from "./chores/block-view";
+import type { BlockDay } from "@/lib/chore-blocks";
+import { toMinutes } from "@/lib/routine-placement";
 import {
   EventBlock,
   HourLines,
@@ -76,13 +81,18 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const now = new Date();
   const today = localDateOf(now, timeZone);
 
+  // Heads-ups due soon become to-dos before the lists are read.
+  await syncEventAndChoreHeadsUps(household);
   const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, tags, templates, items }, routineData, choreData, todoData, mealBasics, todayMeals, energyMode] = await Promise.all([
+  // Chores that have come due make their to-dos before the to-dos are read.
+  const choreData = await loadChores(today, timeZone);
+  await syncChoreTodos(household, choreData.chores);
+  const [{ layers, members, views, tags, templates, items }, routineData, todoData, blocks, mealBasics, todayMeals, energyMode] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
-    loadChores(today, timeZone),
     loadTodos(),
+    loadBlocks(),
     loadMealBasics(),
     loadMeals(today, today),
     energyModeOn(today),
@@ -98,6 +108,13 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     day: "numeric",
   }).format(now);
   const todayProfile = profiles.get(today);
+  // Which chore to-dos wait for a chore block; the rest go on the to-do list,
+  // a few at a time so it isn't overwhelming.
+  const chorePlan = planChores(blocks, choreData.chores, todoData.todos, today);
+  const listTodos = todosForToday(todoData.todos, today).filter((t) => !chorePlan.inBlocks.has(t.id));
+  const choreTodos = listTodos.filter((t) => t.template_id);
+  const shownChoreTodos = new Set(choreTodos.slice(0, CHORE_LIST_LIMIT).map((t) => t.id));
+  const todayTodos = listTodos.filter((t) => !t.template_id || shownChoreTodos.has(t.id));
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -156,12 +173,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           pending={pending}
           meals={todayMeals}
           mealBasics={mealBasics}
+          timedTodos={todoData.todos.filter((t) => t.status === "open" && t.date_kind === "start" && t.due_date === today && t.at_time)}
+          choreBlocks={chorePlan.days.filter((d) => d.date === today)}
         />
 
         <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
           <TodoCard
-            todos={todosForToday(todoData.todos, today)}
-            chores={dueChores(choreData.chores)}
+            todos={todayTodos}
+            waiting={choreTodos.length - shownChoreTodos.size}
             members={choreData.members}
             today={today}
             household={household}
@@ -212,7 +231,11 @@ function PeopleTimeline({
   pending,
   meals,
   mealBasics,
+  timedTodos,
+  choreBlocks,
 }: {
+  /** Today's chore blocks, with their to-dos. */
+  choreBlocks: BlockDay<PlannedTodo>[];
   allDay: CalendarItem[];
   items: CalendarItem[];
   members: Member[];
@@ -227,15 +250,13 @@ function PeopleTimeline({
   /** Today's planned meals. */
   meals: Meal[];
   mealBasics: MealBasics;
+  /** To-dos that start at a time today: points on the timeline, no length. */
+  timedTodos: Todo[];
 }) {
   const { timeZone } = household.settings;
   const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
   const memberIds = new Set(members.map((m) => m.id));
   const forEveryone = timed.filter((e) => !e.member_ids.some((id) => memberIds.has(id)));
-  // Routines float around each person's own plans and the ones for everyone.
-  const routinesFor = new Map(
-    members.map((m) => [m.id, floatingRoutines(routineData, m.id, today, [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone], timeZone)]),
-  );
   // Meals move around the plans of the people eating them.
   const placedMeals = placeTodayMeals(
     meals,
@@ -247,7 +268,32 @@ function PeopleTimeline({
       memberIds: e.member_ids.filter((id) => memberIds.has(id)),
     })),
   );
-  const placements = [...[...routinesFor.values()].flat().map((r) => r.placement), ...placedMeals];
+  // Routines float around each person's own plans, the ones for everyone, and their meals.
+  const dayMeals = mealsForRoutines(placedMeals);
+  // Chore blocks float with them, in the columns of the people doing them (everyone's if nobody's picked).
+  const blocksOf = (memberId: string) => choreBlocks.filter((d) => d.block.member_ids.length === 0 || d.block.member_ids.includes(memberId));
+  const dayFor = new Map(
+    members.map((m) => [
+      m.id,
+      floatingDay(
+        routineData,
+        m.id,
+        today,
+        [...timed.filter((e) => e.member_ids.includes(m.id)), ...forEveryone],
+        timeZone,
+        household.settings.routineFlexMinutes,
+        dayMeals,
+        blocksOf(m.id).map((d) => ({ id: d.block.id, start: toMinutes(d.block.start_time), minutes: d.block.minutes, loose: d.block.loose })),
+      ),
+    ]),
+  );
+  const routinesFor = new Map([...dayFor].map(([id, d]) => [id, d.routines]));
+  const choreBlocksFor = new Map([...dayFor].map(([id, d]) => [id, blocksOf(id).map((day, i) => ({ day, placement: d.extras[i] }))]));
+  const placements = [
+    ...[...routinesFor.values()].flat().map((r) => r.placement),
+    ...[...choreBlocksFor.values()].flat().map((b) => b.placement),
+    ...placedMeals,
+  ];
   const range = timelineRange(timed, [today], timeZone);
   const first = Math.min(range.first, ...placements.map((p) => Math.floor(p.startMin / 60)));
   const last = Math.max(range.last, ...placements.map((p) => Math.ceil(p.endMin / 60)));
@@ -275,10 +321,22 @@ function PeopleTimeline({
         c1,
       })),
     ),
-    // A meal for everyone (no one picked) spans the whole row.
-    ...placedMeals.flatMap((m) =>
-      memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({ id: `meal:${m.id}|${c0}`, startMin: m.startMin, endMin: m.endMin, c0, c1 })),
-    ),
+    // A meal for everyone (no one picked) spans the whole row. With a cook,
+    // the prep is in the cook's column and the rest in the eaters'.
+    ...placedMeals.flatMap((m) => {
+      const cook = m.cookId ? columnIds.indexOf(m.cookId) : -1;
+      const prep = cook >= 0 ? [{ id: `meal:${m.id}|prep`, startMin: m.startMin, endMin: m.eatStart, c0: cook, c1: cook }] : [];
+      return [
+        ...prep,
+        ...memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({
+          id: `meal:${m.id}|${c0}`,
+          startMin: cook >= 0 ? m.eatStart : m.startMin,
+          endMin: m.endMin,
+          c0,
+          c1,
+        })),
+      ];
+    }),
   ]);
   const mealById = new Map(placedMeals.map((m) => [m.id, m]));
   const eventById = new Map(timed.map((e) => [e.id, e]));
@@ -345,6 +403,17 @@ function PeopleTimeline({
                   household={household}
                 />
               ))}
+              {(choreBlocksFor.get(c.id) ?? []).map((b) => (
+                <ChoreBlockOnTimeline
+                  key={b.day.block.id}
+                  day={b.day}
+                  placement={b.placement}
+                  colour={c.colour}
+                  first={first}
+                  last={last}
+                  clock={(m) => clock(m, today, household)}
+                />
+              ))}
             </div>
           ))}
           {/* Events sit over the columns so one bubble can span several people. */}
@@ -353,11 +422,13 @@ function PeopleTimeline({
               const top = ((block.startMin - first * 60) / span) * 100;
               const height = (Math.max(block.endMin - block.startMin, 30) / span) * 100;
               if (block.id.startsWith("meal:")) {
-                const meal = mealById.get(block.id.slice(5).split("|")[0])!;
+                const [mealId, which] = block.id.slice(5).split("|");
+                const meal = mealById.get(mealId)!;
                 return (
                   <div key={block.id} className="pointer-events-auto">
                     <MealBlock
                       meal={meal}
+                      part={which === "prep" ? "prep" : meal.cookId && columnIds.includes(meal.cookId) ? "eat" : "whole"}
                       date={today}
                       household={household}
                       style={{
@@ -395,6 +466,20 @@ function PeopleTimeline({
                     }}
                   />
                 </div>
+              );
+            })}
+            {timedTodos.map((t) => {
+              const minute = Number(t.at_time!.slice(0, 2)) * 60 + Number(t.at_time!.slice(3, 5));
+              if (minute < first * 60 || minute > last * 60) return null;
+              const c = t.assignee_id ? columnIds.indexOf(t.assignee_id) : -1;
+              return (
+                <TodoPoint
+                  key={t.id}
+                  todo={t}
+                  top={((minute - first * 60) / span) * 100}
+                  box={c >= 0 ? spanBox(c, c, columns.length, COLUMN_GAP) : spanBox(0, columns.length - 1, columns.length, COLUMN_GAP)}
+                  colour={c >= 0 ? columns[c].colour : EVERYONE_COLOUR}
+                />
               );
             })}
             <div className="pointer-events-auto">
@@ -454,25 +539,27 @@ function DayPill({ profile, label, household, today }: { profile: DayProfile; la
 /** How many things the To-do card lists before "and N more". */
 const TODO_CARD_LIMIT = 4;
 
-/** To-dos for today (or with no day) and chores that are due. */
+/**
+ * To-dos for today (or with no day), chores' to-dos among them. Chores
+ * waiting for room (see CHORE_LIST_LIMIT) are counted, with a nudge to
+ * set aside some chore time.
+ */
 function TodoCard({
   todos,
-  chores,
+  waiting,
   members,
   today,
   household,
 }: {
   todos: Todo[];
-  chores: ChoreWithTiming[];
+  waiting: number;
   members: ChoreMember[];
   today: LocalDate;
   household: Household;
 }) {
   const memberById = new Map(members.map((m) => [m.id, m]));
   const shownTodos = todos.slice(0, TODO_CARD_LIMIT);
-  const shownChores = chores.slice(0, Math.max(0, TODO_CARD_LIMIT - shownTodos.length));
   const moreTodos = todos.length - shownTodos.length;
-  const moreChores = chores.length - shownChores.length;
   return (
     <Card
       title="To-do"
@@ -484,28 +571,25 @@ function TodoCard({
         </Link>
       }
     >
-      {todos.length + chores.length === 0 ? (
+      {todos.length === 0 ? (
         <p className="py-3 text-xl text-ink-muted">Nothing to do today.</p>
       ) : (
         <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
           {shownTodos.map((t) => (
             <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo="/" />
           ))}
-          {shownChores.map((c) => (
-            <ChoreRow key={c.id} chore={c} members={memberById} today={today} household={household} returnTo="/" />
-          ))}
         </ul>
       )}
-      {moreTodos + moreChores > 0 ? (
+      {moreTodos + waiting > 0 ? (
         <p className="mt-auto flex gap-4 pt-1 text-lg font-bold">
           {moreTodos > 0 ? (
             <Link href="/lists" className="text-accent">
-              +{moreTodos} more to-do{moreTodos === 1 ? "" : "s"}
+              +{moreTodos} more
             </Link>
           ) : null}
-          {moreChores > 0 ? (
-            <Link href="/chores" className="text-accent">
-              +{moreChores} chore{moreChores === 1 ? "" : "s"} due
+          {waiting > 0 ? (
+            <Link href="/chores/blocks" className="text-accent">
+              {waiting} chore{waiting === 1 ? "" : "s"} waiting · add chore time?
             </Link>
           ) : null}
         </p>
@@ -584,4 +668,19 @@ function sortForDay(items: CalendarItem[], timeZone: string): CalendarItem[] {
     const bAll = isAllDayStyle(b, timeZone) ? 0 : 1;
     return aAll - bAll || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime();
   });
+}
+
+/** A to-do at a time: a point on the line, not a block (it has no length). Tapping opens its list. */
+function TodoPoint({ todo, top, box, colour }: { todo: Todo; top: number; box: { left: string; width: string }; colour: string }) {
+  return (
+    <Link
+      href={todo.link ?? `/lists?list=${todo.list_id}`}
+      title={todo.title}
+      className="pointer-events-auto absolute z-[2] flex h-8 -translate-y-1/2 items-center gap-1.5 overflow-hidden"
+      style={{ top: `${top}%`, ...box }}
+    >
+      <span className="size-3.5 shrink-0 rounded-full border-[3px] bg-board" style={{ borderColor: strong(colour) }} aria-hidden />
+      <span className="min-w-0 truncate rounded-lg bg-board/90 px-1.5 font-hand text-xl leading-none text-ink">{todo.title}</span>
+    </Link>
+  );
 }

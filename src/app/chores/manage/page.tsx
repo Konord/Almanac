@@ -3,15 +3,19 @@ import Link from "next/link";
 import { ArrowLeft, Broom, Plus } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Avatar, Button, Card, Emoji, Notice, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
-import { IMPORTANCE_LABEL, SIZE_LABEL, describeRepeat } from "@/lib/chores";
+import { IMPORTANCE_LABEL, SIZE_LABEL, describeRule } from "@/lib/chores";
 import { requireHousehold, type Household } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { addChore, removeChore, setChoreActive, updateChore } from "../actions";
 import { loadChores, type ChoreWithTiming } from "../data";
 import { ChoreFields } from "../forms";
 import { dayPhrase } from "../rows";
+import { Pager, pageOf } from "../../meals/parts";
 
-const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Rows that fit in one list without scrolling. */
+const CHORES_PER_PAGE = 9;
+import { HeadsUpEditor, loadHeadsUps } from "../../heads-ups/editor";
+
 
 /**
  * Setting chores up: the household's chore library, grouped by how often
@@ -39,11 +43,19 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const returnTo = "/chores/manage";
+  // Which page each of the three lists is on.
+  const pages: Record<string, string> = {};
+  for (const k of ["p0", "p1", "p2"]) {
+    const v = firstParam(params[k]);
+    if (v) pages[k] = v;
+  }
 
+  // Chores kept to some times of year go under Seasonal.
+  const seasonal = (c: ChoreWithTiming) => Boolean(c.season_start || c.only_seasons?.length || c.only_months?.length);
   const groups: { title: string; chores: ChoreWithTiming[] }[] = [
-    { title: "Every week or so", chores: chores.filter((c) => !c.season_start && (c.repeat_unit === "day" || c.repeat_unit === "week")) },
-    { title: "Every month or more", chores: chores.filter((c) => !c.season_start && (c.repeat_unit === "month" || c.repeat_unit === "year")) },
-    { title: "Seasonal", chores: chores.filter((c) => c.season_start) },
+    { title: "Every week or so", chores: chores.filter((c) => !seasonal(c) && (c.repeat_unit === "day" || c.repeat_unit === "week")) },
+    { title: "Every month or more", chores: chores.filter((c) => !seasonal(c) && (c.repeat_unit === "month" || c.repeat_unit === "year")) },
+    { title: "Seasonal", chores: chores.filter(seasonal) },
   ];
 
   return (
@@ -70,10 +82,12 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
       </p>
 
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-3">
-        {groups.map((g) => (
+        {groups.map((g, gi) => {
+          const shown = pageOf(g.chores, Number(firstParam(params[`p${gi}`]) ?? 0), CHORES_PER_PAGE);
+          return (
           <Card key={g.title} title={g.title} icon={Broom} tint={g.title === "Seasonal" ? "orange" : "blue"} aside={<span className="text-lg font-bold text-ink-muted">{g.chores.length}</span>}>
-            <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-              {g.chores.map((c) => {
+            <ul className="flex flex-col lg:min-h-0 lg:flex-1">
+              {shown.items.map((c) => {
                 const who = c.default_assignee_id ? memberById.get(c.default_assignee_id) : undefined;
                 return (
                   <li key={c.id} className="border-b border-panel last:border-0">
@@ -92,16 +106,18 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
                 );
               })}
             </ul>
+            <Pager page={shown.page} pages={shown.pages} href={(n) => `/chores/manage?${new URLSearchParams({ ...pages, [`p${gi}`]: String(n) })}`} />
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {adding ? (
         <Sheet title="Add a chore" closeHref="/chores/manage">
-          <form action={addChore} className="grid gap-4 sm:grid-cols-2">
+          <form action={addChore} className="group flex h-full flex-col gap-5">
             <input type="hidden" name="returnTo" value={returnTo} />
             <ChoreFields members={members} />
-            <div className="sm:col-span-2">
+            <div className="shrink-0">
               <Button>Add chore</Button>
             </div>
           </form>
@@ -110,31 +126,44 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
 
       {editing ? (
         <Sheet title={editing.name} closeHref="/chores/manage">
-          <p className="mb-5 text-lg text-ink-muted">
-            {editing.timing.lastDone ? `Last done ${dayPhrase(editing.timing.lastDone, today, household)}. ` : "Not done yet. "}
-            {editing.active ? `Next due ${dayPhrase(editing.timing.dueOn, today, household)}.` : "Paused."}
-          </p>
-          <form action={updateChore} className="grid gap-4 sm:grid-cols-2">
-            <input type="hidden" name="id" value={editing.id} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <ChoreFields chore={editing} members={members} />
-            <div className="sm:col-span-2">
-              <Button>Save chore</Button>
+          <div className="flex h-full flex-col gap-5">
+            <p className="shrink-0 text-lg text-ink-muted">
+              {editing.timing.lastDone ? `Last done ${dayPhrase(editing.timing.lastDone, today, household)}. ` : "Not done yet. "}
+              {editing.active ? `Next due ${dayPhrase(editing.timing.dueOn, today, household)}.` : "Paused."}
+            </p>
+            <form id="edit-chore" action={updateChore} className="group flex min-h-0 flex-1 flex-col">
+              <input type="hidden" name="id" value={editing.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
+              <ChoreFields
+                chore={editing}
+                members={members}
+                initialTab={firstParam(params.tab)}
+                headsUps={
+                  <HeadsUpEditor
+                    headsUps={await loadHeadsUps({ choreId: editing.id })}
+                    source={{ choreId: editing.id }}
+                    returnTo={`/chores/manage?edit=${editing.id}&tab=heads-ups`}
+                    what="it comes due"
+                    example="Buy a new filter"
+                  />
+                }
+              />
+            </form>
+            <div className="flex shrink-0 flex-wrap gap-3">
+              <Button form="edit-chore">Save chore</Button>
+              <form action={setChoreActive} className="ml-auto">
+                <input type="hidden" name="id" value={editing.id} />
+                <input type="hidden" name="active" value={String(!editing.active)} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <Button variant="secondary">{editing.active ? "Pause it" : "Turn it back on"}</Button>
+              </form>
+              <form action={removeChore}>
+                <input type="hidden" name="id" value={editing.id} />
+                <input type="hidden" name="name" value={editing.name} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <Button variant="danger">Remove</Button>
+              </form>
             </div>
-          </form>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <form action={setChoreActive}>
-              <input type="hidden" name="id" value={editing.id} />
-              <input type="hidden" name="active" value={String(!editing.active)} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <Button variant="secondary">{editing.active ? "Pause it" : "Turn it back on"}</Button>
-            </form>
-            <form action={removeChore}>
-              <input type="hidden" name="id" value={editing.id} />
-              <input type="hidden" name="name" value={editing.name} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <Button variant="danger">Remove {editing.name}</Button>
-            </form>
           </div>
         </Sheet>
       ) : null}
@@ -149,8 +178,8 @@ function repeatText(c: ChoreWithTiming, household: Household): string {
     const [m, d] = md.split("-").map(Number);
     return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2026, m - 1, d)));
   };
-  const parts = [describeRepeat(c, c.season_start && c.season_end ? `${fmt(c.season_start)} – ${fmt(c.season_end)}` : undefined)];
-  if (c.preferred_weekday !== null) parts.push(WEEKDAY_SHORT[c.preferred_weekday]);
+  const day = (d: string) => new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
+  const parts = [describeRule(c, day, c.season_start && c.season_end ? `${fmt(c.season_start)} – ${fmt(c.season_end)}` : undefined)];
   parts.push(SIZE_LABEL[c.size]);
   if (c.importance !== "normal") parts.push(IMPORTANCE_LABEL[c.importance]);
   return parts.join(" · ");

@@ -16,11 +16,28 @@ export type ChoreSize = "small" | "medium" | "big";
 /** How much a chore matters, beside its size. Important ones aren't skipped on a survival day unless you choose to. */
 export type ChoreImportance = "low" | "normal" | "high";
 
+/**
+ * Where a chore's due date lands once it's worked out: on the nearest
+ * Saturday, the first Saturday of the month, the last Sunday of the season…
+ */
+export type ChoreSnap = "none" | "weekday" | "first_of_month" | "last_of_month" | "first_of_season" | "last_of_season";
+
+export type Season = "spring" | "summer" | "fall" | "winter";
+
 export type ChoreRule = {
   repeat_every: number;
   repeat_unit: RepeatUnit;
-  /** 0 = Sunday … 6 = Saturday, or null for any day. */
+  /** 0 = Sunday … 6 = Saturday, or null for any day. The weekday a snap uses. */
   preferred_weekday: number | null;
+  /** Count from when it was last done (the default) or from a set date. */
+  repeat_from?: "done" | "date";
+  /** For repeat_from "date": the first date of the schedule. */
+  start_date?: LocalDate | null;
+  /** Missing: snap to the preferred weekday if there is one. */
+  snap?: ChoreSnap;
+  /** Only in these months (1–12) or seasons; empty or null means any time. */
+  only_months?: number[] | null;
+  only_seasons?: Season[] | null;
   /** "MM-DD", or null when the chore has no season. */
   season_start: string | null;
   season_end: string | null;
@@ -88,6 +105,123 @@ export function addInterval(date: LocalDate, every: number, unit: RepeatUnit): L
   }
 }
 
+/*
+ * Seasons follow the solstices and equinoxes, with fixed dates each year:
+ * spring from March 20, summer from June 21, fall from September 22 and
+ * winter from December 21.
+ */
+export const SEASONS: { season: Season; label: string; start: string }[] = [
+  { season: "spring", label: "Spring", start: "03-20" },
+  { season: "summer", label: "Summer", start: "06-21" },
+  { season: "fall", label: "Fall", start: "09-22" },
+  { season: "winter", label: "Winter", start: "12-21" },
+];
+
+/** The season a date falls in, and that season's first and last days. */
+export function seasonOf(date: LocalDate): { season: Season; start: LocalDate; end: LocalDate } {
+  const year = Number(date.slice(0, 4));
+  const md = date.slice(5);
+  const i = SEASONS.findIndex((s, k) => md >= s.start && (k === SEASONS.length - 1 || md < SEASONS[k + 1].start));
+  if (i === -1) {
+    // January to March 19: the winter that began last December.
+    return { season: "winter", start: `${year - 1}-12-21`, end: `${year}-03-19` };
+  }
+  const start = `${year}-${SEASONS[i].start}`;
+  const next = i === SEASONS.length - 1 ? `${year + 1}-${SEASONS[0].start}` : `${year}-${SEASONS[i + 1].start}`;
+  return { season: SEASONS[i].season, start, end: addDays(next, -1) };
+}
+
+/** The first or last `weekday` in a run of days (start..end). */
+function weekdayIn(start: LocalDate, end: LocalDate, weekday: number, which: "first" | "last"): LocalDate {
+  if (which === "first") return onOrAfterWeekday(start, weekday);
+  return addDays(end, -((dayOfWeek(end) - weekday + 7) % 7));
+}
+
+function monthBounds(date: LocalDate): { start: LocalDate; end: LocalDate } {
+  const start = `${date.slice(0, 7)}-01`;
+  return { start, end: addDays(addMonths(start, 1), -1) };
+}
+
+/** Moves a worked-out date onto the rule's snap (if it has one). */
+export function snapDate(date: LocalDate, snap: ChoreSnap, weekday: number | null): LocalDate {
+  if (snap === "none" || weekday === null) return date;
+  switch (snap) {
+    case "weekday":
+      return nearestWeekday(date, weekday);
+    case "first_of_month":
+    case "last_of_month": {
+      const m = monthBounds(date);
+      return weekdayIn(m.start, m.end, weekday, snap === "first_of_month" ? "first" : "last");
+    }
+    case "first_of_season":
+    case "last_of_season": {
+      const s = seasonOf(date);
+      return weekdayIn(s.start, s.end, weekday, snap === "first_of_season" ? "first" : "last");
+    }
+  }
+}
+
+/** The next snapped date after `after`: the snap's next month, season or week. */
+function nextSnap(after: LocalDate, snap: ChoreSnap, weekday: number | null): LocalDate {
+  switch (snap) {
+    case "first_of_month":
+    case "last_of_month":
+      return snapDate(addMonths(monthBounds(after).start, 1), snap, weekday);
+    case "first_of_season":
+    case "last_of_season":
+      return snapDate(addDays(seasonOf(after).end, 1), snap, weekday);
+    default:
+      return snapDate(addDays(after, 7), snap, weekday);
+  }
+}
+
+function allowed(date: LocalDate, rule: ChoreRule): boolean {
+  const months = rule.only_months ?? [];
+  const seasons = rule.only_seasons ?? [];
+  if (months.length > 0 && !months.includes(Number(date.slice(5, 7)))) return false;
+  if (seasons.length > 0 && !seasons.includes(seasonOf(date).season)) return false;
+  return true;
+}
+
+/** The first allowed day on or after `date` (the start of the next allowed month or season). */
+function nextAllowed(date: LocalDate, rule: ChoreRule): LocalDate {
+  let d = date;
+  for (let i = 0; i < 24 && !allowed(d, rule); i++) {
+    const months = rule.only_months ?? [];
+    d = months.length > 0 ? addMonths(monthBounds(d).start, 1) : addDays(seasonOf(d).end, 1);
+  }
+  return d;
+}
+
+/** Which snap a rule uses (old rules: the favourite weekday, if any). */
+export function snapOf(rule: ChoreRule): ChoreSnap {
+  if (rule.preferred_weekday === null) return "none";
+  return rule.snap ?? "weekday";
+}
+
+/**
+ * Puts a worked-out date where the rule wants it: snapped, inside the
+ * allowed months or seasons, and after `after` (if given).
+ */
+function place(date: LocalDate, rule: ChoreRule, after: LocalDate | null): LocalDate {
+  const snap = snapOf(rule);
+  const wd = rule.preferred_weekday;
+  let d = snapDate(date, snap, wd);
+  for (let i = 0; i < 24; i++) {
+    if (after !== null && d <= after) {
+      d = snap === "none" ? addDays(after, 1) : nextSnap(d, snap, wd);
+    } else if (!allowed(d, rule)) {
+      // Into the next allowed stretch, and snapped inside it, never back out.
+      const start = nextAllowed(d, rule);
+      d = snap === "weekday" ? onOrAfterWeekday(start, wd as number) : snapDate(start, snap, wd);
+      if (d < start) d = nextSnap(d, snap, wd);
+    } else {
+      return d;
+    }
+  }
+  return d;
+}
+
 /** The preferred weekday nearest to `date` (up to 3 days either way). */
 function nearestWeekday(date: LocalDate, weekday: number): LocalDate {
   let diff = (weekday - dayOfWeek(date) + 7) % 7; // 0..6 forward
@@ -149,19 +283,67 @@ export function choreTiming(rule: ChoreRule, rounds: ChoreRound[], today: LocalD
   }
 
   let dueOn: LocalDate;
-  if (lastRound === null) {
+  if (rule.repeat_from === "date" && rule.start_date) {
+    // A set schedule (every 2 weeks from Jan 5): the newest date that has
+    // come round since it was last done, or else the next one.
+    dueOn = scheduledDue(rule, rule.start_date, lastRound, today);
+  } else if (lastRound === null) {
     // Never done: due now (or from its first day), on its weekday if it has one.
     const from = rule.first_due ?? today;
-    dueOn = rule.preferred_weekday === null ? from : onOrAfterWeekday(from, rule.preferred_weekday);
+    const snap = snapOf(rule);
+    const wd = rule.preferred_weekday;
+    let first = snap === "weekday" ? onOrAfterWeekday(from, wd as number) : snapDate(from, snap, wd);
+    if (first < from) first = nextSnap(first, snap, wd);
+    dueOn = place(first, rule, addDays(from, -1));
+  } else if (rule.repeat_unit === "day" && snapOf(rule) === "weekday") {
+    // Daily chores ignore a favourite weekday (as before).
+    dueOn = place(addInterval(lastRound, rule.repeat_every, rule.repeat_unit), { ...rule, snap: "none" }, lastRound);
   } else {
-    dueOn = addInterval(lastRound, rule.repeat_every, rule.repeat_unit);
-    if (rule.preferred_weekday !== null && rule.repeat_unit !== "day") {
-      dueOn = nearestWeekday(dueOn, rule.preferred_weekday);
-      if (dueOn <= lastRound) dueOn = addDays(dueOn, 7);
-    }
+    dueOn = place(addInterval(lastRound, rule.repeat_every, rule.repeat_unit), rule, lastRound);
   }
   const state = stateFor(dueOn, today);
   return { state, dueOn, daysOverdue: state === "due" ? daysBetween(dueOn, today) : 0, lastDone, window: null };
+}
+
+/** For a set schedule: the dates start, start + step, start + 2 steps…, each placed by the rule. */
+function scheduledDue(rule: ChoreRule, start: LocalDate, lastRound: LocalDate | null, today: LocalDate): LocalDate {
+  let newestPassed: LocalDate | null = null;
+  for (let k = 0; k < 2000; k++) {
+    const raw = addInterval(start, rule.repeat_every * k, rule.repeat_unit);
+    const d = place(raw, rule, null);
+    if (lastRound !== null && d <= lastRound) continue;
+    if (d > today) return newestPassed ?? d;
+    newestPassed = d;
+  }
+  return newestPassed ?? start;
+}
+
+const SNAP_WORDS: Record<Exclude<ChoreSnap, "none">, (day: string) => string> = {
+  weekday: (day) => `on the nearest ${day}`,
+  first_of_month: (day) => `on the first ${day} of the month`,
+  last_of_month: (day) => `on the last ${day} of the month`,
+  first_of_season: (day) => `on the first ${day} of the season`,
+  last_of_season: (day) => `on the last ${day} of the season`,
+};
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * The whole rule in words: "Every 2 weeks from Jan 5, on the nearest
+ * Saturday, only in summer". `dateLabel` formats the start date.
+ */
+export function describeRule(rule: ChoreRule, dateLabel: (d: LocalDate) => string = (d) => d, seasonLabel?: string): string {
+  if (rule.season_start && rule.season_end) return describeRepeat(rule, seasonLabel);
+  const parts = [describeRepeat(rule)];
+  if (rule.repeat_from === "date" && rule.start_date) parts[0] += ` from ${dateLabel(rule.start_date)}`;
+  const snap = snapOf(rule);
+  if (snap !== "none") parts.push(SNAP_WORDS[snap](WEEKDAY_NAMES[rule.preferred_weekday as number]));
+  const seasons = rule.only_seasons ?? [];
+  const months = rule.only_months ?? [];
+  if (seasons.length > 0) parts.push(`only in ${seasons.join(" and ")}`);
+  if (months.length > 0) parts.push(`only in ${[...months].sort((a, b) => a - b).map((m) => MONTH_SHORT[m - 1]).join(", ")}`);
+  return parts.join(", ");
 }
 
 /** "Every week", "Every 3 months", "Once a year, Oct 15 – Nov 30" (dates already formatted). */

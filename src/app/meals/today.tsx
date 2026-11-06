@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Check } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import type { Household } from "@/lib/household";
-import { mealSlot } from "@/lib/meals";
+import { EATING_MINUTES, mealSlot } from "@/lib/meals";
 import { placeRoutines, type Busy } from "@/lib/routine-placement";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { mealIcon, mealName, type Meal, type MealBasics } from "./data";
@@ -15,6 +15,7 @@ import { mealIcon, mealName, type Meal, type MealBasics } from "./data";
 
 export type TodayMeal = {
   id: string;
+  mealTimeId: string;
   name: string;
   icon: string;
   /** Who it's for; empty means everyone. */
@@ -23,6 +24,11 @@ export type TodayMeal = {
   endMin: number;
   /** Minutes before eating that cooking starts. */
   cookMinutes: number;
+  /** Who's cooking: they get the prep time. Null: not decided. */
+  cookId: string | null;
+  /** When eating starts and ends (tidying up follows, until endMin). */
+  eatStart: number;
+  eatEnd: number;
   cooked: boolean;
   canCook: boolean;
   backup: boolean;
@@ -30,8 +36,9 @@ export type TodayMeal = {
 };
 
 /**
- * Where today's meals sit. A meal for everyone moves around plans for
- * everyone; a meal for some people moves around their own plans too.
+ * Where today's meals sit: prep, eating, then tidying up. A shared meal
+ * stays put when someone's own plans move; it only moves for its cook's
+ * plans, or for a plan for the whole family (or everyone eating it).
  */
 export function placeTodayMeals(
   meals: Meal[],
@@ -46,23 +53,43 @@ export function placeTodayMeals(
     const recipe = m.recipe_id ? (recipes.get(m.recipe_id) ?? null) : null;
     const slot = mealSlot(times.get(m.meal_time_id)?.usual_time ?? "18:00", recipe);
     const busy: Busy[] = events
-      .filter((e) => e.memberIds.length === 0 || (m.member_ids.length > 0 && e.memberIds.some((id) => m.member_ids.includes(id))))
+      .filter(
+        (e) =>
+          e.memberIds.length === 0 ||
+          (m.cook_id !== null && e.memberIds.includes(m.cook_id)) ||
+          (m.member_ids.length > 0 && m.member_ids.every((id) => e.memberIds.includes(id))),
+      )
       .map(({ startMin, endMin, title }) => ({ startMin, endMin, title }));
-    const [placed] = m.status === "cooked" ? [{ startMin: slot.start, endMin: slot.start + slot.minutes, movedFor: null }] : placeRoutines([{ id: m.id, kind: "daily", start: slot.start, minutes: slot.minutes }], busy);
+    const [placed] = m.status === "cooked" ? [{ startMin: slot.start, endMin: slot.start + slot.minutes, movedFor: null }] : placeRoutines([{ id: m.id, start: slot.start, minutes: slot.minutes, direction: "later" }], busy);
     return {
       id: m.id,
+      mealTimeId: m.meal_time_id,
       name: mealName(m, recipes, categories),
       icon: mealIcon(m, recipes, categories),
       memberIds: m.member_ids,
       startMin: placed.startMin,
       endMin: placed.endMin,
       cookMinutes: slot.cookMinutes,
+      cookId: m.cook_id,
+      eatStart: placed.startMin + slot.cookMinutes,
+      eatEnd: placed.startMin + slot.cookMinutes + EATING_MINUTES,
       cooked: m.status === "cooked",
       canCook: Boolean(m.recipe_id),
       backup: recipe?.is_backup ?? false,
       movedFor: placed.movedFor,
     };
   });
+}
+
+/**
+ * Today's meals as routines see them: busy while eating and tidying for
+ * the people eating, and busy while prepping for the cook.
+ */
+export function mealsForRoutines(meals: TodayMeal[]): { mealTimeId: string; eatStart: number; endMin: number; memberIds: string[]; title: string }[] {
+  return meals.flatMap((m) => [
+    { mealTimeId: m.mealTimeId, eatStart: m.eatStart, endMin: m.endMin, memberIds: m.memberIds, title: m.name },
+    ...(m.cookId ? [{ mealTimeId: m.mealTimeId, eatStart: m.startMin, endMin: m.eatStart, memberIds: [m.cookId], title: `cooking ${m.name}` }] : []),
+  ]);
 }
 
 function clock(minutes: number, date: LocalDate, household: Household): string {
@@ -73,13 +100,51 @@ function clock(minutes: number, date: LocalDate, household: Household): string {
     .replace(":00", "");
 }
 
-/** A meal on the timeline: butter yellow, big picture, name in handwriting. */
-export function MealBlock({ meal, date, household, style }: { meal: TodayMeal; date: LocalDate; household: Household; style: React.CSSProperties }) {
-  const eatAt = meal.endMin - 30;
+/**
+ * A meal on the timeline: butter yellow, big picture, name in handwriting.
+ * With a cook, the prep part sits in the cook's column ("prep") and the
+ * eating and tidying in the eaters' ("eat"); without one it's all one
+ * block ("whole").
+ */
+export function MealBlock({
+  meal,
+  date,
+  household,
+  style,
+  part = "whole",
+}: {
+  meal: TodayMeal;
+  date: LocalDate;
+  household: Household;
+  style: React.CSSProperties;
+  part?: "whole" | "prep" | "eat";
+}) {
+  const eat = clock(meal.eatStart, date, household);
+  const detail = meal.cooked
+    ? "Cooked"
+    : part === "eat"
+        ? `eat ${eat}, then tidy`
+        : `cook ${clock(meal.startMin, date, household)}, eat ${eat}`;
+  if (part === "prep") {
+    // Prep is often short on the timeline: one small line.
+    return (
+      <Link
+        href={meal.canCook ? `/meals/cook/${meal.id}` : `/meals?meal=${meal.id}`}
+        title={`${meal.name}: start cooking ${clock(meal.startMin, date, household)}, eat ${eat}`}
+        className={`absolute flex items-center gap-1.5 overflow-hidden rounded-xl border-2 border-dashed border-meal-ink/50 bg-meal/60 px-2 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`}
+        style={style}
+      >
+        <Emoji emoji="🔪" className="size-5" />
+        <span className="min-w-0 flex-1 truncate text-sm leading-none font-bold">
+          {meal.cooked ? "Cooked" : `Cook ${clock(meal.startMin, date, household)}`}
+        </span>
+      </Link>
+    );
+  }
   return (
     <Link
       href={meal.canCook ? `/meals/cook/${meal.id}` : `/meals?meal=${meal.id}`}
-      title={`${meal.name}: start cooking ${clock(meal.startMin, date, household)}, eat ${clock(eatAt, date, household)}`}
+      title={`${meal.name}: start cooking ${clock(meal.startMin, date, household)}, eat ${eat}, then tidy up`}
       className={`absolute flex items-start gap-2 overflow-hidden rounded-2xl bg-meal px-2.5 py-1 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`}
       style={style}
     >
@@ -87,7 +152,7 @@ export function MealBlock({ meal, date, household, style }: { meal: TodayMeal; d
       <span className="min-w-0 flex-1 truncate leading-[1.1]">
         <span className="font-hand text-2xl">{meal.name}</span>{" "}
         <span className="text-sm font-bold whitespace-nowrap">
-          {meal.cooked ? "Cooked" : `cook ${clock(meal.startMin, date, household)}, eat ${clock(eatAt, date, household)}`}
+          {detail}
           {meal.movedFor ? ` · after ${meal.movedFor}` : ""}
         </span>
       </span>

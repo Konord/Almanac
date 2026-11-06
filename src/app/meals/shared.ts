@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { headsUpTime } from "@/lib/heads-ups";
 import { guessAisle, weekDates, weekdayOf } from "@/lib/meals";
 import { addDays, zonedToUtc, localDateOf, type LocalDate } from "@/lib/time";
 
@@ -89,7 +90,7 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   const supabase = await createClient();
   const { data: meal, error } = await supabase
     .from("meals")
-    .select("id, date, status, recipe_id, meal_times(usual_time), recipes(name, icon)")
+    .select("id, date, status, recipe_id, cook_id, meal_times(usual_time), recipes(name, icon)")
     .eq("id", mealId)
     .maybeSingle();
   if (error) throw error;
@@ -114,16 +115,19 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   const eatAt = zonedToUtc(meal.date, usual, timeZone);
   const rows = helpers
     .map((h) => {
-      const due = new Date(eatAt.getTime() - (h.minutes ?? 0) * 60_000);
-      const dueDate = localDateOf(due, timeZone);
-      const time = new Intl.DateTimeFormat("en-CA", { timeZone, hour: "numeric", minute: "2-digit" }).format(due).replace(":00", "");
+      // It shows from its own time ("start"), like the other heads-ups.
+      const when = headsUpTime(eatAt, h.minutes ?? 0, timeZone);
       return {
         household_id: householdId,
         list_id: list.id,
         meal_id: mealId,
-        title: `${h.label ?? "Get ready"} by ${time} (${recipe?.name ?? "dinner"})`.slice(0, 120),
+        title: `${h.label ?? "Get ready"} (${recipe?.name ?? "dinner"})`.slice(0, 120),
         icon: recipe?.icon ?? "🍽️",
-        due_date: dueDate,
+        due_date: when.date,
+        // The cook's job, if there is one yet.
+        assignee_id: meal.cook_id,
+        date_kind: "start",
+        at_time: when.time,
       };
     })
     .filter((r) => r.due_date >= today);

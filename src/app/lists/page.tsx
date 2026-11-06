@@ -8,9 +8,11 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
-import { loadTodos, type ChoreMember } from "../chores/data";
+import { loadChores, loadTodos, type ChoreMember } from "../chores/data";
+import { syncChoreTodos } from "../chores/blocks";
 import { TodoFields } from "../chores/forms";
 import { TodoRow } from "../chores/rows";
+import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
 
 /**
  * To-do lists. Each to-do can have a day and a person, both optional.
@@ -31,6 +33,9 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const params = await searchParams;
   const { locale, timeZone } = household.settings;
   const today = localDateOf(new Date(), timeZone);
+  // Heads-ups due soon become to-dos before the lists are read.
+  await syncEventAndChoreHeadsUps(household);
+  await syncChoreTodos(household, (await loadChores(today, timeZone)).chores);
   const supabase = await createClient();
   const [{ lists, todos }, { data: memberRows }] = await Promise.all([
     loadTodos(),
@@ -52,6 +57,9 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const addingList = firstParam(params.newList) === "1";
   const error = firstParam(params.error);
   const message = firstParam(params.message);
+  const showingDone = firstParam(params.done) === "1";
+  const page = Math.max(0, Number(firstParam(params.page) ?? 0) || 0);
+  const dayPage = Math.max(0, Number(firstParam(params.dayPage) ?? 0) || 0);
 
   return (
     <>
@@ -65,7 +73,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
         {/* Which list */}
         <Card title="Lists" icon={ListChecks} tint="blue">
-          <ul className="flex flex-col gap-1.5 lg:min-h-0 lg:overflow-y-auto">
+          <ul className="flex flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
             {lists.map((l) => {
               const count = todos.filter((t) => t.list_id === l.id && t.status === "open").length;
               const active = l.id === list?.id;
@@ -113,8 +121,14 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <div className="min-w-56 flex-[3]">
                 <Input name="title" placeholder="Add a to-do…" required maxLength={120} aria-label="New to-do" className="w-full" />
               </div>
+              <div className="min-w-36 flex-1">
+                <Select name="dateKind" aria-label="What the day means" defaultValue="due" className="w-full">
+                  <option value="due">Done by</option>
+                  <option value="start">On</option>
+                </Select>
+              </div>
               <div className="min-w-44 flex-1">
-                <Input name="dueDate" type="date" aria-label="For a day (optional)" className="w-full" />
+                <Input name="dueDate" type="date" aria-label="Day (optional)" className="w-full" />
               </div>
               <div className="min-w-36 flex-1">
                 <Select name="assigneeId" aria-label="For someone (optional)" defaultValue="" className="w-full">
@@ -131,38 +145,46 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 Add
               </Button>
             </form>
-            <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-              {open.length === 0 ? <p className="py-4 text-xl text-ink-muted">Nothing on this list. Add something above.</p> : null}
-              <ul className="flex flex-col">
-                {open.map((t) => (
-                  <TodoRow
-                    key={t.id}
-                    todo={t}
-                    members={memberById}
-                    today={today}
-                    household={household}
-                    returnTo={returnTo}
-                    editHref={here(`&edit=${t.id}`)}
-                  />
-                ))}
-              </ul>
-              {done.length > 0 ? (
-                <details className="mt-3">
-                  <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-ink-muted">
-                    Done ({done.length})
-                  </summary>
+            <div className="flex flex-col lg:min-h-0 lg:flex-1">
+              {showingDone ? (
+                <>
                   <ul className="flex flex-col">
-                    {done.map((t) => (
+                    {pageOf(done, page, LIST_PAGE).map((t) => (
                       <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo={returnTo} />
                     ))}
                   </ul>
-                  <form action={clearDone} className="mt-2">
-                    <input type="hidden" name="listId" value={list.id} />
-                    <input type="hidden" name="returnTo" value={returnTo} />
-                    <Button variant="secondary">Clear the done ones</Button>
-                  </form>
-                </details>
-              ) : null}
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+                    <SoftLink href={here()}>Back to the list</SoftLink>
+                    <Pager count={done.length} page={page} perPage={LIST_PAGE} href={(p) => here(`&done=1&page=${p}`)} />
+                    <form action={clearDone} className="ml-auto">
+                      <input type="hidden" name="listId" value={list.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <Button variant="secondary">Clear the done ones</Button>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {open.length === 0 ? <p className="py-4 text-xl text-ink-muted">Nothing on this list. Add something above.</p> : null}
+                  <ul className="flex flex-col">
+                    {pageOf(open, page, LIST_PAGE).map((t) => (
+                      <TodoRow
+                        key={t.id}
+                        todo={t}
+                        members={memberById}
+                        today={today}
+                        household={household}
+                        returnTo={returnTo}
+                        editHref={here(`&edit=${t.id}`)}
+                      />
+                    ))}
+                  </ul>
+                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+                    <Pager count={open.length} page={page} perPage={LIST_PAGE} href={(p) => here(`&page=${p}`)} />
+                    {done.length > 0 ? <SoftLink href={here("&done=1")}>Done ({done.length})</SoftLink> : null}
+                  </div>
+                </>
+              )}
             </div>
           </Card>
         ) : (
@@ -176,8 +198,9 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           {dated.length === 0 ? (
             <p className="py-4 text-xl text-ink-muted">No to-dos with a day yet.</p>
           ) : (
-            <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-              {dated.map((t) => (
+            <>
+            <ul className="flex flex-col">
+              {pageOf(dated, dayPage, DAY_PAGE).map((t) => (
                 <TodoRow
                   key={t.id}
                   todo={{ ...t, icon: t.icon ?? listById.get(t.list_id)?.icon ?? null }}
@@ -188,6 +211,10 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 />
               ))}
             </ul>
+            <div className="mt-auto pt-2">
+              <Pager count={dated.length} page={dayPage} perPage={DAY_PAGE} href={(p) => here(`&dayPage=${p}`)} />
+            </div>
+            </>
           )}
         </Card>
       </div>
@@ -257,5 +284,38 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
         <span className="text-sm text-ink-muted">One emoji.</span>
       </label>
     </>
+  );
+}
+
+/* Long lists turn into pages, so nothing scrolls on the wall screen. */
+const LIST_PAGE = 7;
+const DAY_PAGE = 8;
+
+function pageOf<T>(items: T[], page: number, perPage: number): T[] {
+  const last = Math.max(0, Math.ceil(items.length / perPage) - 1);
+  const p = Math.min(page, last);
+  return items.slice(p * perPage, p * perPage + perPage);
+}
+
+function Pager({ count, page, perPage, href }: { count: number; page: number; perPage: number; href: (page: number) => string }) {
+  const pages = Math.ceil(count / perPage);
+  if (pages <= 1) return null;
+  const p = Math.min(page, pages - 1);
+  return (
+    <span className="flex items-center gap-2 text-base font-bold">
+      {p > 0 ? (
+        <Link href={href(p - 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
+          ‹
+        </Link>
+      ) : null}
+      <span className="text-ink-muted">
+        {p * perPage + 1}–{Math.min(count, (p + 1) * perPage)} of {count}
+      </span>
+      {p < pages - 1 ? (
+        <Link href={href(p + 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
+          More ›
+        </Link>
+      ) : null}
+    </span>
   );
 }

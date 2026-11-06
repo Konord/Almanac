@@ -36,6 +36,7 @@ import { lengthLabel } from "@/lib/quick-times";
 import { loadRoutines } from "../routines/data";
 import { PeopleRow } from "../routines/people-row";
 import { MonthView, WeekView } from "./views";
+import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
 
 type View = "week" | "month";
 
@@ -204,6 +205,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
             skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
             memberName={editing.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(" and ") || undefined}
+            headsUps={await loadHeadsUps({ eventId: editing.id })}
+            headsUpReturn={`/calendar?${returnTo}&edit=${editing.id}&scope=all&tab=heads-ups`}
+            initialTab={firstParam(params.tab)}
           />
         </Sheet>
       ) : null}
@@ -375,7 +379,13 @@ function EditEventPanel({
   skippedDates,
   everyDateHref,
   showEveryDate,
+  headsUps,
+  headsUpReturn,
+  initialTab,
 }: {
+  headsUps: HeadsUp[];
+  headsUpReturn: string;
+  initialTab: string | undefined;
   skippedDates: string[];
   occurrence: CalendarItem | null;
   occurrenceDate: string | undefined;
@@ -458,6 +468,8 @@ function EditEventPanel({
             icon: event.icon ?? "",
             repeat: parseRule(event.recurrence_rule),
           }}
+          headsUps={<HeadsUpEditor headsUps={headsUps} source={{ eventId: event.id }} returnTo={headsUpReturn} what={event.recurrence_rule ? "each one" : "it"} />}
+          initialTab={initialTab}
         />
       </form>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
