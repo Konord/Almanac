@@ -48,6 +48,7 @@ export async function TodayPanel({
   upNext,
   tab,
   returnTo,
+  day = false,
 }: {
   household: Household;
   today: LocalDate;
@@ -57,6 +58,8 @@ export async function TodayPanel({
   tab: string;
   /** This page's address, to come back to after a tap. */
   returnTo: string;
+  /** On the Day view the timeline already shows today, so the panel shows lists only. */
+  day?: boolean;
 }) {
   const { locale, timeZone } = household.settings;
   const [{ lists, todos }, basics, meals] = await Promise.all([
@@ -66,7 +69,7 @@ export async function TodayPanel({
   ]);
 
   // The tab, if its list still exists; otherwise Up next.
-  const list = lists.find((l) => l.id === tab);
+  const list = lists.find((l) => l.id === tab) ?? (day ? lists[0] : undefined);
   const showing = list ? list.id : "upnext";
   // The first few lists get chips, always including the one showing.
   const chipLists = lists.slice(0, LIST_CHIPS);
@@ -160,7 +163,7 @@ export async function TodayPanel({
         aria-label="What the panel shows"
         className="mt-6 flex flex-wrap gap-2"
       >
-        {tabButton("upnext", "Up next")}
+        {day ? null : tabButton("upnext", "Up next")}
         {chipLists.map((l) => tabButton(l.id, l.name))}
       </nav>
       <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">

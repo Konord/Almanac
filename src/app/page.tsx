@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarDots, ListChecks, Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
+import { Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
 import {
   AppFrame,
   Avatar,
-  Card,
   Emoji,
   Notice,
   ProgressBar,
@@ -17,18 +16,18 @@ import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold, type Household } from "@/lib/household";
-import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
-import { PROFILE_COLOUR, ProfileTag } from "./calendar/profile-tag";
+import { PROFILE_COLOUR } from "./calendar/profile-tag";
 import type { CalendarItem, Member } from "./calendar/types";
-import { dueChores, loadChores, loadTodos, todosForToday, type ChoreMember, type Todo } from "./chores/data";
-import { TodoRow } from "./chores/rows";
+import { dueChores, loadChores, loadTodos, type Todo } from "./chores/data";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
 import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals } from "./meals/today";
 import { SurvivalCard } from "./survival-card";
+import { OpenPanelTab, TodayPanel } from "./today-panel/panel";
+import { readPanelPrefs } from "./today-panel/prefs";
 import { clock, floatingDay, RoutineBlock } from "./routines/floating";
-import { RoutinesGlance } from "./routines/glance";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
 import { PlaceAcrossPeople } from "@/components/place-across-people";
@@ -36,7 +35,7 @@ import { PendingSpans } from "@/components/pending-block";
 import { layoutSpans, memberRuns, spanBox } from "@/lib/calendar-layout";
 import type { QuickDefaults } from "./calendar/forms";
 import { syncEventAndChoreHeadsUps } from "./heads-ups/sync";
-import { CHORE_LIST_LIMIT, loadBlocks, planChores, syncChoreTodos, type PlannedTodo } from "./chores/blocks";
+import { loadBlocks, planChores, syncChoreTodos, type PlannedTodo } from "./chores/blocks";
 import { ChoreBlockOnTimeline } from "./chores/block-view";
 import type { BlockDay } from "@/lib/chore-blocks";
 import { toMinutes } from "@/lib/routine-placement";
@@ -56,13 +55,9 @@ import {
 /** The space between people's columns on the timeline. */
 const COLUMN_GAP = "0.625rem";
 
-/** How many days the "Coming up" card looks ahead. */
-const COMING_UP_DAYS = 6;
-
 /**
- * The Today screen: a timeline with a column per person, and cards for
- * what kind of day it is, routines, and what's coming up. To-dos and
- * dinner join it in later steps.
+ * The Today screen (the Day view): the Today panel on the left showing
+ * lists, and a timeline with a column per person filling the rest.
  */
 export default function Home(props: PageProps<"/">) {
   return (
@@ -83,7 +78,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
-  const days = Array.from({ length: COMING_UP_DAYS + 1 }, (_, i) => addDays(today, i));
+  const days = [today];
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   // Chores that have come due make their to-dos before the to-dos are read.
   const choreData = await loadChores(today, timeZone);
@@ -111,10 +106,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   // Which chore to-dos wait for a chore block; the rest go on the to-do list,
   // a few at a time so it isn't overwhelming.
   const chorePlan = planChores(blocks, choreData.chores, todoData.todos, today);
-  const listTodos = todosForToday(todoData.todos, today).filter((t) => !chorePlan.inBlocks.has(t.id));
-  const choreTodos = listTodos.filter((t) => t.template_id);
-  const shownChoreTodos = new Set(choreTodos.slice(0, CHORE_LIST_LIMIT).map((t) => t.id));
-  const todayTodos = listTodos.filter((t) => !t.template_id || shownChoreTodos.has(t.id));
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -128,10 +119,20 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         .sort((a, b) => a.startMin - b.startMin)
     : [];
 
+  // The Today panel on the left (lists only here: the timeline already shows today).
+  const panelPrefs = await readPanelPrefs();
+
   return (
     <>
-      <ScreenHeader title={longDate}>
-        <HeaderClock locale={locale} timeZone={timeZone} />
+      <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
+      {panelPrefs.open ? (
+        <TodayPanel household={household} today={today} upNext={[]} tab={panelPrefs.tab} returnTo="/" day />
+      ) : (
+        <OpenPanelTab returnTo="/" />
+      )}
+      <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
+      <ScreenHeader title={panelPrefs.open ? "Today" : longDate}>
+        {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
         {todayProfile ? (
           <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
         ) : null}
@@ -144,6 +145,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
               {
                 href: `/calendar?view=week&date=${today}`,
                 label: "Week",
+                active: false,
+              },
+              {
+                href: `/calendar?view=weeks&date=${today}`,
+                label: "5 weeks",
                 active: false,
               },
               {
@@ -160,7 +166,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       {message ? <Notice tone="success">{message}</Notice> : null}
       {placing ? <PlacingBar hint="Tap someone's column at a time to add an event for them, or drag down to set how long." cancelHref="/" /> : null}
 
-      <div className="flex flex-col gap-6.5 lg:min-h-0 lg:flex-1 lg:flex-row">
+      <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
         <PeopleTimeline
           allDay={todayItems.filter((e) => isAllDayStyle(e, timeZone))}
           items={todayItems}
@@ -176,18 +182,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           timedTodos={todoData.todos.filter((t) => t.status === "open" && t.date_kind === "start" && t.due_date === today && t.at_time)}
           choreBlocks={chorePlan.days.filter((d) => d.date === today)}
         />
-
-        <div className="grid min-w-0 flex-1 gap-5 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
-          <TodoCard
-            todos={todayTodos}
-            waiting={choreTodos.length - shownChoreTodos.size}
-            members={choreData.members}
-            today={today}
-            household={household}
-          />
-          <RoutinesGlance data={routineData} date={today} household={household} className="lg:row-span-2" />
-          <ComingUp days={days.slice(1, 6)} shown={shown} profiles={profiles} household={household} />
-        </div>
+      </div>
+      </div>
       </div>
 
       {/* Add button, bottom right: starts adding mode, or cancels it. */}
@@ -533,119 +529,6 @@ function DayPill({ profile, label, household, today }: { profile: DayProfile; la
       <SunHorizon size="1.75rem" aria-hidden />
       {label}
     </Link>
-  );
-}
-
-/** How many things the To-do card lists before "and N more". */
-const TODO_CARD_LIMIT = 4;
-
-/**
- * To-dos for today (or with no day), chores' to-dos among them. Chores
- * waiting for room (see CHORE_LIST_LIMIT) are counted, with a nudge to
- * set aside some chore time.
- */
-function TodoCard({
-  todos,
-  waiting,
-  members,
-  today,
-  household,
-}: {
-  todos: Todo[];
-  waiting: number;
-  members: ChoreMember[];
-  today: LocalDate;
-  household: Household;
-}) {
-  const memberById = new Map(members.map((m) => [m.id, m]));
-  const shownTodos = todos.slice(0, TODO_CARD_LIMIT);
-  const moreTodos = todos.length - shownTodos.length;
-  return (
-    <Card
-      title="To-do"
-      icon={ListChecks}
-      tint="blue"
-      aside={
-        <Link href="/lists" className="flex min-h-[var(--touch-target)] items-center text-lg font-bold text-accent">
-          Lists
-        </Link>
-      }
-    >
-      {todos.length === 0 ? (
-        <p className="py-3 text-xl text-ink-muted">Nothing to do today.</p>
-      ) : (
-        <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-          {shownTodos.map((t) => (
-            <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo="/" />
-          ))}
-        </ul>
-      )}
-      {moreTodos + waiting > 0 ? (
-        <p className="mt-auto flex gap-4 pt-1 text-lg font-bold">
-          {moreTodos > 0 ? (
-            <Link href="/lists" className="text-accent">
-              +{moreTodos} more
-            </Link>
-          ) : null}
-          {waiting > 0 ? (
-            <Link href="/chores/blocks" className="text-accent">
-              {waiting} chore{waiting === 1 ? "" : "s"} waiting · add chore time?
-            </Link>
-          ) : null}
-        </p>
-      ) : null}
-    </Card>
-  );
-}
-
-/** The next few days: a picture, what's on, and the day. */
-function ComingUp({
-  days,
-  shown,
-  profiles,
-  household,
-}: {
-  days: LocalDate[];
-  shown: CalendarItem[];
-  profiles: Map<LocalDate, DayProfile>;
-  household: Household;
-}) {
-  const { timeZone } = household.settings;
-  return (
-    <Card title="Coming up" icon={CalendarDots} tint="purple">
-      <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-        {days.map((day) => {
-          const dayItems = sortForDay(eventsOnDay(shown, day, timeZone), timeZone);
-          const profile = profiles.get(day);
-          const lead = dayItems[0];
-          return (
-            <li key={day} className="border-b border-panel last:border-0">
-              <Link href={`/calendar?view=week&date=${day}`} className="flex min-h-16 items-center gap-3.5 py-1.5">
-                {lead ? (
-                  <Emoji emoji={eventEmoji(lead.icon, lead.title)} className="size-10" />
-                ) : (
-                  <span className="size-10 shrink-0" />
-                )}
-                <span
-                  className={`min-w-0 flex-1 truncate text-xl font-semibold ${dayItems.length ? "text-ink" : "text-ink-muted"}`}
-                >
-                  {dayItems.length === 0
-                    ? "Nothing planned"
-                    : dayItems
-                        .slice(0, 2)
-                        .map((e) => e.title)
-                        .join(", ") + (dayItems.length > 2 ? ` +${dayItems.length - 2}` : "")}
-                </span>
-                {profile && profile.kind !== "free" ? <ProfileTag kind={profile.kind} /> : null}
-                <span className="w-14 shrink-0 text-right text-sm font-bold text-ink-muted">
-                  {weekdayLabel(day, household)}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
   );
 }
 

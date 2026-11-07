@@ -44,6 +44,30 @@ export function monthGridDays(date: LocalDate, weekStartsOn: 0 | 1): LocalDate[]
   return days;
 }
 
+/** How many weeks the rolling "5 weeks" view shows. */
+export const ROLLING_WEEKS = 5;
+
+/** The rolling view: whole weeks starting with the week that holds the date. */
+export function rollingWeekDays(date: LocalDate, weekStartsOn: 0 | 1, weeks = ROLLING_WEEKS): LocalDate[] {
+  const start = startOfWeek(date, weekStartsOn);
+  return Array.from({ length: weeks * 7 }, (_, i) => addDays(start, i));
+}
+
+/**
+ * A month always fits in 5 rows, like a paper calendar. When a month needs a
+ * 6th week, its last days share a square with the day a week before them
+ * ("23/30"). Returns the 35 squares, and which squares hold a second day.
+ */
+export function fiveRowMonth(gridDays: LocalDate[]): { cells: LocalDate[]; shared: Map<LocalDate, LocalDate> } {
+  const cells = gridDays.slice(0, 35);
+  const shared = new Map<LocalDate, LocalDate>();
+  const month = monthOf(gridDays[14]);
+  gridDays.slice(35).forEach((day, i) => {
+    if (monthOf(day) === month) shared.set(cells[28 + i], day);
+  });
+  return { cells, shared };
+}
+
 /** Moves a date by whole months, keeping the day where possible. */
 export function addMonths(date: LocalDate, months: number): LocalDate {
   const [y, m, d] = date.split("-").map(Number);
