@@ -8,7 +8,7 @@ import { localDateOf } from "@/lib/time";
 import { createClient } from "@/lib/supabase/server";
 import { addRoutine } from "../actions";
 import { loadRoutines } from "../data";
-import { DayTypeForm, RoutineDetails, RoutineFields, StepsEditor, WeekEditor, anchorSummary } from "../sections";
+import { DayTypeForm, HabitSwitch, RoutineDetails, RoutineFields, StepsEditor, WeekEditor, anchorSummary } from "../sections";
 
 /**
  * The routine planner. Two tabs, neither of which scrolls:
@@ -226,7 +226,7 @@ function RoutinesTab({ data, state, href, returnTo, household, mealTimes }: TabP
                   <Emoji emoji={first?.icon ?? "✅"} className="size-9" />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-lg leading-tight font-bold text-ink">{t.name}</span>
-                    <span className="truncate text-sm font-semibold text-ink-muted">{anchorSummary(t, mealTimes, household)}{t.loose ? " · loose" : ""}</span>
+                    <span className="truncate text-sm font-semibold text-ink-muted">{anchorSummary(t, mealTimes, household)}{t.loose ? " · loose" : ""}{t.habit_since ? " · habit" : ""}</span>
                   </span>
                 </Link>
               </li>
@@ -270,13 +270,16 @@ function RoutinesTab({ data, state, href, returnTo, household, mealTimes }: TabP
           icon={Alarm}
           tint="teal"
           aside={
-            <Segmented
-              label="Steps or details"
-              options={[
-                { href: href({ part: "steps" }), label: `Steps (${steps.length})`, active: part === "steps" },
-                { href: href({ part: "details" }), label: "Details", active: part === "details" },
-              ]}
-            />
+            <div className="flex items-center gap-3">
+              <HabitSwitch template={routine} returnTo={returnTo} />
+              <Segmented
+                label="Steps or details"
+                options={[
+                  { href: href({ part: "steps" }), label: `Steps (${steps.length})`, active: part === "steps" },
+                  { href: href({ part: "details" }), label: "Details", active: part === "details" },
+                ]}
+              />
+            </div>
           }
         >
           <div className="mt-2">

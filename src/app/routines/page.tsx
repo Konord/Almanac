@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Check, GearSix } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, ChartLineUp, Check, GearSix } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Card, Emoji, IconLink, Notice, Panel, ProgressBar, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { requireHousehold, type Household } from "@/lib/household";
@@ -11,6 +11,8 @@ import { endRoutine, setDay, toggleStep } from "./actions";
 import { routinesPlacedOn } from "./floating";
 import { clock } from "./sections";
 import { PeopleRow } from "./people-row";
+import { routineStreaks } from "./habits-data";
+import type { HabitStats } from "@/lib/habits";
 import { dayRoutinesFor, loadRoutines, personDay, type DayRoutine, type RoutineData, type RoutineMember, type RoutineStep } from "./data";
 
 /**
@@ -48,6 +50,9 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const placed = await routinesPlacedOn(data, date, household);
+  // Streaks for routines tracked as habits (counted up to today).
+  const streaks = member ? await routineStreaks(data, member.id, today) : new Map<string, HabitStats>();
+  const anyHabits = data.templates.some((t) => t.habit_since);
 
   const here = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams();
@@ -70,7 +75,13 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
           <SoftLink href={here({ date: null })}>Today</SoftLink>
           <IconLink href={here({ date: addDays(date, 1) })} label="Next day" icon={CaretRight} />
         </div>
-        <SoftLink href="/routines/manage" className="lg:ml-auto">
+        {anyHabits ? (
+          <SoftLink href={member ? `/routines/habits?member=${member.id}` : "/routines/habits"} className="lg:ml-auto">
+            <ChartLineUp size="1.5rem" aria-hidden />
+            Habits
+          </SoftLink>
+        ) : null}
+        <SoftLink href="/routines/manage" className={anyHabits ? "" : "lg:ml-auto"}>
           <GearSix size="1.5rem" aria-hidden />
           Set up routines
         </SoftLink>
@@ -102,6 +113,7 @@ async function Routines({ searchParams }: { searchParams: PageProps<"/routines">
           pageHref={(p) => here({ rpage: p ? String(p) : null })}
           endsAt={new Map((placed.get(member.id) ?? []).map((r) => [r.template.id, r.placement.endMin]))}
           ended={data.ended}
+          streaks={streaks}
           isPast={date < today}
           date={date}
           isToday={date === today}
@@ -128,6 +140,7 @@ function Checklist({
   pageHref,
   endsAt,
   ended,
+  streaks,
   isPast,
   date,
   isToday,
@@ -143,6 +156,8 @@ function Checklist({
   endsAt: Map<string, number>;
   /** "memberId:templateId" for routines ended early. */
   ended: Set<string>;
+  /** Streaks for routines tracked as habits, by routine id. */
+  streaks: Map<string, HabitStats>;
   isPast: boolean;
   date: LocalDate;
   isToday: boolean;
@@ -195,8 +210,11 @@ function Checklist({
             )
           }
         >
-          <div className="mt-2 mb-1">
-            <ProgressBar done={progress.done} total={progress.total} colour={member.colour} />
+          <div className="mt-2 mb-1 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <ProgressBar done={progress.done} total={progress.total} colour={member.colour} />
+            </div>
+            {streaks.has(template.id) ? <Streak days={streaks.get(template.id)?.streak ?? 0} /> : null}
           </div>
           <ul className="mt-1 flex flex-col lg:min-h-0 lg:overflow-hidden">
             {steps.map((step) => {
@@ -239,6 +257,16 @@ function Checklist({
       </div>
     ) : null}
     </div>
+  );
+}
+
+/** "🔥 5 days": done days in a row for a routine tracked as a habit. */
+function Streak({ days }: { days: number }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-base font-bold text-ink" title={`${days} ${days === 1 ? "day" : "days"} in a row`}>
+      <Emoji emoji="🔥" className="size-6" faded={days === 0} />
+      {days} {days === 1 ? "day" : "days"}
+    </span>
   );
 }
 
