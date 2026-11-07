@@ -10,7 +10,9 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"96969696-9696-9696-9696-969696969696","role":"authenticated"}', true);
 select public.create_household('Blocks House');
 
-select is((select link from public.task_templates where name = 'Plan next week''s meals'), '/meals', 'New households get a Plan meals chore that opens the planner');
+select is((select count(*)::int from public.task_templates), 0, 'New households start with no chores, not even Plan meals');
+insert into public.task_templates (household_id, name, size, repeat_every, repeat_unit)
+values (public.current_household_id(), 'Wash the towels', 'small', 1, 'week');
 
 select throws_ok(
   $$insert into public.chore_blocks (household_id, name, kind, weekdays) values (public.current_household_id(), 'Laundry', 'closed', '{1}')$$,

@@ -17,7 +17,7 @@ import { isVisibility } from "../calendar/options";
 function returnPath(formData: FormData): string {
   const value = String(formData.get("returnTo") ?? "");
   // Only our own pages, never another website.
-  return /^\/(chores(\/manage|\/blocks)?|lists|calendar)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/chores";
+  return /^\/(chores(\/add|\/blocks)?|lists|calendar)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/chores";
 }
 
 function back(formData: FormData, kind: "error" | "message", text: string): never {
@@ -219,6 +219,9 @@ export async function addChore(formData: FormData) {
   if (error) back(formData, "error", error.message);
   await log(household.id, "chore_added", "task_template", data.id, { name: chore.name });
   refresh();
+  // Mistakes go back to the form; once it's added, on to where it shows.
+  const doneTo = text(formData, "doneTo");
+  if (doneTo) formData.set("returnTo", doneTo);
   back(formData, "message", `Added ${chore.name}.`);
 }
 
