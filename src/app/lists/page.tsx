@@ -4,6 +4,7 @@ import { CalendarDots, ListChecks, PencilSimple, Plus } from "@phosphor-icons/re
 import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
@@ -280,8 +281,8 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-base font-bold text-ink">Picture</span>
-        <Input name="icon" defaultValue={icon ?? ""} maxLength={8} placeholder="📝" />
-        <span className="text-sm text-ink-muted">One emoji.</span>
+        <EmojiPicker initial={icon ?? ""} nameField="name" className="self-start!" fullScreen />
+        <span className="text-sm text-ink-muted">Tap to pick one.</span>
       </label>
     </>
   );

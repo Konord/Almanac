@@ -1,19 +1,18 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Alarm, ArrowLeft, CalendarCheck, SunHorizon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowLeft, CalendarCheck, SunHorizon } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Avatar, Button, Card, Emoji, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
+import { createClient } from "@/lib/supabase/server";
+import { setDay, setOneDate } from "../actions";
 import { weekPlanFor } from "@/lib/day-types";
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
-import { createClient } from "@/lib/supabase/server";
-import { addRoutine } from "../actions";
 import { loadRoutines } from "../data";
-import { DayTypeForm, HabitSwitch, RoutineDetails, RoutineFields, StepsEditor, WeekEditor, anchorSummary } from "../sections";
+import { DayTypeForm, WeekEditor } from "../sections";
 
 /**
- * The routine planner. Two tabs, neither of which scrolls:
- * - Days: each person's kinds of day (wake-up, bedtime, routines) and their week.
- * - Routines: the routines themselves, their steps and what they follow.
+ * Set days: each person's kinds of day (wake-up, bedtime, routines) and
+ * their week. Opened from the Routine Manager. Nothing scrolls.
  */
 export default function ManageRoutinesPage(props: PageProps<"/routines/manage">) {
   return (
@@ -26,33 +25,26 @@ export default function ManageRoutinesPage(props: PageProps<"/routines/manage">)
 }
 
 const TYPES_PER_PAGE = 2;
-const ROUTINES_PER_PAGE = 7;
-const STEPS_PER_PAGE = 6;
 
 async function Manage({ searchParams }: { searchParams: PageProps<"/routines/manage">["searchParams"] }) {
   const household = await requireHousehold();
   const params = await searchParams;
   const today = localDateOf(new Date(), household.settings.timeZone);
   const supabase = await createClient();
-  const [data, mealTimesResult] = await Promise.all([
+  const [data, upcoming] = await Promise.all([
     loadRoutines(today),
-    supabase.from("meal_times").select("id, name").order("sort_order").order("name"),
+    supabase.from("day_overrides").select("member_id, date, day_type_id, wake_time, bed_time").gte("date", today).order("date").limit(200),
   ]);
-  const mealTimes = mealTimesResult.data ?? [];
-  const tab = firstParam(params.tab) === "routines" ? "routines" : "days";
+  if (upcoming.error) throw upcoming.error;
   const error = firstParam(params.error);
   const message = firstParam(params.message);
 
   const state: Record<string, string | undefined> = {
-    tab,
     member: firstParam(params.member),
     plan: firstParam(params.plan),
     types: firstParam(params.types),
-    routine: firstParam(params.routine),
-    list: firstParam(params.list),
-    part: firstParam(params.part),
-    steps: firstParam(params.steps),
     newType: firstParam(params.newType),
+    week: firstParam(params.week),
   };
   const href = (changes: Record<string, string | undefined | null>) => {
     const next = new URLSearchParams();
@@ -63,28 +55,18 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/routines/man
 
   return (
     <>
-      <ScreenHeader title="Set up routines">
-        <Segmented
-          label="What to set up"
-          options={[
-            { href: href({ tab: "days" }), label: "Days", active: tab === "days" },
-            { href: href({ tab: "routines" }), label: "Routines", active: tab === "routines" },
-          ]}
-        />
+      <ScreenHeader title="Set days">
+        <p className="hidden text-lg text-ink-muted xl:block">Each person&rsquo;s kinds of day: wake-up, bedtime and routines.</p>
         <SoftLink href="/routines" className="lg:ml-auto">
           <ArrowLeft size="1.5rem" aria-hidden />
-          Back to checklists
+          Back to Routine Manager
         </SoftLink>
       </ScreenHeader>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      {tab === "days" ? (
-        <DaysTab data={data} state={state} href={href} returnTo={returnTo} today={today} household={household} />
-      ) : (
-        <RoutinesTab data={data} state={state} href={href} returnTo={returnTo} household={household} mealTimes={mealTimes} />
-      )}
+      <DaysTab data={data} state={state} href={href} returnTo={returnTo} today={today} household={household} upcoming={upcoming.data ?? []} />
     </>
   );
 }
@@ -97,7 +79,9 @@ type TabProps = {
   household: Awaited<ReturnType<typeof requireHousehold>>;
 };
 
-function DaysTab({ data, state, href, returnTo, today, household }: TabProps & { today: string }) {
+type OneDate = { member_id: string; date: string; day_type_id: string | null; wake_time: string | null; bed_time: string | null };
+
+function DaysTab({ data, state, href, returnTo, today, household, upcoming }: TabProps & { today: string; upcoming: OneDate[] }) {
   const member = data.members.find((m) => m.id === state.member) ?? data.members[0];
   if (!member) {
     return (
@@ -135,8 +119,30 @@ function DaysTab({ data, state, href, returnTo, today, household }: TabProps & {
         ))}
       </nav>
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card title={`${member.name}'s week`} icon={CalendarCheck} tint={member.colour}>
-          {plan ? (
+        <Card
+          title={`${member.name}'s week`}
+          icon={CalendarCheck}
+          tint={member.colour}
+          aside={
+            <Segmented
+              label="Every week or one date"
+              options={[
+                { href: href({ week: null }), label: "Every week", active: state.week !== "date" },
+                { href: href({ week: "date" }), label: "One date", active: state.week === "date" },
+              ]}
+            />
+          }
+        >
+          {state.week === "date" ? (
+            <OneDateEditor
+              member={member}
+              types={types}
+              upcoming={upcoming.filter((o) => o.member_id === member.id)}
+              today={today}
+              household={household}
+              returnTo={returnTo}
+            />
+          ) : plan ? (
             <WeekEditor
               member={member}
               data={data}
@@ -200,104 +206,91 @@ function DaysTab({ data, state, href, returnTo, today, household }: TabProps & {
   );
 }
 
-function RoutinesTab({ data, state, href, returnTo, household, mealTimes }: TabProps & { mealTimes: { id: string; name: string }[] }) {
-  const listPage = Math.max(0, Number(state.list ?? 0) || 0);
-  const listPages = Math.max(1, Math.ceil((data.templates.length + 1) / ROUTINES_PER_PAGE));
-  const listed = data.templates.slice(listPage * ROUTINES_PER_PAGE, listPage * ROUTINES_PER_PAGE + ROUTINES_PER_PAGE);
-  const creating = state.routine === "new";
-  const routine = creating ? null : (data.templates.find((t) => t.id === state.routine) ?? data.templates[0] ?? null);
-  const steps = routine ? data.steps.filter((s) => s.template_id === routine.id) : [];
-  const part = state.part === "details" ? "details" : "steps";
-  const stepPage = Math.max(0, Math.min(Number(state.steps ?? 0) || 0, Math.max(0, Math.ceil(steps.length / STEPS_PER_PAGE) - 1)));
+const ONE_DATES_SHOWN = 4;
 
+/** One date that isn't like the usual week: a holiday, a sick day, a late night. */
+function OneDateEditor({
+  member,
+  types,
+  upcoming,
+  today,
+  household,
+  returnTo,
+}: {
+  member: TabProps["data"]["members"][number];
+  types: TabProps["data"]["dayTypes"];
+  upcoming: OneDate[];
+  today: string;
+  household: TabProps["household"];
+  returnTo: string;
+}) {
+  const { locale } = household.settings;
+  const dateLabel = (d: string) =>
+    new Intl.DateTimeFormat(locale, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
+  const time = (t: string) =>
+    new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(`2026-01-01T${t.slice(0, 5)}:00Z`));
+  const shown = upcoming.slice(0, ONE_DATES_SHOWN);
   return (
-    <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)]">
-      <Card title="Routines" icon={Alarm} tint="teal">
-        <ul className="mt-1 flex flex-col gap-1.5">
-          {listed.map((t) => {
-            const first = data.steps.find((s) => s.template_id === t.id);
-            return (
-              <li key={t.id}>
-                <Link
-                  href={href({ routine: t.id, part: null, steps: null })}
-                  aria-current={routine?.id === t.id ? "page" : undefined}
-                  className={`flex min-h-15 items-center gap-3 rounded-2xl px-3 ${routine?.id === t.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : ""}`}
-                >
-                  <Emoji emoji={first?.icon ?? "✅"} className="size-9" />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-lg leading-tight font-bold text-ink">{t.name}</span>
-                    <span className="truncate text-sm font-semibold text-ink-muted">{anchorSummary(t, mealTimes, household)}{t.loose ? " · loose" : ""}{t.habit_since ? " · habit" : ""}</span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-          <Link href={href({ routine: "new" })} className="flex min-h-11 items-center rounded-xl bg-ink px-3.5 text-base font-bold text-board">
-            + New routine
-          </Link>
-          {listPages > 1 ? (
-            <>
-              {listPage > 0 ? (
-                <Link href={href({ list: String(listPage - 1) })} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-base font-bold text-ink">
-                  ‹
-                </Link>
-              ) : null}
-              {listPage < listPages - 1 ? (
-                <Link href={href({ list: String(listPage + 1) })} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-base font-bold text-ink">
-                  More ›
-                </Link>
-              ) : null}
-            </>
-          ) : null}
+    <div className="mt-1 flex min-h-0 flex-1 flex-col gap-3">
+      <p className="text-base text-ink-muted">Make one date a different kind of day, like a holiday on a weekday. Leave the times empty to use that kind of day&rsquo;s usual times.</p>
+      <form action={setOneDate} className="flex flex-col gap-2.5 rounded-2xl bg-rail p-3">
+        <input type="hidden" name="memberId" value={member.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <div className="flex flex-wrap items-end gap-2.5">
+          <label className="flex flex-col gap-1 text-sm font-bold text-ink-muted">
+            Date
+            <input name="date" type="date" min={today} defaultValue={today} required className="min-h-11 rounded-xl border-2 border-frame bg-board px-2 text-base text-ink" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-bold text-ink-muted">
+            Up
+            <input name="wake" type="time" className="min-h-11 rounded-xl border-2 border-frame bg-board px-2 text-base text-ink" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-bold text-ink-muted">
+            Bed
+            <input name="bed" type="time" className="min-h-11 rounded-xl border-2 border-frame bg-board px-2 text-base text-ink" />
+          </label>
         </div>
-      </Card>
-
-      {creating ? (
-        <Card title="New routine" icon={Alarm} tint="teal">
-          <form action={addRoutine} className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3">
-            <input type="hidden" name="returnTo" value={href({ routine: null })} />
-            <RoutineFields mealTimes={mealTimes} />
-            <div className="col-span-full">
-              <Button>Make routine</Button>
+        <fieldset className="flex flex-wrap items-center gap-1.5">
+          <legend className="sr-only">Kind of day</legend>
+          <span className="mr-1 text-sm font-bold text-ink-muted">Kind of day</span>
+          {types.map((t, i) => (
+            <label
+              key={t.id}
+              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border-2 border-frame bg-board px-3 text-base text-ink select-none has-checked:border-ink has-checked:font-bold"
+            >
+              <input type="radio" name="dayTypeId" value={t.id} defaultChecked={i === 0} className="size-4 accent-accent" />
+              {t.icon ? <Emoji emoji={t.icon} className="size-5" /> : null}
+              {t.name}
+            </label>
+          ))}
+        </fieldset>
+        <Button className="min-h-11 self-start text-base">Set this date</Button>
+      </form>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-bold text-ink-muted">Coming up</span>
+        {shown.length === 0 ? <p className="text-base text-ink-muted">No dates changed.</p> : null}
+        {shown.map((o) => {
+          const type = types.find((t) => t.id === o.day_type_id);
+          const times = [o.wake_time ? `up ${time(o.wake_time)}` : null, o.bed_time ? `bed ${time(o.bed_time)}` : null].filter(Boolean).join(", ");
+          return (
+            <div key={o.date} className="flex min-h-11 items-center gap-2.5 rounded-xl bg-rail px-3">
+              <span className="w-28 shrink-0 text-base font-bold text-ink">{dateLabel(o.date)}</span>
+              <span className="min-w-0 flex-1 truncate text-base text-ink">
+                {type?.name ?? "Usual day"}
+                {times ? <span className="text-ink-muted"> · {times}</span> : null}
+              </span>
+              <form action={setDay}>
+                <input type="hidden" name="memberId" value={member.id} />
+                <input type="hidden" name="date" value={o.date} />
+                <input type="hidden" name="reset" value="true" />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <button className="flex min-h-10 items-center rounded-lg px-2 text-base font-bold text-accent">Back to usual</button>
+              </form>
             </div>
-          </form>
-        </Card>
-      ) : routine ? (
-        <Card
-          title={routine.name}
-          icon={Alarm}
-          tint="teal"
-          aside={
-            <div className="flex items-center gap-3">
-              <HabitSwitch template={routine} returnTo={returnTo} />
-              <Segmented
-                label="Steps or details"
-                options={[
-                  { href: href({ part: "steps" }), label: `Steps (${steps.length})`, active: part === "steps" },
-                  { href: href({ part: "details" }), label: "Details", active: part === "details" },
-                ]}
-              />
-            </div>
-          }
-        >
-          <div className="mt-2">
-            {part === "steps" ? (
-              <StepsEditor
-                template={routine}
-                steps={steps}
-                page={stepPage}
-                perPage={STEPS_PER_PAGE}
-                returnTo={returnTo}
-                pageHref={(p) => href({ steps: String(p) })}
-              />
-            ) : (
-              <RoutineDetails template={routine} mealTimes={mealTimes} returnTo={returnTo} />
-            )}
-          </div>
-        </Card>
-      ) : null}
+          );
+        })}
+        {upcoming.length > ONE_DATES_SHOWN ? <span className="text-sm font-bold text-ink-muted">+{upcoming.length - ONE_DATES_SHOWN} more later</span> : null}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   CaretLeft,
@@ -49,6 +50,7 @@ export async function TodayPanel({
   tab,
   returnTo,
   day = false,
+  routine,
 }: {
   household: Household;
   today: LocalDate;
@@ -60,6 +62,8 @@ export async function TodayPanel({
   returnTo: string;
   /** On the Day view the timeline already shows today, so the panel shows lists only. */
   day?: boolean;
+  /** A routine's checklist (from tapping its block), shown instead of the list. */
+  routine?: ReactNode;
 }) {
   const { locale, timeZone } = household.settings;
   const [{ lists, todos }, basics, meals] = await Promise.all([
@@ -159,6 +163,10 @@ export async function TodayPanel({
       </div>
 
       {/* 2. The working part: Up next or a list. */}
+      {routine ? (
+        <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">{routine}</div>
+      ) : (
+      <>
       <nav
         aria-label="What the panel shows"
         className="mt-6 flex flex-wrap gap-2"
@@ -249,6 +257,8 @@ export async function TodayPanel({
           );
         })()}
       </div>
+      </>
+      )}
 
       {/* 3. The bottom box: the next meal. */}
       <Link

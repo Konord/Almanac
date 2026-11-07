@@ -1,28 +1,19 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ChartLineUp, Trash } from "@phosphor-icons/react/dist/ssr";
-import { Button, Emoji, Field, Input, Select } from "@/components/ui";
+import { Button, Emoji, Field, Input } from "@/components/ui";
+import { EmojiPicker } from "@/components/emoji-picker";
 import type { DayType, WeekPlan } from "@/lib/day-types";
 import type { Household } from "@/lib/household";
-import { KIND_LABEL, KIND_ORDER, hhmm } from "@/lib/routines";
+import { hhmm } from "@/lib/routines";
 import { zonedToUtc } from "@/lib/time";
-import { VISIBILITY_OPTIONS } from "../calendar/options";
 import {
-  addStep,
   addWeekPlan,
   chooseWeekPlan,
-  moveStep,
   removeDayType,
-  removeRoutine,
-  removeStep,
   removeWeekPlan,
   saveDayType,
   saveWeekPlan,
-  setRoutineHabit,
-  setStepHabit,
-  updateRoutine,
-  updateStep,
 } from "./actions";
-import type { RoutineData, RoutineMember, RoutineStep, RoutineTemplate } from "./data";
+import type { RoutineData, RoutineMember, RoutineTemplate } from "./data";
 
 /* Pieces for the "Set up routines" page. Nothing here scrolls: long lists page. */
 
@@ -196,7 +187,7 @@ export function DayTypeForm({
         <input type="hidden" name="memberId" value={member.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <Field label="Picture">
-          <Input name="icon" defaultValue={dayType?.icon ?? ""} maxLength={16} placeholder="🏫" className="min-h-11 px-2 text-base" />
+          <EmojiPicker initial={dayType?.icon ?? ""} nameField="name" className="size-11! self-start!" fullScreen />
         </Field>
         <Field label="Kind of day">
           <Input name="name" defaultValue={dayType?.name} required maxLength={30} placeholder="e.g. Night shift" className="min-h-11 text-base" />
@@ -242,304 +233,6 @@ export function DayTypeForm({
       </div>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Editing routines and steps
-// ---------------------------------------------------------------------------
-
-/** A routine's steps, a page at a time, each on one line. */
-export function StepsEditor({
-  template,
-  steps,
-  page,
-  perPage,
-  returnTo,
-  pageHref,
-}: {
-  template: RoutineTemplate;
-  steps: RoutineStep[];
-  page: number;
-  perPage: number;
-  returnTo: string;
-  pageHref: (page: number) => string;
-}) {
-  const shown = steps.slice(page * perPage, page * perPage + perPage);
-  const pages = Math.max(1, Math.ceil(steps.length / perPage));
-  return (
-    <div className="flex flex-col gap-2">
-      {template.habit_since ? (
-        <p className="flex items-center gap-2 px-2 text-sm font-bold text-success">
-          <ChartLineUp size="1.1rem" weight="bold" aria-hidden />
-          Green steps are tracked on the habit chart. Tap one to leave it out.
-        </p>
-      ) : null}
-      <div className="grid grid-cols-[4.5rem_1fr_8.5rem_auto] gap-2 px-2 text-sm font-bold text-ink-muted">
-        <span>Picture</span>
-        <span>Step</span>
-        <span>Done by</span>
-        <span />
-      </div>
-      {shown.map((step, i) => {
-        const index = page * perPage + i;
-        return (
-          <div key={step.id} className="flex items-center gap-2 rounded-2xl bg-rail p-2">
-            <form action={updateStep} className="grid min-w-0 flex-1 grid-cols-[4.5rem_1fr_8.5rem_auto] items-center gap-2">
-              <input type="hidden" name="id" value={step.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <StepFields step={step} />
-              <Button variant="secondary" className="min-h-11 bg-board px-3 text-base">
-                Save
-              </Button>
-            </form>
-            {template.habit_since ? <StepHabitButton step={step} returnTo={returnTo} /> : null}
-            <StepButton action={moveStep} id={step.id} returnTo={returnTo} direction="up" disabled={index === 0} label={`Move ${step.text} up`}>
-              <ArrowUp size="1.25rem" weight="bold" aria-hidden />
-            </StepButton>
-            <StepButton action={moveStep} id={step.id} returnTo={returnTo} direction="down" disabled={index === steps.length - 1} label={`Move ${step.text} down`}>
-              <ArrowDown size="1.25rem" weight="bold" aria-hidden />
-            </StepButton>
-            <StepButton action={removeStep} id={step.id} returnTo={returnTo} label={`Remove ${step.text}`} danger>
-              <Trash size="1.25rem" weight="bold" aria-hidden />
-            </StepButton>
-          </div>
-        );
-      })}
-      <form action={addStep} className="grid grid-cols-[4.5rem_1fr_8.5rem_auto] items-center gap-2 rounded-2xl border-2 border-dashed border-frame p-2">
-        <input type="hidden" name="templateId" value={template.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <StepFields />
-        <Button className="min-h-11 px-3 text-base">Add step</Button>
-      </form>
-      {pages > 1 ? (
-        <div className="flex items-center gap-3 text-base font-bold">
-          {page > 0 ? (
-            <Link href={pageHref(page - 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3.5 text-ink">
-              ‹ Earlier steps
-            </Link>
-          ) : null}
-          <span className="text-ink-muted">
-            Steps {page * perPage + 1}–{Math.min(steps.length, page * perPage + perPage)} of {steps.length}
-          </span>
-          {page < pages - 1 ? (
-            <Link href={pageHref(page + 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3.5 text-ink">
-              More steps ›
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function StepButton({
-  action,
-  id,
-  returnTo,
-  direction,
-  disabled,
-  label,
-  danger,
-  children,
-}: {
-  action: (formData: FormData) => Promise<void>;
-  id: string;
-  returnTo: string;
-  direction?: "up" | "down";
-  disabled?: boolean;
-  label: string;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <form action={action}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      {direction ? <input type="hidden" name="direction" value={direction} /> : null}
-      <button
-        disabled={disabled}
-        aria-label={label}
-        title={label}
-        className={`flex size-11 items-center justify-center rounded-xl bg-board disabled:opacity-30 ${danger ? "text-danger" : "text-ink"}`}
-      >
-        {children}
-      </button>
-    </form>
-  );
-}
-
-/** On a tracked routine: whether this step gets a row on the habit chart. */
-function StepHabitButton({ step, returnTo }: { step: RoutineStep; returnTo: string }) {
-  const label = step.habit ? `Stop tracking ${step.text}` : `Track ${step.text} as a habit`;
-  return (
-    <form action={setStepHabit}>
-      <input type="hidden" name="id" value={step.id} />
-      <input type="hidden" name="on" value={step.habit ? "0" : "1"} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <button
-        aria-pressed={step.habit}
-        aria-label={label}
-        title={label}
-        className={`flex size-11 items-center justify-center rounded-xl ${step.habit ? "bg-success text-white" : "bg-board text-ink-muted"}`}
-      >
-        <ChartLineUp size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </form>
-  );
-}
-
-/** The routine's "Track as a habit" switch. Off by default. */
-export function HabitSwitch({ template, returnTo }: { template: RoutineTemplate; returnTo: string }) {
-  const on = Boolean(template.habit_since);
-  return (
-    <form action={setRoutineHabit}>
-      <input type="hidden" name="id" value={template.id} />
-      <input type="hidden" name="on" value={on ? "0" : "1"} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <button
-        role="switch"
-        aria-checked={on}
-        className={`flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl px-3.5 text-base font-bold ${on ? "bg-[color-mix(in_srgb,var(--color-success)_12%,white)] text-success" : "bg-rail text-ink"}`}
-        title={on ? "Tap to stop tracking (ticks are kept)" : "Tap to track this routine as a habit"}
-      >
-        <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 ${on ? "justify-end bg-success" : "justify-start bg-check-border"}`} aria-hidden>
-          <span className="size-5 rounded-full bg-white" />
-        </span>
-        Track as a habit
-      </button>
-    </form>
-  );
-}
-
-function StepFields({ step }: { step?: RoutineStep }) {
-  return (
-    <>
-      <Input name="icon" defaultValue={step?.icon ?? ""} maxLength={16} placeholder="🪥" aria-label="Picture" className="min-h-11 bg-board px-2 text-base" />
-      <Input name="text" defaultValue={step?.text} required maxLength={80} placeholder="e.g. Brush teeth" aria-label="Step" className="min-h-11 bg-board text-base" />
-      <Input
-        name="targetTime"
-        type="time"
-        defaultValue={step?.target_time ? hhmm(step.target_time) : ""}
-        aria-label="Done by"
-        className="min-h-11 bg-board px-2 text-base"
-      />
-    </>
-  );
-}
-
-/** The routine's details form, including what it follows (its anchor). */
-export function RoutineDetails({ template, mealTimes, returnTo }: { template: RoutineTemplate; mealTimes: { id: string; name: string }[]; returnTo: string }) {
-  return (
-    <>
-      <form action={updateRoutine} className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3">
-        <input type="hidden" name="id" value={template.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <RoutineFields template={template} mealTimes={mealTimes} />
-        <div className="col-span-full flex gap-2">
-          <Button>Save details</Button>
-        </div>
-      </form>
-      <form action={removeRoutine} className="mt-3">
-        <input type="hidden" name="id" value={template.id} />
-        <input type="hidden" name="name" value={template.name} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <Button variant="danger" className="min-h-11 text-base">
-          Remove {template.name}
-        </Button>
-      </form>
-    </>
-  );
-}
-
-export const ANCHOR_LABEL = {
-  wake: "After wake-up",
-  bed: "Ends by bedtime",
-  meal: "After a meal",
-  clock: "At a set time",
-} as const;
-
-export function RoutineFields({ template, mealTimes }: { template?: RoutineTemplate; mealTimes: { id: string; name: string }[] }) {
-  return (
-    <>
-      <Field label="Name">
-        <Input name="name" defaultValue={template?.name} required maxLength={60} placeholder="e.g. Swim night" />
-      </Field>
-      <Field label="Part of the day">
-        <Select name="kind" defaultValue={template?.kind ?? "morning"}>
-          {KIND_ORDER.map((kind) => (
-            <option key={kind} value={kind}>
-              {KIND_LABEL[kind]}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="It follows">
-        <Select name="anchor" defaultValue={template?.anchor ?? "wake"}>
-          {(Object.keys(ANCHOR_LABEL) as (keyof typeof ANCHOR_LABEL)[]).map((a) => (
-            <option key={a} value={a}>
-              {ANCHOR_LABEL[a]}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Which meal" hint="For “After a meal”.">
-        <Select name="anchorMealTimeId" defaultValue={template?.anchor_meal_time_id ?? ""}>
-          <option value="">—</option>
-          {mealTimes.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Gap (minutes)" hint="After wake-up or the meal; before bed.">
-        <Input name="anchorOffset" type="number" min={0} max={240} defaultValue={template?.anchor_offset ?? 0} />
-      </Field>
-      <Field label="Set time" hint="For “At a set time”. Empty: its step times.">
-        <Input name="usualStart" type="time" defaultValue={template?.usual_start?.slice(0, 5) ?? ""} />
-      </Field>
-      <Field label="About how many minutes" hint="Empty: from its step times.">
-        <Input name="usualMinutes" type="number" min={5} max={240} defaultValue={template?.usual_minutes ?? ""} />
-      </Field>
-      <Field label="Written for">
-        <Select name="audience" defaultValue={template?.audience ?? "everyone"}>
-          <option value="everyone">Anyone</option>
-          <option value="kid">Kids (big pictures)</option>
-          <option value="adult">Adults</option>
-        </Select>
-      </Field>
-      <Field label="Who can see it">
-        <Select name="visibility" defaultValue={template?.visibility ?? "everyone"}>
-          {VISIBILITY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <label className="col-span-full flex min-h-11 items-center gap-3 text-lg text-ink">
-        <input type="checkbox" name="loose" defaultChecked={template?.loose ?? false} className="size-6 accent-accent" />
-        <span>
-          <strong>Loose:</strong> it can move anywhere later in the day when plans get in the way (otherwise up to an hour).
-        </span>
-      </label>
-    </>
-  );
-}
-
-/** "After wake-up", "After Dinner, +10 min", "7:30". */
-export function anchorSummary(template: RoutineTemplate, mealTimes: { id: string; name: string }[], household: Household): string {
-  const gap = template.anchor_offset ? `, ${template.anchor === "bed" ? "" : "+"}${template.anchor_offset} min` : "";
-  switch (template.anchor) {
-    case "wake":
-      return `After wake-up${gap}`;
-    case "bed":
-      return template.anchor_offset ? `Ends ${template.anchor_offset} min before bed` : "Ends by bedtime";
-    case "meal":
-      return `After ${mealTimes.find((m) => m.id === template.anchor_meal_time_id)?.name ?? "a meal"}${gap}`;
-    case "clock":
-      return template.usual_start ? `At ${clock(template.usual_start, household)}` : "At its step times";
-  }
 }
 
 // ---------------------------------------------------------------------------
