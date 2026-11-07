@@ -339,6 +339,30 @@ export async function setDay(formData: FormData) {
 }
 
 /** Ends a routine early (or opens it again). Unticked steps then count as missed, but can still be ticked. */
+/** Set days → One date: one person's kind of day (and, if given, times) for a single date. */
+export async function setOneDate(formData: FormData) {
+  const household = await requireHousehold();
+  const memberId = text(formData, "memberId");
+  const date = text(formData, "date");
+  if (!isLocalDate(date)) back(formData, "error", "Pick a date.");
+  const dayTypeId = text(formData, "dayTypeId");
+  if (!dayTypeId) back(formData, "error", "Pick a kind of day.");
+  const wake = text(formData, "wake");
+  const bed = text(formData, "bed");
+  if (wake && !isLocalTime(wake)) back(formData, "error", "Wake-up should look like 7:30 a.m.");
+  if (bed && !isLocalTime(bed)) back(formData, "error", "Bedtime should look like 9:30 p.m.");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("day_overrides")
+    .upsert(
+      { household_id: household.id, member_id: memberId, date, day_type_id: dayTypeId, wake_time: wake || null, bed_time: bed || null },
+      { onConflict: "member_id,date" },
+    );
+  if (error) back(formData, "error", error.message);
+  refresh();
+  back(formData, "message", "Saved that date.");
+}
+
 export async function endRoutine(formData: FormData) {
   const household = await requireHousehold();
   const memberId = text(formData, "memberId");
