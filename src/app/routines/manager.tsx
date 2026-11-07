@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, ChartLineUp, GearSix, Plus, Trash, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { LeaveDialog, SaveBar, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { EATING_MINUTES, TIDY_MINUTES } from "@/lib/meals";
 import { NEW_PREFIX, draftProblem, sameDraft, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
@@ -78,7 +78,6 @@ export function RoutineManager({
   locale: string;
   flexMinutes: number;
 }) {
-  const router = useRouter();
   const [draft, setDraft] = useState<ManagerDraft>(initial);
   const [selected, setSelected] = useState<string | null>(() => {
     const id = typeof window === "undefined" ? null : recall(SELECTED_KEY);
@@ -99,36 +98,9 @@ export function RoutineManager({
   const [adding, setAdding] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState<string | null>(null);
   const dirty = !sameDraft(draft, initial);
 
-  // --- Leaving with changes -------------------------------------------------
-  const dirtyRef = useRef(dirty);
-  useEffect(() => {
-    dirtyRef.current = dirty;
-  }, [dirty]);
-  useEffect(() => {
-    const onUnload = (e: BeforeUnloadEvent) => {
-      if (dirtyRef.current) e.preventDefault();
-    };
-    // Any link on the page (the menu, Set days) asks first when there are changes.
-    const onClick = (e: MouseEvent) => {
-      if (!dirtyRef.current || e.defaultPrevented) return;
-      const link = (e.target as Element | null)?.closest?.("a[href]");
-      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank") return;
-      const url = new URL(link.href, window.location.href);
-      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setLeaving(url.pathname + url.search);
-    };
-    window.addEventListener("beforeunload", onUnload);
-    document.addEventListener("click", onClick, true);
-    return () => {
-      window.removeEventListener("beforeunload", onUnload);
-      document.removeEventListener("click", onClick, true);
-    };
-  }, []);
+  const guard = useUnsavedChanges(dirty);
 
   // --- Columns and where each block sits ---------------------------------------
   const columns: Column[] = useMemo(() => {
@@ -256,11 +228,11 @@ export function RoutineManager({
   };
 
   // --- Saving ---------------------------------------------------------------------
-  const save = async (then?: string) => {
+  const save = async (then?: string | null) => {
     const problem = draftProblem(draft);
     if (problem) {
       setError(problem);
-      setLeaving(null);
+      guard.stay();
       return;
     }
     setSaving(true);
@@ -268,13 +240,11 @@ export function RoutineManager({
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
-      setLeaving(null);
+      guard.stay();
       return;
     }
     if (selected) remember(SELECTED_KEY, result.ids[selected] ?? selected);
-    dirtyRef.current = false;
-    if (then) router.push(then);
-    else router.refresh();
+    guard.saved(then);
   };
   const undo = () => {
     setDraft(initial);
@@ -609,52 +579,14 @@ export function RoutineManager({
           )}
 
           {/* One Save for everything */}
-          <div className={`mt-3 flex shrink-0 items-center gap-2.5 rounded-2xl px-3 py-2 ${dirty ? "bg-[color-mix(in_srgb,var(--color-accent)_9%,white)]" : "bg-rail"}`}>
-            <span className={`min-w-0 flex-1 text-base font-bold ${error ? "text-danger" : dirty ? "text-accent" : "text-ink-muted"}`} role="status">
-              {error ?? (dirty ? "You have changes that aren't saved yet." : "Everything is saved.")}
-            </span>
-            {dirty ? (
-              <button type="button" onClick={undo} disabled={saving} className="flex min-h-11 items-center rounded-xl px-3 text-base font-bold text-ink hover:bg-board">
-                Undo changes
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => save()}
-              disabled={!dirty || saving}
-              className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board disabled:opacity-40"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+          <div className="mt-3">
+            <SaveBar dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
           </div>
         </section>
       </div>
 
-      {leaving ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,35,45,0.35)]" role="dialog" aria-label="Unsaved changes">
-          <div className="flex w-[34rem] max-w-[92vw] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-7 shadow-2xl">
-            <h2 className="text-2xl font-extrabold text-ink">Save your changes?</h2>
-            <p className="text-lg text-ink-soft">You changed some routines and haven&rsquo;t saved them yet.</p>
-            <div className="flex flex-wrap gap-2.5">
-              <button type="button" onClick={() => save(leaving)} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board">
-                {saving ? "Saving…" : "Save and go"}
-              </button>
-              <button type="button" onClick={() => setLeaving(null)} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink">
-                Go back
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  dirtyRef.current = false;
-                  router.push(leaving);
-                }}
-                className="ml-auto flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-4 text-base font-bold text-danger"
-              >
-                Leave without saving
-              </button>
-            </div>
-          </div>
-        </div>
+      {guard.leaving ? (
+        <LeaveDialog what="some routines" saving={saving} onSave={() => save(guard.leaving)} onStay={guard.stay} onLeave={guard.leaveWithoutSaving} />
       ) : null}
     </>
   );

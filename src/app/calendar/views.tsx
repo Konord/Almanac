@@ -6,6 +6,7 @@ import type { Household } from "@/lib/household";
 import { fiveRowMonth, layoutDay, monthOf } from "@/lib/calendar-layout";
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import type { DayProfile } from "@/lib/day-profile";
+import type { Break } from "@/lib/day-types";
 import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Member } from "./types";
 import type { QuickDefaults } from "./forms";
@@ -25,7 +26,27 @@ type ViewProps = {
   profiles: Map<LocalDate, DayProfile>;
   /** Adding by placing: whether we're in adding mode, and the event being added. */
   adding?: Adding;
+  /** Breaks (holidays and the like) touching these days. */
+  breaks?: Break[];
 };
+
+/** The breaks on a day. */
+function breaksOn(breaks: Break[] | undefined, day: LocalDate): Break[] {
+  return (breaks ?? []).filter((b) => b.start_date <= day && day <= b.end_date);
+}
+
+const BREAKS_HREF = "/routines/manage?tab=breaks";
+
+/** Who a break is for, e.g. "Ava and Dad". */
+function breakWho(b: Break, memberById: Map<string, Member>): string {
+  const names = b.people.flatMap((p) => memberById.get(p.member_id)?.name ?? []);
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/** A break's colour: the person's when it's for one person, otherwise everyone's. */
+function breakColour(b: Break, memberById: Map<string, Member>): string {
+  return b.people.length === 1 ? (memberById.get(b.people[0].member_id)?.colour ?? EVERYONE_COLOUR) : EVERYONE_COLOUR;
+}
 
 export type Adding = {
   placing: boolean;
@@ -350,6 +371,7 @@ export function WeekView({
   profiles,
   adding,
   dinners,
+  breaks,
 }: ViewProps & { dinners: Map<LocalDate, Dinner> }) {
   const { timeZone } = household.settings;
   const { first, last } = timelineRange(events, days, timeZone);
@@ -357,7 +379,7 @@ export function WeekView({
   const editLink = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
   // The rows under the dates (all-day things, then dinner) only show when they have something.
   const anyDinner = dinners.size > 0;
-  const anyAllDay = days.some((day) => eventsOnDay(events, day, timeZone).some((e) => isAllDayStyle(e, timeZone)));
+  const anyAllDay = days.some((day) => breaksOn(breaks, day).length > 0 || eventsOnDay(events, day, timeZone).some((e) => isAllDayStyle(e, timeZone)));
 
   return (
     // On a phone the week is wider than the screen, so it scrolls sideways.
@@ -390,7 +412,21 @@ export function WeekView({
                   ) : null}
                 </Link>
                 <div className={`h-10 items-center gap-1 ${anyAllDay ? "flex" : "hidden"}`}>
-                  {allDay.slice(0, 1).map((e) => (
+                  {breaksOn(breaks, day)
+                    .slice(0, 1)
+                    .map((b) => (
+                      <Link
+                        key={b.id}
+                        href={BREAKS_HREF}
+                        title={`${b.name}: ${breakWho(b, memberById)}`}
+                        className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border-2 border-dashed px-2 text-sm font-bold text-ink"
+                        style={{ background: soft(breakColour(b, memberById)), borderColor: strong(breakColour(b, memberById)) }}
+                      >
+                        <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />
+                        <span className="truncate">{b.name}</span>
+                      </Link>
+                    ))}
+                  {allDay.slice(0, breaksOn(breaks, day).length > 0 ? 0 : 1).map((e) => (
                     <Link
                       key={e.id}
                       href={editLink(e)}
@@ -402,15 +438,12 @@ export function WeekView({
                       <span className="truncate">{e.title}</span>
                     </Link>
                   ))}
-                  {allDay.length > 1 ? (
+                  {allDay.length + breaksOn(breaks, day).length > 1 ? (
                     <span
                       className="shrink-0 rounded-xl bg-rail px-2 text-sm leading-10 font-bold text-ink-muted"
-                      title={allDay
-                        .slice(1)
-                        .map((e) => e.title)
-                        .join(", ")}
+                      title={[...breaksOn(breaks, day).map((b) => b.name), ...allDay.map((e) => e.title)].slice(1).join(", ")}
                     >
-                      +{allDay.length - 1}
+                      +{allDay.length + breaksOn(breaks, day).length - 1}
                     </span>
                   ) : null}
                 </div>
@@ -509,6 +542,7 @@ export function MonthView({
   anchor,
   adding,
   mode,
+  breaks,
 }: ViewProps & { anchor: LocalDate; mode: "month" | "weeks" }) {
   const { locale, timeZone } = household.settings;
   const month = monthOf(anchor);
@@ -548,6 +582,20 @@ export function MonthView({
           >
             {label}
           </Link>
+          {breaksOn(breaks, day)
+            .slice(0, 1)
+            .map((b) => (
+              <Link
+                key={b.id}
+                href={BREAKS_HREF}
+                title={`${b.name}: ${breakWho(b, memberById)}`}
+                aria-label={`${b.name}, a break for ${breakWho(b, memberById)}`}
+                className="shrink-0 rounded-lg border-2 border-dashed p-px"
+                style={{ background: soft(breakColour(b, memberById)), borderColor: strong(breakColour(b, memberById)) }}
+              >
+                <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />
+              </Link>
+            ))}
           {shownStickers.map((e) => (
             <Link key={e.id} href={editHref(e)} scroll={false} title={e.title} aria-label={`${e.title}, all day`} className="shrink-0">
               <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-8" />
