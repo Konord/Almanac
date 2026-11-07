@@ -97,7 +97,7 @@ async function HouseholdsContent({ searchParams }: { searchParams: PageProps<"/h
         <div className="flex flex-col gap-5 lg:min-h-0">
           <Card title="New household" icon={Plus} tint="green">
             <form action={newHousehold} className="mt-2 flex flex-col gap-4">
-              <Field label="Name" hint="It starts with the usual starter routines, chores and meals.">
+              <Field label="Name" hint="It starts with the usual starter routines and meals, and no chores.">
                 <Input name="name" required maxLength={80} placeholder="Test house" />
               </Field>
               <div>

@@ -77,8 +77,9 @@ async function Manage({ searchParams }: { searchParams: PageProps<"/chores/manag
       {message ? <Notice tone="success">{message}</Notice> : null}
 
       <p className="shrink-0 text-lg text-ink-muted">
-        These started as a suggested list. Change, pause or remove any of them. Each one comes back a set time after it was
-        last done, or once a year in its season.
+        {chores.length === 0
+          ? "No chores yet. Tap Add a chore to make your first one."
+          : "Tap a chore to change, pause or remove it. Each one comes back a set time after it was last done, or once a year in its season."}
       </p>
 
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-3">

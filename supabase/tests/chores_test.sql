@@ -1,7 +1,7 @@
 -- Checks for chores and to-dos (Phase 3, step 3). Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(8);
 
 insert into auth.users (id, email, aud, role) values
   ('66666666-6666-6666-6666-666666666666', 'chores-a@test', 'authenticated', 'authenticated'),
@@ -11,9 +11,10 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"66666666-6666-6666-6666-666666666666","role":"authenticated"}', true);
 select public.create_household('Chore House');
 
-select ok((select count(*) from public.task_templates) >= 30, 'A new household gets the starter chores');
-select is((select count(*)::int from public.task_templates where season_start is not null), 14, 'Including the Canadian seasonal list');
-select is((select count(*)::int from public.task_lists), 2, 'And two to-do lists');
+select is((select count(*)::int from public.task_templates), 0, 'A new household starts with no chores');
+select is((select count(*)::int from public.task_lists), 2, 'But it gets two to-do lists');
+insert into public.task_templates (household_id, name, size, repeat_every, repeat_unit)
+values (public.current_household_id(), 'Clean out the fridge', 'medium', 1, 'month');
 
 insert into public.task_instances (household_id, list_id, title)
 select public.current_household_id(), id, 'Book the dentist' from public.task_lists where name = 'To-do';
