@@ -148,11 +148,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
                 active: false,
               },
               {
-                href: `/calendar?view=weeks&date=${today}`,
-                label: "5 weeks",
-                active: false,
-              },
-              {
                 href: `/calendar?view=month&date=${today}`,
                 label: "Month",
                 active: false,

@@ -41,8 +41,8 @@ import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel"
 import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
 
-/** Week, the rolling 5 weeks, or a calendar month. */
-type View = "week" | "weeks" | "month";
+/** Week or Month. What Month shows (rolling 5 weeks or the calendar month) is a setting. */
+type View = "week" | "month";
 
 export default function CalendarPage(props: PageProps<"/calendar">) {
   return (
@@ -61,8 +61,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const supabase = await createClient();
 
   const today = localDateOf(new Date(), timeZone);
-  const viewParam = firstParam(params.view);
-  const view: View = viewParam === "month" || viewParam === "weeks" ? viewParam : "week";
+  const view: View = firstParam(params.view) === "month" ? "month" : "week";
+  const rolling = household.settings.monthStyle === "rolling";
   const dateParam = firstParam(params.date);
   const anchor = dateParam && isLocalDate(dateParam) ? dateParam : today;
   const editId = firstParam(params.edit);
@@ -74,7 +74,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const days =
     view === "week"
       ? weekDays(anchor, weekStartsOn)
-      : view === "weeks"
+      : rolling
         ? rollingWeekDays(anchor, weekStartsOn)
         : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
@@ -118,8 +118,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Open the edit card on the side away from the event, so it stays in view.
   const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
   const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
-  // Week and 5 weeks move a week at a time; Month moves a month.
-  const step = (n: number) => (view === "month" ? addMonths(anchor, n) : addDays(anchor, 7 * n));
+  // Week and the rolling 5 weeks move a week at a time; the calendar month moves a month.
+  const byMonth = view === "month" && !rolling;
+  const step = (n: number) => (byMonth ? addMonths(anchor, n) : addDays(anchor, 7 * n));
   const error = firstParam(params.error);
   const message = firstParam(params.message);
 
@@ -156,9 +157,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       <ScreenHeader title={rangeTitle(view, days, anchor, household)}>
         {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
         <div className="flex items-center gap-2">
-          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={view === "month" ? "Previous month" : "Previous week"} icon={CaretLeft} />
+          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={byMonth ? "Previous month" : "Previous week"} icon={CaretLeft} />
           <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>Today</SoftLink>
-          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={view === "month" ? "Next month" : "Next week"} icon={CaretRight} />
+          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
           <SoftLink href={href({ panel: "tags", edit: null, add: null })}>
@@ -174,7 +175,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             options={[
               { href: "/", label: "Day", active: false },
               { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
-              { href: href({ view: "weeks", edit: null, add: null, panel: null }), label: "5 weeks", active: view === "weeks" },
               { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
             ]}
           />
@@ -214,7 +214,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           href={href}
           profiles={profiles}
           anchor={anchor}
-          mode={view === "weeks" ? "weeks" : "month"}
+          mode={rolling ? "weeks" : "month"}
           adding={{ placing, pending, addHref }}
         />
       )}
@@ -668,7 +668,7 @@ async function dinnersFor(days: LocalDate[]): Promise<Map<LocalDate, Dinner>> {
 function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household: Household): string {
   const { locale, timeZone } = household.settings;
   const noon = (d: LocalDate) => zonedToUtc(d, "12:00", timeZone);
-  // Month and 5 weeks are both titled with the month (of today, unless you've moved).
+  // Month is titled with the month either way (today's, unless you've moved).
   if (view !== "week") {
     return new Intl.DateTimeFormat(locale, { timeZone, month: "long", year: "numeric" }).format(noon(anchor));
   }
