@@ -949,14 +949,14 @@ isOneToOne: false
                   ]
                 },"routine_steps": {
                   Row: {
-                    "created_at": string,"essential": boolean,"household_id": string,"icon": string | null,"id": string,"position": number,"target_time": string | null,"template_id": string,"text": string,"updated_at": string
+                    "created_at": string,"essential": boolean,"habit": boolean,"household_id": string,"icon": string | null,"id": string,"position": number,"target_time": string | null,"template_id": string,"text": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"essential"?: boolean,"household_id": string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id": string,"text": string,"updated_at"?: string
+                    "created_at"?: string,"essential"?: boolean,"habit"?: boolean,"household_id": string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id": string,"text": string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"essential"?: boolean,"household_id"?: string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id"?: string,"text"?: string,"updated_at"?: string
+                    "created_at"?: string,"essential"?: boolean,"habit"?: boolean,"household_id"?: string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id"?: string,"text"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -975,14 +975,14 @@ isOneToOne: false
                   ]
                 },"routine_templates": {
                   Row: {
-                    "anchor": string,"anchor_meal_time_id": string | null,"anchor_offset": number,"audience": string,"created_at": string,"household_id": string,"id": string,"kind": string,"loose": boolean,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
+                    "anchor": string,"anchor_meal_time_id": string | null,"anchor_offset": number,"audience": string,"created_at": string,"habit_since": string | null,"household_id": string,"id": string,"kind": string,"loose": boolean,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "anchor": string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"household_id": string,"id"?: string,"kind"?: string,"loose"?: boolean,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
+                    "anchor": string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"habit_since"?: string | null,"household_id": string,"id"?: string,"kind"?: string,"loose"?: boolean,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Update: {
-                    "anchor"?: string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"kind"?: string,"loose"?: boolean,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
+                    "anchor"?: string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"habit_since"?: string | null,"household_id"?: string,"id"?: string,"kind"?: string,"loose"?: boolean,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Relationships: [
                     {

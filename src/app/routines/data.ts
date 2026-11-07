@@ -27,6 +27,8 @@ export type RoutineTemplate = {
   anchor_meal_time_id: string | null;
   anchor_offset: number;
   loose: boolean;
+  /** When habit tracking was switched on; null when it's off. */
+  habit_since: string | null;
 };
 export type RoutineStep = {
   id: string;
@@ -36,6 +38,8 @@ export type RoutineStep = {
   position: number;
   target_time: string | null;
   essential: boolean;
+  /** Tracked as a habit when the routine is tracked. */
+  habit: boolean;
 };
 export type RoutineAssignment = {
   id: string;
@@ -68,10 +72,10 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       .order("name"),
     supabase
       .from("routine_templates")
-      .select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes, anchor, anchor_meal_time_id, anchor_offset, loose")
+      .select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes, anchor, anchor_meal_time_id, anchor_offset, loose, habit_since")
       .order("sort_order")
       .order("name"),
-    supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential").order("position"),
+    supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential, habit").order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, day_type_id, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),
     supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order").order("sort_order").order("name"),

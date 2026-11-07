@@ -6,7 +6,7 @@ import { requireHousehold } from "@/lib/household";
 import { isRoutineKind, routineProgress } from "@/lib/routines";
 import { createClient } from "@/lib/supabase/server";
 import { weekStart } from "@/lib/day-types";
-import { addDays, isLocalDate, isLocalTime } from "@/lib/time";
+import { addDays, isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
 import { isVisibility } from "../calendar/options";
 
 /*
@@ -18,7 +18,7 @@ import { isVisibility } from "../calendar/options";
 function returnPath(formData: FormData): string {
   const value = String(formData.get("returnTo") ?? "");
   // Only our own pages, never another website.
-  return /^\/(routines(\/manage)?)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/routines";
+  return /^\/(routines(\/manage|\/habits)?)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/routines";
 }
 
 function back(formData: FormData, kind: "error" | "message", text: string): never {
@@ -48,6 +48,7 @@ async function log(householdId: string, action: string, targetType: string, targ
 
 function refresh() {
   revalidatePath("/routines");
+  revalidatePath("/routines/habits");
   revalidatePath("/");
 }
 
@@ -177,6 +178,36 @@ export async function updateStep(formData: FormData) {
   if (error) back(formData, "error", error.message);
   refresh();
   back(formData, "message", `Saved "${step.text}".`);
+}
+
+// ---------------------------------------------------------------------------
+// Habit tracking
+// ---------------------------------------------------------------------------
+
+/** Switches habit tracking on (from today) or off for a routine. */
+export async function setRoutineHabit(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const on = text(formData, "on") === "1";
+  const since = on ? localDateOf(new Date(), household.settings.timeZone) : null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("routine_templates").update({ habit_since: since }).eq("id", id).select("name").single();
+  if (error) back(formData, "error", error.message);
+  await log(household.id, on ? "habit_tracking_on" : "habit_tracking_off", "routine", id, { name: data.name });
+  refresh();
+  back(formData, "message", on ? `${data.name} is now tracked as a habit, starting today.` : `${data.name} is no longer tracked. Its ticks are kept.`);
+}
+
+/** Tracks or stops tracking one step of a tracked routine. */
+export async function setStepHabit(formData: FormData) {
+  await requireHousehold();
+  const id = text(formData, "id");
+  const on = text(formData, "on") === "1";
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("routine_steps").update({ habit: on }).eq("id", id).select("text").single();
+  if (error) back(formData, "error", error.message);
+  refresh();
+  back(formData, "message", on ? `Tracking "${data.text}".` : `Not tracking "${data.text}".`);
 }
 
 export async function removeStep(formData: FormData) {

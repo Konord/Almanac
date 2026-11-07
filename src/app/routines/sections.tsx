@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Trash } from "@phosphor-icons/react/dist/ssr";
+import { ArrowDown, ArrowUp, ChartLineUp, Trash } from "@phosphor-icons/react/dist/ssr";
 import { Button, Emoji, Field, Input, Select } from "@/components/ui";
 import type { DayType, WeekPlan } from "@/lib/day-types";
 import type { Household } from "@/lib/household";
@@ -17,6 +17,8 @@ import {
   removeWeekPlan,
   saveDayType,
   saveWeekPlan,
+  setRoutineHabit,
+  setStepHabit,
   updateRoutine,
   updateStep,
 } from "./actions";
@@ -266,6 +268,12 @@ export function StepsEditor({
   const pages = Math.max(1, Math.ceil(steps.length / perPage));
   return (
     <div className="flex flex-col gap-2">
+      {template.habit_since ? (
+        <p className="flex items-center gap-2 px-2 text-sm font-bold text-success">
+          <ChartLineUp size="1.1rem" weight="bold" aria-hidden />
+          Green steps are tracked on the habit chart. Tap one to leave it out.
+        </p>
+      ) : null}
       <div className="grid grid-cols-[4.5rem_1fr_8.5rem_auto] gap-2 px-2 text-sm font-bold text-ink-muted">
         <span>Picture</span>
         <span>Step</span>
@@ -284,6 +292,7 @@ export function StepsEditor({
                 Save
               </Button>
             </form>
+            {template.habit_since ? <StepHabitButton step={step} returnTo={returnTo} /> : null}
             <StepButton action={moveStep} id={step.id} returnTo={returnTo} direction="up" disabled={index === 0} label={`Move ${step.text} up`}>
               <ArrowUp size="1.25rem" weight="bold" aria-hidden />
             </StepButton>
@@ -354,6 +363,49 @@ function StepButton({
         className={`flex size-11 items-center justify-center rounded-xl bg-board disabled:opacity-30 ${danger ? "text-danger" : "text-ink"}`}
       >
         {children}
+      </button>
+    </form>
+  );
+}
+
+/** On a tracked routine: whether this step gets a row on the habit chart. */
+function StepHabitButton({ step, returnTo }: { step: RoutineStep; returnTo: string }) {
+  const label = step.habit ? `Stop tracking ${step.text}` : `Track ${step.text} as a habit`;
+  return (
+    <form action={setStepHabit}>
+      <input type="hidden" name="id" value={step.id} />
+      <input type="hidden" name="on" value={step.habit ? "0" : "1"} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <button
+        aria-pressed={step.habit}
+        aria-label={label}
+        title={label}
+        className={`flex size-11 items-center justify-center rounded-xl ${step.habit ? "bg-success text-white" : "bg-board text-ink-muted"}`}
+      >
+        <ChartLineUp size="1.25rem" weight="bold" aria-hidden />
+      </button>
+    </form>
+  );
+}
+
+/** The routine's "Track as a habit" switch. Off by default. */
+export function HabitSwitch({ template, returnTo }: { template: RoutineTemplate; returnTo: string }) {
+  const on = Boolean(template.habit_since);
+  return (
+    <form action={setRoutineHabit}>
+      <input type="hidden" name="id" value={template.id} />
+      <input type="hidden" name="on" value={on ? "0" : "1"} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <button
+        role="switch"
+        aria-checked={on}
+        className={`flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl px-3.5 text-base font-bold ${on ? "bg-[color-mix(in_srgb,var(--color-success)_12%,white)] text-success" : "bg-rail text-ink"}`}
+        title={on ? "Tap to stop tracking (ticks are kept)" : "Tap to track this routine as a habit"}
+      >
+        <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 ${on ? "justify-end bg-success" : "justify-start bg-check-border"}`} aria-hidden>
+          <span className="size-5 rounded-full bg-white" />
+        </span>
+        Track as a habit
       </button>
     </form>
   );
