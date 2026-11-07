@@ -35,7 +35,9 @@ import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadRoutines } from "../routines/data";
 import { PeopleRow } from "../routines/people-row";
-import { MonthView, WeekView } from "./views";
+import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime } from "./views";
+import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
+import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
 
 type View = "week" | "month";
@@ -110,10 +112,32 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const error = firstParam(params.error);
   const message = firstParam(params.message);
 
+  // The Today panel on the left: what's still to come today, soonest first.
+  const panelPrefs = await readPanelPrefs();
+  const panelReturn = `/calendar?${returnTo}`;
+  const now = new Date();
+  const upNext: UpNextItem[] = eventsOnDay(events, today, timeZone)
+    .filter((e) => !isAllDayStyle(e, timeZone) && new Date(e.ends_at) > now)
+    .sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1))
+    .map((e) => ({
+      id: `${e.id}|${e.occurrence_date ?? ""}`,
+      title: e.title,
+      emoji: eventEmoji(e.icon, e.title),
+      time: new Date(e.starts_at) <= now ? "Now" : shortTime(new Date(e.starts_at), household),
+      colour: eventColour(e, memberById),
+    }));
+
   return (
     <>
+      <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
+      {panelPrefs.open ? (
+        <TodayPanel household={household} today={today} upNext={upNext} tab={panelPrefs.tab} returnTo={panelReturn} />
+      ) : (
+        <OpenPanelTab returnTo={panelReturn} />
+      )}
+      <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
       <ScreenHeader title={rangeTitle(view, days, anchor, household)}>
-        <HeaderClock locale={locale} timeZone={timeZone} />
+        {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
         <div className="flex items-center gap-2">
           <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={view === "week" ? "Previous week" : "Previous month"} icon={CaretLeft} />
           <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>Today</SoftLink>
@@ -174,6 +198,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           adding={{ placing, pending, addHref }}
         />
       )}
+      </div>
+      </div>
 
       {/* Add button, bottom right: starts adding mode, or cancels it. */}
       <Link
