@@ -292,8 +292,8 @@ export function TodoFields({
       <Field label="What needs doing">
         <Input name="title" defaultValue={todo?.title} required maxLength={120} />
       </Field>
-      <Field label="Picture" hint="Optional: one emoji.">
-        <Input name="icon" defaultValue={todo?.icon ?? ""} maxLength={8} />
+      <Field label="Picture" hint="Optional. Tap to pick one.">
+        <EmojiPicker initial={todo?.icon ?? ""} nameField="title" className="self-start!" fullScreen />
       </Field>
       <Field label="Day" hint="Optional.">
         <Input name="dueDate" type="date" defaultValue={todo?.due_date ?? ""} />

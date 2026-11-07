@@ -28,6 +28,7 @@ import { SurvivalCard } from "./survival-card";
 import { OpenPanelTab, TodayPanel } from "./today-panel/panel";
 import { readPanelPrefs } from "./today-panel/prefs";
 import { clock, floatingDay, RoutineBlock } from "./routines/floating";
+import { ChecklistSheet } from "./routines/checklist-sheet";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
 import { PlaceAcrossPeople } from "@/components/place-across-people";
@@ -112,6 +113,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/");
   // The Survival card (?survival=1): meals still to cook, and chores due.
   const survivalOpen = firstParam(params.survival) === "1" && !placing;
+  const openRoutine = firstParam(params.routine);
+  const openMember = firstParam(params.member);
   const survivalParts = survivalOpen ? await loadBackupParts() : [];
   const mealsToCook = survivalOpen
     ? placeTodayMeals(todayMeals, mealBasics, [])
@@ -200,6 +203,20 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       {pending ? (
         <QuickAddSheet pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
+      ) : null}
+
+      {/* A routine's checklist, from tapping its block (?routine=…&member=…). */}
+      {openRoutine && openMember && !pending ? (
+        <ChecklistSheet
+          data={routineData}
+          memberId={openMember}
+          templateId={openRoutine}
+          date={today}
+          today={today}
+          household={household}
+          closeHref="/"
+          returnTo={`/?routine=${openRoutine}&member=${openMember}`}
+        />
       ) : null}
     </>
   );

@@ -190,7 +190,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         />
       ) : null}
 
-      {view === "week" ? <PeopleRow data={routineData} date={today} hrefFor={(id) => `/routines?member=${id}`} /> : null}
+      {view === "week" ? <PeopleRow data={routineData} date={today} /> : null}
 
       {view === "week" ? (
         <WeekView

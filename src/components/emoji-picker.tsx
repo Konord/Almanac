@@ -30,8 +30,23 @@ export function EmojiPicker({
   nameField = "title",
   letter = false,
   fullScreen = false,
+  onChange,
+  nameText,
+  fieldName = "icon",
+  label,
+  className = "",
 }: {
   initial?: string;
+  /** For screens that keep their own changes (no form): called with each pick. */
+  onChange?: (emoji: string) => void;
+  /** The name to suggest pictures for, when there's no form field to follow. */
+  nameText?: string;
+  /** The form field the picture is sent as (empty: none). */
+  fieldName?: string;
+  /** What the button says to screen readers, e.g. "Picture for Brush teeth". */
+  label?: string;
+  /** Extra classes for the button, e.g. a smaller size. */
+  className?: string;
   /** The form field holding the name, for suggestions. */
   nameField?: string;
   /** For a person: with no picture they show the first letter of their name, not a guess. */
@@ -41,7 +56,8 @@ export function EmojiPicker({
 }) {
   const [icon, setIcon] = useState(initial ?? "");
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
+  const [formTitle, setTitle] = useState("");
+  const title = nameText ?? formTitle;
   const [query, setQuery] = useState("");
   /** 0 = Suggested, then 1 + the group number. */
   const [tab, setTab] = useState(0);
@@ -50,6 +66,7 @@ export function EmojiPicker({
 
   // Follow the name typed in the same form, for the guess and the suggestions.
   useEffect(() => {
+    if (nameText !== undefined) return;
     const form = marker.current?.form;
     const field = form?.elements.namedItem(nameField) as HTMLInputElement | null;
     if (!field) return;
@@ -57,11 +74,12 @@ export function EmojiPicker({
     read();
     field.addEventListener("input", read);
     return () => field.removeEventListener("input", read);
-  }, [nameField]);
+  }, [nameField, nameText]);
 
   const shown = icon || eventEmoji(null, title);
   const pick = (emoji: string) => {
     setIcon(emoji);
+    onChange?.(emoji);
     setOpen(false);
     setQuery("");
     setTab(0);
@@ -77,12 +95,12 @@ export function EmojiPicker({
 
   return (
     <>
-      <input ref={marker} type="hidden" name="icon" value={icon} />
+      <input ref={marker} type="hidden" name={fieldName || undefined} value={icon} />
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={icon ? "Change the picture" : letter ? "Pick a picture (showing the first letter for now)" : "Pick a picture (Almanac is guessing one from the name)"}
-        className="flex size-[var(--touch-target)] shrink-0 items-center justify-center self-end rounded-[var(--radius)] border-2 border-frame bg-board hover:border-ink"
+        aria-label={label ?? (icon ? "Change the picture" : letter ? "Pick a picture (showing the first letter for now)" : "Pick a picture (Almanac is guessing one from the name)")}
+        className={`flex size-[var(--touch-target)] shrink-0 items-center justify-center self-end rounded-[var(--radius)] border-2 border-frame bg-board hover:border-ink ${className}`}
       >
         {letter && !icon ? (
           <span className="text-2xl font-extrabold text-ink-muted">{[...title.trim()][0]?.toUpperCase() ?? "?"}</span>

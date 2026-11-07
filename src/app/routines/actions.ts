@@ -3,11 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
-import { isRoutineKind, routineProgress } from "@/lib/routines";
+import { routineProgress } from "@/lib/routines";
 import { createClient } from "@/lib/supabase/server";
 import { weekStart } from "@/lib/day-types";
-import { addDays, isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
-import { isVisibility } from "../calendar/options";
+import { addDays, isLocalDate, isLocalTime } from "@/lib/time";
 
 /*
  * Like the other screens: each action re-checks the signed-in household,
@@ -48,205 +47,11 @@ async function log(householdId: string, action: string, targetType: string, targ
 
 function refresh() {
   revalidatePath("/routines");
-  revalidatePath("/routines/habits");
   revalidatePath("/");
 }
 
 // ---------------------------------------------------------------------------
-// Routines (templates)
-// ---------------------------------------------------------------------------
-
-function readRoutine(formData: FormData) {
-  const name = text(formData, "name");
-  const kind = text(formData, "kind");
-  const audience = text(formData, "audience");
-  const visibility = text(formData, "visibility") || "everyone";
-  if (!name) back(formData, "error", "A routine needs a name.");
-  if (!isRoutineKind(kind)) back(formData, "error", "Choose when the routine happens.");
-  if (!["kid", "adult", "everyone"].includes(audience)) back(formData, "error", "Choose who the routine is for.");
-  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this routine.");
-  const usualStart = text(formData, "usualStart");
-  if (usualStart && !isLocalTime(usualStart)) back(formData, "error", "The usual time should look like 7:30 p.m.");
-  const minutesText = text(formData, "usualMinutes");
-  const usualMinutes = minutesText ? Number(minutesText) : null;
-  if (usualMinutes !== null && !(Number.isInteger(usualMinutes) && usualMinutes >= 5 && usualMinutes <= 240)) {
-    back(formData, "error", "How long should be between 5 and 240 minutes.");
-  }
-  const anchor = text(formData, "anchor") || "clock";
-  if (!["wake", "bed", "meal", "clock"].includes(anchor)) back(formData, "error", "Choose what the routine follows.");
-  const mealTimeId = text(formData, "anchorMealTimeId") || null;
-  if (anchor === "meal" && !mealTimeId) back(formData, "error", "Choose which meal it comes after.");
-  const offset = Number(text(formData, "anchorOffset") || 0);
-  if (!(Number.isInteger(offset) && offset >= 0 && offset <= 240)) back(formData, "error", "The gap should be between 0 and 240 minutes.");
-  return {
-    name,
-    kind,
-    audience,
-    visibility,
-    usual_start: usualStart || null,
-    usual_minutes: usualMinutes,
-    anchor,
-    anchor_meal_time_id: anchor === "meal" ? mealTimeId : null,
-    anchor_offset: offset,
-    loose: formData.get("loose") === "on",
-  };
-}
-
-export async function addRoutine(formData: FormData) {
-  const household = await requireHousehold();
-  const routine = readRoutine(formData);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("routine_templates")
-    .insert({ ...routine, household_id: household.id, sort_order: 100 })
-    .select("id")
-    .single();
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "routine_added", "routine", data.id, { name: routine.name });
-  refresh();
-  const [base, query = ""] = returnPath(formData).split("?");
-  const params = new URLSearchParams(query);
-  params.set("routine", data.id);
-  params.set("message", `Added ${routine.name}. Now add its steps, and give it to a kind of day on the Days tab.`);
-  redirect(`${base}?${params.toString()}`);
-}
-
-export async function updateRoutine(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const routine = readRoutine(formData);
-  const supabase = await createClient();
-  const { error } = await supabase.from("routine_templates").update(routine).eq("id", id);
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "routine_updated", "routine", id, { name: routine.name });
-  refresh();
-  back(formData, "message", `Saved ${routine.name}.`);
-}
-
-export async function removeRoutine(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const supabase = await createClient();
-  const { error } = await supabase.from("routine_templates").delete().eq("id", id);
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "routine_removed", "routine", id, { name });
-  refresh();
-  back(formData, "message", `Removed ${name}.`);
-}
-
-// ---------------------------------------------------------------------------
-// Steps
-// ---------------------------------------------------------------------------
-
-function readStep(formData: FormData) {
-  const stepText = text(formData, "text");
-  const icon = text(formData, "icon") || null;
-  const targetTime = text(formData, "targetTime") || null;
-  if (!stepText) back(formData, "error", "A step needs some words.");
-  if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🪥.");
-  if (targetTime && !isLocalTime(targetTime)) back(formData, "error", "The target time should look like 07:45.");
-  return { text: stepText, icon, target_time: targetTime };
-}
-
-export async function addStep(formData: FormData) {
-  const household = await requireHousehold();
-  const templateId = text(formData, "templateId");
-  const step = readStep(formData);
-  const supabase = await createClient();
-  const { data: last } = await supabase
-    .from("routine_steps")
-    .select("position")
-    .eq("template_id", templateId)
-    .order("position", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const { error } = await supabase
-    .from("routine_steps")
-    .insert({ ...step, template_id: templateId, household_id: household.id, position: (last?.position ?? 0) + 1 });
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Added "${step.text}".`);
-}
-
-export async function updateStep(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const step = readStep(formData);
-  const supabase = await createClient();
-  const { error } = await supabase.from("routine_steps").update(step).eq("id", id);
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Saved "${step.text}".`);
-}
-
-// ---------------------------------------------------------------------------
-// Habit tracking
-// ---------------------------------------------------------------------------
-
-/** Switches habit tracking on (from today) or off for a routine. */
-export async function setRoutineHabit(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const on = text(formData, "on") === "1";
-  const since = on ? localDateOf(new Date(), household.settings.timeZone) : null;
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("routine_templates").update({ habit_since: since }).eq("id", id).select("name").single();
-  if (error) back(formData, "error", error.message);
-  await log(household.id, on ? "habit_tracking_on" : "habit_tracking_off", "routine", id, { name: data.name });
-  refresh();
-  back(formData, "message", on ? `${data.name} is now tracked as a habit, starting today.` : `${data.name} is no longer tracked. Its ticks are kept.`);
-}
-
-/** Tracks or stops tracking one step of a tracked routine. */
-export async function setStepHabit(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const on = text(formData, "on") === "1";
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("routine_steps").update({ habit: on }).eq("id", id).select("text").single();
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", on ? `Tracking "${data.text}".` : `Not tracking "${data.text}".`);
-}
-
-export async function removeStep(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const supabase = await createClient();
-  const { error } = await supabase.from("routine_steps").delete().eq("id", id);
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", "Removed the step.");
-}
-
-/** Swaps a step with the one above or below it. */
-export async function moveStep(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const direction = text(formData, "direction") === "up" ? "up" : "down";
-  const supabase = await createClient();
-  const { data: step } = await supabase.from("routine_steps").select("id, template_id, position").eq("id", id).maybeSingle();
-  if (!step) back(formData, "error", "That step no longer exists.");
-  const { data: neighbour } = await supabase
-    .from("routine_steps")
-    .select("id, position")
-    .eq("template_id", step.template_id)
-    [direction === "up" ? "lt" : "gt"]("position", step.position)
-    .order("position", { ascending: direction === "down" })
-    .limit(1)
-    .maybeSingle();
-  if (neighbour) {
-    const a = await supabase.from("routine_steps").update({ position: neighbour.position }).eq("id", step.id);
-    const b = await supabase.from("routine_steps").update({ position: step.position }).eq("id", neighbour.id);
-    if (a.error || b.error) back(formData, "error", (a.error ?? b.error)!.message);
-  }
-  refresh();
-  redirect(returnPath(formData));
-}
-
-// ---------------------------------------------------------------------------
-// Who does what, when
+// Who has which routine
 // ---------------------------------------------------------------------------
 
 export async function setAssignmentActive(formData: FormData) {

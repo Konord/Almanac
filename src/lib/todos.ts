@@ -50,7 +50,7 @@ export const FEATURE_LINKS = [
   { path: "/meals/groceries", label: "Grocery list" },
   { path: "/meals/backups", label: "Backup meals" },
   { path: "/chores", label: "Chores" },
-  { path: "/routines/manage", label: "Routine planner" },
+  { path: "/routines", label: "Routine Manager" },
   { path: "/calendar", label: "Calendar" },
 ] as const;
 

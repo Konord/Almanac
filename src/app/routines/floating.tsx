@@ -100,8 +100,8 @@ export function clock(minutes: number, date: LocalDate, household: Household): s
 
 /**
  * A routine on the timeline: a dashed block in the person's colour, so it
- * reads as "this moves" next to the solid events. Tapping it opens the
- * person's checklist.
+ * reads as "this moves" next to the solid events. Tapping it opens its
+ * checklist over the calendar.
  */
 export function RoutineBlock({
   routine,
@@ -137,7 +137,8 @@ export function RoutineBlock({
   const count = `${progress.done}/${progress.total}`;
   return (
     <Link
-      href={`/routines?member=${memberId}`}
+      href={`/?routine=${template.id}&member=${memberId}`}
+      scroll={false}
       className={`absolute z-[1] flex gap-1.5 overflow-hidden rounded-xl border-2 border-dashed px-2 text-ink ${short ? "items-center" : "items-start py-1"} ${progress.complete ? "opacity-60" : ""}`}
       style={{
         top: `calc(${top}% + 2px)`,
