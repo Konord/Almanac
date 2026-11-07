@@ -5,7 +5,7 @@ import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, 
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
 import { strong } from "@/lib/colours";
-import { addMonths, dayOfWeek, monthGridDays, weekDays } from "@/lib/calendar-layout";
+import { addMonths, dayOfWeek, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
@@ -35,11 +35,13 @@ import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadRoutines } from "../routines/data";
 import { PeopleRow } from "../routines/people-row";
-import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime } from "./views";
+import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime, type Dinner } from "./views";
+import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
 import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
 import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
 
+/** Week or Month. What Month shows (rolling 5 weeks or the calendar month) is a setting. */
 type View = "week" | "month";
 
 export default function CalendarPage(props: PageProps<"/calendar">) {
@@ -60,6 +62,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
 
   const today = localDateOf(new Date(), timeZone);
   const view: View = firstParam(params.view) === "month" ? "month" : "week";
+  const rolling = household.settings.monthStyle === "rolling";
   const dateParam = firstParam(params.date);
   const anchor = dateParam && isLocalDate(dateParam) ? dateParam : today;
   const editId = firstParam(params.edit);
@@ -68,7 +71,12 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const panelParam = firstParam(params.panel);
   const panel = panelParam === "layers" || panelParam === "tags" ? panelParam : null;
 
-  const days = view === "week" ? weekDays(anchor, weekStartsOn) : monthGridDays(anchor, weekStartsOn);
+  const days =
+    view === "week"
+      ? weekDays(anchor, weekStartsOn)
+      : rolling
+        ? rollingWeekDays(anchor, weekStartsOn)
+        : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   const [{ layers, members, views, tags, templates, items, exceptions }, routineData] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
@@ -76,6 +84,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   ]);
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
+  // The week view shows each day's dinner under the date.
+  const dinners = view === "week" ? await dinnersFor(days) : new Map<LocalDate, Dinner>();
   const profiles = profilesFor(days, items, layers, household);
   const layerById = new Map(layers.map((l) => [l.id, l]));
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
@@ -108,7 +118,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Open the edit card on the side away from the event, so it stays in view.
   const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
   const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
-  const step = (n: number) => (view === "week" ? addDays(anchor, 7 * n) : addMonths(anchor, n));
+  // Week and the rolling 5 weeks move a week at a time; the calendar month moves a month.
+  const byMonth = view === "month" && !rolling;
+  const step = (n: number) => (byMonth ? addMonths(anchor, n) : addDays(anchor, 7 * n));
   const error = firstParam(params.error);
   const message = firstParam(params.message);
 
@@ -116,7 +128,13 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const panelPrefs = await readPanelPrefs();
   const panelReturn = `/calendar?${returnTo}`;
   const now = new Date();
-  const upNext: UpNextItem[] = eventsOnDay(events, today, timeZone)
+  // Up next is always about today, even when the calendar shows another month.
+  let todayEvents = events;
+  if (!days.includes(today)) {
+    const todayRange = rangeOf([today], timeZone);
+    todayEvents = panelPrefs.open ? itemsInView((await loadCalendar(todayRange.rangeStart, todayRange.rangeEnd)).items, savedView) : [];
+  }
+  const upNext: UpNextItem[] = eventsOnDay(todayEvents, today, timeZone)
     .filter((e) => !isAllDayStyle(e, timeZone) && new Date(e.ends_at) > now)
     .sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1))
     .map((e) => ({
@@ -139,9 +157,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       <ScreenHeader title={rangeTitle(view, days, anchor, household)}>
         {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
         <div className="flex items-center gap-2">
-          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={view === "week" ? "Previous week" : "Previous month"} icon={CaretLeft} />
+          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={byMonth ? "Previous month" : "Previous week"} icon={CaretLeft} />
           <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>Today</SoftLink>
-          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={view === "week" ? "Next week" : "Next month"} icon={CaretRight} />
+          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
           <SoftLink href={href({ panel: "tags", edit: null, add: null })}>
@@ -183,6 +201,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           memberById={memberById}
           href={href}
           profiles={profiles}
+          dinners={dinners}
           adding={{ placing, pending, addHref }}
         />
       ) : (
@@ -195,6 +214,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           href={href}
           profiles={profiles}
           anchor={anchor}
+          mode={rolling ? "weeks" : "month"}
           adding={{ placing, pending, addHref }}
         />
       )}
@@ -625,10 +645,31 @@ function CloseLink({ href, label = "Cancel" }: { href: string; label?: string })
   );
 }
 
+/**
+ * Each day's dinner: the planned meals at the dinner meal time (the one
+ * called Dinner or Supper, else the latest in the day).
+ */
+async function dinnersFor(days: LocalDate[]): Promise<Map<LocalDate, Dinner>> {
+  const [basics, meals] = await Promise.all([loadMealBasics(), loadMeals(days[0], days[days.length - 1])]);
+  const times = basics.mealTimes.toSorted((x, y) => (x.usual_time ?? "").localeCompare(y.usual_time ?? ""));
+  const dinner = times.find((t) => /dinner|supper/i.test(t.name)) ?? times.at(-1);
+  const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
+  const categories = new Map(basics.categories.map((c) => [c.id, c]));
+  const result = new Map<LocalDate, Dinner>();
+  if (!dinner) return result;
+  for (const day of days) {
+    const here = meals.filter((m) => m.date === day && m.meal_time_id === dinner.id && (m.status === "planned" || m.status === "cooked"));
+    if (here.length === 0) continue;
+    result.set(day, { name: mealName(here[0], recipes, categories), icon: mealIcon(here[0], recipes, categories), more: here.length - 1 });
+  }
+  return result;
+}
+
 function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household: Household): string {
   const { locale, timeZone } = household.settings;
   const noon = (d: LocalDate) => zonedToUtc(d, "12:00", timeZone);
-  if (view === "month") {
+  // Month is titled with the month either way (today's, unless you've moved).
+  if (view !== "week") {
     return new Intl.DateTimeFormat(locale, { timeZone, month: "long", year: "numeric" }).format(noon(anchor));
   }
   const first = days[0];

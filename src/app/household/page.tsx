@@ -119,6 +119,12 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               <option value="1">Monday</option>
             </Select>
           </Field>
+          <Field label="The Month view shows">
+            <Select name="monthStyle" defaultValue={settings.monthStyle}>
+              <option value="rolling">5 weeks from this week</option>
+              <option value="calendar">The calendar month</option>
+            </Select>
+          </Field>
           <Field label="Currency">
             <Input name="currency" defaultValue={settings.currency} required maxLength={3} />
           </Field>

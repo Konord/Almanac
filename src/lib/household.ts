@@ -16,6 +16,8 @@ export type HouseholdSettings = {
   currency: string;
   /** 0 = Sunday, 1 = Monday */
   weekStartsOn: 0 | 1;
+  /** What "Month" shows: a rolling 5 weeks from this week, or the calendar month (5 rows). */
+  monthStyle: "rolling" | "calendar";
   activeTheme: string;
   /** Show family-written things (to-dos, meals, notes) in handwriting. */
   handwriting: boolean;
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   temperatureUnit: "celsius",
   currency: "CAD",
   weekStartsOn: 0,
+  monthStyle: "rolling",
   activeTheme: "bright",
   handwriting: true,
   dayProfile: DEFAULT_DAY_PROFILE,
@@ -58,6 +61,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     temperatureUnit: pick("temperatureUnit", (v) => v === "celsius" || v === "fahrenheit"),
     currency: pick("currency", (v) => typeof v === "string" && /^[A-Z]{3}$/.test(v)),
     weekStartsOn: pick("weekStartsOn", (v) => v === 0 || v === 1),
+    monthStyle: pick("monthStyle", (v) => v === "rolling" || v === "calendar"),
     activeTheme: pick("activeTheme", (v) => typeof v === "string" && v.length > 0),
     handwriting: pick("handwriting", (v) => typeof v === "boolean"),
     dayProfile: parseDayProfile(value.dayProfile),
