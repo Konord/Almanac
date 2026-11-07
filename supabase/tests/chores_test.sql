@@ -1,7 +1,7 @@
 -- Checks for chores and to-dos (Phase 3, step 3). Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(9);
 
 insert into auth.users (id, email, aud, role) values
   ('66666666-6666-6666-6666-666666666666', 'chores-a@test', 'authenticated', 'authenticated'),
@@ -42,6 +42,8 @@ select throws_ok(
 select set_config('request.jwt.claims', '{"sub":"77777777-7777-7777-7777-777777777777","role":"authenticated"}', true);
 select public.create_household('Other House');
 select is((select count(*)::int from public.task_instances), 0, 'Another household cannot see these to-dos');
+
+select is((select count(*)::int from public.task_templates where premade), 0, 'No household has app-made chores any more');
 
 select * from finish();
 rollback;
