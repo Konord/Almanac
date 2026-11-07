@@ -1,10 +1,10 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { Alarm, Broom, CalendarBlank, ForkKnife, GearSix, House, ListChecks } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
 import { soft, strong } from "@/lib/colours";
 import { TimerPill } from "./timer-pill";
+import { MenuTray, type Section } from "./menu-tray";
 
 /**
  * Small building blocks shared by every screen, in the locked "bright"
@@ -17,68 +17,26 @@ import { TimerPill } from "./timer-pill";
  */
 
 // ---------------------------------------------------------------------------
-// The app frame: icon rail on the left, the screen on the right
+// The app frame: the whole screen for content, with the menu in a hidden tray
 // ---------------------------------------------------------------------------
 
-export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "settings";
-
-const RAIL: { section: Section; href: string; label: string; icon: Icon }[] = [
-  { section: "today", href: "/", label: "Today", icon: House },
-  { section: "calendar", href: "/calendar", label: "Calendar", icon: CalendarBlank },
-  { section: "chores", href: "/chores", label: "Chores", icon: Broom },
-  { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
-  { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
-  { section: "meals", href: "/meals", label: "Meals", icon: ForkKnife },
-];
-
-const RAIL_BOTTOM: { section: Section; href: string; label: string; icon: Icon }[] = [
-  { section: "settings", href: "/household", label: "Settings", icon: GearSix },
-];
+export type { Section };
 
 /**
  * Every main screen sits in this frame. On a landscape screen the frame is
- * exactly one screen tall and nothing in it scrolls the page; on a phone
- * the rail becomes a bar along the top and the page scrolls as usual.
+ * exactly one screen tall and nothing in it scrolls the page; on a phone the
+ * page scrolls as usual. The menu is not shown on screen: it lives in a tray
+ * that slides up from the handle at the bottom centre (see menu-tray.tsx).
  */
 export function AppFrame({ section, children }: { section: Section; children: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-1 flex-col lg:h-dvh lg:max-h-dvh lg:flex-row lg:overflow-hidden">
-      <nav
-        aria-label="Sections"
-        className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-frame bg-rail px-3 py-2 lg:w-28 lg:flex-col lg:overflow-visible lg:border-r lg:border-b-0 lg:px-3 lg:py-5.5"
-      >
-        <span className="mb-3.5 hidden size-14 items-center justify-center self-center rounded-full border border-frame bg-board text-2xl font-extrabold text-ink-muted lg:flex">
-          A
-        </span>
-        {RAIL.map((item) => (
-          <RailItem key={item.section} {...item} active={item.section === section} />
-        ))}
-        <div className="ml-auto flex gap-1.5 lg:mt-auto lg:ml-0 lg:flex-col">
-          {RAIL_BOTTOM.map((item) => (
-            <RailItem key={item.section} {...item} active={item.section === section} />
-          ))}
-        </div>
-      </nav>
-      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 sm:p-6 lg:min-h-0 lg:pt-5.5 lg:pr-8.5 lg:pb-6 lg:pl-7.5">
+    <div className="flex min-h-dvh flex-1 flex-col lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
+      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 pb-12 sm:p-6 sm:pb-12 lg:min-h-0 lg:px-8.5 lg:pt-5.5 lg:pb-9">
         {children}
       </main>
+      <MenuTray section={section} />
       <TimerPill />
     </div>
-  );
-}
-
-function RailItem({ href, label, icon: IconComponent, active }: { href: string; label: string; icon: Icon; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={`flex min-h-[var(--touch-target)] min-w-20 flex-col items-center justify-center gap-1 rounded-[1.125rem] px-2 text-xs font-bold lg:min-h-21.5 ${
-        active ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.1)]" : "text-ink-muted"
-      }`}
-    >
-      <IconComponent size="2rem" weight={active ? "fill" : "regular"} aria-hidden />
-      {label}
-    </Link>
   );
 }
 
