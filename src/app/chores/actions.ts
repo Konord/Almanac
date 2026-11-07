@@ -17,7 +17,7 @@ import { isVisibility } from "../calendar/options";
 function returnPath(formData: FormData): string {
   const value = String(formData.get("returnTo") ?? "");
   // Only our own pages, never another website.
-  return /^\/(chores(\/add|\/blocks)?|lists)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/chores";
+  return /^\/(chores(\/add|\/blocks)?|lists|calendar)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/chores";
 }
 
 function back(formData: FormData, kind: "error" | "message", text: string): never {

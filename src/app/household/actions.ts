@@ -120,6 +120,7 @@ export async function saveSettings(formData: FormData) {
   const timeZone = text(formData, "timeZone");
   const currency = text(formData, "currency").toUpperCase();
   const weekStartsOn = text(formData, "weekStartsOn") === "1" ? 1 : 0;
+  const monthStyle = text(formData, "monthStyle") === "calendar" ? "calendar" : "rolling";
   const units = text(formData, "units") === "imperial" ? "imperial" : "metric";
   const temperatureUnit = text(formData, "temperatureUnit") === "fahrenheit" ? "fahrenheit" : "celsius";
 
@@ -153,6 +154,7 @@ export async function saveSettings(formData: FormData) {
     timeZone,
     currency,
     weekStartsOn,
+    monthStyle,
     units,
     temperatureUnit,
     handwriting: formData.get("handwriting") === "on",

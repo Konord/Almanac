@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addMonths, dayOfWeek, layoutDay, layoutSpans, memberRuns, monthGridDays, startOfWeek, weekDays } from "./calendar-layout.ts";
+import { addMonths, dayOfWeek, fiveRowMonth, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
 
 test("finds the day of the week", () => {
   assert.equal(dayOfWeek("2026-11-04"), 3); // Wednesday
@@ -24,6 +24,24 @@ test("a month grid covers whole weeks", () => {
   const feb = monthGridDays("2026-02-10", 1);
   assert.equal(feb[0], "2026-01-26");
   assert.equal(feb.at(-1), "2026-03-01");
+});
+
+test("the rolling view starts with this week and shows five", () => {
+  const days = rollingWeekDays("2026-11-19", 0);
+  assert.equal(days.length, 35);
+  assert.equal(days[0], "2026-11-15");
+  assert.equal(days.at(-1), "2026-12-19");
+});
+
+test("a six-week month folds its last days into the fifth row", () => {
+  // August 2026 starting Sunday: Aug 1 is a Saturday, so Aug 30 and 31 make a 6th week.
+  const { cells, shared } = fiveRowMonth(monthGridDays("2026-08-10", 0));
+  assert.equal(cells.length, 35);
+  assert.equal(shared.get("2026-08-23"), "2026-08-30");
+  assert.equal(shared.get("2026-08-24"), "2026-08-31");
+  assert.equal(shared.size, 2);
+  // A five-week month shares nothing.
+  assert.equal(fiveRowMonth(monthGridDays("2026-11-15", 0)).shared.size, 0);
 });
 
 test("adding months clamps to the end of shorter months", () => {
