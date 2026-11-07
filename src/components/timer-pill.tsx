@@ -6,7 +6,7 @@ import { X } from "@phosphor-icons/react";
 import { stopTimer, timeLeft, useAlarm, useNow, useTimers } from "./timer-store";
 
 /**
- * Running kitchen timers, in the bottom corner of every screen, so a
+ * Running kitchen timers, in the bottom-right corner of every screen (the bottom centre is the menu handle), so a
  * timer started in Cooking mode is still seen (and heard) elsewhere.
  */
 export function TimerPill() {
@@ -16,7 +16,7 @@ export function TimerPill() {
   useAlarm(timers, now);
   if (timers.length === 0 || now === 0 || path.startsWith("/meals/cook")) return null;
   return (
-    <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2">
+    <div className="fixed right-6 bottom-5 z-30 flex flex-col items-end gap-2">
       {timers.slice(0, 3).map((t) => {
         const done = t.endsAt <= now;
         return (
