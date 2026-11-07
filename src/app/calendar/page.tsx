@@ -33,7 +33,7 @@ import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, profiles
 import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedView, Tag as TagType } from "./types";
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
-import { loadRoutines } from "../routines/data";
+import { loadBreaks, loadRoutines } from "../routines/data";
 import { PeopleRow } from "../routines/people-row";
 import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime, type Dinner } from "./views";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
@@ -78,9 +78,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         ? rollingWeekDays(anchor, weekStartsOn)
         : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, tags, templates, items, exceptions }, routineData] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items, exceptions }, routineData, breaks] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
+    loadBreaks(days[0], days[days.length - 1]),
   ]);
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
@@ -203,6 +204,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           profiles={profiles}
           dinners={dinners}
           adding={{ placing, pending, addHref }}
+          breaks={breaks}
         />
       ) : (
         <MonthView
@@ -216,6 +218,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           anchor={anchor}
           mode={rolling ? "weeks" : "month"}
           adding={{ placing, pending, addHref }}
+          breaks={breaks}
         />
       )}
       </div>

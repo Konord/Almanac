@@ -81,6 +81,70 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"break_members": {
+                  Row: {
+                    "break_id": string,"day_type_id": string | null,"household_id": string,"member_id": string,"week_plan_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "break_id": string,"day_type_id"?: string | null,"household_id": string,"member_id": string,"week_plan_id"?: string | null
+                  }
+                  Update: {
+                    "break_id"?: string,"day_type_id"?: string | null,"household_id"?: string,"member_id"?: string,"week_plan_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "break_members_break_id_household_id_fkey"
+      columns: ["break_id","household_id"]
+isOneToOne: false
+      referencedRelation: "breaks"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "break_members_day_type_id_household_id_fkey"
+      columns: ["day_type_id","household_id"]
+isOneToOne: false
+      referencedRelation: "day_types"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "break_members_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "break_members_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "break_members_week_plan_id_household_id_fkey"
+      columns: ["week_plan_id","household_id"]
+isOneToOne: false
+      referencedRelation: "week_plans"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"breaks": {
+                  Row: {
+                    "created_at": string,"end_date": string,"household_id": string,"icon": string | null,"id": string,"name": string,"start_date": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"end_date": string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"start_date": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"end_date"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"start_date"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "breaks_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"chore_block_presets": {
                   Row: {
                     "block_id": string,"chore_id": string,"household_id": string,"sort_order": number
@@ -1317,9 +1381,6 @@ isOneToOne: false
           Functions: {
             "add_day_types_for":
 { Args: { "target_member": string }; Returns: undefined
-                           },
-"add_plan_meals_chore":
-{ Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_chores":
 { Args: { "target_household": string }; Returns: undefined

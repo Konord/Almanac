@@ -161,6 +161,20 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         {todayProfile ? (
           <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
         ) : null}
+        {routineData.breaks
+          .filter((b) => b.start_date <= today && today <= b.end_date)
+          .slice(0, 1)
+          .map((b) => (
+            <Link
+              key={b.id}
+              href="/routines/manage?tab=breaks"
+              title={`A break until ${b.end_date}`}
+              className="inline-flex min-h-[var(--touch-target)] max-w-64 shrink-0 items-center gap-2 rounded-2xl border-2 border-dashed border-frame bg-rail px-4 text-base font-bold text-ink"
+            >
+              <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />
+              <span className="truncate">{b.name}</span>
+            </Link>
+          ))}
         <SurvivalButton used={energyMode === "survival"} href="/?survival=1" />
         <div className="lg:ml-auto">
           <Segmented
