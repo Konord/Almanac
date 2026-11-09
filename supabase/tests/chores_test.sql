@@ -13,8 +13,8 @@ select public.create_household('Chore House');
 
 select is((select count(*)::int from public.task_templates), 0, 'A new household starts with no chores');
 select is((select count(*)::int from public.task_lists), 2, 'But it gets two to-do lists');
-insert into public.task_templates (household_id, name, size, repeat_every, repeat_unit)
-values (public.current_household_id(), 'Clean out the fridge', 'medium', 1, 'month');
+insert into public.task_templates (household_id, name, repeat_every, repeat_unit)
+values (public.current_household_id(), 'Clean out the fridge', 1, 'month');
 
 insert into public.task_instances (household_id, list_id, title)
 select public.current_household_id(), id, 'Book the dentist' from public.task_lists where name = 'To-do';

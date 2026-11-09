@@ -47,6 +47,8 @@ export type DraftBreak = {
   icon: string | null;
   start: string;
   end: string;
+  /** Away from home: chores that show every chore day are skipped, the rest wait. */
+  away?: boolean;
   people: DraftBreakPerson[];
 };
 

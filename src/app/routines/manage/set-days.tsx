@@ -542,7 +542,7 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
     const id = newId();
     update((d) => ({
       ...d,
-      breaks: [...d.breaks, { id, name: "", icon: null, start: today, end: today, people: members.map((m) => ({ member_id: m.id, day_type_id: null, week_plan_id: null })) }],
+      breaks: [...d.breaks, { id, name: "", icon: null, start: today, end: today, away: false, people: members.map((m) => ({ member_id: m.id, day_type_id: null, week_plan_id: null })) }],
     }));
     setSelected(id);
   };
@@ -714,6 +714,10 @@ function BreakEditor({
           <input type="date" value={item.end} min={item.start} onChange={(e) => set({ end: e.target.value })} className={dateClass} />
         </label>
         <span className="pb-3 text-base font-semibold text-ink-muted">{dayCount(item.start, item.end)}</span>
+        <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2.5 text-base font-bold text-ink">
+          <input type="checkbox" checked={Boolean(item.away)} onChange={(e) => set({ away: e.target.checked })} className="size-7 accent-[var(--color-ink)]" />
+          Away from home (no chores)
+        </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

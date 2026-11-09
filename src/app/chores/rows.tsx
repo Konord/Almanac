@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowCounterClockwise, ArrowRight, ArrowsLeftRight, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, ArrowRight, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji } from "@/components/ui";
-import { IMPORTANCE_LABEL, SIZE_LABEL, daysBetween } from "@/lib/chores";
+import { CHORE_TAGS } from "@/lib/chore-days";
+import { daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { carriedOver, linkLabel } from "@/lib/todos";
-import { doToday, markChoreDone, skipChore, swapOut, toggleTodo, undoRound } from "./actions";
+import { doToday, markChoreDone, skipChore, toggleTodo, undoRound } from "./actions";
 import type { ChoreMember, ChoreWithTiming, Round, Todo } from "./data";
 
 /** "Today", "Tomorrow", "Sat", or "Nov 14". */
@@ -39,11 +40,16 @@ export function dayPhrase(date: LocalDate, today: LocalDate, household: Househol
   return ["Today", "Tomorrow", "Yesterday"].includes(label) ? label.toLowerCase() : label;
 }
 
-/** "Important · Medium · 40 min · waiting 9 days" */
+/** "Essential · Big", the chore's tags in words. */
+export function tagText(chore: Pick<ChoreWithTiming, "tags">): string {
+  return CHORE_TAGS.filter((t) => chore.tags.includes(t.value))
+    .map((t) => t.label)
+    .join(" · ");
+}
+
+/** "Essential · Big · waiting 9 days" */
 export function choreMeta(chore: ChoreWithTiming, today: LocalDate, household: Household): string {
-  const parts = [SIZE_LABEL[chore.size]];
-  if (chore.importance !== "normal") parts.unshift(IMPORTANCE_LABEL[chore.importance]);
-  if (chore.est_minutes) parts.push(`${chore.est_minutes} min`);
+  const parts = tagText(chore) ? [tagText(chore)] : [];
   if (chore.timing.window && chore.timing.state === "due") parts.push(`in season until ${dayLabel(chore.timing.window.end, today, household)}`);
   else if (chore.timing.daysOverdue >= 2) parts.push(`waiting ${chore.timing.daysOverdue} days`);
   return parts.join(" · ");
@@ -84,7 +90,7 @@ export function ChoreRow({
         {hidden}
         <button
           className="min-h-[var(--touch-target)] rounded-2xl px-3.5 text-base font-bold text-ink-muted hover:bg-rail"
-          title="Not this time. It comes back next round."
+          title="Not today. It finds another day."
         >
           Skip
         </button>
@@ -236,50 +242,6 @@ export function TodoRow({
         </Link>
       ) : null}
       {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
-    </li>
-  );
-}
-
-/** A chore's to-do inside a chore block: tick it off, or swap it for another. */
-export function BlockItemRow({
-  todo,
-  minutes,
-  date,
-  canSwap,
-  returnTo,
-}: {
-  todo: Todo;
-  minutes: number;
-  date: LocalDate;
-  canSwap: boolean;
-  returnTo: string;
-}) {
-  return (
-    <li className="flex min-h-16 items-center gap-3 border-b border-panel last:border-0">
-      <form action={toggleTodo}>
-        <input type="hidden" name="id" value={todo.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <button aria-label={`Done: ${todo.title}`} className="flex size-[var(--touch-target)] items-center justify-center">
-          <span className="flex size-8 items-center justify-center rounded-[0.625rem] border-[2.5px] border-check-border" />
-        </button>
-      </form>
-      <Emoji emoji={todo.icon ?? "🧹"} className="size-8" />
-      <span className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{todo.title}</span>
-      <span className="shrink-0 text-sm font-bold text-ink-muted">{minutes} min</span>
-      {canSwap ? (
-        <form action={swapOut}>
-          <input type="hidden" name="id" value={todo.id} />
-          <input type="hidden" name="date" value={date} />
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <button
-            className="flex min-h-[var(--touch-target)] items-center gap-1.5 rounded-2xl px-3 text-base font-bold text-ink-muted hover:bg-rail"
-            title="Not this time: another due chore takes its place"
-          >
-            <ArrowsLeftRight size="1.25rem" aria-hidden />
-            Swap
-          </button>
-        </form>
-      ) : null}
     </li>
   );
 }

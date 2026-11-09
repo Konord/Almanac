@@ -1,5 +1,6 @@
 "use server";
 
+import { skipChoreNow } from "../chores/skip";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
@@ -985,14 +986,12 @@ export async function survivalRescue(formData: FormData) {
     swapped.push(result.backupName);
   }
 
-  // Skipping a chore starts its clock again, like the Skip button on Chores.
+  // Skipped chores leave today's list, like the Skip button on Chores. Essential ones can't be skipped.
   const skips = [...new Set(formData.getAll("skip").map(String).filter(Boolean))];
   if (skips.length) {
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from("task_instances")
-      .insert(skips.map((template_id) => ({ household_id: household.id, template_id, status: "skipped", completed_on: today, completed_at: now })));
-    if (error) back(formData, "error", error.message);
+    const { data: essential } = await supabase.from("task_templates").select("id").in("id", skips).contains("tags", ["essential"]);
+    const keep = new Set((essential ?? []).map((c) => c.id));
+    for (const id of skips) if (!keep.has(id)) await skipChoreNow(id, today);
   }
 
   const { error } = await supabase.from("days").upsert({ household_id: household.id, date: today, energy_mode: "survival" }, { onConflict: "household_id,date" });

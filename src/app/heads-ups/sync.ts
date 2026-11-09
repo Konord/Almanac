@@ -95,7 +95,7 @@ export async function syncEventAndChoreHeadsUps(household: Household, force = fa
   if (forChores.length > 0) {
     const { chores } = await loadChores(today, timeZone);
     for (const chore of chores) {
-      if (!chore.active || chore.timing.dueOn < today) continue;
+      if (!chore.active || chore.kind === "preset" || chore.timing.dueOn < today) continue;
       for (const h of forChores.filter((x) => x.chore_id === chore.id)) {
         const date = choreHeadsUpDate(chore.timing.dueOn, h.minutes_before);
         if (date > lastDay) continue;

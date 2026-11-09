@@ -9,8 +9,8 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
-import { loadChores, loadTodos, type ChoreMember } from "../chores/data";
-import { syncChoreTodos } from "../chores/blocks";
+import { loadTodos, type ChoreMember } from "../chores/data";
+import { choreSchedule } from "../chores/plan";
 import { TodoFields } from "../chores/forms";
 import { TodoRow } from "../chores/rows";
 import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
@@ -36,7 +36,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const today = localDateOf(new Date(), timeZone);
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
-  await syncChoreTodos(household, (await loadChores(today, timeZone)).chores);
+  const { choreDays } = await choreSchedule(household, today, timeZone);
   const supabase = await createClient();
   const [{ lists, todos }, { data: memberRows }] = await Promise.all([
     loadTodos(),
@@ -222,19 +222,19 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
       {editing ? (
         <Sheet title="Edit to-do" closeHref={returnTo}>
-          <form action={updateTodo} className="grid gap-4 sm:grid-cols-2">
+          <form id="edit-todo" action={updateTodo} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={editing.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <TodoFields members={members} lists={lists} todo={editing} showList />
-            <div className="sm:col-span-2">
-              <Button>Save</Button>
-            </div>
+            <TodoFields members={members} lists={lists} choreDays={choreDays} todo={editing} showList />
           </form>
-          <form action={removeTodo} className="mt-6">
-            <input type="hidden" name="id" value={editing.id} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <Button variant="danger">Remove this to-do</Button>
-          </form>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button form="edit-todo">Save</Button>
+            <form action={removeTodo} className="ml-auto">
+              <input type="hidden" name="id" value={editing.id} />
+              <input type="hidden" name="returnTo" value={returnTo} />
+              <Button variant="danger">Remove this to-do</Button>
+            </form>
+          </div>
         </Sheet>
       ) : null}
 

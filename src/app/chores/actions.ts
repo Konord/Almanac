@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
+import { isChoreTag } from "@/lib/chore-days";
 import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
 import { isFeatureLink } from "@/lib/todos";
 import { isVisibility } from "../calendar/options";
+import { skipChoreNow } from "./skip";
 
 /*
  * Like the other screens: each action re-checks the signed-in household,
@@ -17,7 +19,7 @@ import { isVisibility } from "../calendar/options";
 function returnPath(formData: FormData): string {
   const value = String(formData.get("returnTo") ?? "");
   // Only our own pages, never another website.
-  return /^\/(chores(\/add|\/blocks)?|lists|calendar)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/chores";
+  return /^\/(chores(\/add)?|lists|calendar)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/chores";
 }
 
 function back(formData: FormData, kind: "error" | "message", text: string): never {
@@ -60,21 +62,16 @@ function readIcon(formData: FormData): string | null {
 // Doing and skipping chores
 // ---------------------------------------------------------------------------
 
-/** Marks a chore done (or skipped) today. Skipping just starts its clock again. */
-async function closeChore(formData: FormData, status: "done" | "skipped") {
+/** Marks a chore done today. */
+export async function markChoreDone(formData: FormData) {
   const household = await requireHousehold();
   const templateId = text(formData, "templateId");
   const name = text(formData, "name");
   const by = text(formData, "memberId") || null;
   const today = localDateOf(new Date(), household.settings.timeZone);
   const supabase = await createClient();
-  const closed = {
-    status,
-    completed_on: today,
-    completed_at: new Date().toISOString(),
-    completed_by: status === "done" ? by : null,
-  };
-  // If the chore has made a to-do, that to-do is this round.
+  const closed = { status: "done", completed_on: today, completed_at: new Date().toISOString(), completed_by: by };
+  // If the chore is on today's list, that task is this round.
   const { data: todo } = await supabase
     .from("task_instances")
     .update(closed)
@@ -83,36 +80,32 @@ async function closeChore(formData: FormData, status: "done" | "skipped") {
     .not("list_id", "is", null)
     .select("id")
     .maybeSingle();
-  if (todo) {
-    await log(household.id, status === "done" ? "task_done" : "task_skipped", "task", todo.id, { name });
-    refresh();
-    back(formData, "message", status === "done" ? `Done: ${name}.` : `Skipped ${name} this time.`);
+  let roundId = todo?.id;
+  if (!roundId) {
+    const { data, error } = await supabase
+      .from("task_instances")
+      .insert({ household_id: household.id, template_id: templateId, ...closed, due_date: today, assignee_id: by })
+      .select("id")
+      .single();
+    if (error) back(formData, "error", error.message);
+    roundId = data.id;
   }
-  const { data, error } = await supabase
-    .from("task_instances")
-    .insert({
-      household_id: household.id,
-      template_id: templateId,
-      status,
-      completed_on: today,
-      completed_at: new Date().toISOString(),
-      completed_by: status === "done" ? by : null,
-      assignee_id: by,
-    })
-    .select("id")
-    .single();
-  if (error) back(formData, "error", error.message);
-  await log(household.id, status === "done" ? "task_done" : "task_skipped", "task", data.id, { name });
+  // Done early: any "wait until" from a skip is over.
+  await supabase.from("task_templates").update({ not_before: null }).eq("id", templateId);
+  await log(household.id, "task_done", "task", roundId, { name });
   refresh();
-  back(formData, "message", status === "done" ? `Done: ${name}.` : `Skipped ${name} this time.`);
+  back(formData, "message", `Done: ${name}.`);
 }
 
-export async function markChoreDone(formData: FormData) {
-  await closeChore(formData, "done");
-}
-
+/** Skips a chore for today (see skipChoreNow). */
 export async function skipChore(formData: FormData) {
-  await closeChore(formData, "skipped");
+  const household = await requireHousehold();
+  const templateId = text(formData, "templateId");
+  const name = text(formData, "name");
+  await skipChoreNow(templateId, localDateOf(new Date(), household.settings.timeZone));
+  await log(household.id, "task_skipped", "task_template", templateId, { name });
+  refresh();
+  back(formData, "message", `Skipped ${name} for today.`);
 }
 
 /** Takes back a done or skipped round (for a mis-tap). */
@@ -137,9 +130,10 @@ const MONTH_DAY = /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
 
 function readChore(formData: FormData) {
   const name = text(formData, "name");
-  const size = text(formData, "size");
-  const estText = text(formData, "estMinutes");
-  const est = estText ? Number(estText) : null;
+  const kind = text(formData, "kind") === "preset" ? "preset" : "generated";
+  const tags = [...new Set(formData.getAll("tags").map(String))].filter(isChoreTag);
+  const atTime = text(formData, "atTime");
+  const choreDayIds = [...new Set(formData.getAll("choreDayIds").map(String).filter(Boolean))];
   const every = Number(text(formData, "repeatEvery") || "1");
   const unit = text(formData, "repeatUnit");
   const weekdayText = text(formData, "preferredWeekday");
@@ -159,22 +153,30 @@ function readChore(formData: FormData) {
   };
   const seasonStart = monthDay("seasonStart");
   const seasonEnd = monthDay("seasonEnd");
-  const location = text(formData, "location") || "indoor";
-  const importance = text(formData, "importance") || "normal";
   const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
 
   if (!name) back(formData, "error", "A chore needs a name.");
-  if (!["small", "medium", "big"].includes(size)) back(formData, "error", "Choose a size.");
-  if (est !== null && !(Number.isInteger(est) && est >= 1 && est <= 1440)) back(formData, "error", "Minutes should be a whole number, like 20.");
+  if (kind === "preset" && choreDayIds.length === 0) back(formData, "error", "An every-chore-day chore needs a chore day.");
+  if (atTime && !isLocalTime(atTime)) back(formData, "error", "The time should look like 7:00 p.m.");
+  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this chore.");
+  const common = {
+    name,
+    icon: readIcon(formData),
+    kind,
+    tags,
+    at_time: atTime || null,
+    default_assignee_id: text(formData, "assigneeId") || null,
+    visibility,
+    notes: notes || null,
+  };
+  // Every-chore-day chores follow their chore day, so they have no date rule.
+  if (kind === "preset") return { choreDayIds, chore: { ...common, ...NO_RULE } };
   if (!seasonal && !(Number.isInteger(every) && every >= 1 && every <= 365)) back(formData, "error", "Repeat every 1 to 365.");
   if (!seasonal && !UNITS.includes(unit)) back(formData, "error", "Choose how often.");
   if (seasonal && (!MONTH_DAY.test(seasonStart) || !MONTH_DAY.test(seasonEnd))) {
     back(formData, "error", "Pick the start and end of the season.");
   }
-  if (!["indoor", "outdoor"].includes(location)) back(formData, "error", "Choose indoor or outdoor.");
-  if (!["low", "normal", "high"].includes(importance)) back(formData, "error", "Choose how important it is.");
-  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this chore.");
   const weekday = weekdayText === "" ? null : Number(weekdayText);
   if (weekday !== null && !(weekday >= 0 && weekday <= 6)) back(formData, "error", "Choose a day of the week.");
   if (!SNAPS.includes(snap)) back(formData, "error", "Choose where it lands.");
@@ -185,31 +187,51 @@ function readChore(formData: FormData) {
   const snapped = !seasonal && snap !== "none";
 
   return {
-    name,
-    icon: readIcon(formData),
-    size,
-    est_minutes: est,
-    repeat_every: seasonal ? 1 : every,
-    repeat_unit: seasonal ? "year" : unit,
-    preferred_weekday: snapped ? weekday : null,
-    snap: snapped ? snap : "none",
-    repeat_from: seasonal ? "done" : repeatFrom,
-    start_date: !seasonal && repeatFrom === "date" ? startDate : null,
-    only_seasons: onlyIn === "seasons" ? onlySeasons : null,
-    only_months: onlyIn === "months" ? onlyMonths : null,
-    season_start: seasonal ? seasonStart : null,
-    season_end: seasonal ? seasonEnd : null,
-    location,
-    importance,
-    default_assignee_id: text(formData, "assigneeId") || null,
-    visibility,
-    notes: notes || null,
+    choreDayIds,
+    chore: {
+      ...common,
+      repeat_every: seasonal ? 1 : every,
+      repeat_unit: seasonal ? "year" : unit,
+      preferred_weekday: snapped ? weekday : null,
+      snap: snapped ? snap : "none",
+      repeat_from: seasonal ? "done" : repeatFrom,
+      start_date: !seasonal && repeatFrom === "date" ? startDate : null,
+      only_seasons: onlyIn === "seasons" ? onlySeasons : null,
+      only_months: onlyIn === "months" ? onlyMonths : null,
+      season_start: seasonal ? seasonStart : null,
+      season_end: seasonal ? seasonEnd : null,
+    },
   };
+}
+
+const NO_RULE = {
+  repeat_every: 1,
+  repeat_unit: "week",
+  preferred_weekday: null,
+  snap: "none",
+  repeat_from: "done",
+  start_date: null,
+  only_seasons: null,
+  only_months: null,
+  season_start: null,
+  season_end: null,
+};
+
+/** Saves which chore days a chore may go on. */
+async function saveChoreDays(householdId: string, templateId: string, choreDayIds: string[]) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("task_template_chore_days").delete().eq("template_id", templateId);
+  if (error) throw error;
+  if (choreDayIds.length === 0) return;
+  const { error: insertError } = await supabase
+    .from("task_template_chore_days")
+    .insert(choreDayIds.map((id) => ({ household_id: householdId, template_id: templateId, chore_day_id: id })));
+  if (insertError) throw insertError;
 }
 
 export async function addChore(formData: FormData) {
   const household = await requireHousehold();
-  const chore = readChore(formData);
+  const { chore, choreDayIds } = readChore(formData);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("task_templates")
@@ -217,6 +239,7 @@ export async function addChore(formData: FormData) {
     .select("id")
     .single();
   if (error) back(formData, "error", error.message);
+  await saveChoreDays(household.id, data.id, choreDayIds);
   await log(household.id, "chore_added", "task_template", data.id, { name: chore.name });
   refresh();
   // Mistakes go back to the form; once it's added, on to where it shows.
@@ -228,10 +251,13 @@ export async function addChore(formData: FormData) {
 export async function updateChore(formData: FormData) {
   const household = await requireHousehold();
   const id = text(formData, "id");
-  const chore = readChore(formData);
+  const { chore, choreDayIds } = readChore(formData);
   const supabase = await createClient();
   const { error } = await supabase.from("task_templates").update(chore).eq("id", id);
   if (error) back(formData, "error", error.message);
+  await saveChoreDays(household.id, id, choreDayIds);
+  // The chore changed: today's task for it is made again to match.
+  await supabase.from("task_instances").delete().eq("template_id", id).eq("status", "open");
   await log(household.id, "chore_updated", "task_template", id, { name: chore.name });
   refresh();
   back(formData, "message", `Saved ${chore.name}.`);
@@ -289,6 +315,8 @@ function readTodo(formData: FormData) {
     link: link || null,
     assignee_id: text(formData, "assigneeId") || null,
     notes: text(formData, "notes") || null,
+    // A one-off chore: no date of its own, it waits for this chore day.
+    chore_day_id: dueDate ? null : text(formData, "choreDayId") || null,
   };
 }
 
@@ -375,15 +403,9 @@ export async function removeTodo(formData: FormData) {
     .eq("id", id)
     .not("heads_up_id", "is", null);
   if (skipError) back(formData, "error", skipError.message);
-  // A chore's to-do counts as skipping the chore this round. It leaves the
-  // list but stays in the chore's history, so it isn't made again at once.
-  const { error: choreError } = await supabase
-    .from("task_instances")
-    .update({ status: "skipped", completed_on: today, completed_at: new Date().toISOString(), list_id: null })
-    .eq("id", id)
-    .eq("status", "open")
-    .not("template_id", "is", null);
-  if (choreError) back(formData, "error", choreError.message);
+  // A chore's task: removing it skips the chore for today.
+  const { data: chore } = await supabase.from("task_instances").select("template_id, status").eq("id", id).maybeSingle();
+  if (chore?.template_id && chore.status === "open") await skipChoreNow(chore.template_id, today);
   const { error: doneChoreError } = await supabase.from("task_instances").update({ list_id: null }).eq("id", id).not("template_id", "is", null);
   if (doneChoreError) back(formData, "error", doneChoreError.message);
   const { error } = await supabase
@@ -474,142 +496,59 @@ export async function removeList(formData: FormData) {
 }
 
 // ---------------------------------------------------------------------------
-// Chore blocks
+// Chore days
 // ---------------------------------------------------------------------------
 
-function readBlock(formData: FormData) {
+function readChoreDay(formData: FormData, isFree: boolean) {
   const name = text(formData, "name");
-  const kind = text(formData, "kind") === "closed" ? "closed" : "open";
-  const weekdays = [...new Set(formData.getAll("weekdays").map(Number))].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
-  const startTime = text(formData, "startTime");
-  const minutes = Number(text(formData, "minutes"));
-  const choreId = text(formData, "choreId") || null;
-  const presets = [...new Set(formData.getAll("presets").map(String).filter(Boolean))].slice(0, 6);
-  if (!name) back(formData, "error", "Give the chore time a name, like Big clean.");
-  if (weekdays.length === 0) back(formData, "error", "Pick at least one day.");
-  if (!isLocalTime(startTime)) back(formData, "error", "Pick a start time.");
-  if (!(Number.isInteger(minutes) && minutes >= 10 && minutes <= 480)) back(formData, "error", "How long: 10 minutes to 8 hours.");
-  if (kind === "closed" && !choreId) back(formData, "error", "Pick the chore this time is for.");
+  const weekdays = [...new Set(formData.getAll("weekdays").map(Number))].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort();
+  const maxTasks = Number(text(formData, "maxTasks"));
+  const maxBig = Number(text(formData, "maxBig"));
+  if (!name || name.length > 40) back(formData, "error", "Give the chore day a short name, like Laundry.");
+  if (!isFree && weekdays.length === 0) back(formData, "error", "Pick at least one day of the week.");
+  if (!(Number.isInteger(maxTasks) && maxTasks >= 0 && maxTasks <= 20)) back(formData, "error", "Room for 0 to 20 chores.");
+  if (!(Number.isInteger(maxBig) && maxBig >= 0 && maxBig <= 20)) back(formData, "error", "Room for 0 to 20 Big chores.");
   return {
-    block: {
-      name: name.slice(0, 40),
-      icon: readIcon(formData),
-      kind,
-      chore_id: kind === "closed" ? choreId : null,
-      weekdays,
-      start_time: startTime,
-      minutes,
-      member_ids: formData.getAll("memberIds").map(String).filter(Boolean),
-      loose: formData.get("loose") === "on",
-    },
-    presets: kind === "open" ? presets : [],
+    name,
+    icon: readIcon(formData),
+    max_tasks: maxTasks,
+    max_big: maxBig,
+    // The Free day fills days with nothing else: no weekdays, never restrictive.
+    ...(isFree ? {} : { weekdays, span: formData.get("span") === "on", restrictive: formData.get("restrictive") === "on" }),
   };
 }
 
-async function savePresets(householdId: string, blockId: string, presets: string[]) {
-  const supabase = await createClient();
-  await supabase.from("chore_block_presets").delete().eq("block_id", blockId);
-  if (presets.length === 0) return;
-  const { error } = await supabase
-    .from("chore_block_presets")
-    .insert(presets.map((choreId, i) => ({ household_id: householdId, block_id: blockId, chore_id: choreId, sort_order: i })));
-  if (error) throw error;
-}
-
-export async function addBlock(formData: FormData) {
-  const household = await requireHousehold();
-  const { block, presets } = readBlock(formData);
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("chore_blocks").insert({ ...block, household_id: household.id }).select("id").single();
-  if (error) back(formData, "error", error.message);
-  await savePresets(household.id, data.id, presets);
-  refresh();
-  revalidatePath("/chores/blocks");
-  back(formData, "message", `Added ${block.name}.`);
-}
-
-export async function updateBlock(formData: FormData) {
+/** Adds a chore day, or saves one (`id` set). */
+export async function saveChoreDay(formData: FormData) {
   const household = await requireHousehold();
   const id = text(formData, "id");
-  const { block, presets } = readBlock(formData);
   const supabase = await createClient();
-  const { error } = await supabase.from("chore_blocks").update(block).eq("id", id);
-  if (error) back(formData, "error", error.message);
-  await savePresets(household.id, id, presets);
-  refresh();
-  revalidatePath("/chores/blocks");
-  back(formData, "message", `Saved ${block.name}.`);
-}
-
-export async function removeBlock(formData: FormData) {
-  await requireHousehold();
-  const supabase = await createClient();
-  const { error } = await supabase.from("chore_blocks").delete().eq("id", text(formData, "id"));
-  if (error) back(formData, "error", error.message);
-  refresh();
-  revalidatePath("/chores/blocks");
-  back(formData, "message", "Removed that chore time.");
-}
-
-/**
- * The example week from the design doc: Laundry on Monday (closed: just laundry),
- * Odd jobs on Wednesday evening and a Big clean on Saturday morning (open).
- */
-export async function addExampleBlocks(formData: FormData) {
-  const household = await requireHousehold();
-  const supabase = await createClient();
-  const { data: found } = await supabase.from("task_templates").select("id").ilike("name", "laundry").limit(1).maybeSingle();
-  let laundryId = found?.id;
-  if (!laundryId) {
-    const { data, error } = await supabase
-      .from("task_templates")
-      .insert({
-        household_id: household.id,
-        name: "Laundry",
-        icon: "🧺",
-        size: "big",
-        est_minutes: 90,
-        repeat_every: 1,
-        repeat_unit: "week",
-        preferred_weekday: 1,
-        snap: "weekday",
-        sort_order: 8,
-      })
-      .select("id")
-      .single();
+  const isFree = id ? Boolean((await supabase.from("chore_days").select("is_free").eq("id", id).maybeSingle()).data?.is_free) : false;
+  const day = readChoreDay(formData, isFree);
+  let dayId = id;
+  if (id) {
+    const { error } = await supabase.from("chore_days").update(day).eq("id", id);
     if (error) back(formData, "error", error.message);
-    laundryId = data.id;
+  } else {
+    const { data, error } = await supabase.from("chore_days").insert({ ...day, household_id: household.id, sort_order: 100 }).select("id").single();
+    if (error) back(formData, "error", error.message);
+    dayId = data.id;
   }
-  const { data: parents } = await supabase.from("members").select("id").eq("role", "parent");
-  const people = (parents ?? []).map((m) => m.id);
-  const { data: vacuum } = await supabase.from("task_templates").select("id").eq("name", "Vacuum and mop the floors").maybeSingle();
-  const { data: blocks, error } = await supabase
-    .from("chore_blocks")
-    .insert([
-      { household_id: household.id, name: "Laundry", icon: "🧺", kind: "closed", chore_id: laundryId, weekdays: [1], start_time: "18:30", minutes: 90, member_ids: people, sort_order: 1 },
-      { household_id: household.id, name: "Odd jobs", icon: "🧰", kind: "open", weekdays: [3], start_time: "19:00", minutes: 45, member_ids: people, sort_order: 2 },
-      { household_id: household.id, name: "Big clean", icon: "🧽", kind: "open", weekdays: [6], start_time: "10:00", minutes: 120, member_ids: people, sort_order: 3 },
-    ])
-    .select("id, name");
-  if (error) back(formData, "error", error.message);
-  const bigClean = blocks.find((b) => b.name === "Big clean");
-  if (bigClean && vacuum) await savePresets(household.id, bigClean.id, [vacuum.id]);
+  await log(household.id, id ? "chore_day_updated" : "chore_day_added", "chore_day", dayId, { name: day.name });
   refresh();
-  revalidatePath("/chores/blocks");
-  back(formData, "message", "Added Laundry, Odd jobs and Big clean. Change any of them to suit.");
+  formData.set("returnTo", "/chores");
+  back(formData, "message", id ? `Saved ${day.name}.` : `Added ${day.name}.`);
 }
 
-/** Swaps a chore out of a block: it waits until after that day, and another due chore takes its place. */
-export async function swapOut(formData: FormData) {
-  await requireHousehold();
+export async function removeChoreDay(formData: FormData) {
+  const household = await requireHousehold();
   const id = text(formData, "id");
-  const date = text(formData, "date");
-  if (!isLocalDate(date)) back(formData, "error", "Which day?");
+  const name = text(formData, "name");
   const supabase = await createClient();
-  const [y, m, d] = date.split("-").map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-  const { error } = await supabase.from("task_instances").update({ not_before: next }).eq("id", id).not("template_id", "is", null);
+  const { error } = await supabase.from("chore_days").delete().eq("id", id).eq("is_free", false);
   if (error) back(formData, "error", error.message);
+  await log(household.id, "chore_day_removed", "chore_day", id, { name });
   refresh();
-  back(formData, "message", "Swapped. Another chore takes its place.");
+  formData.set("returnTo", "/chores");
+  back(formData, "message", `Removed ${name}. Its chores can go on other days now.`);
 }
