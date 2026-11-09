@@ -54,3 +54,17 @@ test("rules read back and describe themselves", () => {
   assert.equal(describeHolidayRule(rule("family-day")), "3rd Monday of February");
   assert.equal(describeHolidayRule(rule("good-friday")), "2 days before Easter");
 });
+
+test("new households start with every public holiday (the migration matches the list)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sql = readFileSync(new URL("../../supabase/migrations/20261110240000_starter_holidays.sql", import.meta.url), "utf8");
+  const rows = [...sql.matchAll(/\(target_household, '((?:[^']|'')*)', '([^']*)', '([^']*)'::jsonb, '([^']*)', (\d+)\)/g)];
+  assert.equal(rows.length, PUBLIC_HOLIDAYS.length);
+  PUBLIC_HOLIDAYS.forEach((h, i) => {
+    const [, name, icon, rule, key, order] = rows[i];
+    assert.deepEqual(
+      { name: name.replace(/''/g, "'"), icon, rule: JSON.parse(rule), key, order: Number(order) },
+      { name: h.name, icon: h.icon, rule: h.rule, key: h.key, order: i },
+    );
+  });
+});
