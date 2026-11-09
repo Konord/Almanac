@@ -177,7 +177,8 @@ async function makeToday(
               title: c.name,
               icon: c.icon ?? "🧹",
               due_date: date,
-              date_kind: "start",
+              // A regular chore's time is when it's due by; an occasional one's is when it starts.
+              date_kind: c.kind === "preset" && c.at_time ? "due" : "start",
               at_time: c.at_time,
               must_do: c.tags.includes("essential"),
               assignee_id: c.default_assignee_id,

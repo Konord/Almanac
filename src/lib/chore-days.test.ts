@@ -263,3 +263,16 @@ test("a chore day moved by the weekly review", () => {
   const early = [{ chore_day_id: "big", date: "2026-11-13", on: true }];
   assert.equal(stretchStart(bigClean, SUN, early), "2026-11-13");
 });
+
+test("a chore put on today by hand stays there even when it isn't due for months", () => {
+  const plan = planChoreDays({
+    choreDays: [free, kitchen],
+    chores: [chore("oven", { dueOn: "2027-02-01" })],
+    today: MON,
+    keptToday: new Set(["oven"]),
+  });
+  assert.equal(where(plan, "oven"), MON);
+  // Without the hand-placed task, it isn't planned at all yet.
+  const later = planChoreDays({ choreDays: [free, kitchen], chores: [chore("oven", { dueOn: "2027-02-01" })], today: MON });
+  assert.equal(where(later, "oven"), undefined);
+});

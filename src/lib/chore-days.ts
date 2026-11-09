@@ -8,10 +8,10 @@ import { addDays, type LocalDate } from "./time.ts";
  * Saturday, or the Free day when nothing else is set. Chores only ever go
  * on the daily list, never on the calendar:
  *
- *   - A preset chore shows every time its chore day comes round. On a chore
+ *   - A preset ("regular") chore shows every time its chore day comes round. On a chore
  *     day that runs over several days (Big Clean, Sat + Sun), it shows from
  *     the first day and carries until the stretch ends.
- *   - A generated chore has a date rule. When it comes due it is put on the
+ *   - A generated ("occasional") chore has a date rule. When it comes due it is put on the
  *     last day on or before its due date that accepts it and has room; if
  *     none has room, the first one after. Overdue ones go on the first day
  *     with room from today. Essential overdue ones go on today whatever the
@@ -214,7 +214,8 @@ export function planChoreDays(input: {
   });
   const waiting = (input.oneOffs ?? []).filter((one) => !keep(oneOffItem(one)));
   const generated = chores
-    .filter((c) => c.active && c.kind === "generated" && c.dueOn <= last)
+    // A chore put on today's list by hand ("+" on the Chore Manager) stays there even when it isn't due yet.
+    .filter((c) => c.active && c.kind === "generated" && (c.dueOn <= last || kept.has(c.id)))
     .sort(
       (a, b) =>
         Number(kept.has(b.id)) - Number(kept.has(a.id)) ||
@@ -224,8 +225,6 @@ export function planChoreDays(input: {
     );
 
   for (const chore of generated) {
-    const earliest = chore.not_before && chore.not_before > today ? chore.not_before : today;
-    if (earliest > last) continue;
     const item: PlanItem = {
       id: chore.id,
       kind: "generated",
@@ -234,6 +233,8 @@ export function planChoreDays(input: {
       pinned: chore.at_time !== null,
     };
     if (keep(item)) continue;
+    const earliest = chore.not_before && chore.not_before > today ? chore.not_before : today;
+    if (earliest > last || chore.dueOn > last) continue;
     // An exact time: pinned to its day (or today, once it's passed).
     if (item.pinned) {
       const date = chore.dueOn > earliest ? chore.dueOn : earliest;
