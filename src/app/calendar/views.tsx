@@ -7,6 +7,7 @@ import { fiveRowMonth, layoutBars, layoutDay, monthOf } from "@/lib/calendar-lay
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import type { DayProfile } from "@/lib/day-profile";
 import type { Break } from "@/lib/day-types";
+import { specialLabel, type SpecialDay } from "@/lib/holidays";
 import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Member } from "./types";
 import type { QuickDefaults } from "./forms";
@@ -27,9 +28,16 @@ type ViewProps = {
   profiles: Map<LocalDate, DayProfile>;
   /** Adding by placing: whether we're in adding mode, and the event being added. */
   adding?: Adding;
-  /** Breaks (holidays and the like) touching these days. */
+  /** Breaks (summer, a sick day) touching these days. */
   breaks?: Break[];
+  /** Holidays and birthdays, by date. */
+  specials?: Map<LocalDate, SpecialDay[]>;
 };
+
+const HOLIDAYS_HREF = "/holidays";
+/** Holidays and birthdays each have their own colour, so they stand out from events. */
+const HOLIDAY_COLOUR = "purple";
+const BIRTHDAY_COLOUR = "pink";
 
 /** The breaks on a day. */
 function breaksOn(breaks: Break[] | undefined, day: LocalDate): Break[] {
@@ -426,6 +434,30 @@ export function nowPercent(now: Date, first: number, last: number, timeZone: str
 // Week view
 // ---------------------------------------------------------------------------
 
+/**
+ * A holiday or birthday on the week view: a ribbon in its own colour with
+ * notched ends, above the day's all-day things.
+ */
+export function Ribbon({ special, more = 0, big = false }: { special: SpecialDay; more?: number; big?: boolean }) {
+  const colour = special.kind === "holiday" ? HOLIDAY_COLOUR : BIRTHDAY_COLOUR;
+  const notch = big ? "1rem" : "0.625rem";
+  return (
+    <Link
+      href={HOLIDAYS_HREF}
+      title={specialLabel(special)}
+      className={`flex min-w-0 flex-1 items-center justify-center gap-2 font-extrabold text-white ${big ? "h-14 px-8 text-2xl" : "h-10 px-4 text-sm"}`}
+      style={{
+        background: strong(colour),
+        clipPath: `polygon(0 0, 100% 0, calc(100% - ${notch}) 50%, 100% 100%, 0 100%, ${notch} 50%)`,
+      }}
+    >
+      <Emoji emoji={special.icon} className={big ? "size-10" : "size-7"} />
+      <span className="truncate">{specialLabel(special)}</span>
+      {more > 0 ? <span className="shrink-0 opacity-80">+{more}</span> : null}
+    </Link>
+  );
+}
+
 /** How many rows of all-day bars fit above the week's timeline. */
 const ALL_DAY_LANES = 2;
 
@@ -555,6 +587,7 @@ export function WeekView({
   adding,
   dinners,
   breaks,
+  specials,
 }: ViewProps & { dinners: Map<LocalDate, Dinner> }) {
   const { timeZone } = household.settings;
   const { first, last } = timelineRange(events, days, timeZone);
@@ -601,6 +634,21 @@ export function WeekView({
             );
           })}
         </div>
+
+        {/* Holidays and birthdays: a ribbon across the top of the day */}
+        {days.some((day) => specials?.get(day)?.length) ? (
+          <div className="mt-2 grid shrink-0 grid-cols-7 pl-16.5">
+            {days.map((day) => {
+              const here = specials?.get(day) ?? [];
+              const first = here[0];
+              return (
+                <div key={day} className="flex min-w-0 px-1">
+                  {first ? <Ribbon special={first} more={here.length - 1} /> : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
 
         {/* All-day things, and things over several days, as bars across their days */}
         {allDayRow.lanes > 0 ? (
@@ -749,6 +797,7 @@ export function MonthView({
   adding,
   mode,
   breaks,
+  specials,
 }: ViewProps & { anchor: LocalDate; mode: "month" | "weeks" }) {
   const { locale, timeZone } = household.settings;
   const month = monthOf(anchor);
@@ -776,9 +825,28 @@ export function MonthView({
     const weekHref = href({ view: "week", date: day, edit: null, add: null, panel: null });
     // In the rolling view, the 1st of a month (and the first square) says which month.
     const label = mode === "weeks" && (day.endsWith("-01") || day === cells[0]) ? `${shortMonth(day)} ${Number(day.slice(8))}` : String(Number(day.slice(8)));
+    // A holiday's picture fills the square, faded when there are things on top of it.
+    const holiday = specials?.get(day)?.find((x) => x.kind === "holiday");
+    const birthdays = specials?.get(day)?.filter((x) => x.kind === "birthday") ?? [];
+    const busy = dayEvents.length > 0 || breaksOn(breaks, day).length > 0;
     return (
-      <div className={`flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-hidden ${past ? "opacity-45" : ""}`}>
-        <div className="flex shrink-0 items-center gap-1">
+      <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-hidden ${past ? "opacity-45" : ""}`}>
+        {holiday ? (
+          <Link
+            href={HOLIDAYS_HREF}
+            title={specialLabel(holiday)}
+            aria-label={`${specialLabel(holiday)}, a holiday`}
+            className={`absolute inset-0 flex flex-col items-center justify-center ${busy ? "opacity-20" : ""}`}
+          >
+            <Emoji emoji={holiday.icon} className={`aspect-square max-h-full min-h-0 flex-1 ${busy ? "" : "pt-9 pb-1"}`} />
+            {busy || half ? null : (
+              <span className="max-w-full shrink-0 truncate px-1 text-sm font-extrabold" style={{ color: strong(HOLIDAY_COLOUR) }}>
+                {holiday.name}
+              </span>
+            )}
+          </Link>
+        ) : null}
+        <div className="relative flex shrink-0 items-center gap-1">
           <Link
             href={weekHref}
             className={`flex h-9 min-w-9 items-center justify-center rounded-full px-1.5 text-xl font-bold whitespace-nowrap ${
@@ -802,6 +870,18 @@ export function MonthView({
                 <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />
               </Link>
             ))}
+          {birthdays.slice(0, 1).map((b) => (
+            <Link
+              key={b.key}
+              href={HOLIDAYS_HREF}
+              title={specialLabel(b)}
+              aria-label={specialLabel(b)}
+              className="shrink-0 rounded-lg p-px"
+              style={{ background: soft(BIRTHDAY_COLOUR), boxShadow: `inset 0 0 0 2px ${strong(BIRTHDAY_COLOUR)}` }}
+            >
+              <Emoji emoji={b.icon} className="size-7" />
+            </Link>
+          ))}
           {shownStickers.map((e) => (
             <Link key={e.id} href={editHref(e)} scroll={false} title={e.title} aria-label={`${e.title}, all day`} className="shrink-0">
               <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-8" />
@@ -819,7 +899,7 @@ export function MonthView({
             href={editHref(e)}
             scroll={false}
             title={`${e.title}, ${timeRange(e, household)}`}
-            className="flex min-h-0 shrink items-center gap-1.5 overflow-hidden px-1 text-base font-bold"
+            className="relative flex min-h-0 shrink items-center gap-1.5 overflow-hidden px-1 text-base font-bold"
           >
             <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
             <span className="min-w-0 truncate" style={{ color: strong(eventColour(e, memberById)) }}>
@@ -829,7 +909,7 @@ export function MonthView({
           </Link>
         ))}
         {more > 0 ? (
-          <Link href={weekHref} className="shrink-0 px-1.5 text-sm font-bold text-ink-muted">
+          <Link href={weekHref} className="relative shrink-0 px-1.5 text-sm font-bold text-ink-muted">
             + {more} more
           </Link>
         ) : null}

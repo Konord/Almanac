@@ -22,6 +22,7 @@ import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./c
 import { PROFILE_COLOUR } from "./calendar/profile-tag";
 import type { CalendarItem, Member } from "./calendar/types";
 import { loadTodos, type Todo } from "./chores/data";
+import { loadSpecialDays } from "./holidays/data";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
 import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals, startCooking } from "./meals/today";
@@ -46,6 +47,7 @@ import {
   isPointEvent,
   minutesIntoDay,
   NowLine,
+  Ribbon,
   eventsOnDay,
   isAllDayStyle,
   nowPercent,
@@ -94,6 +96,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     energyModeOn(today),
     reviewReminder(household, today, now),
   ]);
+  const todaySpecials = (await loadSpecialDays(today, today)).get(today) ?? [];
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
   const profiles = profilesFor(days, items, layers, household);
@@ -157,6 +160,12 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
       <ScreenHeader title={panelPrefs.open ? "Agenda" : longDate}>
         {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
+        {/* A holiday or birthday today: a big ribbon right by the title. */}
+        {todaySpecials.length > 0 ? (
+          <div className="flex max-w-[28rem] min-w-0 shrink">
+            <Ribbon special={todaySpecials[0]} more={todaySpecials.length - 1} big />
+          </div>
+        ) : null}
         {todayProfile ? (
           <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
         ) : null}

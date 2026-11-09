@@ -39,6 +39,7 @@ import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedVi
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
+import { loadSpecialDays } from "../holidays/data";
 import { PeopleRow } from "../routines/people-row";
 import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime, type Dinner } from "./views";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
@@ -83,10 +84,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         ? rollingWeekDays(anchor, weekStartsOn)
         : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
-  const [{ layers, members, views, tags, templates, items, exceptions }, routineData, breaks] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items, exceptions }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadBreaks(days[0], days[days.length - 1]),
+    loadSpecialDays(days[0], days[days.length - 1]),
   ]);
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
@@ -169,6 +171,14 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+          <Link
+            href="/holidays"
+            aria-label="Holidays and birthdays"
+            title="Holidays and birthdays"
+            className="inline-flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-2xl bg-rail hover:bg-panel"
+          >
+            <Emoji emoji="🎉" className="size-7" />
+          </Link>
           <SoftLink href={href({ panel: "tags", edit: null, add: null })}>
             <Tag size="1.5rem" aria-hidden />
             Tags
@@ -211,6 +221,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           dinners={dinners}
           adding={{ placing, pending, addHref }}
           breaks={breaks}
+          specials={specials}
         />
       ) : (
         <MonthView
@@ -225,6 +236,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           mode={rolling ? "weeks" : "month"}
           adding={{ placing, pending, addHref }}
           breaks={breaks}
+          specials={specials}
         />
       )}
       </div>
