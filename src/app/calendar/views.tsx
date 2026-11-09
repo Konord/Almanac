@@ -12,6 +12,7 @@ import type { CalendarItem, Member } from "./types";
 import type { QuickDefaults } from "./forms";
 import { PlaceOnTimeline } from "@/components/place-on-timeline";
 import { DraggableEvent } from "@/components/draggable-event";
+import { StretchBar } from "@/components/stretch-bar";
 import { PendingBlock } from "@/components/pending-block";
 
 type ViewProps = {
@@ -214,6 +215,8 @@ export function EventBlock({
     minutes: number;
     first: number;
     last: number;
+    /** On the week view: the week's days, so its sides stretch it over more days. */
+    week?: LocalDate[];
   };
   /** A bubble shared by several people fades from one person's colour to the next. */
   colours?: string[];
@@ -273,6 +276,7 @@ export function EventBlock({
         minutes={drag.minutes}
         first={drag.first}
         last={drag.last}
+        week={drag.week}
         className={className}
         style={{ ...rest, background }}
         title={title}
@@ -301,8 +305,8 @@ export function DayBlocks({
   colourFor,
   draggable,
 }: {
-  /** Lets you drag the blocks to move or stretch them. */
-  draggable?: object;
+  /** Lets you drag the blocks to move or stretch them (and, given the week's days, over more days). */
+  draggable?: { week?: LocalDate[] };
   events: CalendarItem[];
   day: LocalDate;
   first: number;
@@ -344,7 +348,7 @@ export function DayBlocks({
             narrow={!big && block.lanes >= 3}
             drag={
               draggable
-                ? { day, start: block.startMin, minutes: block.endMin - block.startMin, first, last }
+                ? { day, start: block.startMin, minutes: block.endMin - block.startMin, first, last, week: draggable.week }
                 : undefined
             }
             style={{
@@ -441,6 +445,8 @@ type AllDayBar = {
   time: string | null;
   continuesBefore: boolean;
   continuesAfter: boolean;
+  /** Events (not breaks) can be stretched over more days. */
+  stretch?: { eventId: string; occurrenceDate: string | null };
 };
 
 /**
@@ -504,6 +510,7 @@ function allDayBars({
       href: editLink(e),
       dashed: false,
       time: from >= days[0] ? time : null,
+      stretch: { eventId: e.series_id, occurrenceDate: e.occurrence_date },
       continuesBefore: false,
       continuesAfter: false,
     });
@@ -579,14 +586,14 @@ export function WeekView({
                   >
                     {Number(day.slice(8))}
                   </span>
+                  {allDayRow.hidden[i] > 0 ? (
+                    <span className="shrink-0 rounded-lg bg-rail px-1.5 text-sm font-bold text-ink-muted" title={allDayRow.hiddenNames[i]}>
+                      +{allDayRow.hidden[i]}
+                    </span>
+                  ) : null}
                   {profile && profile.kind !== "free" ? (
                     <span className="hidden xl:inline">
                       <ProfileTag kind={profile.kind} />
-                    </span>
-                  ) : null}
-                  {allDayRow.hidden[i] > 0 ? (
-                    <span className="ml-auto shrink-0 rounded-lg bg-rail px-1.5 text-sm font-bold text-ink-muted" title={allDayRow.hiddenNames[i]}>
-                      +{allDayRow.hidden[i]}
                     </span>
                   ) : null}
                 </Link>
@@ -601,27 +608,43 @@ export function WeekView({
             className="mt-2 grid shrink-0 grid-cols-7 gap-y-1 pl-16.5"
             style={{ gridTemplateRows: `repeat(${allDayRow.lanes}, 2.5rem)` }}
           >
-            {allDayRow.bars.map((bar) => (
-              <div
-                key={bar.id}
-                className="flex min-w-0 px-1"
-                style={{ gridColumn: `${bar.first + 1} / ${bar.last + 2}`, gridRow: bar.lane + 1 }}
-              >
-                <Link
-                  href={bar.href}
-                  scroll={false}
-                  title={bar.title}
-                  className={`flex h-10 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm font-bold text-ink ${
-                    bar.dashed ? "border-2 border-dashed" : ""
-                  } ${bar.continuesBefore ? "rounded-l-sm" : "rounded-l-xl"} ${bar.continuesAfter ? "rounded-r-sm" : "rounded-r-xl"}`}
-                  style={{ background: soft(bar.colour), borderColor: bar.dashed ? strong(bar.colour) : undefined }}
-                >
+            {allDayRow.bars.map((bar) => {
+              const look = `flex h-10 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm font-bold text-ink ${bar.dashed ? "border-2 border-dashed" : ""} ${
+                bar.continuesBefore ? "rounded-l-sm" : "rounded-l-xl"
+              } ${bar.continuesAfter ? "rounded-r-sm" : "rounded-r-xl"}`;
+              const look2 = { background: soft(bar.colour), borderColor: bar.dashed ? strong(bar.colour) : undefined };
+              const content = (
+                <>
                   <Emoji emoji={bar.emoji} className="size-7" />
                   <span className="truncate">{bar.label}</span>
                   {bar.time ? <span className="ml-auto shrink-0 font-semibold text-ink-soft">{bar.time}</span> : null}
-                </Link>
-              </div>
-            ))}
+                </>
+              );
+              // Events that start and end this week can be stretched over more (or fewer) days.
+              return bar.stretch && !bar.continuesBefore && !bar.continuesAfter ? (
+                <StretchBar
+                  key={bar.id}
+                  href={bar.href}
+                  eventId={bar.stretch.eventId}
+                  occurrenceDate={bar.stretch.occurrenceDate}
+                  week={days}
+                  first={bar.first}
+                  last={bar.last}
+                  lane={bar.lane}
+                  title={bar.title}
+                  className={look}
+                  style={look2}
+                >
+                  {content}
+                </StretchBar>
+              ) : (
+                <div key={bar.id} className="flex min-w-0 px-1" style={{ gridColumn: `${bar.first + 1} / ${bar.last + 2}`, gridRow: bar.lane + 1 }}>
+                  <Link href={bar.href} scroll={false} title={bar.title} className={look} style={look2}>
+                    {content}
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         ) : null}
 
@@ -671,7 +694,7 @@ export function WeekView({
                 household={household}
                 memberById={memberById}
                 linkFor={editLink}
-                draggable={{}}
+                draggable={{ week: days }}
               />
               {day === today ? (
                 <NowLine percent={nowPercent(now, first, last, timeZone)} label={`Now, ${shortTime(now, household)}`} />

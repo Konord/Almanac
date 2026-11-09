@@ -12,6 +12,7 @@ import {
   firstParam,
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
+import { RememberDisplay } from "@/components/remember-display";
 import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
@@ -125,6 +126,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   return (
     <>
+      <RememberDisplay display="agenda" />
       <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
       {panelPrefs.open || routineOpen ? (
         <TodayPanel

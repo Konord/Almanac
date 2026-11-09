@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CaretLeft, CaretRight, Plus, Stack, Tag, Trash, X } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
+import { RememberDisplay } from "@/components/remember-display";
 import { Sheet } from "@/components/sheet";
 import { strong } from "@/lib/colours";
 import { addMonths, dayOfWeek, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
@@ -152,6 +153,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
 
   return (
     <>
+      <RememberDisplay display={view} />
       <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
       {panelPrefs.open ? (
         <TodayPanel household={household} today={today} upNext={upNext} tab={panelPrefs.tab} returnTo={panelReturn} />

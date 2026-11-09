@@ -74,8 +74,17 @@ export function WhenFields({
   const changeEndTime = (value: string) => isLocalTime(value) && apply(setEnd(when, { date: end.date, minute: toMinutes(value) }));
   const changeEndDate = (value: string) => isLocalDate(value) && apply(setEnd(when, { date: value, minute: end.minute }));
   const changeLength = (value: number) => apply(setLength(when, value));
-  const toggleAllDay = (on: boolean) =>
-    write({ ...core, allDay: on, start: on ? core.start : (core.start ?? USUAL_START), length: !on && core.length === 0 ? 60 : core.length });
+  // Switching All day keeps the days it covers: Thu to Sun all day becomes Thu 9am to Sun 10am, and back.
+  const toggleAllDay = (on: boolean) => {
+    if (on) {
+      setLastDay(end.date);
+      write({ ...core, allDay: true });
+      return;
+    }
+    const days = Math.round((Date.parse(`${lastDay}T00:00:00Z`) - Date.parse(`${core.date}T00:00:00Z`)) / 86_400_000);
+    const length = days > 0 ? days * 24 * 60 + 60 : core.length === 0 ? 60 : core.length;
+    write({ ...core, allDay: false, start: core.start ?? USUAL_START, length });
+  };
 
   const point = core.length === 0;
   const timeFields = !core.allDay;
