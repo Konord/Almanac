@@ -27,6 +27,8 @@ export type DraftRoutine = {
   loose: boolean;
   /** When habit tracking was switched on; null when off. */
   habit_since: string | null;
+  /** Also shows on the daily list in the Today panel. */
+  show_on_daily_list: boolean;
   visibility: string;
 };
 

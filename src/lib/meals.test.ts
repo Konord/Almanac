@@ -40,9 +40,9 @@ test("aisles are guessed from the name", () => {
   assert.equal(guessAisle("paper towels"), "Other");
 });
 
-test("a meal block is cooking then eating", () => {
-  assert.deepEqual(mealSlot("18:00", { hands_on_minutes: 25, total_minutes: 40 }), { start: 17 * 60 + 35, minutes: 70, cookMinutes: 25 });
-  assert.equal(mealSlot("18:00", null).start, 17 * 60 + 30);
+test("a meal block is the eating; the cook starts earlier", () => {
+  assert.deepEqual(mealSlot("18:00", { hands_on_minutes: 25, total_minutes: 40 }), { start: 18 * 60, minutes: 30, cookMinutes: 25 });
+  assert.equal(mealSlot("18:00", null).cookMinutes, 30);
 });
 
 test("timers are spotted in steps", () => {

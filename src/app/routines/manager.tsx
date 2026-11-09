@@ -7,7 +7,7 @@ import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveBar, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
-import { EATING_MINUTES, TIDY_MINUTES } from "@/lib/meals";
+import { EATING_MINUTES } from "@/lib/meals";
 import { NEW_PREFIX, draftProblem, sameDraft, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
 import { placeRoutines, toMinutes, wantedSlot, type Anchor, type DayAnchors } from "@/lib/routine-placement";
 import { saveRoutineManager } from "./manager-actions";
@@ -120,7 +120,7 @@ export function RoutineManager({
 
   const mealEnd = (id: string) => {
     const meal = mealTimes.find((m) => m.id === id);
-    return meal ? toMinutes(meal.usual_time) + EATING_MINUTES + TIDY_MINUTES : null;
+    return meal ? toMinutes(meal.usual_time) + EATING_MINUTES : null;
   };
   const placed = columns.map((c) => {
     if (!c.dayType) return { column: c, blocks: [] };
@@ -220,6 +220,7 @@ export function RoutineManager({
       usual_minutes: 30,
       loose: false,
       habit_since: null,
+      show_on_daily_list: false,
       visibility: "everyone",
     };
     const use: DraftUse = { id: newId(), routine_id: id, member_id: column.member.id, day_type_id: column.dayType.id };
@@ -556,7 +557,18 @@ export function RoutineManager({
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" hint="Can move later in the day" />
-                  <Switch on={Boolean(routine.habit_since)} onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })} label="Track as a habit" />
+                  <Switch
+                    on={Boolean(routine.habit_since)}
+                    onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
+                    label="Track"
+                    hint="Keeps a habit history"
+                  />
+                  <Switch
+                    on={routine.show_on_daily_list}
+                    onClick={() => setRoutine({ show_on_daily_list: !routine.show_on_daily_list })}
+                    label="Show on daily list"
+                    hint="Extra reminder, like a new medicine"
+                  />
                   <label className="ml-auto flex items-center gap-2 text-sm font-bold text-ink-muted">
                     Who sees it
                     <select value={routine.visibility} onChange={(e) => setRoutine({ visibility: e.target.value })} className={`${fieldClass} min-h-11`}>

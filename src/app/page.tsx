@@ -23,11 +23,11 @@ import type { CalendarItem, Member } from "./calendar/types";
 import { loadTodos, type Todo } from "./chores/data";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
-import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals } from "./meals/today";
+import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals, startCooking } from "./meals/today";
 import { SurvivalCard } from "./survival-card";
 import { OpenPanelTab, TodayPanel } from "./today-panel/panel";
 import { readPanelPrefs } from "./today-panel/prefs";
-import { floatingDay, RoutineBlock } from "./routines/floating";
+import { chainPositions, floatingDay, RoutineChain } from "./routines/floating";
 import { RoutineChecklist } from "./routines/routine-checklist";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
@@ -340,22 +340,16 @@ function PeopleTimeline({
         c1,
       })),
     ),
-    // A meal for everyone (no one picked) spans the whole row. With a cook,
-    // the prep is in the cook's column and the rest in the eaters'.
-    ...placedMeals.flatMap((m) => {
-      const cook = m.cookId ? columnIds.indexOf(m.cookId) : -1;
-      const prep = cook >= 0 ? [{ id: `meal:${m.id}|prep`, startMin: m.startMin, endMin: m.eatStart, c0: cook, c1: cook }] : [];
-      return [
-        ...prep,
-        ...memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({
-          id: `meal:${m.id}|${c0}`,
-          startMin: cook >= 0 ? m.eatStart : m.startMin,
-          endMin: m.endMin,
-          c0,
-          c1,
-        })),
-      ];
-    }),
+    // A meal is its eating time. One for everyone (no one picked) spans the whole row.
+    ...placedMeals.flatMap((m) =>
+      memberRuns(m.memberIds, columnIds).map(([c0, c1]) => ({
+        id: `meal:${m.id}|${c0}`,
+        startMin: m.startMin,
+        endMin: m.endMin,
+        c0,
+        c1,
+      })),
+    ),
   ]);
   const mealById = new Map(placedMeals.map((m) => [m.id, m]));
   const eventById = new Map(timed.map((e) => [e.id, e]));
@@ -410,33 +404,35 @@ function PeopleTimeline({
           <HourLines first={first} last={last} />
           {columns.map((c) => (
             <div key={c.id} data-drop-day={today} data-drop-member={c.id} className="relative min-w-0 flex-1 basis-0">
-              {(routinesFor.get(c.id) ?? []).map((r) => (
-                <RoutineBlock
-                  key={r.assignment.id}
-                  routine={r}
-                  memberId={c.id}
-                  colour={c.colour}
-                  date={today}
-                  first={first}
-                  last={last}
-                  household={household}
-                />
-              ))}
+              {(() => {
+                const mine = routinesFor.get(c.id) ?? [];
+                const tops = chainPositions(mine, first, last);
+                return mine.map((r) => (
+                  <RoutineChain
+                    key={r.assignment.id}
+                    routine={r}
+                    memberId={c.id}
+                    colour={c.colour}
+                    date={today}
+                    top={tops.get(r.assignment.id) ?? 0}
+                    household={household}
+                  />
+                ));
+              })()}
             </div>
           ))}
           {/* Events sit over the columns so one bubble can span several people. */}
           <div className="pointer-events-none absolute inset-y-0 right-0 left-16.5">
             {placedEvents.map((block) => {
               const top = ((block.startMin - first * 60) / span) * 100;
-              const height = (Math.max(block.endMin - block.startMin, 30) / span) * 100;
+              // A meal is only its eating time; give it room for its name.
+              const height = (Math.max(block.endMin - block.startMin, block.id.startsWith("meal:") ? 36 : 30) / span) * 100;
               if (block.id.startsWith("meal:")) {
-                const [mealId, which] = block.id.slice(5).split("|");
-                const meal = mealById.get(mealId)!;
+                const meal = mealById.get(block.id.slice(5).split("|")[0])!;
                 return (
                   <div key={block.id} className="pointer-events-auto">
                     <MealBlock
                       meal={meal}
-                      part={which === "prep" ? "prep" : meal.cookId && columnIds.includes(meal.cookId) ? "eat" : "whole"}
                       date={today}
                       household={household}
                       style={{
@@ -492,6 +488,25 @@ function PeopleTimeline({
                   big
                 />
               ));
+            })}
+            {/* The cook's "Start dinner": a point in their column. */}
+            {placedMeals.flatMap((m) => {
+              const start = startCooking(m);
+              const c = m.cookId ? columnIds.indexOf(m.cookId) : -1;
+              if (!start || c < 0 || start.minute < first * 60 || start.minute > last * 60) return [];
+              return [
+                <Link
+                  key={`start:${m.id}`}
+                  href={start.href}
+                  title={start.title}
+                  className="pointer-events-auto absolute z-[2] flex h-8 -translate-y-1/2 items-center gap-1.5 overflow-hidden"
+                  style={{ top: `${((start.minute - first * 60) / span) * 100}%`, ...spanBox(c, c, columns.length, COLUMN_GAP) }}
+                >
+                  <span className="size-3.5 shrink-0 rounded-full border-[3px] border-meal-ink bg-meal" aria-hidden />
+                  <Emoji emoji="🔪" className="size-6" />
+                  <span className="min-w-0 truncate rounded-lg bg-board/90 px-1.5 font-hand text-xl leading-none text-meal-ink">{start.title}</span>
+                </Link>,
+              ];
             })}
             {timedTodos.map((t) => {
               const minute = Number(t.at_time!.slice(0, 2)) * 60 + Number(t.at_time!.slice(3, 5));

@@ -50,6 +50,7 @@ export async function saveRoutineManager(draft: ManagerDraft): Promise<SaveResul
       usual_minutes: r.usual_minutes,
       loose: r.loose,
       habit_since: r.habit_since,
+      show_on_daily_list: r.show_on_daily_list,
       visibility: r.visibility,
       sort_order: i,
     };

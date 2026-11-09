@@ -1001,14 +1001,14 @@ isOneToOne: false
                   ]
                 },"routine_templates": {
                   Row: {
-                    "anchor": string,"anchor_meal_time_id": string | null,"anchor_offset": number,"audience": string,"created_at": string,"habit_since": string | null,"household_id": string,"id": string,"kind": string,"loose": boolean,"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
+                    "anchor": string,"anchor_meal_time_id": string | null,"anchor_offset": number,"audience": string,"created_at": string,"habit_since": string | null,"household_id": string,"id": string,"kind": string,"loose": boolean,"name": string,"premade": boolean,"show_on_daily_list": boolean,"sort_order": number,"updated_at": string,"usual_minutes": number | null,"usual_start": string | null,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "anchor": string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"habit_since"?: string | null,"household_id": string,"id"?: string,"kind"?: string,"loose"?: boolean,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
+                    "anchor": string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"habit_since"?: string | null,"household_id": string,"id"?: string,"kind"?: string,"loose"?: boolean,"name": string,"premade"?: boolean,"show_on_daily_list"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Update: {
-                    "anchor"?: string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"habit_since"?: string | null,"household_id"?: string,"id"?: string,"kind"?: string,"loose"?: boolean,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
+                    "anchor"?: string,"anchor_meal_time_id"?: string | null,"anchor_offset"?: number,"audience"?: string,"created_at"?: string,"habit_since"?: string | null,"household_id"?: string,"id"?: string,"kind"?: string,"loose"?: boolean,"name"?: string,"premade"?: boolean,"show_on_daily_list"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_minutes"?: number | null,"usual_start"?: string | null,"visibility"?: string
                   }
                   Relationships: [
                     {

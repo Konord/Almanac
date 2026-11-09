@@ -35,12 +35,12 @@ export function floatingRoutines(
   return floatingDay(data, memberId, date, events, timeZone, flexMinutes, meals).routines;
 }
 
-/** Something else that floats with the routines, like a chore block: where it would like to be. */
+/** Something else that floats with the routines: where it would like to be. */
 export type FloatingExtra = { id: string; start: number; minutes: number; loose: boolean };
 
 /**
- * Like floatingRoutines, with other floating things (chore blocks) placed
- * in the same pass, so routines and chore time keep out of each other's way.
+ * Like floatingRoutines, with other floating things placed in the same
+ * pass, so they keep out of each other's way.
  */
 export function floatingDay(
   data: RoutineData,
@@ -80,7 +80,7 @@ export function floatingDay(
         id: r.assignment.id,
         ...wantedSlot(r.template, r.steps.map((s) => s.target_time), anchors, flexMinutes),
       })),
-      // Chore time moves either way, like a routine at a set time.
+      // Extras move either way, like a routine at a set time.
       ...extras.map((x) => ({ id: x.id, start: x.start, minutes: x.minutes, direction: "both" as const, band: x.loose ? DAY_END : flexMinutes })),
     ],
     busy,
@@ -99,83 +99,94 @@ export function clock(minutes: number, date: LocalDate, household: Household): s
 }
 
 /**
- * A routine on the timeline: a dashed block in the person's colour, so it
- * reads as "this moves" next to the solid events. Tapping it opens its
- * checklist over the calendar.
+ * A routine on the Agenda (tasks rework, step 3): a point, or a chain of
+ * points. It sits at the time it starts, in the person's colour: a ring
+ * (filled once it's all done), its name, then a row of small dots, one
+ * per step, filled as each is ticked. Its length is only for working out
+ * where it fits; it never shows as a block. Tapping it opens its
+ * checklist in the Today panel.
+ *
+ * `top` is where to draw it (a percentage down the timeline), which can
+ * sit a little below its start so routines close together don't overlap.
  */
-export function RoutineBlock({
+export function RoutineChain({
   routine,
   memberId,
   colour,
   date,
-  first,
-  last,
+  top,
   household,
 }: {
   routine: FloatingRoutine;
   memberId: string;
   colour: string;
   date: LocalDate;
-  first: number;
-  last: number;
+  top: number;
   household: Household;
 }) {
-  const { placement, template, progress } = routine;
-  const span = (last - first) * 60;
-  // Short routines still get enough room for a line of text.
-  const shownMinutes = Math.max(placement.endMin - placement.startMin, 35);
-  const top = ((placement.startMin - first * 60) / span) * 100;
-  const height = (shownMinutes / span) * 100;
-  const icon = progress.next?.icon ?? routine.steps[0]?.icon ?? null;
+  const { placement, template, progress, steps, doneIds } = routine;
+  const ink = strong(colour);
+  const single = steps.length === 1;
+  const icon = progress.next?.icon ?? steps[0]?.icon ?? null;
   const when = placement.clash
     ? "No free time for it"
     : placement.movedFor
       ? `Moved for ${placement.movedFor}`
-      : `${clock(placement.startMin, date, household)}–${clock(placement.endMin, date, household)}`;
+      : clock(placement.startMin, date, household);
   const flagged = Boolean(placement.movedFor || placement.clash);
-  const short = shownMinutes < 55;
-  const count = `${progress.done}/${progress.total}`;
+  const ordered = steps.toSorted((x, y) => x.position - y.position);
   return (
     <Link
       href={`/?routine=${template.id}&member=${memberId}`}
       scroll={false}
-      className={`absolute z-[1] flex gap-1.5 overflow-hidden rounded-xl border-2 border-dashed px-2 text-ink ${short ? "items-center" : "items-start py-1"} ${progress.complete ? "opacity-60" : ""}`}
-      style={{
-        top: `calc(${top}% + 2px)`,
-        height: `calc(${height}% - 4px)`,
-        left: "4px",
-        right: "4px",
-        borderColor: strong(colour),
-        background: `color-mix(in srgb, ${strong(colour)} 7%, white)`,
-      }}
+      className={`absolute right-1 left-1 z-[1] flex h-8 -translate-y-1/2 items-center gap-1.5 overflow-hidden ${progress.complete ? "opacity-60" : ""}`}
+      style={{ top: `${top}%` }}
       title={`${template.name}: ${progress.done} of ${progress.total} done. ${when}.`}
     >
       {progress.complete ? (
-        <CheckCircle size="1.5rem" weight="fill" className="shrink-0" style={{ color: strong(colour) }} aria-hidden />
+        <CheckCircle size="1.25rem" weight="fill" className="shrink-0" style={{ color: ink }} aria-hidden />
       ) : (
-        <Emoji emoji={icon} className="size-6" />
+        <span className="size-3.5 shrink-0 rounded-full border-[3px] bg-board" style={{ borderColor: ink }} aria-hidden />
       )}
-      {short ? (
-        <>
-          <span className="min-w-0 flex-1 truncate text-sm leading-[1.15] font-bold">{template.name}</span>
-          <span className="flex shrink-0 items-center gap-0.5 text-sm font-bold" style={flagged ? { color: strong(colour) } : undefined}>
-            {flagged ? <ArrowsClockwise size="0.875rem" weight="bold" aria-label="Moved" /> : null}
-            {count}
-          </span>
-        </>
-      ) : (
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-base leading-[1.15] font-bold">{template.name}</span>
-          <span
-            className={`truncate text-sm leading-[1.15] font-semibold ${flagged ? "" : "text-ink-soft"}`}
-            style={flagged ? { color: strong(colour) } : undefined}
-          >
-            {when} · {count}
-          </span>
+      {icon ? <Emoji emoji={icon} className="size-6" /> : null}
+      <span className="min-w-0 shrink truncate rounded-lg bg-board/90 px-1 text-sm leading-none font-bold text-ink">{template.name}</span>
+      {single ? null : (
+        <span className="flex shrink-0 items-center gap-0.5" aria-label={`${progress.done} of ${progress.total} done`}>
+          {ordered.slice(0, 8).map((step) => (
+            <span
+              key={step.id}
+              className="size-2 rounded-full border-2"
+              style={{ borderColor: ink, background: doneIds.has(step.id) ? ink : "white" }}
+              aria-hidden
+            />
+          ))}
+          {ordered.length > 8 ? <span className="text-xs font-bold text-ink-muted">+{ordered.length - 8}</span> : null}
         </span>
       )}
+      <span className="flex shrink-0 items-center gap-0.5 text-xs font-bold text-ink-muted" style={flagged ? { color: ink } : undefined}>
+        {flagged ? <ArrowsClockwise size="0.75rem" weight="bold" aria-label="Moved" /> : null}
+        {when}
+      </span>
     </Link>
   );
+}
+
+/**
+ * Where to draw each of a person's routines: at its start, nudged down so
+ * points close together stay readable (and always in order).
+ */
+export function chainPositions(routines: FloatingRoutine[], first: number, last: number): Map<string, number> {
+  const span = (last - first) * 60;
+  // About one row of text on a 720-pixel-high screen.
+  const gap = span * 0.055;
+  const out = new Map<string, number>();
+  let previous = -Infinity;
+  for (const r of routines.toSorted((a, b) => a.placement.startMin - b.placement.startMin)) {
+    const at = Math.max(r.placement.startMin, previous + gap);
+    previous = at;
+    out.set(r.assignment.id, ((at - first * 60) / span) * 100);
+  }
+  return out;
 }
 
 /**
