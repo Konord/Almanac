@@ -113,7 +113,7 @@ export async function loadBreaks(from: LocalDate, to: LocalDate): Promise<Break[
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("breaks")
-    .select("id, name, icon, start_date, end_date, away, break_members (member_id, day_type_id, week_plan_id)")
+    .select("id, name, icon, start_date, end_date, away, from_review, break_members (member_id, day_type_id, week_plan_id)")
     .lte("start_date", to)
     .gte("end_date", from)
     .order("start_date")

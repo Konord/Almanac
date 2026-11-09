@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Alarm, Broom, CalendarBlank, CaretDown, ForkKnife, GearSix, House, ListChecks } from "@phosphor-icons/react";
+import { Alarm, Broom, CalendarBlank, CalendarCheck, CaretDown, ForkKnife, GearSix, House, ListChecks } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 
 /**
@@ -17,7 +17,7 @@ import type { Icon } from "@phosphor-icons/react";
  * section, when you tap outside it, or when you press Escape.
  */
 
-export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "settings";
+export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "review" | "settings";
 
 const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "today", href: "/", label: "Agenda", icon: House },
@@ -26,6 +26,7 @@ const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
   { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
   { section: "meals", href: "/meals", label: "Meals", icon: ForkKnife },
+  { section: "review", href: "/review", label: "Review", icon: CalendarCheck },
   { section: "settings", href: "/household", label: "Settings", icon: GearSix },
 ];
 

@@ -108,21 +108,33 @@ export type ChorePlan = {
 /** How far ahead the generator plans. */
 export const PLAN_DAYS = 14;
 
-/** The chore days on a date: those set for its weekday, or else the Free day. */
-export function choreDaysOn(choreDays: ChoreDay[], date: LocalDate): ChoreDay[] {
-  const wd = dayOfWeek(date);
-  const set = choreDays.filter((d) => !d.is_free && d.weekdays.includes(wd));
+/**
+ * A chore day moved on one date (from the weekly review): `on` puts it on a
+ * date it doesn't usually fall on, `on: false` takes it off one it does.
+ */
+export type ChoreDayMove = { chore_day_id: string; date: LocalDate; on: boolean };
+
+/** Whether a (non-Free) chore day falls on a date: its weekdays, unless moved. */
+export function fallsOn(choreDay: ChoreDay, date: LocalDate, moves: ChoreDayMove[] = []): boolean {
+  if (choreDay.is_free) return false;
+  const moved = moves.find((m) => m.chore_day_id === choreDay.id && m.date === date);
+  return moved ? moved.on : choreDay.weekdays.includes(dayOfWeek(date));
+}
+
+/** The chore days on a date: those set for it (its weekday, or moved there), or else the Free day. */
+export function choreDaysOn(choreDays: ChoreDay[], date: LocalDate, moves: ChoreDayMove[] = []): ChoreDay[] {
+  const set = choreDays.filter((d) => fallsOn(d, date, moves));
   if (set.length > 0) return set;
   return choreDays.filter((d) => d.is_free);
 }
 
 /** The first day of the stretch a date belongs to (the date itself unless the chore day spans days). */
-export function stretchStart(choreDay: ChoreDay, date: LocalDate): LocalDate {
+export function stretchStart(choreDay: ChoreDay, date: LocalDate, moves: ChoreDayMove[] = []): LocalDate {
   if (!choreDay.span) return date;
   let start = date;
   for (let i = 0; i < 6; i++) {
     const before = addDays(start, -1);
-    if (!choreDay.weekdays.includes(dayOfWeek(before))) break;
+    if (!fallsOn(choreDay, before, moves)) break;
     start = before;
   }
   return start;
@@ -148,17 +160,20 @@ export function planChoreDays(input: {
   days?: number;
   /** Chores and one-offs already on today's list: they stay there (so the list doesn't shuffle during the day). */
   keptToday?: Set<string>;
+  /** Chore days moved on single dates (the weekly review). */
+  moves?: ChoreDayMove[];
 }): ChorePlan {
   const { choreDays, chores, today } = input;
   const count = input.days ?? PLAN_DAYS;
   const away = input.away ?? new Set<LocalDate>();
+  const moves = input.moves ?? [];
   const last = addDays(today, count - 1);
   const days: PlanDay[] = Array.from({ length: count }, (_, i) => {
     const date = addDays(today, i);
     return {
       date,
       away: away.has(date),
-      choreDays: away.has(date) ? [] : choreDaysOn(choreDays, date),
+      choreDays: away.has(date) ? [] : choreDaysOn(choreDays, date, moves),
       presets: [],
       items: [],
     };
@@ -170,7 +185,7 @@ export function planChoreDays(input: {
     if (!chore.active || chore.kind !== "preset") continue;
     for (const day of days) {
       const mine = day.choreDays.filter((cd) => chore.chore_day_ids.includes(cd.id));
-      if (mine.some((cd) => stretchStart(cd, day.date) === day.date || day.date === today)) day.presets.push(chore.id);
+      if (mine.some((cd) => stretchStart(cd, day.date, moves) === day.date || day.date === today)) day.presets.push(chore.id);
     }
   }
 

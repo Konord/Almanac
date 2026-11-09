@@ -233,3 +233,33 @@ test("weekday labels", () => {
   assert.equal(weekdaysLabel([6, 0]), "Sat, Sun");
   assert.equal(weekdaysLabel([]), "Days with nothing else");
 });
+
+test("a chore day moved by the weekly review", () => {
+  // Laundry moved from Tuesday to Wednesday this week.
+  const moves = [
+    { chore_day_id: "laundry", date: TUE, on: false },
+    { chore_day_id: "laundry", date: WED, on: true },
+  ];
+  assert.deepEqual(
+    choreDaysOn([free, laundry], TUE, moves).map((d) => d.id),
+    ["free"],
+  );
+  assert.deepEqual(
+    choreDaysOn([free, laundry], WED, moves).map((d) => d.id),
+    ["laundry"],
+  );
+  const plan = planChoreDays({
+    choreDays: [free, laundry],
+    chores: [chore("bins", { kind: "preset", chore_day_ids: ["laundry"] })],
+    today: MON,
+    days: 7,
+    moves,
+  });
+  assert.deepEqual(
+    plan.days.filter((d) => d.presets.includes("bins")).map((d) => d.date),
+    [WED],
+  );
+  // A stretch moved a day earlier starts on the new first day.
+  const early = [{ chore_day_id: "big", date: "2026-11-13", on: true }];
+  assert.equal(stretchStart(bigClean, SUN, early), "2026-11-13");
+});
