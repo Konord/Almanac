@@ -13,7 +13,8 @@ import { addDays, type LocalDate } from "./time.ts";
  *     the first day and carries until the stretch ends.
  *   - A generated ("occasional") chore has a date rule. When it comes due it is put on the
  *     last day on or before its due date that accepts it and has room; if
- *     none has room, the first one after. Overdue ones go on the first day
+ *     none has room, the first one after. A long-repeat chore may go a
+ *     few days early when an earlier day is quieter. Overdue ones go on the first day
  *     with room from today. Essential overdue ones go on today whatever the
  *     room.
  *   - A one-off chore (a list task with a chore day) waits for the next
@@ -77,6 +78,8 @@ export type PlannableChore = {
   /** Skipped: not placed before this day. */
   not_before: LocalDate | null;
   active: boolean;
+  /** Generated: how many days early it may go when an earlier day is quieter (long repeats only). */
+  slackDays?: number;
 };
 
 /** A one-off chore: a list task waiting for a chore day. */
@@ -195,6 +198,7 @@ export function planChoreDays(input: {
     const placed = day.items.filter((i) => !i.pinned);
     return placed.length < maxTasks && (!item.big || placed.filter((i) => i.big).length < maxBig);
   };
+  const load = (day: PlanDay) => day.items.filter((i) => !i.pinned).length;
   const takes = (day: PlanDay, ids: string[]) => !day.away && day.choreDays.some((cd) => accepts(cd, ids));
 
   const unplaced: string[] = [];
@@ -253,8 +257,14 @@ export function planChoreDays(input: {
       chosen ??= window.find(fits);
     } else {
       const before = window.filter((d) => d.date <= chore.dueOn && fits(d));
+      // A long-repeat chore may go a few days early onto a quieter day (the
+      // latest of the quietest), so chores that bunch up drift apart.
+      const soonest = addDays(chore.dueOn, -(chore.slackDays ?? 0));
+      const quietest = before
+        .filter((d) => d.date >= soonest)
+        .reduce<PlanDay | undefined>((best, d) => (!best || load(d) <= load(best) ? d : best), undefined);
       // Errands join a day that already has one, if there is one.
-      chosen = (item.errand ? before.findLast((d) => d.items.some((i) => i.errand)) : undefined) ?? before.at(-1);
+      chosen = (item.errand ? before.findLast((d) => d.items.some((i) => i.errand)) : undefined) ?? quietest ?? before.at(-1);
       chosen ??= window.find((d) => d.date > chore.dueOn && fits(d));
     }
     if (chosen) chosen.items.push(item);

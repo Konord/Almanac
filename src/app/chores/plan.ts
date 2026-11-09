@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
+import { spreadSlack } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { addDays, type LocalDate } from "@/lib/time";
 import { loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
@@ -92,6 +93,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
       dueOn: c.timing.dueOn,
       not_before: c.not_before,
       active: c.active,
+      slackDays: c.kind === "generated" ? spreadSlack(c) : 0,
     })),
     oneOffs: oneOffs.map((t) => ({
       id: t.id,

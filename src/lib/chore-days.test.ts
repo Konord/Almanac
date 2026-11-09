@@ -276,3 +276,30 @@ test("a chore put on today by hand stays there even when it isn't due for months
   const later = planChoreDays({ choreDays: [free, kitchen], chores: [chore("oven", { dueOn: "2027-02-01" })], today: MON });
   assert.equal(where(later, "oven"), undefined);
 });
+
+test("a long-repeat chore goes a few days early onto a quieter day", () => {
+  // Three chores due Friday the 13th; the third may go up to four days early.
+  const roomy = { ...free, max_tasks: 5 };
+  const plan = planChoreDays({
+    choreDays: [roomy],
+    chores: [
+      chore("a", { dueOn: "2026-11-13" }),
+      chore("b", { dueOn: "2026-11-13" }),
+      chore("c", { dueOn: "2026-11-13", slackDays: 4 }),
+    ],
+    today: MON,
+  });
+  assert.equal(where(plan, "a"), "2026-11-13");
+  assert.equal(where(plan, "b"), "2026-11-13");
+  // The latest of the quiet days before it: Thursday.
+  assert.equal(where(plan, "c"), "2026-11-12");
+});
+
+test("with no quieter day it stays on its due date", () => {
+  const plan = planChoreDays({
+    choreDays: [{ ...free, max_tasks: 5 }],
+    chores: [chore("c", { dueOn: "2026-11-13", slackDays: 4 })],
+    today: MON,
+  });
+  assert.equal(where(plan, "c"), "2026-11-13");
+});
