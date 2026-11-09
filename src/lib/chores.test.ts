@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addInterval, choreTiming, daysBetween, describeRepeat, describeRule, seasonOf, seasonWindow, snapDate, starterFirstDue, type ChoreRule } from "./chores.ts";
+import { addInterval, choreTiming, daysBetween, describeRepeat, describeRule, seasonOf, seasonWindow, snapDate, spreadFirstDue, spreadSlack, starterFirstDue, upcomingDue, type ChoreRule } from "./chores.ts";
 
 const rule = (extra: Partial<ChoreRule> = {}): ChoreRule => ({
   repeat_every: 1,
@@ -192,4 +192,41 @@ test("only in some months", () => {
 test("the rule in words", () => {
   const r = rule({ repeat_every: 2, preferred_weekday: 6, snap: "last_of_month", only_seasons: ["summer"] });
   assert.equal(describeRule(r), "Every 2 weeks, on the last Saturday of the month, only in summer");
+});
+
+test("a new chore's first time goes on the quietest day within one repeat", () => {
+  // Monthly: the next ten days are busy, so it goes in the quiet stretch after,
+  // as far from them as it can within the month.
+  const busy = ["2026-11-05", "2026-11-05", "2026-11-06", "2026-11-08", "2026-11-12", "2026-11-14", "2026-12-06"];
+  assert.equal(spreadFirstDue(rule({ repeat_unit: "month" }), TODAY, busy), "2026-11-25");
+  // Nothing else due: today.
+  assert.equal(spreadFirstDue(rule({ repeat_unit: "month" }), TODAY, []), TODAY);
+  // Weekly chores stay within the week.
+  const d = spreadFirstDue(rule(), TODAY, busy) as string;
+  assert.ok(d >= TODAY && d <= "2026-11-11");
+  // Set schedules and season windows keep their own dates.
+  assert.equal(spreadFirstDue(rule({ repeat_from: "date", start_date: "2026-11-01" }), TODAY, busy), null);
+  assert.equal(spreadFirstDue(rule({ season_start: "10-15", season_end: "11-30" }), TODAY, busy), null);
+});
+
+test("chores made together and spread out keep apart", () => {
+  let others: string[] = [];
+  const picks: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    const r = rule({ repeat_unit: "month" });
+    const d = spreadFirstDue(r, TODAY, others) as string;
+    picks.push(d);
+    others = [...others, ...upcomingDue(d, r, TODAY, "2026-12-31")];
+  }
+  // Four monthly chores made on one day land at least a week apart.
+  const sorted = picks.toSorted();
+  for (let i = 1; i < sorted.length; i++) assert.ok(daysBetween(sorted[i - 1], sorted[i]) >= 7, picks.join(", "));
+});
+
+test("only long repeats may go early", () => {
+  assert.equal(spreadSlack(rule()), 0);
+  assert.equal(spreadSlack(rule({ repeat_every: 2 })), 0);
+  assert.equal(spreadSlack(rule({ repeat_unit: "month" })), 4);
+  assert.equal(spreadSlack(rule({ repeat_unit: "month", repeat_every: 3 })), 7);
+  assert.equal(spreadSlack(rule({ repeat_unit: "month", repeat_from: "date", start_date: "2026-01-01" })), 0);
 });

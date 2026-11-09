@@ -368,3 +368,87 @@ export function starterFirstDue(id: string, addedOn: LocalDate, rule: Pick<Chore
   for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return addDays(addedOn, hash % spread);
 }
+
+/*
+ * Spreading occasional chores out (2026-11-09). Chores made in the same
+ * week would otherwise come due together every time round, then leave a
+ * long gap. Two things stop that:
+ *
+ *   - A new chore's first time goes on the quietest day within one repeat
+ *     (at most eight weeks): the day with the fewest other chores due
+ *     within three days of it, then the one furthest from any of them,
+ *     then the earliest.
+ *   - The daily list may do a long-repeat chore a few days early when an
+ *     earlier day is quieter (see `spreadSlack`). Done early, it repeats
+ *     from then, so bunched chores drift apart over time.
+ */
+
+/** How far ahead a new chore's first time can go. */
+const FIRST_DUE_SPREAD_DAYS = 56;
+/** Days either side of a day that count as "around then" when judging how busy it is. */
+const BUSY_NEAR_DAYS = 3;
+
+/** Only chores that repeat from when they were done move about: not set schedules or season windows. */
+function spreads(rule: ChoreRule): boolean {
+  return !(rule.season_start && rule.season_end) && !(rule.repeat_from === "date" && rule.start_date);
+}
+
+/** A chore's next few due dates up to `until`, from when it's next due (overdue counts as today). */
+export function upcomingDue(dueOn: LocalDate, rule: ChoreRule, today: LocalDate, until: LocalDate): LocalDate[] {
+  const out: LocalDate[] = [];
+  let d = dueOn < today ? today : dueOn;
+  for (let k = 0; k < 400 && d <= until; k++) {
+    out.push(d);
+    if (!spreads(rule)) break;
+    d = addInterval(d, rule.repeat_every, rule.repeat_unit);
+  }
+  return out;
+}
+
+/**
+ * The first due date for a new occasional chore: the quietest day from
+ * today to one repeat later (at most eight weeks), judged by `others`
+ * (the other chores' coming due dates). Null when the chore doesn't move
+ * about (a set schedule or a season window).
+ */
+export function spreadFirstDue(rule: ChoreRule, today: LocalDate, others: LocalDate[]): LocalDate | null {
+  if (!spreads(rule)) return null;
+  const intervalDays = daysBetween(today, addInterval(today, rule.repeat_every, rule.repeat_unit));
+  const span = Math.max(1, Math.min(intervalDays, FIRST_DUE_SPREAD_DAYS));
+  let best = today;
+  let bestLoad = Infinity;
+  let bestGap = -1;
+  for (let i = 0; i < span; i++) {
+    const d = addDays(today, i);
+    const from = addDays(d, -BUSY_NEAR_DAYS);
+    const to = addDays(d, BUSY_NEAR_DAYS);
+    const load = others.filter((o) => o >= from && o <= to).length;
+    // Among equally quiet days, the one furthest from any other chore.
+    const gap = Math.min(Infinity, ...others.map((o) => Math.abs(daysBetween(o, d))));
+    if (load < bestLoad || (load === bestLoad && gap > bestGap)) {
+      best = d;
+      bestLoad = load;
+      bestGap = gap;
+    }
+  }
+  return best;
+}
+
+/** Long repeats can be done this share of their repeat early… */
+const SLACK_SHARE = 0.15;
+/** …but at most this many days, and only when they repeat at least this often. */
+const SLACK_MAX_DAYS = 7;
+const SLACK_MIN_INTERVAL = 28;
+
+/**
+ * How many days early the daily list may put a chore when that day is
+ * quieter: none for anything that repeats more often than every four
+ * weeks, about a week for a chore done every few months.
+ */
+export function spreadSlack(rule: ChoreRule): number {
+  if (!spreads(rule)) return 0;
+  const start = "2026-01-01";
+  const intervalDays = daysBetween(start, addInterval(start, rule.repeat_every, rule.repeat_unit));
+  if (intervalDays < SLACK_MIN_INTERVAL) return 0;
+  return Math.min(SLACK_MAX_DAYS, Math.floor(intervalDays * SLACK_SHARE));
+}

@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { draftProblem, isNewId, ruleColumns, type ChoreManagerDraft } from "@/lib/chore-manager";
-import { localDateOf } from "@/lib/time";
+import { addDays, localDateOf } from "@/lib/time";
+import { spreadFirstDue, upcomingDue, type ChoreRule } from "@/lib/chores";
+import { loadChores } from "./data";
 
 /** On success, the saved id of each new thing ("new-…" → its real id). */
 export type SaveResult = { ok: true; ids: Record<string, string> } | { ok: false; error: string };
@@ -161,6 +163,26 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
   // 4. Occasional chores and their heads-ups.
   const headsOf = new Map<string, { id: string; label: string; minutes_before: number; makes: string }[]>();
   for (const h of headsNow.data ?? []) if (h.chore_id) headsOf.set(h.chore_id, [...(headsOf.get(h.chore_id) ?? []), h]);
+  // A new occasional chore's first time goes on a quiet day, so chores
+  // made together don't keep coming due together.
+  const firstDue = new Map<string, string | null>();
+  const fresh = draft.occasional.filter((c) => isNewId(c.id));
+  if (fresh.length > 0) {
+    const timeZone = household.settings.timeZone;
+    const today = localDateOf(new Date(), timeZone);
+    const until = addDays(today, 70);
+    const { chores } = await loadChores(today, timeZone);
+    const others = chores
+      .filter((c) => c.kind === "generated" && c.active && keepChores.has(c.id))
+      .flatMap((c) => upcomingDue(c.timing.dueOn, c, today, until));
+    for (const c of fresh) {
+      const rule = { ...ruleColumns(c), first_due: null } as ChoreRule;
+      const picked = c.active ? spreadFirstDue(rule, today, others) : null;
+      firstDue.set(c.id, picked);
+      if (picked) others.push(...upcomingDue(picked, rule, today, until));
+    }
+  }
+
   for (const [i, c] of draft.occasional.entries()) {
     const bad = await saveChore(
       c.id,
@@ -176,6 +198,7 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
         visibility: c.visibility,
         sort_order: 100 + i,
         ...ruleColumns(c),
+        ...(firstDue.has(c.id) ? { first_due: firstDue.get(c.id) } : {}),
       },
       c.chore_day_ids,
     );

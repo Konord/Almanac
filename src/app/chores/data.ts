@@ -68,7 +68,7 @@ export type Todo = {
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
 
 const CHORE_COLUMNS =
-  "id, name, icon, kind, tags, at_time, not_before, repeat_every, repeat_unit, preferred_weekday, repeat_from, start_date, snap, only_months, only_seasons, season_start, season_end, default_assignee_id, notes, link, active, visibility, premade, created_at";
+  "id, name, icon, kind, tags, at_time, not_before, repeat_every, repeat_unit, preferred_weekday, repeat_from, start_date, snap, only_months, only_seasons, season_start, season_end, first_due, default_assignee_id, notes, link, active, visibility, premade, created_at";
 
 /** How far back chore history is read (long enough for yearly chores). */
 const HISTORY_DAYS = 400;
@@ -105,8 +105,10 @@ export async function loadChores(today: LocalDate, timeZone: string) {
     at_time: c.at_time ? c.at_time.slice(0, 5) : null,
     repeat_unit: c.repeat_unit as RepeatUnit,
     timing: choreTiming(
-      // Starter chores come due a few at a time instead of all on day one.
-      c.premade && !c.season_start ? { ...c, first_due: starterFirstDue(c.id, localDateOf(new Date(c.created_at), timeZone), c) } : c,
+      // A chore never done comes due on its first day: picked on a quiet day
+      // when it was made, or else a steady spread from the day it was made,
+      // so chores made together don't all come due together.
+      c.season_start ? c : { ...c, first_due: c.first_due ?? starterFirstDue(c.id, localDateOf(new Date(c.created_at), timeZone), c) },
       byChore.get(c.id) ?? [],
       today,
     ),
