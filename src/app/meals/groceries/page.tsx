@@ -73,7 +73,7 @@ async function Groceries({ searchParams }: { searchParams: PageProps<"/meals/gro
 
   return (
     <>
-      <MealsHeader title="Groceries" tab="groceries" error={firstParam(params.error)} message={firstParam(params.message)}>
+      <MealsHeader title="Grocery list" tab="groceries" error={firstParam(params.error)} message={firstParam(params.message)}>
         <div className="flex items-center gap-2">
           <IconLink href={here({ week: addDays(week, -7) })} label="Previous week" icon={CaretLeft} />
           <span className="min-w-40 text-center text-xl font-bold text-ink">{week === thisWeek ? "This week" : weekLabel}</span>

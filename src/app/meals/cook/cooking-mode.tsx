@@ -98,7 +98,7 @@ export function CookingMode({
     <div className="flex h-dvh flex-col gap-4 overflow-hidden bg-board p-5 lg:p-7">
       {/* Top bar */}
       <header className="flex shrink-0 items-center gap-4">
-        <Link href="/meals" aria-label="Leave cooking mode" className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink">
+        <Link href="/" aria-label="Leave cooking mode" className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink">
           <ArrowLeft size="1.75rem" weight="bold" aria-hidden />
         </Link>
         <Picture emoji={icon} className="size-16" />

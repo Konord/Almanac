@@ -22,11 +22,12 @@ export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "
 const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "today", href: "/", label: "Agenda", icon: House },
   { section: "calendar", href: "/calendar", label: "Calendar", icon: CalendarBlank },
-  { section: "chores", href: "/chores", label: "Chores", icon: Broom },
-  { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
-  { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
-  { section: "meals", href: "/meals", label: "Meals", icon: ForkKnife },
-  { section: "review", href: "/review", label: "Review", icon: CalendarCheck },
+  // Planning happens in the weekly review; the rest are managers (Connor, 2026-11-09).
+  { section: "review", href: "/review", label: "Weekly review", icon: CalendarCheck },
+  { section: "routines", href: "/routines", label: "Routine Manager", icon: Alarm },
+  { section: "lists", href: "/lists", label: "List Manager", icon: ListChecks },
+  { section: "chores", href: "/chores", label: "Chore Manager", icon: Broom },
+  { section: "meals", href: "/meals/library", label: "Menu Manager", icon: ForkKnife },
   { section: "settings", href: "/household", label: "Settings", icon: GearSix },
 ];
 
