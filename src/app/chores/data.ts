@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { choreTiming, starterFirstDue, type ChoreImportance, type ChoreRule, type ChoreSize, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
+import { choreTiming, starterFirstDue, type ChoreRule, type ChoreTiming, type RepeatUnit } from "@/lib/chores";
+import { isChoreTag, type ChoreDay, type ChoreTag } from "@/lib/chore-days";
 import { addDays, localDateOf, type LocalDate } from "@/lib/time";
 import { showsOn, sortForToday, type DateKind } from "@/lib/todos";
 
@@ -9,10 +10,15 @@ export type Chore = ChoreRule & {
   id: string;
   name: string;
   icon: string | null;
-  size: ChoreSize;
-  est_minutes: number | null;
-  location: "indoor" | "outdoor";
-  importance: ChoreImportance;
+  /** "preset": every time its chore day comes round. "generated": by its date rule. */
+  kind: "preset" | "generated";
+  tags: ChoreTag[];
+  /** The chore days it may go on (empty: any day that isn't restrictive). */
+  chore_day_ids: string[];
+  /** "19:00" for a chore at an exact time. */
+  at_time: string | null;
+  /** Skipped: waits until this day. */
+  not_before: LocalDate | null;
   default_assignee_id: string | null;
   notes: string | null;
   /** A part of the app its to-dos open, e.g. "/meals". */
@@ -53,16 +59,16 @@ export type Todo = {
   link: string | null;
   /** Set when a chore made this to-do. */
   template_id: string | null;
-  /** How long it takes (a chore's to-do carries the chore's minutes). */
+  /** How long it takes. */
   minutes: number | null;
-  /** Swapped out of a chore block: not put back in one before this date. */
-  not_before: LocalDate | null;
+  /** A one-off chore: waits for the next one of this chore day with room. */
+  chore_day_id: string | null;
 };
 
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
 
 const CHORE_COLUMNS =
-  "id, name, icon, size, est_minutes, repeat_every, repeat_unit, preferred_weekday, repeat_from, start_date, snap, only_months, only_seasons, season_start, season_end, location, importance, default_assignee_id, notes, link, active, visibility, premade, created_at";
+  "id, name, icon, kind, tags, at_time, not_before, repeat_every, repeat_unit, preferred_weekday, repeat_from, start_date, snap, only_months, only_seasons, season_start, season_end, default_assignee_id, notes, link, active, visibility, premade, created_at";
 
 /** How far back chore history is read (long enough for yearly chores). */
 const HISTORY_DAYS = 400;
@@ -70,7 +76,7 @@ const HISTORY_DAYS = 400;
 /** All chores with when each is next due. */
 export async function loadChores(today: LocalDate, timeZone: string) {
   const supabase = await createClient();
-  const [chores, rounds, members] = await Promise.all([
+  const [chores, rounds, members, links] = await Promise.all([
     supabase.from("task_templates").select(CHORE_COLUMNS).order("sort_order").order("name"),
     supabase
       .from("task_instances")
@@ -80,15 +86,23 @@ export async function loadChores(today: LocalDate, timeZone: string) {
       .gte("completed_on", addDays(today, -HISTORY_DAYS))
       .order("completed_on", { ascending: false }),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
+    supabase.from("task_template_chore_days").select("template_id, chore_day_id"),
   ]);
-  for (const r of [chores, rounds, members]) if (r.error) throw r.error;
+  for (const r of [chores, rounds, members, links]) if (r.error) throw r.error;
 
   const roundList = (rounds.data ?? []) as Round[];
   const byChore = new Map<string, Round[]>();
   for (const r of roundList) byChore.set(r.template_id, [...(byChore.get(r.template_id) ?? []), r]);
 
+  const daysOf = new Map<string, string[]>();
+  for (const l of links.data ?? []) daysOf.set(l.template_id, [...(daysOf.get(l.template_id) ?? []), l.chore_day_id]);
+
   const list: ChoreWithTiming[] = ((chores.data ?? []) as unknown as Chore[]).map((c) => ({
     ...c,
+    kind: c.kind === "preset" ? "preset" : "generated",
+    tags: (c.tags as string[]).filter(isChoreTag),
+    chore_day_ids: daysOf.get(c.id) ?? [],
+    at_time: c.at_time ? c.at_time.slice(0, 5) : null,
     repeat_unit: c.repeat_unit as RepeatUnit,
     timing: choreTiming(
       // Starter chores come due a few at a time instead of all on day one.
@@ -100,16 +114,16 @@ export async function loadChores(today: LocalDate, timeZone: string) {
   return { chores: list, rounds: roundList, members: (members.data ?? []) as ChoreMember[] };
 }
 
-/** Active chores due now, most overdue first. */
-export function dueChores(chores: ChoreWithTiming[]): ChoreWithTiming[] {
-  return chores
-    .filter((c) => c.active && c.timing.state === "due")
-    .sort((a, b) => b.timing.daysOverdue - a.timing.daysOverdue || (a.timing.dueOn < b.timing.dueOn ? -1 : 1));
-}
-
-/** Active chores coming up soon, soonest first. */
-export function soonChores(chores: ChoreWithTiming[]): ChoreWithTiming[] {
-  return chores.filter((c) => c.active && c.timing.state === "soon").sort((a, b) => (a.timing.dueOn < b.timing.dueOn ? -1 : 1));
+/** The household's chore days, Free day last. */
+export async function loadChoreDays(): Promise<(ChoreDay & { sort_order: number })[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("chore_days")
+    .select("id, name, icon, weekdays, span, restrictive, max_tasks, max_big, is_free, sort_order")
+    .order("sort_order")
+    .order("name");
+  if (error) throw error;
+  return data;
 }
 
 /** The to-do lists and their to-dos (open ones, plus the last few done). */
@@ -119,7 +133,7 @@ export async function loadTodos() {
     supabase.from("task_lists").select("id, name, icon, visibility").order("sort_order").order("name"),
     supabase
       .from("task_instances")
-      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, minutes, not_before")
+      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, minutes, chore_day_id")
       .not("list_id", "is", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at"),

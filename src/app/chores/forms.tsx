@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { EmojiPicker } from "@/components/emoji-picker";
-import { Chips, Field, Input, Select } from "@/components/ui";
+import { Chips, Emoji, Field, Input, Select } from "@/components/ui";
 import { SEASONS, snapOf, type ChoreSnap } from "@/lib/chores";
 import { CardTabs } from "../calendar/quick-controls";
 import { FEATURE_LINKS } from "@/lib/todos";
 import { VISIBILITY_OPTIONS } from "../calendar/options";
+import { CHORE_TAGS, type ChoreDay } from "@/lib/chore-days";
 import type { Chore, ChoreMember } from "./data";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -36,11 +37,16 @@ function onlyInOf(chore?: Chore): string {
 export function ChoreFields({
   chore,
   members,
+  choreDays,
   headsUps,
   initialTab,
+  kind,
 }: {
   chore?: Chore;
   members: ChoreMember[];
+  choreDays: ChoreDay[];
+  /** For a new chore: which kind to start as. */
+  kind?: "preset" | "generated";
   headsUps?: ReactNode;
   initialTab?: string;
 }) {
@@ -64,24 +70,16 @@ export function ChoreFields({
                   </Field>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Size">
-                  <Select name="size" defaultValue={chore?.size ?? "small"}>
-                    <option value="small">Small (a few minutes)</option>
-                    <option value="medium">Medium</option>
-                    <option value="big">Big (a proper job)</option>
-                  </Select>
-                </Field>
-                <Field label="How important">
-                  <Select name="importance" defaultValue={chore?.importance ?? "normal"}>
-                    <option value="low">Can wait</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">Important (Survival keeps it)</option>
-                  </Select>
-                </Field>
-                <Field label="About how many minutes">
-                  <Input name="estMinutes" type="number" min={1} max={1440} defaultValue={chore?.est_minutes ?? ""} />
-                </Field>
+              <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+                <Chips
+                  name="kind"
+                  label="Shows"
+                  defaultValue={chore?.kind ?? kind ?? "generated"}
+                  options={[
+                    { value: "preset", label: "Every chore day" },
+                    { value: "generated", label: "When it comes due" },
+                  ]}
+                />
                 <Field label="Who usually does it">
                   <Select name="assigneeId" defaultValue={chore?.default_assignee_id ?? ""}>
                     <option value="">Whoever&apos;s free</option>
@@ -93,6 +91,23 @@ export function ChoreFields({
                   </Select>
                 </Field>
               </div>
+              <Chips
+                name="choreDayIds"
+                label="Chore days it goes on (none: any day that takes all chores)"
+                multiple
+                defaultValue={chore?.chore_day_ids ?? []}
+                options={choreDays.map((d) => ({ value: d.id, label: d.name, leading: d.icon ? <Emoji emoji={d.icon} className="size-6" /> : undefined }))}
+              />
+              <Chips
+                name="tags"
+                label="Tags"
+                multiple
+                defaultValue={chore?.tags ?? []}
+                options={CHORE_TAGS.map((t) => ({ value: t.value, label: t.label }))}
+              />
+              <p className="text-base text-ink-muted">
+                Essential: Survival can&apos;t skip it. Big: only a few a day. Outdoor: for dry days. Errand: grouped onto one trip.
+              </p>
             </>
           ),
         },
@@ -100,6 +115,10 @@ export function ChoreFields({
           label: "When",
           panel: (
             <>
+              <p className="hidden text-xl text-ink-muted group-has-[input[name=kind][value=preset]:checked]:block">
+                An every-chore-day chore shows each time its chore day comes round, so it needs no schedule.
+              </p>
+              <div className="contents group-has-[input[name=kind][value=preset]:checked]:hidden">
               <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
                 <Chips
                   name="repeatFrom"
@@ -151,9 +170,10 @@ export function ChoreFields({
                 </div>
               </div>
               <p className="text-base text-ink-muted">
-                From when it was last done, a missed one never piles up. A set date keeps a steady schedule, like every other
-                Monday.
+                It goes on the last chore day on or before it&apos;s due that has room. From when it was last done, a missed one
+                never piles up. A set date keeps a steady schedule, like every other Monday.
               </p>
+              </div>
             </>
           ),
         },
@@ -236,11 +256,8 @@ export function ChoreFields({
           panel: (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Inside or outside">
-                  <Select name="location" defaultValue={chore?.location ?? "indoor"}>
-                    <option value="indoor">Inside</option>
-                    <option value="outdoor">Outside</option>
-                  </Select>
+                <Field label="At an exact time" hint="Optional. It stays on its day and shows the time.">
+                  <Input name="atTime" type="time" defaultValue={chore?.at_time ?? ""} />
                 </Field>
                 <Field label="Who can see it">
                   <Select name="visibility" defaultValue={chore?.visibility ?? "everyone"}>
@@ -269,10 +286,13 @@ export function TodoFields({
   members,
   lists,
   todo,
+  choreDays = [],
   showList = false,
 }: {
   members: ChoreMember[];
   lists?: { id: string; name: string }[];
+  /** For a one-off chore: the chore day it waits for. */
+  choreDays?: Pick<ChoreDay, "id" | "name">[];
   todo?: {
     title: string;
     icon: string | null;
@@ -284,6 +304,7 @@ export function TodoFields({
     at_time: string | null;
     lead_days: number | null;
     link: string | null;
+    chore_day_id?: string | null;
   };
   showList?: boolean;
 }) {
@@ -313,6 +334,18 @@ export function TodoFields({
       <Field label="Show it ahead (days)" hint="For one done by a day. Empty: show it all along.">
         <Input name="leadDays" type="number" min={0} max={60} defaultValue={todo?.lead_days ?? ""} />
       </Field>
+      {choreDays.length > 0 ? (
+        <Field label="Or on a chore day" hint="With no day: it waits for the next one with room.">
+          <Select name="choreDayId" defaultValue={todo?.chore_day_id ?? ""}>
+            <option value="">No</option>
+            {choreDays.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
       <Field label="Opens" hint="Optional: tapping it goes there.">
         <Select name="link" defaultValue={todo?.link ?? ""}>
           <option value="">Nothing</option>

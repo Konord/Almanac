@@ -114,7 +114,7 @@ export async function saveSetDays(draft: DaysDraft, knownBreakIds: string[]): Pr
     if (bad) return bad;
   }
   for (const b of draft.breaks) {
-    const row = { name: b.name.trim(), icon: b.icon || null, start_date: b.start, end_date: b.end };
+    const row = { name: b.name.trim(), icon: b.icon || null, start_date: b.start, end_date: b.end, away: Boolean(b.away) };
     let id = b.id;
     if (isNewId(b.id)) {
       const { data, error } = await supabase.from("breaks").insert({ ...row, household_id: household.id }).select("id").single();

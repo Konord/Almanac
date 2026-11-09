@@ -4,11 +4,11 @@ import { AppFrame, Button, Card, Notice, ScreenHeader, SoftLink, firstParam } fr
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { addChore } from "../actions";
-import { loadChores } from "../data";
+import { loadChoreDays, loadChores } from "../data";
 import { ChoreFields } from "../forms";
 
 /**
- * Adding a chore, on its own screen: what it is, when it comes back,
+ * Adding a chore, on its own screen: what it is, which chore days it goes on, when it comes back,
  * when in the year it's allowed, and the rest, on tabs so nothing scrolls.
  * Once added it runs by itself and shows in the lists on Chores.
  */
@@ -25,7 +25,11 @@ export default function AddChorePage(props: PageProps<"/chores/add">) {
 async function AddChore({ searchParams }: { searchParams: PageProps<"/chores/add">["searchParams"] }) {
   const household = await requireHousehold();
   const params = await searchParams;
-  const { members } = await loadChores(localDateOf(new Date(), household.settings.timeZone), household.settings.timeZone);
+  const [{ members }, choreDays] = await Promise.all([
+    loadChores(localDateOf(new Date(), household.settings.timeZone), household.settings.timeZone),
+    loadChoreDays(),
+  ]);
+  const kind = firstParam(params.kind) === "preset" ? "preset" : "generated";
   const error = firstParam(params.error);
   const message = firstParam(params.message);
 
@@ -48,7 +52,7 @@ async function AddChore({ searchParams }: { searchParams: PageProps<"/chores/add
           <input type="hidden" name="returnTo" value="/chores/add" />
           <input type="hidden" name="doneTo" value="/chores" />
           <div className="flex min-h-0 flex-1 flex-col">
-            <ChoreFields members={members} />
+            <ChoreFields members={members} choreDays={choreDays} kind={kind} />
           </div>
           <div className="flex shrink-0 flex-wrap gap-3">
             <Button>Add chore</Button>

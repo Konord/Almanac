@@ -21,6 +21,8 @@ export type Break = {
   icon: string | null;
   start_date: string;
   end_date: string;
+  /** Away from home (no chores). */
+  away?: boolean;
   people: { member_id: string; day_type_id: string | null; week_plan_id: string | null }[];
 };
 export type WeekSettings = { id: string; current_week_plan_id: string | null; week_plans_rotate: boolean; rotation_start: string | null };

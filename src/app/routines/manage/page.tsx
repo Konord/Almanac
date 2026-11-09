@@ -63,6 +63,7 @@ async function Days({ searchParams }: { searchParams: PageProps<"/routines/manag
       icon: b.icon,
       start: b.start_date,
       end: b.end_date,
+      away: b.away ?? false,
       people: data.members.flatMap((m) => b.people.filter((p) => p.member_id === m.id)),
     })),
   };

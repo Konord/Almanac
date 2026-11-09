@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Button, Emoji } from "@/components/ui";
-import { IMPORTANCE_LABEL } from "@/lib/chores";
-import type { ChoreWithTiming } from "./chores/data";
+import type { Todo } from "./chores/data";
 import { survivalRescue } from "./meals/actions";
 import { readyCount, type BackupPart, type MealBasics } from "./meals/data";
 import { Modal } from "./meals/parts";
@@ -10,10 +9,10 @@ import type { TodayMeal } from "./meals/today";
 /*
  * The Survival card, opened by the Survival button on Today. It offers two
  * things in one go: swap the meals still to cook for backup meals, and skip
- * the chores that are due. Routines and to-dos are left alone.
+ * today's chores. Routines and other tasks are left alone.
  *
- * It suggests (the next meal gets the readiest backup, chores are ticked
- * unless they're important) and nothing happens until you press "Do it".
+ * It suggests (the next meal gets the readiest backup, chores are ticked;
+ * Essential ones can't be skipped) and nothing happens until you press "Do it".
  */
 
 /** How many meals the card offers to swap (the rest stay as planned). */
@@ -34,8 +33,8 @@ export function SurvivalCard({
   meals: TodayMeal[];
   basics: MealBasics;
   parts: BackupPart[];
-  /** Chores due today. */
-  chores: ChoreWithTiming[];
+  /** Today's chores on the daily list. */
+  chores: Todo[];
   closeHref: string;
 }) {
   // Backup meals, the ones you could make right now first.
@@ -109,17 +108,21 @@ export function SurvivalCard({
           <section className="flex min-h-0 flex-col">
             <h3 className={heading}>Skip today&apos;s chores?</h3>
             {shownChores.length === 0 ? (
-              <p className="text-xl text-ink-muted">No chores due today.</p>
+              <p className="text-xl text-ink-muted">No chores on today&apos;s list.</p>
             ) : (
               <ul className="flex flex-col">
                 {shownChores.map((c) => (
                   <li key={c.id} className="border-b border-panel last:border-0">
                     <label className="flex min-h-16 cursor-pointer items-center gap-3.5 py-1">
-                      <input type="checkbox" name="skip" value={c.id} defaultChecked={c.importance !== "high"} className="size-7 shrink-0 accent-[var(--color-ink)]" />
+                      {c.must_do ? (
+                        <span className="size-7 shrink-0" aria-hidden />
+                      ) : (
+                        <input type="checkbox" name="skip" value={c.template_id ?? ""} defaultChecked className="size-7 shrink-0 accent-[var(--color-ink)]" />
+                      )}
                       <Emoji emoji={c.icon ?? "🧹"} className="size-10" />
-                      <span className="min-w-0 flex-1 truncate text-xl font-semibold text-ink">{c.name}</span>
-                      {c.importance === "high" ? (
-                        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">{IMPORTANCE_LABEL.high}</span>
+                      <span className="min-w-0 flex-1 truncate text-xl font-semibold text-ink">{c.title}</span>
+                      {c.must_do ? (
+                        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Essential: stays</span>
                       ) : null}
                     </label>
                   </li>
@@ -140,7 +143,7 @@ export function SurvivalCard({
 
         <div className="flex shrink-0 items-center gap-5 border-t border-frame pt-4">
           <Button className="px-8 text-xl">Do it</Button>
-          <p className="text-lg text-ink-muted">Skipped chores come back next time. Routines and to-dos stay as they are.</p>
+          <p className="text-lg text-ink-muted">Skipped chores find another day. Routines and other tasks stay as they are.</p>
         </div>
       </form>
     </Modal>
