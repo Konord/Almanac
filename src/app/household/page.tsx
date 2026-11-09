@@ -125,6 +125,18 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               <option value="calendar">The calendar month</option>
             </Select>
           </Field>
+          <Field label="Weekly review on" hint="A reminder shows on the Agenda from then until the next week is confirmed.">
+            <Select name="reviewWeekday" defaultValue={String(settings.weeklyReview.weekday)}>
+              {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
+                <option key={day} value={i}>
+                  {day}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Weekly review at">
+            <Input name="reviewTime" type="time" defaultValue={settings.weeklyReview.time} required />
+          </Field>
           <Field label="Currency">
             <Input name="currency" defaultValue={settings.currency} required maxLength={3} />
           </Field>

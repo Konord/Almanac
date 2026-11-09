@@ -127,18 +127,44 @@ isOneToOne: false
                   ]
                 },"breaks": {
                   Row: {
-                    "away": boolean,"created_at": string,"end_date": string,"household_id": string,"icon": string | null,"id": string,"name": string,"start_date": string,"updated_at": string
+                    "away": boolean,"created_at": string,"end_date": string,"from_review": boolean,"household_id": string,"icon": string | null,"id": string,"name": string,"start_date": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "away"?: boolean,"created_at"?: string,"end_date": string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"start_date": string,"updated_at"?: string
+                    "away"?: boolean,"created_at"?: string,"end_date": string,"from_review"?: boolean,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"start_date": string,"updated_at"?: string
                   }
                   Update: {
-                    "away"?: boolean,"created_at"?: string,"end_date"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"start_date"?: string,"updated_at"?: string
+                    "away"?: boolean,"created_at"?: string,"end_date"?: string,"from_review"?: boolean,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"start_date"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
       foreignKeyName: "breaks_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"chore_day_moves": {
+                  Row: {
+                    "chore_day_id": string,"created_at": string,"date": string,"household_id": string,"id": string,"on": boolean
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chore_day_id": string,"created_at"?: string,"date": string,"household_id": string,"id"?: string,"on": boolean
+                  }
+                  Update: {
+                    "chore_day_id"?: string,"created_at"?: string,"date"?: string,"household_id"?: string,"id"?: string,"on"?: boolean
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "chore_day_moves_chore_day_id_household_id_fkey"
+      columns: ["chore_day_id","household_id"]
+isOneToOne: false
+      referencedRelation: "chore_days"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "chore_day_moves_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
       referencedRelation: "households"
@@ -1371,6 +1397,26 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "items"
       referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"weekly_reviews": {
+                  Row: {
+                    "dismissed": (string)[],"household_id": string,"reviewed_at": string,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "dismissed"?: (string)[],"household_id": string,"reviewed_at"?: string,"week_start": string
+                  }
+                  Update: {
+                    "dismissed"?: (string)[],"household_id"?: string,"reviewed_at"?: string,"week_start"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "weekly_reviews_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
     }
                   ]
                 }

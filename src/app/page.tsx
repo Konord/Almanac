@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
+import { CalendarCheck, Plus, SunHorizon, X } from "@phosphor-icons/react/dist/ssr";
 import {
   AppFrame,
   Avatar,
@@ -37,6 +37,7 @@ import { layoutSpans, memberRuns, spanBox } from "@/lib/calendar-layout";
 import type { QuickDefaults } from "./calendar/forms";
 import { syncEventAndChoreHeadsUps } from "./heads-ups/sync";
 import { choreSchedule } from "./chores/plan";
+import { reviewReminder } from "./review/data";
 import {
   EventBlock,
   EventPoint,
@@ -83,13 +84,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   // The chore generator puts today's chores on the daily list before the tasks are read.
   await choreSchedule(household, today, timeZone);
-  const [{ layers, members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, energyMode] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, energyMode, reviewNow] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, today),
     energyModeOn(today),
+    reviewReminder(household, today, now),
   ]);
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
@@ -170,6 +172,15 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
               <span className="truncate">{b.name}</span>
             </Link>
           ))}
+        {reviewNow ? (
+          <Link
+            href="/review"
+            className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-[color-mix(in_srgb,var(--color-accent)_12%,white)] px-4 text-base font-bold text-accent"
+          >
+            <CalendarCheck size="1.5rem" weight="bold" aria-hidden />
+            Weekly review
+          </Link>
+        ) : null}
         <SurvivalButton used={energyMode === "survival"} href="/?survival=1" />
         <div className="lg:ml-auto">
           <Segmented

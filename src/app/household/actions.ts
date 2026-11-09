@@ -128,6 +128,12 @@ export async function saveSettings(formData: FormData) {
   if (!isTimeZone(timeZone)) back("error", `"${timeZone}" isn't a time zone I recognise.`);
   if (!/^[A-Z]{3}$/.test(currency)) back("error", "Currency should be a 3-letter code like CAD.");
 
+  const reviewWeekday = Number(text(formData, "reviewWeekday"));
+  const reviewTime = text(formData, "reviewTime");
+  if (!(Number.isInteger(reviewWeekday) && reviewWeekday >= 0 && reviewWeekday <= 6) || !isLocalTime(reviewTime)) {
+    back("error", "Pick a day and a time for the weekly review.");
+  }
+
   const dayStarts = text(formData, "dayStarts");
   const eveningStarts = text(formData, "eveningStarts");
   const dayEnds = text(formData, "dayEnds");
@@ -159,6 +165,7 @@ export async function saveSettings(formData: FormData) {
     temperatureUnit,
     handwriting: formData.get("handwriting") === "on",
     dayProfile,
+    weeklyReview: { weekday: reviewWeekday, time: reviewTime },
   };
 
   const supabase = await createClient();

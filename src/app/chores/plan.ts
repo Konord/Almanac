@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { placeable, planChoreDays, stretchStart, type ChoreDay, type ChorePlan } from "@/lib/chore-days";
+import { placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
 import type { Household } from "@/lib/household";
 import { addDays, type LocalDate } from "@/lib/time";
 import { loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
@@ -46,14 +46,23 @@ async function loadAway(today: LocalDate, last: LocalDate): Promise<Set<LocalDat
   return away;
 }
 
+/** Chore days moved on single dates (by the weekly review) between two dates. */
+export async function loadChoreDayMoves(from: LocalDate, to: LocalDate): Promise<ChoreDayMove[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("chore_day_moves").select("chore_day_id, date, on").gte("date", from).lte("date", to);
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Plans the chores and makes today's into tasks. `sync: false` only plans (for screens that don't show the daily list). */
 export async function choreSchedule(household: Household, today: LocalDate, timeZone: string, sync = true): Promise<ChoreSchedule> {
   const supabase = await createClient();
   const last = addDays(today, 13);
-  const [{ chores, rounds, members }, choreDays, away, tasks] = await Promise.all([
+  const [{ chores, rounds, members }, choreDays, away, moves, tasks] = await Promise.all([
     loadChores(today, timeZone),
     loadChoreDays(),
     loadAway(today, last),
+    loadChoreDayMoves(addDays(today, -6), last),
     supabase
       .from("task_instances")
       .select("id, template_id, chore_day_id, status, due_date, list_id")
@@ -91,6 +100,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     today,
     away,
     keptToday,
+    moves,
   });
 
   const hard = new Set(plan.unplaced);
@@ -104,6 +114,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
       plan,
       tasks.data,
       oneOffs.map((t) => t.id),
+      moves,
     );
   return { chores, rounds, members, choreDays, plan, hard };
 }
@@ -123,6 +134,7 @@ async function makeToday(
   plan: ChorePlan,
   tasks: TaskRow[],
   oneOffIds: string[],
+  moves: ChoreDayMove[],
 ) {
   const supabase = await createClient();
   const fail = (error: { code?: string } | null) => {
@@ -137,7 +149,7 @@ async function makeToday(
   for (const id of day.presets) {
     const chore = byId.get(id);
     const cd = day.choreDays.find((d) => chore?.chore_day_ids.includes(d.id));
-    if (chore && cd) wanted.set(id, stretchStart(cd, today));
+    if (chore && cd) wanted.set(id, stretchStart(cd, today, moves));
   }
   for (const item of day.items) if (item.kind === "generated") wanted.set(item.id, today);
   // A preset done (or skipped) earlier in its stretch isn't made again.

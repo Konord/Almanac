@@ -27,6 +27,8 @@ export type HouseholdSettings = {
   defaultEventMinutes: number;
   /** How far a routine may move to get around an event (unless it's loose). */
   routineFlexMinutes: number;
+  /** When the weekly review is due: a weekday (0 = Sunday) and a time. */
+  weeklyReview: { weekday: number; time: string };
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   dayProfile: DEFAULT_DAY_PROFILE,
   defaultEventMinutes: 60,
   routineFlexMinutes: 60,
+  weeklyReview: { weekday: 6, time: "09:00" },
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -67,6 +70,11 @@ export function parseSettings(raw: Json): HouseholdSettings {
     dayProfile: parseDayProfile(value.dayProfile),
     defaultEventMinutes: pick("defaultEventMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 5 && v <= 24 * 60),
     routineFlexMinutes: pick("routineFlexMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 6 * 60),
+    weeklyReview: pick("weeklyReview", (v) => {
+      if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
+      const r = v as { weekday?: unknown; time?: unknown };
+      return typeof r.weekday === "number" && Number.isInteger(r.weekday) && r.weekday >= 0 && r.weekday <= 6 && typeof r.time === "string" && isLocalTime(r.time);
+    }),
   };
 }
 
