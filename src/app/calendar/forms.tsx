@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Chips, Emoji, Field, Input, Select } from "@/components/ui";
 import { PERSON_COLOURS } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
-import { ENERGY_OPTIONS, VISIBILITY_OPTIONS } from "./options";
+import { VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import { CardTabs, LengthControl } from "./quick-controls";
 import { PendingSync } from "./pending-sync";
@@ -149,7 +149,6 @@ export type CardDefaults = QuickDefaults & {
   icon?: string;
   notes?: string;
   layerId?: string;
-  energyCost?: number;
   visibility?: string;
   repeat?: RepeatOptions;
   /** Last day, for all-day events over several days. */
@@ -218,7 +217,7 @@ export function EventCardFields({
                 </div>
                 <div className="flex items-end gap-3">
                   <div className="min-w-0 flex-1 group-has-[input[name=allDay]:checked]:invisible">
-                    <LengthControl initial={defaults.minutes} />
+                    <LengthControl initial={defaults.minutes} allowPoint />
                   </div>
                   <label className="flex min-h-[var(--touch-target)] shrink-0 cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
                     <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-5 accent-ink" />
@@ -264,12 +263,6 @@ export function EventCardFields({
                 <Field label="Notes">
                   <Input name="notes" maxLength={2000} defaultValue={defaults.notes} />
                 </Field>
-                <Chips
-                  name="energyCost"
-                  label="Energy cost"
-                  defaultValue={String(defaults.energyCost ?? 1)}
-                  options={ENERGY_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))}
-                />
                 <Chips name="visibility" label="Who can see it" defaultValue={defaults.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
               </>
             ),

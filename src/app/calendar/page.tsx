@@ -174,7 +174,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           <Segmented
             label="How much to show"
             options={[
-              { href: "/", label: "Day", active: false },
+              { href: "/", label: "Agenda", active: false },
               { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
               { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
             ]}
@@ -511,7 +511,6 @@ function EditEventPanel({
             minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
             memberIds: event.member_ids,
             tagIds: event.tag_ids,
-            energyCost: event.energy_cost,
             visibility: event.visibility,
             notes: event.notes ?? "",
             icon: event.icon ?? "",

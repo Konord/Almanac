@@ -347,6 +347,22 @@ export async function toggleTodo(formData: FormData) {
   redirect(returnPath(formData));
 }
 
+/** "Do today": a list task with no date goes on today's daily list. */
+export async function doToday(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("task_instances")
+    .update({ due_date: localDateOf(new Date(), household.settings.timeZone), date_kind: "start", at_time: null, lead_days: null })
+    .eq("id", id)
+    .eq("status", "open")
+    .is("due_date", null);
+  if (error) back(formData, "error", error.message);
+  refresh();
+  redirect(returnPath(formData));
+}
+
 export async function removeTodo(formData: FormData) {
   const household = await requireHousehold();
   const id = text(formData, "id");

@@ -32,12 +32,12 @@ export async function setPanelOpen(formData: FormData) {
   back(formData);
 }
 
-/** Shows "Up next" or one list in the working part of the panel. */
+/** Shows "Up next", the daily list ("today") or one list in the working part of the panel. */
 export async function pickPanelTab(formData: FormData) {
   await requireHousehold();
   const tab = String(formData.get("tab") ?? "");
   const store = await cookies();
-  if (/^(upnext|[0-9a-f-]{36})$/.test(tab)) {
+  if (/^(upnext|today|[0-9a-f-]{36})$/.test(tab)) {
     store.set(PANEL_TAB_COOKIE, tab, {
       path: "/",
       maxAge: YEAR,

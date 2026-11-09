@@ -86,6 +86,14 @@ export function isAllDayStyle(event: CalendarItem, timeZone: string): boolean {
   );
 }
 
+/**
+ * A point event: a time with no length ("Homework due 9am"). It shows as a
+ * dot with a time, never makes anyone busy and never pushes routines.
+ */
+export function isPointEvent(event: Pick<CalendarItem, "all_day" | "starts_at" | "ends_at">): boolean {
+  return !event.all_day && new Date(event.starts_at).getTime() === new Date(event.ends_at).getTime();
+}
+
 export function minutesIntoDay(instant: Date, timeZone: string): number {
   const [h, m] = localTimeOf(instant, timeZone).split(":").map(Number);
   return h * 60 + m;
@@ -105,6 +113,7 @@ export function shortTime(instant: Date, household: Household): string {
 
 /** "9:30–12" style range, dropping the am/pm the way a wall calendar would. */
 export function timeRange(event: CalendarItem, household: Household): string {
+  if (isPointEvent(event)) return shortTime(new Date(event.starts_at), household);
   const strip = (t: string) => t.replace(/[ap]$/, "");
   return `${strip(shortTime(new Date(event.starts_at), household))}–${strip(shortTime(new Date(event.ends_at), household))}`;
 }
@@ -305,7 +314,9 @@ export function DayBlocks({
   colourFor?: (e: CalendarItem) => string;
 }) {
   const { timeZone } = household.settings;
-  const dayEvents = eventsOnDay(events, day, timeZone).filter((e) => !isAllDayStyle(e, timeZone));
+  const onDay = eventsOnDay(events, day, timeZone).filter((e) => !isAllDayStyle(e, timeZone));
+  const dayEvents = onDay.filter((e) => !isPointEvent(e));
+  const points = onDay.filter(isPointEvent);
   const byId = new Map(dayEvents.map((e) => [e.id, e]));
   const placed = layoutDay(
     dayEvents.map((e) => ({
@@ -345,7 +356,60 @@ export function DayBlocks({
           />
         );
       })}
+      {points.map((event) => {
+        const minute = minutesIntoDay(new Date(event.starts_at), timeZone);
+        if (minute < first * 60 || minute > last * 60) return null;
+        return (
+          <EventPoint
+            key={event.id}
+            event={event}
+            colour={colourFor ? colourFor(event) : eventColour(event, memberById)}
+            household={household}
+            href={linkFor(event)}
+            top={((minute - first * 60) / span) * 100}
+            box={{ left: "4px", width: "calc(100% - 8px)" }}
+            big={big}
+          />
+        );
+      })}
     </>
+  );
+}
+
+/** A point event on a timeline: a dot on the line at its time, its picture and title beside it. */
+export function EventPoint({
+  event,
+  colour,
+  household,
+  href,
+  top,
+  box,
+  big = false,
+}: {
+  event: CalendarItem;
+  colour: string;
+  household: Household;
+  href: string;
+  /** Where its time sits, as a percentage down the timeline. */
+  top: number;
+  box: { left: string; width: string };
+  big?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      title={`${event.title}, ${shortTime(new Date(event.starts_at), household)}`}
+      className={`pointer-events-auto absolute z-[2] flex -translate-y-1/2 items-center gap-1.5 overflow-hidden ${big ? "h-9" : "h-7"}`}
+      style={{ top: `${top}%`, ...box }}
+    >
+      <span className="size-3.5 shrink-0 rounded-full" style={{ background: strong(colour) }} aria-hidden />
+      <span className={`flex min-w-0 items-center gap-1.5 rounded-lg bg-board/90 px-1.5 font-bold text-ink ${big ? "text-lg" : "text-sm"}`}>
+        <Emoji emoji={eventEmoji(event.icon, event.title)} className={big ? "size-7" : "size-5"} />
+        <span className="min-w-0 truncate">{event.title}</span>
+        <span className="shrink-0 font-semibold text-ink-soft">{shortTime(new Date(event.starts_at), household)}</span>
+      </span>
+    </Link>
   );
 }
 

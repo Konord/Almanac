@@ -44,6 +44,33 @@ export function sortForToday<T extends TodoTiming>(todos: T[], today: LocalDate)
   );
 }
 
+/*
+ * The daily list (tasks rework, 2026-11-09): today's tasks on the Today
+ * panel. A list task with no date stays on its list until someone taps
+ * "Do today"; anything with a date shows here when its time comes.
+ */
+
+/** Whether a task belongs on today's daily list. */
+export function onDailyList<T extends TodoTiming>(todo: T, today: LocalDate): boolean {
+  return todo.due_date !== null && showsOn(todo, today);
+}
+
+/** True for a task with a time today (it shows the time beside it). */
+export function timedToday(todo: Pick<TodoTiming, "due_date" | "at_time">, today: LocalDate): boolean {
+  return todo.due_date === today && todo.at_time !== null;
+}
+
+/** The daily list's order: timed tasks by time, then must-dos, carried over, today's, then the rest by date. */
+export function dailyOrder<T extends TodoTiming>(todos: T[], today: LocalDate): T[] {
+  const rank = (t: T) => (timedToday(t, today) ? 0 : t.must_do ? 1 : carriedOver(t, today) ? 2 : t.due_date === today ? 3 : 4);
+  return todos.toSorted(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      (rank(a) === 0 ? (a.at_time ?? "").localeCompare(b.at_time ?? "") : 0) ||
+      (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"),
+  );
+}
+
 /** The parts of the app a to-do can open. */
 export const FEATURE_LINKS = [
   { path: "/meals", label: "Meal planner" },

@@ -42,7 +42,9 @@ import type { BlockDay } from "@/lib/chore-blocks";
 import { toMinutes } from "@/lib/routine-placement";
 import {
   EventBlock,
+  EventPoint,
   HourLines,
+  isPointEvent,
   minutesIntoDay,
   NowLine,
   eventsOnDay,
@@ -57,8 +59,9 @@ import {
 const COLUMN_GAP = "0.625rem";
 
 /**
- * The Today screen (the Day view): the Today panel on the left showing
- * lists, and a timeline with a column per person filling the rest.
+ * The Agenda view (was the Day view): the Today panel on the left with the
+ * daily list, and a timeline of today with a column per person filling the
+ * rest: events, routines, timed tasks and point events.
  */
 export default function Home(props: PageProps<"/">) {
   return (
@@ -123,7 +126,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         .sort((a, b) => a.startMin - b.startMin)
     : [];
 
-  // The Today panel on the left (lists only here: the timeline already shows today).
+  // The Today panel on the left (no Up next here: the timeline already shows today).
   const panelPrefs = await readPanelPrefs();
 
   return (
@@ -156,7 +159,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         <OpenPanelTab returnTo="/" />
       )}
       <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
-      <ScreenHeader title={panelPrefs.open ? "Today" : longDate}>
+      <ScreenHeader title={panelPrefs.open ? "Agenda" : longDate}>
         {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
         {todayProfile ? (
           <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
@@ -180,7 +183,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           <Segmented
             label="How much to show"
             options={[
-              { href: "/", label: "Day", active: true },
+              { href: "/", label: "Agenda", active: true },
               {
                 href: `/calendar?view=week&date=${today}`,
                 label: "Week",
@@ -285,7 +288,9 @@ function PeopleTimeline({
   timedTodos: Todo[];
 }) {
   const { timeZone } = household.settings;
-  const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
+  // Point events (a time, no length) are dots: they don't make anyone busy or push routines.
+  const points = items.filter((e) => !isAllDayStyle(e, timeZone) && isPointEvent(e));
+  const timed = items.filter((e) => !isAllDayStyle(e, timeZone) && !isPointEvent(e));
   const memberIds = new Set(members.map((m) => m.id));
   const forEveryone = timed.filter((e) => !e.member_ids.some((id) => memberIds.has(id)));
   // Meals move around the plans of the people eating them.
@@ -498,6 +503,23 @@ function PeopleTimeline({
                   />
                 </div>
               );
+            })}
+            {points.flatMap((e) => {
+              const minute = minutesIntoDay(new Date(e.starts_at), timeZone);
+              if (minute < first * 60 || minute > last * 60) return [];
+              const runs = memberRuns(e.member_ids, columnIds);
+              return runs.map(([c0, c1]) => (
+                <EventPoint
+                  key={`${e.id}|${c0}`}
+                  event={e}
+                  colour={colourOf.get(columnIds[c0]) ?? EVERYONE_COLOUR}
+                  household={household}
+                  href={editLink(e)}
+                  top={((minute - first * 60) / span) * 100}
+                  box={spanBox(c0, c1, columns.length, COLUMN_GAP)}
+                  big
+                />
+              ));
             })}
             {timedTodos.map((t) => {
               const minute = Number(t.at_time!.slice(0, 2)) * 60 + Number(t.at_time!.slice(3, 5));

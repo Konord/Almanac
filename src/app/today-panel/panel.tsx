@@ -10,7 +10,9 @@ import { Emoji } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
+import { createClient } from "@/lib/supabase/server";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { dailyOrder, onDailyList, timedToday } from "@/lib/todos";
 import { toggleTodo } from "../chores/actions";
 import { loadTodos } from "../chores/data";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
@@ -20,9 +22,12 @@ import { pickPanelTab, setPanelOpen } from "./actions";
  * The Today panel: a column on the left of the calendar with three parts.
  *
  * 1. The top never changes: the day, the big date, the weather and the clock.
- * 2. The working part shows "Up next" or one of the to-do lists. Chips switch
- *    between them, and the screen remembers the last one picked. (Later steps
- *    let a routine or a chore block take this part over for a while.)
+ * 2. The working part shows the daily list, "Up next" or one of the lists.
+ *    Chips switch between them, and the screen remembers the last one picked.
+ *    The daily list is today's tasks from every list: chores, heads-ups and
+ *    list tasks for today (tasks rework, 2026-11-09). Timed ones come first,
+ *    with the time beside them; a task for one person is in their colour.
+ *    A routine's checklist can take this part over for a while.
  * 3. The bottom box shows the next meal. (Spotify comes later.)
  *
  * The panel can be closed, leaving the calendar the whole width. Each screen
@@ -40,7 +45,7 @@ export type UpNextItem = {
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
-/** How many list chips fit beside "Up next". */
+/** How many list chips fit beside "Today" (and "Up next", which needs one of their places). */
 const LIST_CHIPS = 3;
 
 export async function TodayPanel({
@@ -60,28 +65,38 @@ export async function TodayPanel({
   tab: string;
   /** This page's address, to come back to after a tap. */
   returnTo: string;
-  /** On the Day view the timeline already shows today, so the panel shows lists only. */
+  /** On the Agenda view the timeline already shows today, so the panel has no "Up next". */
   day?: boolean;
   /** A routine's checklist (from tapping its block), shown instead of the list. */
   routine?: ReactNode;
 }) {
   const { locale, timeZone } = household.settings;
-  const [{ lists, todos }, basics, meals] = await Promise.all([
+  const supabase = await createClient();
+  const [{ lists, todos }, basics, meals, { data: memberRows }] = await Promise.all([
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, addDays(today, 1)),
+    supabase.from("members").select("id, colour"),
   ]);
+  const colourOf = new Map((memberRows ?? []).map((m) => [m.id, m.colour]));
 
-  // The tab, if its list still exists; otherwise Up next.
-  const list = lists.find((l) => l.id === tab) ?? (day ? lists[0] : undefined);
-  const showing = list ? list.id : "upnext";
+  // The tab, if its list still exists; Up next where it's offered; otherwise the daily list.
+  const list = lists.find((l) => l.id === tab);
+  const showing = list ? list.id : tab === "upnext" && !day ? "upnext" : "today";
   // The first few lists get chips, always including the one showing.
-  const chipLists = lists.slice(0, LIST_CHIPS);
-  if (list && !chipLists.includes(list)) chipLists[LIST_CHIPS - 1] = list;
+  const chipCount = day ? LIST_CHIPS : LIST_CHIPS - 1;
+  const chipLists = lists.slice(0, chipCount);
+  if (list && !chipLists.includes(list)) chipLists[chipCount - 1] = list;
 
-  const open = list
-    ? todos.filter((t) => t.list_id === list.id && t.status === "open")
-    : [];
+  const open =
+    showing === "today"
+      ? dailyOrder(
+          todos.filter((t) => t.status === "open" && onDailyList(t, today)),
+          today,
+        )
+      : list
+        ? todos.filter((t) => t.list_id === list.id && t.status === "open")
+        : [];
 
   // The next meal: today's still to come (or under way), else tomorrow's first.
   const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
@@ -119,6 +134,11 @@ export async function TodayPanel({
         .format(zonedToUtc(nextMeal.meal.date, nextMeal.at, timeZone))
         .replace(":00", "")
     : "";
+
+  const taskTime = (time: string) =>
+    new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" })
+      .format(zonedToUtc(today, time.slice(0, 5), timeZone))
+      .replace(":00", "");
 
   const tabButton = (value: string, label: string) => (
     <form key={value} action={pickPanelTab}>
@@ -162,7 +182,7 @@ export async function TodayPanel({
         </span>
       </div>
 
-      {/* 2. The working part: Up next or a list. */}
+      {/* 2. The working part: the daily list, Up next or a list. */}
       {routine ? (
         <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">{routine}</div>
       ) : (
@@ -171,6 +191,7 @@ export async function TodayPanel({
         aria-label="What the panel shows"
         className="mt-6 flex flex-wrap gap-2"
       >
+        {tabButton("today", "Today")}
         {day ? null : tabButton("upnext", "Up next")}
         {chipLists.map((l) => tabButton(l.id, l.name))}
       </nav>
@@ -209,7 +230,9 @@ export async function TodayPanel({
             </ul>
           )
         ) : open.length === 0 ? (
-          <p className="py-3 text-lg text-ink-muted">Nothing on this list.</p>
+          <p className="py-3 text-lg text-ink-muted">
+            {showing === "today" ? "Nothing on today's list." : "Nothing on this list."}
+          </p>
         ) : (
           <ul className="flex flex-col">
             {open.slice(0, ROWS).map((todo) => (
@@ -232,9 +255,21 @@ export async function TodayPanel({
                 {todo.icon ? (
                   <Emoji emoji={todo.icon} className="size-8" />
                 ) : null}
-                <span className="line-clamp-2 min-w-0 flex-1 font-hand text-2xl leading-[1.1] break-words text-ink">
+                <span
+                  className="line-clamp-2 min-w-0 flex-1 font-hand text-2xl leading-[1.1] break-words text-ink"
+                  style={todo.assignee_id && colourOf.has(todo.assignee_id) ? { color: strong(colourOf.get(todo.assignee_id)!) } : undefined}
+                >
                   {todo.title}
                 </span>
+                {todo.at_time && timedToday(todo, today) ? (
+                  <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">
+                    {taskTime(todo.at_time)}
+                  </span>
+                ) : todo.must_do ? (
+                  <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">
+                    Must do
+                  </span>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -242,7 +277,7 @@ export async function TodayPanel({
         {(() => {
           const extra =
             showing === "upnext" ? upNext.length - ROWS : open.length - ROWS;
-          const href = showing === "upnext" ? "/" : `/lists?list=${showing}`;
+          const href = showing === "upnext" ? "/" : showing === "today" ? "/lists" : `/lists?list=${showing}`;
           return (
             <Link
               href={href}
@@ -251,8 +286,10 @@ export async function TodayPanel({
               {extra > 0
                 ? `+${extra} more`
                 : showing === "upnext"
-                  ? "Open today"
-                  : "Open the list"}
+                  ? "Open the agenda"
+                  : showing === "today"
+                    ? "Open the lists"
+                    : "Open the list"}
             </Link>
           );
         })()}

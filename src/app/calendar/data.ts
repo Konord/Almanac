@@ -11,7 +11,7 @@ import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedVi
  */
 
 export const EVENT_COLUMNS =
-  "id, title, layer_id, starts_at, ends_at, all_day, energy_cost, visibility, notes, timezone, recurrence_rule, icon, event_members(member_id), event_tags(tag_id)";
+  "id, title, layer_id, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, event_members(member_id), event_tags(tag_id)";
 
 type EventRow = Omit<CalendarEvent, "member_ids" | "tag_ids"> & {
   event_members: { member_id: string }[];

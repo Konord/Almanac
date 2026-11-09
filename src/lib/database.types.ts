@@ -393,14 +393,14 @@ isOneToOne: false
                   ]
                 },"events": {
                   Row: {
-                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"energy_cost": number,"household_id": string,"icon": string | null,"id": string,"layer_id": string,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
+                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"household_id": string,"icon": string | null,"id": string,"layer_id": string,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"energy_cost"?: number,"household_id": string,"icon"?: string | null,"id"?: string,"layer_id": string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"household_id": string,"icon"?: string | null,"id"?: string,"layer_id": string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
                   }
                   Update: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"energy_cost"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"layer_id"?: string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"layer_id"?: string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
