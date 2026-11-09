@@ -396,7 +396,10 @@ export async function TodayPanel({
                     <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">{row.count}</span>
                   ) : null}
                   {row.time ? (
-                    <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">{taskTime(row.time)}</span>
+                    <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">
+                      {row.kind === "todo" && row.todo.date_kind === "due" ? "by " : ""}
+                      {taskTime(row.time)}
+                    </span>
                   ) : row.kind === "todo" && row.todo.must_do ? (
                     <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
                   ) : null}
