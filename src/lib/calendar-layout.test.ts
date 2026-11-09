@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addMonths, dayOfWeek, fiveRowMonth, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
+import { addMonths, dayOfWeek, fiveRowMonth, layoutBars, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
 
 test("finds the day of the week", () => {
   assert.equal(dayOfWeek("2026-11-04"), 3); // Wednesday
@@ -92,4 +92,24 @@ test("spanning blocks share lanes only where they meet", () => {
   assert.equal(by.karate.lanes, 2);
   assert.equal(by.dentist.lanes, 2);
   assert.notEqual(by.karate.lane, by.dentist.lane);
+});
+
+test("bars over several days stack so they never overlap", () => {
+  const { placed, hidden } = layoutBars(
+    [
+      { id: "trip", first: 3, last: 6 },
+      { id: "dentist", first: 4, last: 4 },
+      { id: "camp", first: 0, last: 2 },
+      { id: "party", first: 4, last: 4 },
+    ],
+    7,
+    2,
+  );
+  const lane = Object.fromEntries(placed.map((b) => [b.id, b.lane]));
+  assert.equal(lane.camp, 0);
+  assert.equal(lane.trip, 0);
+  assert.equal(lane.dentist, 1);
+  // The third thing on Thursday doesn't fit, so Thursday shows "+1".
+  assert.equal(lane.party, undefined);
+  assert.deepEqual(hidden, [0, 0, 0, 0, 1, 0, 0]);
 });

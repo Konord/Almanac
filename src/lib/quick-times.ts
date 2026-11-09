@@ -40,8 +40,15 @@ function fromMinutes(total: number): LocalTime {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
-/** "1 h 30" style label for a length in minutes. */
+/** "1 h 30" (or "2 days 3 h") style label for a length in minutes. */
 export function lengthLabel(minutes: number): string {
+  // Several days: "2 days 3 h".
+  if (minutes >= 24 * 60) {
+    const days = Math.floor(minutes / (24 * 60));
+    const rest = minutes % (24 * 60);
+    const dayPart = days === 1 ? "1 day" : `${days} days`;
+    return rest === 0 ? dayPart : `${dayPart} ${lengthLabel(rest)}`;
+  }
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m} min`;

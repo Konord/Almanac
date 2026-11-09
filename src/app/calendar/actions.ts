@@ -22,7 +22,7 @@ import { VIEW_COOKIE } from "./data";
 function back(formData: FormData, kind: "error" | "message", text: string): never {
   const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
   const params = new URLSearchParams();
-  for (const key of ["view", "date", "panel"]) {
+  for (const key of ["view", "date", "panel", "tpl"]) {
     const value = from.get(key);
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
@@ -135,7 +135,7 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     endDate: endDateInput,
     startTime: text(formData, "startTime"),
     endTime: text(formData, "endTime"),
-    // The quick-add card sends a length; the full form uses the usual length.
+    // The card sends the end; with no end, the length it sends (or the usual length).
     defaultMinutes: readMinutes(formData) ?? settings.defaultEventMinutes,
   });
   if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
@@ -258,7 +258,10 @@ export async function addEvent(formData: FormData) {
       title: event.title,
       icon: event.icon,
       start_time: !event.all_day && isLocalTime(startTime) ? startTime : null,
-      minutes: readMinutes(formData) ?? household.settings.defaultEventMinutes,
+      // Templates hold up to a day's length; 0 is a point.
+      minutes: event.all_day
+        ? household.settings.defaultEventMinutes
+        : Math.min(Math.round((Date.parse(event.ends_at) - Date.parse(event.starts_at)) / 60_000), 24 * 60),
       all_day: event.all_day,
       member_ids: readIds(formData, "memberIds"),
       tag_ids: readIds(formData, "tagIds"),
@@ -596,4 +599,38 @@ export async function removeTemplate(formData: FormData) {
   await log(household.id, "template_removed", "event_template", id, name);
   revalidatePath("/calendar");
   back(formData, "message", `Removed the ${name} template.`);
+}
+
+/** Saves the template card: name, picture, usual start and length, people, tags and notes. */
+export async function updateTemplate(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const title = text(formData, "title");
+  const icon = text(formData, "icon");
+  const startTime = text(formData, "startTime");
+  const allDay = formData.get("allDay") === "on";
+  const notes = text(formData, "notes");
+  const minutes = readMinutes(formData) ?? household.settings.defaultEventMinutes;
+  if (!title) back(formData, "error", "A template needs a name.");
+  if (icon && [...icon].length > 8) back(formData, "error", "The picture should be one emoji, like 🦷.");
+  if (startTime && !isLocalTime(startTime)) back(formData, "error", "Check the start time.");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("event_templates")
+    .update({
+      title,
+      icon: icon || null,
+      start_time: !allDay && startTime ? startTime : null,
+      minutes,
+      all_day: allDay,
+      member_ids: readIds(formData, "memberIds"),
+      tag_ids: readIds(formData, "tagIds"),
+      notes: notes || null,
+    })
+    .eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "template_updated", "event_template", id, title);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  back(formData, "message", `Saved the ${title} template.`);
 }

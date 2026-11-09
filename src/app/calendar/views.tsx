@@ -3,7 +3,7 @@ import { Emoji } from "@/components/ui";
 import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import type { Household } from "@/lib/household";
-import { fiveRowMonth, layoutDay, monthOf } from "@/lib/calendar-layout";
+import { fiveRowMonth, layoutBars, layoutDay, monthOf } from "@/lib/calendar-layout";
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import type { DayProfile } from "@/lib/day-profile";
 import type { Break } from "@/lib/day-types";
@@ -422,6 +422,118 @@ export function nowPercent(now: Date, first: number, last: number, timeZone: str
 // Week view
 // ---------------------------------------------------------------------------
 
+/** How many rows of all-day bars fit above the week's timeline. */
+const ALL_DAY_LANES = 2;
+
+type AllDayBar = {
+  id: string;
+  first: number;
+  last: number;
+  lane: number;
+  label: string;
+  title: string;
+  emoji: string;
+  colour: string;
+  href: string;
+  /** Breaks have a dashed edge, so they don't look like events. */
+  dashed: boolean;
+  /** Its first start time, for a timed event over several days. */
+  time: string | null;
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+};
+
+/**
+ * The week's all-day row: breaks, all-day events and timed events that run
+ * past midnight, each one bar across the days it covers (a trip from
+ * Thursday to Sunday is one bar, not four). Up to two rows; anything more
+ * shows as "+ N" on its days.
+ */
+function allDayBars({
+  days,
+  events,
+  breaks,
+  household,
+  memberById,
+  editLink,
+}: {
+  days: LocalDate[];
+  events: CalendarItem[];
+  breaks: Break[] | undefined;
+  household: Household;
+  memberById: Map<string, Member>;
+  editLink: (e: CalendarItem) => string;
+}): { bars: AllDayBar[]; lanes: number; hidden: number[]; hiddenNames: string[] } {
+  const { timeZone } = household.settings;
+  const columnOf = (day: LocalDate) => (day < days[0] ? 0 : day > days[days.length - 1] ? days.length - 1 : days.indexOf(day));
+  type Item = Omit<AllDayBar, "lane" | "first" | "last"> & { from: LocalDate; to: LocalDate };
+  const items: Item[] = [];
+  for (const b of breaks ?? []) {
+    if (b.end_date < days[0] || b.start_date > days[days.length - 1]) continue;
+    const who = breakWho(b, memberById);
+    items.push({
+      id: `break-${b.id}`,
+      from: b.start_date,
+      to: b.end_date,
+      label: b.name,
+      title: who ? `${b.name}: ${who}` : b.name,
+      emoji: eventEmoji(b.icon, b.name),
+      colour: breakColour(b, memberById),
+      href: BREAKS_HREF,
+      dashed: true,
+      time: null,
+      continuesBefore: false,
+      continuesAfter: false,
+    });
+  }
+  for (const e of events) {
+    if (!isAllDayStyle(e, timeZone)) continue;
+    const from = localDateOf(new Date(e.starts_at), timeZone);
+    // All-day events end at midnight after their last day.
+    const to = localDateOf(new Date(new Date(e.ends_at).getTime() - 1), timeZone);
+    if (to < days[0] || from > days[days.length - 1]) continue;
+    const time = e.all_day ? null : shortTime(new Date(e.starts_at), household);
+    items.push({
+      id: e.id,
+      from,
+      to,
+      label: e.title,
+      title: e.all_day ? e.title : `${e.title}, ${time} until ${shortTime(new Date(e.ends_at), household)}`,
+      emoji: eventEmoji(e.icon, e.title),
+      colour: eventColour(e, memberById),
+      href: editLink(e),
+      dashed: false,
+      time: from >= days[0] ? time : null,
+      continuesBefore: false,
+      continuesAfter: false,
+    });
+  }
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const { placed, hidden } = layoutBars(
+    items.map((item) => ({ id: item.id, first: columnOf(item.from), last: columnOf(item.to) })),
+    days.length,
+    ALL_DAY_LANES,
+  );
+  const bars = placed.map((p) => {
+    const item = byId.get(p.id)!;
+    return {
+      ...item,
+      ...p,
+      continuesBefore: item.from < days[0],
+      continuesAfter: item.to > days[days.length - 1],
+    };
+  });
+  const shown = new Set(placed.map((p) => p.id));
+  const hiddenNames = days.map((day) =>
+    items
+      .filter((item) => !shown.has(item.id) && item.from <= day && day <= item.to)
+      .map((item) => item.label)
+      .join(", "),
+  );
+  return { bars, lanes: placed.reduce((n, p) => Math.max(n, p.lane + 1), 0), hidden, hiddenNames };
+}
+
+
 /** A day's dinner, shown under the date in the week view. */
 export type Dinner = { name: string; icon: string; more: number };
 
@@ -443,25 +555,23 @@ export function WeekView({
   const editLink = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
   // The rows under the dates (all-day things, then dinner) only show when they have something.
   const anyDinner = dinners.size > 0;
-  const anyAllDay = days.some((day) => breaksOn(breaks, day).length > 0 || eventsOnDay(events, day, timeZone).some((e) => isAllDayStyle(e, timeZone)));
+  const allDayRow = allDayBars({ days, events, breaks, household, memberById, editLink });
 
   return (
     // On a phone the week is wider than the screen, so it scrolls sideways.
     <div className="flex min-h-[40rem] flex-col max-lg:overflow-x-auto lg:min-h-0 lg:flex-1">
       <div className="flex flex-1 flex-col max-lg:min-w-[56rem] lg:min-h-0">
-        {/* Day headings and all-day things */}
-        <div className="flex shrink-0 pl-16.5">
-          {days.map((day) => {
-            const allDay = eventsOnDay(events, day, timeZone).filter((e) => isAllDayStyle(e, timeZone));
+        {/* Day headings */}
+        <div className="grid shrink-0 grid-cols-7 pl-16.5">
+          {days.map((day, i) => {
             const profile = profiles.get(day);
-            const dinner = dinners.get(day);
             return (
-              <div key={day} className="flex min-w-0 flex-1 basis-0 flex-col gap-2 px-1">
+              <div key={day} className="flex min-w-0 px-1">
                 <Link
                   href={adding ? adding.addHref(day, { allday: "1" }) : href({ add: day, allday: "1", edit: null, panel: null })}
                   scroll={false}
                   title="Add an all-day event on this day"
-                  className="flex h-12.5 items-center gap-2 rounded-xl pl-2.5 text-2xl font-bold text-ink hover:bg-rail lg:text-3xl"
+                  className="flex h-12.5 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-xl pl-2.5 text-2xl font-bold whitespace-nowrap text-ink hover:bg-rail lg:text-3xl"
                 >
                   {weekdayLabel(day, household)}
                   <span
@@ -474,47 +584,56 @@ export function WeekView({
                       <ProfileTag kind={profile.kind} />
                     </span>
                   ) : null}
-                </Link>
-                <div className={`h-10 items-center gap-1 ${anyAllDay ? "flex" : "hidden"}`}>
-                  {breaksOn(breaks, day)
-                    .slice(0, 1)
-                    .map((b) => (
-                      <Link
-                        key={b.id}
-                        href={BREAKS_HREF}
-                        title={`${b.name}: ${breakWho(b, memberById)}`}
-                        className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl border-2 border-dashed px-2 text-sm font-bold text-ink"
-                        style={{ background: soft(breakColour(b, memberById)), borderColor: strong(breakColour(b, memberById)) }}
-                      >
-                        <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />
-                        <span className="truncate">{b.name}</span>
-                      </Link>
-                    ))}
-                  {allDay.slice(0, breaksOn(breaks, day).length > 0 ? 0 : 1).map((e) => (
-                    <Link
-                      key={e.id}
-                      href={editLink(e)}
-                      scroll={false}
-                      className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-xl px-2.5 text-sm font-bold text-ink"
-                      style={{ background: soft(eventColour(e, memberById)) }}
-                    >
-                      <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-7" />
-                      <span className="truncate">{e.title}</span>
-                    </Link>
-                  ))}
-                  {allDay.length + breaksOn(breaks, day).length > 1 ? (
-                    <span
-                      className="shrink-0 rounded-xl bg-rail px-2 text-sm leading-10 font-bold text-ink-muted"
-                      title={[...breaksOn(breaks, day).map((b) => b.name), ...allDay.map((e) => e.title)].slice(1).join(", ")}
-                    >
-                      +{allDay.length + breaksOn(breaks, day).length - 1}
+                  {allDayRow.hidden[i] > 0 ? (
+                    <span className="ml-auto shrink-0 rounded-lg bg-rail px-1.5 text-sm font-bold text-ink-muted" title={allDayRow.hiddenNames[i]}>
+                      +{allDayRow.hidden[i]}
                     </span>
                   ) : null}
-                </div>
-                {anyDinner ? (
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* All-day things, and things over several days, as bars across their days */}
+        {allDayRow.lanes > 0 ? (
+          <div
+            className="mt-2 grid shrink-0 grid-cols-7 gap-y-1 pl-16.5"
+            style={{ gridTemplateRows: `repeat(${allDayRow.lanes}, 2.5rem)` }}
+          >
+            {allDayRow.bars.map((bar) => (
+              <div
+                key={bar.id}
+                className="flex min-w-0 px-1"
+                style={{ gridColumn: `${bar.first + 1} / ${bar.last + 2}`, gridRow: bar.lane + 1 }}
+              >
+                <Link
+                  href={bar.href}
+                  scroll={false}
+                  title={bar.title}
+                  className={`flex h-10 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm font-bold text-ink ${
+                    bar.dashed ? "border-2 border-dashed" : ""
+                  } ${bar.continuesBefore ? "rounded-l-sm" : "rounded-l-xl"} ${bar.continuesAfter ? "rounded-r-sm" : "rounded-r-xl"}`}
+                  style={{ background: soft(bar.colour), borderColor: bar.dashed ? strong(bar.colour) : undefined }}
+                >
+                  <Emoji emoji={bar.emoji} className="size-7" />
+                  <span className="truncate">{bar.label}</span>
+                  {bar.time ? <span className="ml-auto shrink-0 font-semibold text-ink-soft">{bar.time}</span> : null}
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {anyDinner ? (
+          <div className="mt-2 grid shrink-0 grid-cols-7 pl-16.5">
+            {days.map((day) => {
+              const dinner = dinners.get(day);
+              return (
+                <div key={day} className="flex min-w-0 px-1">
                   <Link
                     href={`/review?week=${day}`}
-                    className={`flex h-9 min-w-0 items-center gap-1.5 rounded-xl px-2 text-base font-bold ${
+                    className={`flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2 text-base font-bold ${
                       dinner ? "bg-meal text-meal-ink" : "text-ink-muted"
                     }`}
                     title={dinner ? `Dinner: ${dinner.name}` : "No dinner planned"}
@@ -529,11 +648,11 @@ export function WeekView({
                       <span className="truncate pl-0.5 text-sm">No dinner yet</span>
                     )}
                   </Link>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
 
         {/* The timeline */}
         <div className="relative mt-5 mb-1 flex min-h-0 flex-1 pl-16.5">

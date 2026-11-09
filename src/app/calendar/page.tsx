@@ -24,8 +24,12 @@ import {
   skipOccurrence,
   updateEvent,
   updateLayer,
+  updateTemplate,
 } from "./actions";
 import { EventCardFields, LayerFields, ViewFields } from "./forms";
+import { LengthInput } from "./when-fields";
+import { Stickers } from "./stickers";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { ViewChooser } from "./view-chooser";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
 import { VISIBILITY_OPTIONS } from "./options";
@@ -69,7 +73,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const occParam = firstParam(params.occ);
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const panelParam = firstParam(params.panel);
-  const panel = panelParam === "layers" || panelParam === "tags" ? panelParam : null;
+  const panel = panelParam === "layers" || panelParam === "tags" || panelParam === "template" ? panelParam : null;
 
   const days =
     view === "week"
@@ -271,6 +275,18 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       {panel === "tags" ? (
         <Sheet title="Tags and templates" closeHref={closeHref} narrow>
           <TagsPanel tags={tags} templates={templates} memberById={memberById} tagById={new Map(tags.map((t) => [t.id, t]))} returnTo={returnTo} />
+        </Sheet>
+      ) : null}
+
+      {panel === "template" && templates.some((t) => t.id === firstParam(params.tpl)) ? (
+        <Sheet title="Edit template" closeHref={href({ panel: "tags", tpl: null })} narrow>
+          <TemplateCard
+            template={templates.find((t) => t.id === firstParam(params.tpl))!}
+            members={members}
+            tags={tags}
+            returnTo={returnTo}
+            backHref={href({ panel: "tags", tpl: null })}
+          />
         </Sheet>
       ) : null}
 
@@ -689,8 +705,9 @@ function visibilityLabel(value: string): string {
 }
 
 /**
- * The tags and templates you've made, with a way to remove each. New ones
- * are made on the add card ("New tag", and "Save as a template too").
+ * The tags and templates you've made, with a way to remove each; tap a
+ * template to change it. New ones are made on the add card ("New tag",
+ * and "Save as a template too").
  */
 function TagsPanel({
   tags,
@@ -731,7 +748,9 @@ function TagsPanel({
         <h3 className="text-2xl font-bold text-ink">Templates</h3>
         {templates.length === 0 ? (
           <p className="text-lg text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding an event.</p>
-        ) : null}
+        ) : (
+          <p className="text-base text-ink-muted">Tap a template to change it.</p>
+        )}
         <ul className="grid grid-cols-2 gap-2">
           {templates.slice(0, 8).map((t) => {
             const who = t.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(", ");
@@ -740,10 +759,15 @@ function TagsPanel({
             return (
               <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
                 <Emoji emoji={t.icon || eventEmoji(null, t.title)} className="size-8" />
-                <span className="flex min-w-0 flex-1 flex-col">
+                <Link
+                  href={`/calendar?${returnTo}&panel=template&tpl=${t.id}`}
+                  scroll={false}
+                  title={`Edit the ${t.title} template`}
+                  className="flex min-h-[var(--touch-target)] min-w-0 flex-1 flex-col justify-center"
+                >
                   <span className="truncate text-lg font-bold text-ink">{t.title}</span>
                   <span className="truncate text-sm text-ink-muted">{[when, who, tagNames].filter(Boolean).join(" · ")}</span>
-                </span>
+                </Link>
                 <form action={removeTemplate}>
                   <input type="hidden" name="id" value={t.id} />
                   <input type="hidden" name="name" value={t.title} />
@@ -770,5 +794,66 @@ function RemoveButton({ label }: { label: string }) {
     >
       <Trash size="1.5rem" aria-hidden />
     </button>
+  );
+}
+
+/** Changing a template: the same fields as the event card, without a date. One Save. */
+function TemplateCard({
+  template,
+  members,
+  tags,
+  returnTo,
+  backHref,
+}: {
+  template: EventTemplate;
+  members: Member[];
+  tags: TagType[];
+  returnTo: string;
+  backHref: string;
+}) {
+  const back = `${returnTo}&panel=template&tpl=${template.id}`;
+  return (
+    <div className="flex h-full flex-col gap-5">
+      <form id="edit-template" action={updateTemplate} className="group flex min-h-0 flex-1 flex-col gap-5">
+        <input type="hidden" name="id" value={template.id} />
+        <input type="hidden" name="returnTo" value={back} />
+        <div className="flex gap-3">
+          <EmojiPicker initial={template.icon ?? ""} />
+          <div className="min-w-0 flex-1">
+            <Field label="Name">
+              <Input name="title" required maxLength={120} defaultValue={template.title} />
+            </Field>
+          </div>
+        </div>
+        <div className="flex items-end gap-3">
+          <div className="min-w-0 flex-1 group-has-[input[name=allDay]:checked]:invisible">
+            <Field label="Usually starts at" hint="Leave blank to use wherever you tap.">
+              <Input name="startTime" type="time" step={900} defaultValue={template.start_time ?? ""} />
+            </Field>
+          </div>
+          <label className="mb-7 flex min-h-[var(--touch-target)] shrink-0 cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold">
+            <input type="checkbox" name="allDay" defaultChecked={template.all_day} className="size-5 accent-ink" />
+            All day
+          </label>
+        </div>
+        <div className="group-has-[input[name=allDay]:checked]:hidden">
+          <LengthInput initial={template.minutes} />
+        </div>
+        <Stickers members={members} tags={tags} memberIds={template.member_ids} tagIds={template.tag_ids} />
+        <Field label="Notes">
+          <Input name="notes" maxLength={2000} defaultValue={template.notes ?? ""} />
+        </Field>
+      </form>
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <Button form="edit-template">Save</Button>
+        <CloseLink href={backHref} />
+        <form action={removeTemplate} className="ml-auto">
+          <input type="hidden" name="id" value={template.id} />
+          <input type="hidden" name="name" value={template.title} />
+          <input type="hidden" name="returnTo" value={`${returnTo}&panel=tags`} />
+          <Button variant="danger">Delete template</Button>
+        </form>
+      </div>
+    </div>
   );
 }

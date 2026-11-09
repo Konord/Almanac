@@ -152,7 +152,12 @@ export function QuickAddSheet({
             tags={tags}
             defaults={pending}
             adding
-            templates={{ list: templates, href: templateHref, chosen: pending.templateId }}
+            templates={{
+              list: templates,
+              href: templateHref,
+              chosen: pending.templateId,
+              editHref: `/calendar?${returnTo ? `${returnTo}&` : ""}panel=tags`,
+            }}
           />
           <div className="mt-auto flex shrink-0 items-center gap-3">
             <Button>Add event</Button>
