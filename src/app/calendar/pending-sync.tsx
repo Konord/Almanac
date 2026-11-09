@@ -2,13 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { setPending, updatePending, usePending } from "@/components/pending-store";
-import { clock, toMinutes } from "@/components/timeline-drag";
+import { toMinutes } from "@/components/timeline-drag";
 import type { QuickDefaults } from "./forms";
 
 /**
  * Keeps the quick-add card and the dashed outline on the timeline in step.
- * Drag the outline and the card's day, time and person change; change them
- * on the card and the outline moves. Draws nothing itself.
+ * The day, time and length are shared directly (see WhenFields); this
+ * starts the outline off and keeps the card's people in step with it.
+ * Draws nothing itself.
  */
 export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
   const marker = useRef<HTMLSpanElement>(null);
@@ -29,15 +30,12 @@ export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
     return () => setPending(null);
   }, [defaults.date, defaults.startTime, defaults.minutes, defaults.allDay, memberKey]);
 
-  // Card → outline: typing or tapping on the card moves the outline.
+  // Card → outline: ticking people on Today moves the outline to their columns.
   useEffect(() => {
     const form = marker.current?.closest("form");
     if (!form) return;
     const onChange = (e: Event) => {
       const input = e.target as HTMLInputElement;
-      if (input.name === "startDate" && input.value) updatePending({ date: input.value });
-      if (input.name === "startTime") updatePending({ start: input.value ? toMinutes(input.value) : null });
-      if (input.name === "allDay") updatePending({ allDay: input.checked });
       // On Today the outline covers the chosen people's columns.
       if (input.name === "memberIds") updatePending({ members: checkedMembers(form) });
     };
@@ -49,18 +47,10 @@ export function PendingSync({ defaults }: { defaults: QuickDefaults }) {
     };
   }, []);
 
-  // Outline → card: dragging the outline fills in the card.
+  // Outline → card: dragging the outline across columns ticks those people.
   useEffect(() => {
     const form = marker.current?.closest("form");
     if (!form || !pending) return;
-    const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | null;
-    const date = field("startDate");
-    if (date && date.value !== pending.date) date.value = pending.date;
-    const start = field("startTime");
-    const time = pending.start === null ? "" : clock(pending.start);
-    if (start && start.value !== time) start.value = time;
-    const allDay = field("allDay");
-    if (allDay && allDay.checked !== pending.allDay) allDay.checked = pending.allDay;
     // Stretched or dragged across people's columns: tick exactly those people.
     const want = new Set(pending.members);
     form.querySelectorAll<HTMLInputElement>('input[name="memberIds"]').forEach((box) => {

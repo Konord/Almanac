@@ -180,3 +180,30 @@ export function spanBox(c0: number, c1: number, n: number, gap: string, lane = 0
     width: `calc(${column} * ${c1 - c0 + 1 / lanes} + ${gap} * ${c1 - c0})`,
   };
 }
+
+/** Something that covers a run of day columns, e.g. a trip from Thursday to Sunday. */
+export type DayBar = { id: string; first: number; last: number };
+export type PlacedBar = DayBar & { lane: number };
+
+/**
+ * Stacks bars that cover runs of days into rows ("lanes") so none overlap,
+ * longest first so trips stay on top. Only `maxLanes` rows fit; anything
+ * else is counted per column, for a "+ N" on those days.
+ */
+export function layoutBars(bars: DayBar[], columns: number, maxLanes: number): { placed: PlacedBar[]; hidden: number[] } {
+  const order = bars.toSorted((a, b) => a.first - b.first || b.last - b.first - (a.last - a.first));
+  const lanes: number[][] = [];
+  const placed: PlacedBar[] = [];
+  const hidden = Array.from({ length: columns }, () => 0);
+  for (const bar of order) {
+    let lane = lanes.findIndex((taken) => taken.every((c) => c < bar.first || c > bar.last));
+    if (lane === -1) {
+      lane = lanes.length;
+      lanes.push([]);
+    }
+    for (let c = bar.first; c <= bar.last; c++) lanes[lane].push(c);
+    if (lane < maxLanes) placed.push({ ...bar, lane });
+    else for (let c = bar.first; c <= bar.last; c++) hidden[c] += 1;
+  }
+  return { placed, hidden };
+}

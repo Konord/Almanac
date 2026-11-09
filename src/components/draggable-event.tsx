@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { changeEventPeople, rescheduleEvent } from "@/app/calendar/actions";
+import { changeEventPeople, rescheduleEvent, stretchEventDays } from "@/app/calendar/actions";
 import { spanBox } from "@/lib/calendar-layout";
 import { SideHandles } from "./side-handles";
 import { ResizeHandle } from "./pending-block";
@@ -11,7 +11,8 @@ import { clock, useTimelineDrag } from "./timeline-drag";
 /**
  * An event block you can drag: up and down to change the time, sideways
  * to another day (or, on Today, another person), or by its bottom edge to
- * change how long it is. A tap still opens it for editing.
+ * change how long it is. On the week view, pulling a side over more days
+ * makes it a multi-day event. A tap still opens it for editing.
  */
 export function DraggableEvent({
   href,
@@ -27,7 +28,10 @@ export function DraggableEvent({
   style,
   title,
   children,
+  week,
 }: {
+  /** On the week view: the week's days, so the block's sides stretch it over more days. */
+  week?: string[];
   href: string;
   eventId: string;
   occurrenceDate: string | null;
@@ -86,6 +90,20 @@ export function DraggableEvent({
       else router.refresh();
     });
 
+  // Stretching sideways over more days (week view): it becomes a multi-day event.
+  const [stretching, setStretching] = useState<[number, number] | null>(null);
+  const d0 = week ? week.indexOf(day) : -1;
+  const stretched =
+    week && stretching
+      ? { left: `calc(${(stretching[0] - d0) * 100}% + 4px)`, width: `calc(${(stretching[1] - stretching[0] + 1) * 100}% - 8px)`, zIndex: 30 }
+      : null;
+  const stretch = (range: [number, number]) =>
+    startSaving(async () => {
+      const result = await stretchEventDays({ eventId, occurrenceDate, daysBefore: d0 - range[0], daysAfter: range[1] - d0 });
+      if (result.error) window.alert(result.error);
+      else router.refresh();
+    });
+
   return (
     <div
       {...drag.bodyHandlers}
@@ -98,10 +116,11 @@ export function DraggableEvent({
         if (e.key === "Enter") router.push(href, { scroll: false });
       }}
       className={`${className} cursor-grab touch-none select-none active:cursor-grabbing ${drag.dragging ? "z-30 shadow-lg ring-2 ring-ink" : ""} ${saving ? "opacity-70" : ""}`}
-      style={{ ...style, ...drag.position, ...wide }}
+      style={{ ...style, ...drag.position, ...wide, ...stretched }}
     >
       {children}
       {people ? <SideHandles columns={people.columns} c0={c0} c1={c1} onPreview={setWidening} onDone={widen} /> : null}
+      {week && d0 >= 0 ? <SideHandles byDay columns={week} c0={d0} c1={d0} onPreview={setStretching} onDone={stretch} /> : null}
       {drag.dragging ? (
         <span className="absolute right-1 bottom-5 rounded-md bg-ink px-1.5 text-sm font-bold text-board">{drag.label}</span>
       ) : null}

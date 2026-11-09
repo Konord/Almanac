@@ -8,7 +8,7 @@ import { requireHousehold, type HouseholdSettings } from "@/lib/household";
 import { fillTimes } from "@/lib/quick-times";
 import { createClient } from "@/lib/supabase/server";
 import { buildRule, isValidRule, type RepeatEnd, type RepeatFrequency } from "@/lib/recurrence";
-import { addDays, isLocalDate, isLocalTime, zonedToUtc } from "@/lib/time";
+import { addDays, isLocalDate, isLocalTime, localDateOf, localTimeOf, zonedToUtc } from "@/lib/time";
 import { dayOfWeek } from "@/lib/calendar-layout";
 import { isVisibility } from "./options";
 import { VIEW_COOKIE } from "./data";
@@ -22,7 +22,7 @@ import { VIEW_COOKIE } from "./data";
 function back(formData: FormData, kind: "error" | "message", text: string): never {
   const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
   const params = new URLSearchParams();
-  for (const key of ["view", "date", "panel"]) {
+  for (const key of ["view", "date", "panel", "tpl"]) {
     const value = from.get(key);
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
@@ -135,7 +135,7 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     endDate: endDateInput,
     startTime: text(formData, "startTime"),
     endTime: text(formData, "endTime"),
-    // The quick-add card sends a length; the full form uses the usual length.
+    // The card sends the end; with no end, the length it sends (or the usual length).
     defaultMinutes: readMinutes(formData) ?? settings.defaultEventMinutes,
   });
   if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
@@ -258,7 +258,10 @@ export async function addEvent(formData: FormData) {
       title: event.title,
       icon: event.icon,
       start_time: !event.all_day && isLocalTime(startTime) ? startTime : null,
-      minutes: readMinutes(formData) ?? household.settings.defaultEventMinutes,
+      // Templates hold up to a day's length; 0 is a point.
+      minutes: event.all_day
+        ? household.settings.defaultEventMinutes
+        : Math.min(Math.round((Date.parse(event.ends_at) - Date.parse(event.starts_at)) / 60_000), 24 * 60),
       all_day: event.all_day,
       member_ids: readIds(formData, "memberIds"),
       tag_ids: readIds(formData, "tagIds"),
@@ -510,6 +513,84 @@ export async function rescheduleEvent(input: {
   return {};
 }
 
+/** The same wall-clock time some days earlier or later. */
+function shiftByDays(instant: string, days: number, timeZone: string): Date {
+  const at = new Date(instant);
+  return zonedToUtc(addDays(localDateOf(at, timeZone), days), localTimeOf(at, timeZone), timeZone);
+}
+
+/**
+ * Stretching an event sideways on the week view: it starts some days
+ * earlier and/or ends some days later (same times), so it runs over
+ * several days. Pulling a side back in shortens it. For a repeating event
+ * only the stretched date changes (like "Move just this one").
+ */
+export async function stretchEventDays(input: {
+  eventId: string;
+  occurrenceDate: string | null;
+  daysBefore: number;
+  daysAfter: number;
+}): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  const { eventId, occurrenceDate, daysBefore, daysAfter } = input;
+  if (![daysBefore, daysAfter].every((n) => Number.isInteger(n) && Math.abs(n) <= 31)) return { error: "That stretch doesn't work." };
+  const supabase = await createClient();
+  const { data: event, error: findError } = await supabase
+    .from("events")
+    .select("id, title, starts_at, ends_at, all_day, timezone, recurrence_rule")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (findError || !event) return { error: "Couldn't find that event." };
+  const tz = event.timezone;
+
+  // Where it is now: the event itself, or this one date of a repeating event.
+  let startsAt = event.starts_at;
+  let endsAt = event.ends_at;
+  if (event.recurrence_rule) {
+    if (!occurrenceDate || !isLocalDate(occurrenceDate)) return { error: "Couldn't tell which date to stretch." };
+    const { data: moved } = await supabase
+      .from("event_exceptions")
+      .select("new_starts_at, new_ends_at")
+      .eq("event_id", eventId)
+      .eq("original_date", occurrenceDate)
+      .maybeSingle();
+    if (moved?.new_starts_at && moved.new_ends_at) {
+      startsAt = moved.new_starts_at;
+      endsAt = moved.new_ends_at;
+    } else {
+      const shift = Math.round((Date.parse(`${occurrenceDate}T00:00:00Z`) - Date.parse(`${localDateOf(new Date(startsAt), tz)}T00:00:00Z`)) / 86_400_000);
+      startsAt = shiftByDays(startsAt, shift, tz).toISOString();
+      endsAt = shiftByDays(endsAt, shift, tz).toISOString();
+    }
+  }
+  const newStart = shiftByDays(startsAt, -daysBefore, tz);
+  const newEnd = shiftByDays(endsAt, daysAfter, tz);
+  if (newEnd < newStart) return { error: "It would end before it starts." };
+
+  if (event.recurrence_rule) {
+    const { error } = await supabase.from("event_exceptions").upsert(
+      {
+        household_id: household.id,
+        event_id: eventId,
+        original_date: occurrenceDate!,
+        skipped: false,
+        new_starts_at: newStart.toISOString(),
+        new_ends_at: newEnd.toISOString(),
+      },
+      { onConflict: "event_id,original_date" },
+    );
+    if (error) return { error: error.message };
+    await log(household.id, "event_occurrence_moved", "event", eventId, `${event.title} (${occurrenceDate})`);
+  } else {
+    const { error } = await supabase.from("events").update({ starts_at: newStart.toISOString(), ends_at: newEnd.toISOString() }).eq("id", eventId);
+    if (error) return { error: error.message };
+    await log(household.id, "event_updated", "event", eventId, event.title);
+  }
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  return {};
+}
+
 /**
  * Takes some people off an event and puts others on. An event for everyone
  * counts as being for each person; one that ends up for everybody in the
@@ -596,4 +677,38 @@ export async function removeTemplate(formData: FormData) {
   await log(household.id, "template_removed", "event_template", id, name);
   revalidatePath("/calendar");
   back(formData, "message", `Removed the ${name} template.`);
+}
+
+/** Saves the template card: name, picture, usual start and length, people, tags and notes. */
+export async function updateTemplate(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const title = text(formData, "title");
+  const icon = text(formData, "icon");
+  const startTime = text(formData, "startTime");
+  const allDay = formData.get("allDay") === "on";
+  const notes = text(formData, "notes");
+  const minutes = readMinutes(formData) ?? household.settings.defaultEventMinutes;
+  if (!title) back(formData, "error", "A template needs a name.");
+  if (icon && [...icon].length > 8) back(formData, "error", "The picture should be one emoji, like 🦷.");
+  if (startTime && !isLocalTime(startTime)) back(formData, "error", "Check the start time.");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("event_templates")
+    .update({
+      title,
+      icon: icon || null,
+      start_time: !allDay && startTime ? startTime : null,
+      minutes,
+      all_day: allDay,
+      member_ids: readIds(formData, "memberIds"),
+      tag_ids: readIds(formData, "tagIds"),
+      notes: notes || null,
+    })
+    .eq("id", id);
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "template_updated", "event_template", id, title);
+  revalidatePath("/calendar");
+  revalidatePath("/");
+  back(formData, "message", `Saved the ${title} template.`);
 }

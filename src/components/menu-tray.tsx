@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Alarm, Broom, CalendarBlank, CalendarCheck, CaretDown, ForkKnife, GearSix, House, ListChecks } from "@phosphor-icons/react";
+import { Alarm, Broom, CalendarBlank, CalendarCheck, CaretDown, ForkKnife, GearSix, ListChecks } from "@phosphor-icons/react";
+import { lastDisplayHref } from "./remember-display";
 import type { Icon } from "@phosphor-icons/react";
 
 /**
@@ -20,7 +21,8 @@ import type { Icon } from "@phosphor-icons/react";
 export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "review" | "settings";
 
 const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
-  { section: "today", href: "/", label: "Agenda", icon: House },
+  // Calendar goes back to whichever display (Agenda, Week, Month) this screen
+  // showed last; you switch between them at the top right (Connor, 2026-11-09).
   { section: "calendar", href: "/calendar", label: "Calendar", icon: CalendarBlank },
   // Planning happens in the weekly review; the rest are managers (Connor, 2026-11-09).
   { section: "review", href: "/review", label: "Weekly review", icon: CalendarCheck },
@@ -36,6 +38,7 @@ const AUTO_HIDE_MS = 30_000;
 
 export function MenuTray({ section }: { section: Section }) {
   const [open, setOpen] = useState(false);
+  const [calendarHref, setCalendarHref] = useState("/calendar");
   const path = usePathname();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const swipeStart = useRef<number | null>(null);
@@ -74,10 +77,16 @@ export function MenuTray({ section }: { section: Section }) {
         aria-label="Open the menu"
         aria-expanded={open}
         aria-controls="menu-tray"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setCalendarHref(lastDisplayHref());
+          setOpen(true);
+        }}
         onPointerDown={(e) => (swipeStart.current = e.clientY)}
         onPointerUp={(e) => {
-          if (swipeStart.current !== null && swipeStart.current - e.clientY > 20) setOpen(true);
+          if (swipeStart.current !== null && swipeStart.current - e.clientY > 20) {
+            setCalendarHref(lastDisplayHref());
+            setOpen(true);
+          }
           swipeStart.current = null;
         }}
         className={`fixed bottom-0 left-1/2 z-40 flex h-11 w-48 -translate-x-1/2 touch-none items-center justify-center ${
@@ -113,11 +122,12 @@ export function MenuTray({ section }: { section: Section }) {
         </button>
         <div className="flex gap-2">
           {ITEMS.map(({ section: s, href, label, icon: IconComponent }) => {
-            const active = s === section;
+            // The Agenda is one of the calendar's displays.
+            const active = s === section || (s === "calendar" && section === "today");
             return (
               <Link
                 key={s}
-                href={href}
+                href={s === "calendar" ? calendarHref : href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
                 className={`flex min-h-24 min-w-28 flex-col items-center justify-center gap-1.5 rounded-[1.25rem] px-3 text-base font-bold ${

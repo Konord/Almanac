@@ -5,7 +5,8 @@ import { PERSON_COLOURS } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import { VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
-import { CardTabs, LengthControl } from "./quick-controls";
+import { CardTabs } from "./quick-controls";
+import { WhenFields } from "./when-fields";
 import { PendingSync } from "./pending-sync";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Stickers } from "./stickers";
@@ -156,9 +157,9 @@ export type CardDefaults = QuickDefaults & {
 };
 
 /**
- * The event card, for adding and editing: name, day, time and length up front, with
- * person buttons and an All day switch. Repeats, several days and the rest
- * are behind tabs. Put it inside a <form className="group ...">.
+ * The event card, for adding and editing: name, then the day, start, length
+ * dial and end (an end on a later day makes a multi-day event), with person
+ * buttons and an All day switch. Repeats and the rest are behind tabs. Put it inside a <form className="group ...">.
  */
 export function EventCardFields({
   layers,
@@ -181,7 +182,7 @@ export function EventCardFields({
   /** Adding a new event: keep the dashed outline on the timeline in step. */
   adding?: boolean;
   /** Ready-made events to start from (adding only). */
-  templates?: { list: EventTemplate[]; href: (id: string) => string; chosen?: string };
+  templates?: { list: EventTemplate[]; href: (id: string) => string; chosen?: string; editHref?: string };
 }) {
   return (
     <>
@@ -189,7 +190,7 @@ export function EventCardFields({
       {/* Tags replace layers on the card; events still quietly belong to one (Connor, 2026-11-05). */}
       <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />
       <CardTabs
-        initial={initialTab === "heads-ups" ? 4 : 0}
+        initial={initialTab === "heads-ups" ? 3 : 0}
         tabs={[
           {
             label: "Event",
@@ -204,26 +205,14 @@ export function EventCardFields({
                     </Field>
                   </div>
                 </div>
-                <div className="grid grid-cols-[1fr_1fr] gap-4">
-                  <Field label="Day">
-                    <Input name="startDate" type="date" defaultValue={defaults.date} required />
-                  </Field>
-                  {/* Hidden while All day is ticked. */}
-                  <div className="group-has-[input[name=allDay]:checked]:invisible">
-                    <Field label="Starts at">
-                      <Input name="startTime" type="time" step={900} defaultValue={defaults.startTime ?? ""} required={false} />
-                    </Field>
-                  </div>
-                </div>
-                <div className="flex items-end gap-3">
-                  <div className="min-w-0 flex-1 group-has-[input[name=allDay]:checked]:invisible">
-                    <LengthControl initial={defaults.minutes} allowPoint />
-                  </div>
-                  <label className="flex min-h-[var(--touch-target)] shrink-0 cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
-                    <input type="checkbox" name="allDay" defaultChecked={defaults.allDay} className="size-5 accent-ink" />
-                    All day
-                  </label>
-                </div>
+                <WhenFields
+                  date={defaults.date}
+                  startTime={defaults.startTime}
+                  minutes={defaults.minutes}
+                  allDay={defaults.allDay}
+                  endDate={defaults.endDate}
+                  adding={adding}
+                />
                 <Stickers members={members} tags={tags} memberIds={defaults.memberIds} tagIds={defaults.tagIds} />
               </>
             ),
@@ -249,14 +238,6 @@ export function EventCardFields({
             ),
           },
           {
-            label: "Days",
-            panel: (
-              <Field label="Runs over several days? Last day" hint="Leave blank if it's just the one day.">
-                <Input name="endDate" type="date" defaultValue={defaults.endDate && defaults.endDate !== defaults.date ? defaults.endDate : ""} />
-              </Field>
-            ),
-          },
-          {
             label: "More",
             panel: (
               <>
@@ -277,9 +258,21 @@ export function EventCardFields({
 /**
  * Ready-made events across the top of the add card. Tapping one fills in
  * the card (it reloads the card with ?template=). Templates are saved with
- * "Save as a template too" when adding, and removed under Tags.
+ * "Save as a template too" when adding; "Edit templates" opens the list
+ * where each can be changed or deleted.
  */
-function TemplateRow({ list, href, chosen }: { list: EventTemplate[]; href: (id: string) => string; chosen?: string }) {
+function TemplateRow({
+  list,
+  href,
+  chosen,
+  editHref,
+}: {
+  list: EventTemplate[];
+  href: (id: string) => string;
+  chosen?: string;
+  /** Where "Edit templates" goes (the calendar's Tags and templates panel). */
+  editHref?: string;
+}) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <span className="shrink-0 text-base font-bold text-ink">Start from</span>
@@ -304,6 +297,11 @@ function TemplateRow({ list, href, chosen }: { list: EventTemplate[]; href: (id:
           ))}
         </div>
       )}
+      {editHref && list.length > 0 ? (
+        <Link href={editHref} scroll={false} className="ml-auto flex min-h-[var(--touch-target)] shrink-0 items-center text-base font-bold text-accent">
+          Edit templates
+        </Link>
+      ) : null}
     </div>
   );
 }

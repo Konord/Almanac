@@ -81,6 +81,26 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"birthdays": {
+                  Row: {
+                    "birth_year": number | null,"created_at": string,"day": number,"household_id": string,"icon": string | null,"id": string,"month": number,"name": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "birth_year"?: number | null,"created_at"?: string,"day": number,"household_id": string,"icon"?: string | null,"id"?: string,"month": number,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "birth_year"?: number | null,"created_at"?: string,"day"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"month"?: number,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "birthdays_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"break_members": {
                   Row: {
                     "break_id": string,"day_type_id": string | null,"household_id": string,"member_id": string,"week_plan_id": string | null
@@ -443,6 +463,26 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     },{
       foreignKeyName: "heads_ups_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"holidays": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"public_key": string | null,"rule": NonNullable<Json>,"sort_order": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"public_key"?: string | null,"rule": NonNullable<Json>,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"public_key"?: string | null,"rule"?: NonNullable<Json>,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "holidays_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
       referencedRelation: "households"
@@ -1251,14 +1291,14 @@ isOneToOne: false
                   ]
                 },"task_templates": {
                   Row: {
-                    "first_due": string | null,"active": boolean,"at_time": string | null,"created_at": string,"default_assignee_id": string | null,"household_id": string,"icon": string | null,"id": string,"kind": string,"link": string | null,"name": string,"not_before": string | null,"notes": string | null,"only_months": (number)[] | null,"only_seasons": (string)[] | null,"preferred_weekday": number | null,"premade": boolean,"repeat_every": number,"repeat_from": string,"repeat_unit": string,"season_end": string | null,"season_start": string | null,"snap": string,"sort_order": number,"start_date": string | null,"tags": (string)[],"updated_at": string,"visibility": string
+                    "active": boolean,"at_time": string | null,"created_at": string,"default_assignee_id": string | null,"first_due": string | null,"household_id": string,"icon": string | null,"id": string,"kind": string,"link": string | null,"name": string,"not_before": string | null,"notes": string | null,"only_months": (number)[] | null,"only_seasons": (string)[] | null,"preferred_weekday": number | null,"premade": boolean,"repeat_every": number,"repeat_from": string,"repeat_unit": string,"season_end": string | null,"season_start": string | null,"snap": string,"sort_order": number,"start_date": string | null,"tags": (string)[],"updated_at": string,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "first_due"?: string | null,"active"?: boolean,"at_time"?: string | null,"created_at"?: string,"default_assignee_id"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"kind"?: string,"link"?: string | null,"name": string,"not_before"?: string | null,"notes"?: string | null,"only_months"?: (number)[] | null,"only_seasons"?: (string)[] | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_from"?: string,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"snap": string,"sort_order"?: number,"start_date"?: string | null,"tags"?: (string)[],"updated_at"?: string,"visibility"?: string
+                    "active"?: boolean,"at_time"?: string | null,"created_at"?: string,"default_assignee_id"?: string | null,"first_due"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"kind"?: string,"link"?: string | null,"name": string,"not_before"?: string | null,"notes"?: string | null,"only_months"?: (number)[] | null,"only_seasons"?: (string)[] | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_from"?: string,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"snap": string,"sort_order"?: number,"start_date"?: string | null,"tags"?: (string)[],"updated_at"?: string,"visibility"?: string
                   }
                   Update: {
-                    "first_due"?: string | null,"active"?: boolean,"at_time"?: string | null,"created_at"?: string,"default_assignee_id"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"kind"?: string,"link"?: string | null,"name"?: string,"not_before"?: string | null,"notes"?: string | null,"only_months"?: (number)[] | null,"only_seasons"?: (string)[] | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_from"?: string,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"snap"?: string,"sort_order"?: number,"start_date"?: string | null,"tags"?: (string)[],"updated_at"?: string,"visibility"?: string
+                    "active"?: boolean,"at_time"?: string | null,"created_at"?: string,"default_assignee_id"?: string | null,"first_due"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"kind"?: string,"link"?: string | null,"name"?: string,"not_before"?: string | null,"notes"?: string | null,"only_months"?: (number)[] | null,"only_seasons"?: (string)[] | null,"preferred_weekday"?: number | null,"premade"?: boolean,"repeat_every"?: number,"repeat_from"?: string,"repeat_unit"?: string,"season_end"?: string | null,"season_start"?: string | null,"snap"?: string,"sort_order"?: number,"start_date"?: string | null,"tags"?: (string)[],"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
