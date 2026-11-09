@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "@phosphor-icons/react";
 
 /*
  * One Save for a whole screen (Connor, 2026-11-07: "there are way too many
@@ -60,26 +61,40 @@ export function useUnsavedChanges(dirty: boolean) {
   };
 }
 
-/** The bar at the bottom: what's saved, Undo changes, and the one Save. */
-export function SaveBar({ dirty, saving, error, onSave, onUndo }: { dirty: boolean; saving: boolean; error: string | null; onSave: () => void; onUndo: () => void }) {
+/**
+ * Save, at the right of the screen's header (Connor picked this over a bar
+ * along the bottom, 2026-11-09). With changes: Undo and a blue Save with a
+ * dot. Without: a small green "Saved". A problem shows in red beside it.
+ */
+export function SaveButton({ dirty, saving, error, onSave, onUndo }: { dirty: boolean; saving: boolean; error: string | null; onSave: () => void; onUndo: () => void }) {
   return (
-    <div className={`flex shrink-0 items-center gap-2.5 rounded-2xl px-3 py-2 ${dirty ? "bg-[color-mix(in_srgb,var(--color-accent)_9%,white)]" : "bg-rail"}`}>
-      <span className={`min-w-0 flex-1 text-base font-bold ${error ? "text-danger" : dirty ? "text-accent" : "text-ink-muted"}`} role="status">
-        {error ?? (dirty ? "You have changes that aren't saved yet." : "Everything is saved.")}
-      </span>
-      {dirty ? (
-        <button type="button" onClick={onUndo} disabled={saving} className="flex min-h-11 items-center rounded-xl px-3 text-base font-bold text-ink hover:bg-board">
-          Undo changes
-        </button>
+    <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2" role="group" aria-label="Save">
+      {error ? (
+        <span className="line-clamp-2 max-w-[28rem] text-right text-base leading-tight font-bold text-danger" role="alert" title={error}>
+          {error}
+        </span>
       ) : null}
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={!dirty || saving}
-        className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board disabled:opacity-40"
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
+      {dirty ? (
+        <>
+          <button type="button" onClick={onUndo} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-2xl px-4 text-base font-bold text-ink-soft hover:bg-rail">
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-accent px-6 text-lg font-bold text-white shadow-[0_2px_8px_color-mix(in_srgb,var(--color-accent)_35%,transparent)] disabled:opacity-70"
+          >
+            <span aria-hidden className="size-2.5 rounded-full bg-white" />
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </>
+      ) : (
+        <span className="flex min-h-[var(--touch-target)] items-center gap-1.5 px-2 text-base font-bold text-success" role="status">
+          <Check size="1.25rem" weight="bold" aria-hidden />
+          Saved
+        </span>
+      )}
     </div>
   );
 }

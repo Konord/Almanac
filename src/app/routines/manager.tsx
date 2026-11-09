@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, GearSix, Plus, Trash, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
-import { LeaveDialog, SaveBar, useUnsavedChanges } from "@/components/unsaved-changes";
+import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { EATING_MINUTES } from "@/lib/meals";
 import { NEW_PREFIX, draftProblem, sameDraft, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
@@ -310,11 +310,12 @@ export function RoutineManager({
         </div>
         <Link
           href="/routines/manage"
-          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel lg:ml-auto"
+          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
         >
           <GearSix size="1.5rem" aria-hidden />
           Set days
         </Link>
+        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </header>
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)]">
@@ -590,10 +591,6 @@ export function RoutineManager({
             </div>
           )}
 
-          {/* One Save for everything */}
-          <div className="mt-3">
-            <SaveBar dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-          </div>
         </section>
       </div>
 

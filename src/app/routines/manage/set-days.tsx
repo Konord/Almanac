@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarCheck, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
-import { LeaveDialog, SaveBar, useUnsavedChanges } from "@/components/unsaved-changes";
+import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import {
@@ -139,11 +139,12 @@ export function SetDays({
         </nav>
         <Link
           href="/routines"
-          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel lg:ml-auto"
+          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
         >
           <ArrowLeft size="1.5rem" aria-hidden />
           Routine Manager
         </Link>
+        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -157,7 +158,6 @@ export function SetDays({
           Saving also takes {losing === 1 ? "1 routine" : `${losing} routines`} off the kinds of day you removed.
         </p>
       ) : null}
-      <SaveBar dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
 
       {guard.leaving ? (
         <LeaveDialog what="some days" saving={saving} onSave={() => save(guard.leaving)} onStay={guard.stay} onLeave={guard.leaveWithoutSaving} />

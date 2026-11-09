@@ -2,9 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, CalendarCheck, CaretLeft, CaretRight, Minus, Plus, Repeat, Trash, X } from "@phosphor-icons/react";
-import { Avatar, Emoji } from "@/components/ui";
+import { Avatar, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
-import { LeaveDialog, SaveBar, useUnsavedChanges } from "@/components/unsaved-changes";
+import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { CHORE_TAGS, weekdaysLabel, type ChoreTag } from "@/lib/chore-days";
 import { SEASONS, describeRule, type ChoreRule, type RepeatUnit, type Season } from "@/lib/chores";
@@ -122,6 +122,7 @@ export function ChoreManager({
   timeZone,
   weekStartsOn,
   startWith,
+  clock,
 }: {
   initial: ChoreManagerDraft;
   members: ManagerMember[];
@@ -133,6 +134,8 @@ export function ChoreManager({
   weekStartsOn: 0 | 1;
   /** ?edit=<chore> or ?day=<chore day> from a link. */
   startWith: { chore?: string; day?: string };
+  /** The header clock (drawn on the server first). */
+  clock: ReactNode;
 }) {
   const [draft, setDraft] = useState<ChoreManagerDraft>(initial);
   // A link (?edit= or ?day=) wins; else what was open before a save.
@@ -207,7 +210,12 @@ export function ChoreManager({
   };
 
   return (
-    <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">
+    <>
+      <ScreenHeader title="Chore Manager">
+        {clock}
+        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
+      </ScreenHeader>
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">
       {/* Left: Occasional chores on top, then the chore days */}
       <section className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame bg-board p-4 lg:min-h-0">
         <button
@@ -311,13 +319,13 @@ export function ChoreManager({
             />
           )}
         </div>
-        <SaveBar dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </section>
 
       {guard.leaving ? (
         <LeaveDialog what="some chores" saving={saving} onSave={() => save(guard.leaving)} onStay={guard.stay} onLeave={guard.leaveWithoutSaving} />
       ) : null}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -426,7 +434,7 @@ function DayPanel({
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         {/* Regular chores, like a list */}
         <div className="flex min-h-0 flex-col gap-2">
-          <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">Regular chores · every {day.is_free ? "free day" : `${day.name || "chore"} day`}</h3>
+          <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">Regular chores · every {day.is_free ? "free day" : /\bday$/i.test(day.name.trim()) ? day.name.trim() : `${day.name.trim() || "chore"} day`}</h3>
           <div className="flex items-center gap-2">
             <EmojiPicker key={round} initial="" fieldName="" nameText={name} onChange={setIcon} label="Picture for the new chore" className="size-12! self-center!" fullScreen />
             <input

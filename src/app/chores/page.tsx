@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame, ScreenHeader, firstParam } from "@/components/ui";
+import { AppFrame, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { placeable } from "@/lib/chore-days";
 import { snapOf, type Season } from "@/lib/chores";
@@ -149,11 +149,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
   }
 
   return (
-    <>
-      <ScreenHeader title="Chore Manager">
-        <HeaderClock locale={locale} timeZone={timeZone} />
-      </ScreenHeader>
-      <ChoreManager
+    <ChoreManager
         // A fresh start after each save, so the screen shows what was saved.
         key={hash(JSON.stringify(initial))}
         initial={initial}
@@ -164,9 +160,9 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
         locale={locale}
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
-        startWith={{ chore: firstParam(params.edit), day: firstParam(params.day) }}
-      />
-    </>
+      startWith={{ chore: firstParam(params.edit), day: firstParam(params.day) }}
+      clock={<HeaderClock locale={locale} timeZone={timeZone} />}
+    />
   );
 }
 
