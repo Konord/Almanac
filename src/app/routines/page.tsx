@@ -44,6 +44,7 @@ async function Manager() {
       usual_minutes: t.usual_minutes ?? DEFAULT_MINUTES,
       loose: t.loose,
       habit_since: t.habit_since,
+      show_on_daily_list: t.show_on_daily_list,
       visibility: t.visibility,
     })),
     steps: data.steps.map((s) => ({ id: s.id, routine_id: s.template_id, text: s.text, icon: s.icon, habit: s.habit })),

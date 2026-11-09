@@ -29,6 +29,8 @@ export type RoutineTemplate = {
   loose: boolean;
   /** When habit tracking was switched on; null when it's off. */
   habit_since: string | null;
+  /** Also shows on the daily list (rare extra emphasis, like a new medicine). */
+  show_on_daily_list: boolean;
 };
 export type RoutineStep = {
   id: string;
@@ -72,7 +74,7 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       .order("name"),
     supabase
       .from("routine_templates")
-      .select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes, anchor, anchor_meal_time_id, anchor_offset, loose, habit_since")
+      .select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes, anchor, anchor_meal_time_id, anchor_offset, loose, habit_since, show_on_daily_list")
       .order("sort_order")
       .order("name"),
     supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential, habit").order("position"),

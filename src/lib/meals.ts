@@ -118,15 +118,14 @@ export function guessAisle(name: string): string {
 // Where a meal sits on the day
 // ---------------------------------------------------------------------------
 
-/** Minutes after the eating time a meal block keeps (for eating). */
+/** How long a meal's block on the timeline lasts: the eating. */
 export const EATING_MINUTES = 30;
-/** Tidying up after a meal: done by everyone who ate, and not tracked. */
-export const TIDY_MINUTES = 15;
 
 /**
- * A meal's block on the timeline: prep (its hands-on minutes, or a
- * sensible default) before the usual eating time, then eating, then
- * tidying up.
+ * A meal on the timeline is just the eating time (tasks rework, step 3).
+ * Tidying up is an ordinary routine anchored after the meal, and there's
+ * no prep block: the cook gets a "Start dinner" task instead, `cookMinutes`
+ * (the recipe's hands-on time, or a sensible default) before eating.
  */
 export function mealSlot(usualTime: string, recipe: { hands_on_minutes: number | null; total_minutes: number | null } | null): {
   start: number;
@@ -136,6 +135,5 @@ export function mealSlot(usualTime: string, recipe: { hands_on_minutes: number |
   const [h, m] = usualTime.split(":").map(Number);
   const eat = h * 60 + m;
   const cookMinutes = recipe?.hands_on_minutes ?? (recipe?.total_minutes ? Math.min(recipe.total_minutes, 60) : 30);
-  const start = Math.max(0, eat - cookMinutes);
-  return { start, minutes: eat - start + EATING_MINUTES + TIDY_MINUTES, cookMinutes: eat - start };
+  return { start: eat, minutes: EATING_MINUTES, cookMinutes: Math.min(cookMinutes, eat) };
 }

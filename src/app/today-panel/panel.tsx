@@ -14,8 +14,12 @@ import { createClient } from "@/lib/supabase/server";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { dailyOrder, onDailyList, timedToday } from "@/lib/todos";
 import { toggleTodo } from "../chores/actions";
-import { loadTodos } from "../chores/data";
+import { loadTodos, type Todo } from "../chores/data";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
+import { mealsForRoutines, placeTodayMeals, startCooking } from "../meals/today";
+import { toggleStep } from "../routines/actions";
+import { loadRoutines } from "../routines/data";
+import { floatingRoutines } from "../routines/floating";
 import { pickPanelTab, setPanelOpen } from "./actions";
 
 /**
@@ -27,6 +31,8 @@ import { pickPanelTab, setPanelOpen } from "./actions";
  *    The daily list is today's tasks from every list: chores, heads-ups and
  *    list tasks for today (tasks rework, 2026-11-09). Timed ones come first,
  *    with the time beside them; a task for one person is in their colour.
+ *    Routines switched to "Show on daily list" join it (tasks rework,
+ *    step 3), and so does the cook's "Start dinner".
  *    A routine's checklist can take this part over for a while.
  * 3. The bottom box shows the next meal. (Spotify comes later.)
  *
@@ -42,6 +48,24 @@ export type UpNextItem = {
   time: string;
   colour: string;
 };
+
+/** A row on the daily list: a task, a routine switched on to show there, or the cook's "Start dinner". */
+type Row =
+  | { kind: "todo"; key: string; todo: Todo; time: string | null }
+  | {
+      kind: "routine";
+      key: string;
+      title: string;
+      icon: string | null;
+      colour: string | null;
+      time: string;
+      memberId: string;
+      templateId: string;
+      /** A one-step routine (a point) ticks right here; a chain opens its checklist. */
+      stepId: string | null;
+      count: string;
+    }
+  | { kind: "start"; key: string; title: string; colour: string | null; time: string; href: string };
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
@@ -72,11 +96,12 @@ export async function TodayPanel({
 }) {
   const { locale, timeZone } = household.settings;
   const supabase = await createClient();
-  const [{ lists, todos }, basics, meals, { data: memberRows }] = await Promise.all([
+  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData] = await Promise.all([
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, addDays(today, 1)),
     supabase.from("members").select("id, colour"),
+    loadRoutines(today),
   ]);
   const colourOf = new Map((memberRows ?? []).map((m) => [m.id, m.colour]));
 
@@ -88,7 +113,71 @@ export async function TodayPanel({
   const chipLists = lists.slice(0, chipCount);
   if (list && !chipLists.includes(list)) chipLists[chipCount - 1] = list;
 
-  const open =
+  const nowMinutes = (() => {
+    const [h, m] = localTimeOf(new Date(), timeZone).split(":").map(Number);
+    return h * 60 + m;
+  })();
+  const hhmm = (minutes: number) =>
+    `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+  // Besides tasks, the daily list has routines switched on to show there,
+  // and the cook's "Start dinner" (until the meal is eaten).
+  const todayMeals = placeTodayMeals(
+    meals.filter((m) => m.date === today),
+    basics,
+    [],
+  );
+  const extras: Row[] =
+    showing === "today"
+      ? [
+          ...routineData.members.flatMap((m) =>
+            floatingRoutines(
+              routineData,
+              m.id,
+              today,
+              [],
+              timeZone,
+              household.settings.routineFlexMinutes,
+              mealsForRoutines(todayMeals),
+            )
+              .filter(
+                (r) =>
+                  r.template.show_on_daily_list &&
+                  !r.progress.complete &&
+                  !routineData.ended.has(`${m.id}:${r.template.id}`),
+              )
+              .map(
+                (r): Row => ({
+                  kind: "routine",
+                  key: `routine:${r.assignment.id}`,
+                  title: r.steps.length === 1 ? r.steps[0].text : r.template.name,
+                  icon: r.progress.next?.icon ?? r.steps[0]?.icon ?? null,
+                  colour: m.colour,
+                  time: hhmm(r.placement.startMin),
+                  memberId: m.id,
+                  templateId: r.template.id,
+                  stepId: r.steps.length === 1 ? r.steps[0].id : null,
+                  count: `${r.progress.done}/${r.progress.total}`,
+                }),
+              ),
+          ),
+          ...todayMeals.flatMap((m): Row[] => {
+            const start = startCooking(m);
+            if (!start || m.eatEnd <= nowMinutes) return [];
+            return [
+              {
+                kind: "start",
+                key: `start:${m.id}`,
+                title: start.title,
+                colour: m.cookId ? (colourOf.get(m.cookId) ?? null) : null,
+                time: hhmm(start.minute),
+                href: start.href,
+              },
+            ];
+          }),
+        ]
+      : [];
+  const tasks: Row[] = (
     showing === "today"
       ? dailyOrder(
           todos.filter((t) => t.status === "open" && onDailyList(t, today)),
@@ -96,7 +185,20 @@ export async function TodayPanel({
         )
       : list
         ? todos.filter((t) => t.list_id === list.id && t.status === "open")
-        : [];
+        : []
+  ).map((todo) => ({
+    kind: "todo",
+    key: todo.id,
+    todo,
+    time: todo.at_time && timedToday(todo, today) ? todo.at_time.slice(0, 5) : null,
+  }));
+  // Timed things first, by time; then the rest in the daily list's order.
+  const open: Row[] = [
+    ...[...tasks, ...extras]
+      .filter((r) => r.time !== null)
+      .sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+    ...tasks.filter((r) => r.time === null),
+  ];
 
   // The next meal: today's still to come (or under way), else tomorrow's first.
   const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
@@ -235,43 +337,72 @@ export async function TodayPanel({
           </p>
         ) : (
           <ul className="flex flex-col">
-            {open.slice(0, ROWS).map((todo) => (
-              <li
-                key={todo.id}
-                className="flex min-h-16 items-center gap-2 border-b border-panel last:border-0"
-              >
-                <form action={toggleTodo}>
-                  <input type="hidden" name="id" value={todo.id} />
-                  <input type="hidden" name="returnTo" value={returnTo} />
-                  <button
-                    aria-label={`Tick off ${todo.title}`}
-                    className="flex size-[var(--touch-target)] items-center justify-center"
-                  >
-                    <span className="flex size-8 items-center justify-center rounded-[0.625rem] border-[2.5px] border-check-border text-transparent hover:text-check-border">
-                      <Check size="1.125rem" weight="bold" aria-hidden />
-                    </span>
-                  </button>
-                </form>
-                {todo.icon ? (
-                  <Emoji emoji={todo.icon} className="size-8" />
-                ) : null}
-                <span
-                  className="line-clamp-2 min-w-0 flex-1 font-hand text-2xl leading-[1.1] break-words text-ink"
-                  style={todo.assignee_id && colourOf.has(todo.assignee_id) ? { color: strong(colourOf.get(todo.assignee_id)!) } : undefined}
-                >
-                  {todo.title}
+            {open.slice(0, ROWS).map((row) => {
+              const colour =
+                row.kind === "todo"
+                  ? row.todo.assignee_id
+                    ? colourOf.get(row.todo.assignee_id)
+                    : undefined
+                  : (row.colour ?? undefined);
+              const title = row.kind === "todo" ? row.todo.title : row.title;
+              const icon = row.kind === "todo" ? row.todo.icon : row.kind === "start" ? "🔪" : row.icon;
+              const box = (
+                <span className="flex size-8 items-center justify-center rounded-[0.625rem] border-[2.5px] border-check-border text-transparent hover:text-check-border">
+                  <Check size="1.125rem" weight="bold" aria-hidden />
                 </span>
-                {todo.at_time && timedToday(todo, today) ? (
-                  <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">
-                    {taskTime(todo.at_time)}
+              );
+              return (
+                <li
+                  key={row.key}
+                  className="flex min-h-16 items-center gap-2 border-b border-panel last:border-0"
+                >
+                  {row.kind === "todo" ? (
+                    <form action={toggleTodo}>
+                      <input type="hidden" name="id" value={row.todo.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <button aria-label={`Tick off ${title}`} className="flex size-[var(--touch-target)] items-center justify-center">
+                        {box}
+                      </button>
+                    </form>
+                  ) : row.kind === "routine" && row.stepId ? (
+                    <form action={toggleStep}>
+                      <input type="hidden" name="memberId" value={row.memberId} />
+                      <input type="hidden" name="stepId" value={row.stepId} />
+                      <input type="hidden" name="templateId" value={row.templateId} />
+                      <input type="hidden" name="date" value={today} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <button aria-label={`Tick off ${title}`} className="flex size-[var(--touch-target)] items-center justify-center">
+                        {box}
+                      </button>
+                    </form>
+                  ) : (
+                    // A routine with several steps opens its checklist; Start dinner opens the cook's view.
+                    <Link
+                      href={row.kind === "routine" ? `/?routine=${row.templateId}&member=${row.memberId}` : row.href}
+                      aria-label={`Open ${title}`}
+                      className="flex size-[var(--touch-target)] items-center justify-center text-ink-muted"
+                    >
+                      <CaretRight size="1.5rem" weight="bold" aria-hidden />
+                    </Link>
+                  )}
+                  {icon ? <Emoji emoji={icon} className="size-8" /> : null}
+                  <span
+                    className="line-clamp-2 min-w-0 flex-1 font-hand text-2xl leading-[1.1] break-words text-ink"
+                    style={colour ? { color: strong(colour) } : undefined}
+                  >
+                    {title}
                   </span>
-                ) : todo.must_do ? (
-                  <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">
-                    Must do
-                  </span>
-                ) : null}
-              </li>
-            ))}
+                  {row.kind === "routine" && !row.stepId ? (
+                    <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">{row.count}</span>
+                  ) : null}
+                  {row.time ? (
+                    <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">{taskTime(row.time)}</span>
+                  ) : row.kind === "todo" && row.todo.must_do ? (
+                    <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
         {(() => {

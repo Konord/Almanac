@@ -21,6 +21,7 @@ const routine = {
   usual_minutes: 30,
   loose: false,
   habit_since: null,
+  show_on_daily_list: false,
   visibility: "everyone",
 };
 const draft = (changes: Partial<ManagerDraft> = {}): ManagerDraft => ({
