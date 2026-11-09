@@ -119,7 +119,6 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
   const title = text(formData, "title");
   const layerId = text(formData, "layerId");
   const startDate = text(formData, "startDate");
-  const energyCost = Number(text(formData, "energyCost") || "1");
   const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
   const icon = text(formData, "icon");
@@ -141,7 +140,6 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
   });
   if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
   if (icon && [...icon].length > 8) back(formData, "error", "The picture should be one emoji, like 🦷.");
-  if (![0, 1, 2, 3].includes(energyCost)) back(formData, "error", "Choose an energy cost.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
   const allDay = times.allDay;
@@ -163,17 +161,18 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     ends_at: endsAt.toISOString(),
     all_day: allDay,
     timezone: timeZone,
-    energy_cost: energyCost,
     visibility,
     notes: notes || null,
     icon: icon || null,
   };
 }
 
-/** A length in minutes from the quick-add card, if it sent a sensible one. */
+/** A length in minutes from the quick-add card, if it sent a sensible one. 0 is a point (no length). */
 function readMinutes(formData: FormData): number | null {
-  const minutes = Number(text(formData, "minutes"));
-  return Number.isInteger(minutes) && minutes >= 5 && minutes <= 24 * 60 ? minutes : null;
+  const raw = text(formData, "minutes");
+  if (raw === "") return null;
+  const minutes = Number(raw);
+  return Number.isInteger(minutes) && (minutes === 0 || (minutes >= 5 && minutes <= 24 * 60)) ? minutes : null;
 }
 
 const FREQUENCIES: RepeatFrequency[] = ["none", "daily", "weekly", "monthly", "yearly"];

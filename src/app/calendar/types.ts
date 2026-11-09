@@ -34,7 +34,6 @@ export type CalendarEvent = {
   all_day: boolean;
   /** Who it's for; empty means everyone. */
   member_ids: string[];
-  energy_cost: number;
   visibility: string;
   notes: string | null;
   timezone: string;

@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ArrowCounterClockwise, ArrowRight, ArrowsLeftRight, Check } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, ArrowRight, ArrowsLeftRight, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji } from "@/components/ui";
 import { IMPORTANCE_LABEL, SIZE_LABEL, daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { carriedOver, linkLabel } from "@/lib/todos";
-import { markChoreDone, skipChore, swapOut, toggleTodo, undoRound } from "./actions";
+import { doToday, markChoreDone, skipChore, swapOut, toggleTodo, undoRound } from "./actions";
 import type { ChoreMember, ChoreWithTiming, Round, Todo } from "./data";
 
 /** "Today", "Tomorrow", "Sat", or "Nov 14". */
@@ -211,6 +211,19 @@ export function TodoRow({
         <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
       ) : todo.due_date && !done ? (
         <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{todoWhen(todo, today, household)}</span>
+      ) : !done ? (
+        // No date: it stays on its list until it's put on today's daily list.
+        <form action={doToday} className="shrink-0">
+          <input type="hidden" name="id" value={todo.id} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <button
+            className="flex min-h-11 items-center gap-1.5 rounded-full bg-rail px-3 text-sm font-bold text-ink"
+            title="Put this on today's list"
+          >
+            <SunHorizon size="1.125rem" aria-hidden />
+            Do today
+          </button>
+        </form>
       ) : null}
       {opens && todo.link && !done ? (
         <Link

@@ -20,7 +20,7 @@ import type { Icon } from "@phosphor-icons/react";
 export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "settings";
 
 const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
-  { section: "today", href: "/", label: "Today", icon: House },
+  { section: "today", href: "/", label: "Agenda", icon: House },
   { section: "calendar", href: "/calendar", label: "Calendar", icon: CalendarBlank },
   { section: "chores", href: "/chores", label: "Chores", icon: Broom },
   { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
