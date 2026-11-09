@@ -433,7 +433,7 @@ export async function TodayPanel({
 
       {/* 3. The bottom box: the next meal. */}
       <Link
-        href="/meals"
+        href={nextMeal ? `/review?meal=${nextMeal.meal.id}` : `/review?week=${today}`}
         className="mt-4 flex min-h-22 items-center gap-4 rounded-[1.375rem] bg-meal px-5 py-3 text-meal-ink"
       >
         {nextMeal ? (

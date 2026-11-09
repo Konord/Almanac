@@ -6,7 +6,7 @@ import { requireHousehold } from "@/lib/household";
 import { weekDates } from "@/lib/meals";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalDate, localDateOf } from "@/lib/time";
-import { movesFor, type ReviewDraft } from "@/lib/weekly-review";
+import { isNewMeal, movesFor, type DraftMeal, type ReviewDraft } from "@/lib/weekly-review";
 import { loadChoreDays } from "../chores/data";
 import { syncHeadsUps } from "../meals/shared";
 import { loadRoutines } from "../routines/data";
@@ -22,7 +22,7 @@ export type SaveReviewResult = { ok: true } | { ok: false; error: string };
  *   - Kinds of day: the review's own one-day breaks are replaced; a day
  *     where someone's kind of day differs from their usual one gets a
  *     one-day break that switches it.
- *   - Meals: swapped to another theme, or taken off.
+ *   - Meals: changed (kind, which one, who, servings), added or taken off.
  */
 export async function saveReview(week: string, draft: ReviewDraft): Promise<SaveReviewResult> {
   const household = await requireHousehold();
@@ -78,32 +78,9 @@ export async function saveReview(week: string, draft: ReviewDraft): Promise<Save
       if (bad2) return bad2;
     }
 
-    // 3. Meals.
-    const changed = Object.entries(draft.meals);
-    if (changed.length > 0) {
-      const [mealRows, links] = await Promise.all([
-        supabase.from("meals").select("id, date").in("id", changed.map(([id]) => id)),
-        supabase.from("recipe_categories").select("recipe_id, category_id"),
-      ]);
-      for (const r of [mealRows, links]) if (r.error) return { ok: false, error: r.error.message };
-      const dateOf = new Map((mealRows.data ?? []).map((m) => [m.id, m.date]));
-      for (const [id, categoryId] of changed) {
-        const date = dateOf.get(id);
-        if (!date || date < today) continue;
-        if (categoryId === null) {
-          const bad3 = fail((await supabase.from("meals").delete().eq("id", id)).error);
-          if (bad3) return bad3;
-          continue;
-        }
-        // A theme with one variant needs no choosing.
-        const variants = (links.data ?? []).filter((l) => l.category_id === categoryId).map((l) => l.recipe_id);
-        const bad3 = fail(
-          (await supabase.from("meals").update({ category_id: categoryId, recipe_id: variants.length === 1 ? variants[0] : null, from_preset: false }).eq("id", id)).error,
-        );
-        if (bad3) return bad3;
-        await syncHeadsUps(household.id, id, household.settings.timeZone);
-      }
-    }
+    // 3. Meals: changed, added or taken off (all meal planning happens here).
+    const bad3 = await saveMeals(household.id, household.settings.timeZone, draft, dates);
+    if (bad3) return { ok: false, error: bad3 };
   }
 
   // 4. The week is reviewed.
@@ -111,6 +88,13 @@ export async function saveReview(week: string, draft: ReviewDraft): Promise<Save
     (await supabase.from("weekly_reviews").upsert({ household_id: household.id, week_start: week, reviewed_at: new Date().toISOString(), dismissed: draft.dismissed.slice(0, 100) }, { onConflict: "household_id,week_start" })).error,
   );
   if (done) return done;
+  // The grocery list's suggestions follow the meals just saved.
+  try {
+    const { buildSuggestions } = await import("../meals/groceries-build");
+    await buildSuggestions(household, week);
+  } catch {
+    // Not worth failing the save over: the list rebuilds when it's opened.
+  }
   await supabase.from("activity_log").insert({
     household_id: household.id,
     action: "week_reviewed",
@@ -120,4 +104,76 @@ export async function saveReview(week: string, draft: ReviewDraft): Promise<Save
   });
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Writes the draft's meals on the open days. Returns a problem, or null. */
+async function saveMeals(householdId: string, timeZone: string, draft: ReviewDraft, dates: string[]): Promise<string | null> {
+  const entries = Object.entries(draft.meals);
+  if (entries.length === 0) return null;
+  const supabase = await createClient();
+  const savedIds = entries.map(([id]) => id).filter((id) => !isNewMeal(id));
+  const [rows, recipes, members] = await Promise.all([
+    savedIds.length ? supabase.from("meals").select("id, date").in("id", savedIds) : Promise.resolve({ data: [], error: null }),
+    supabase.from("recipes").select("id"),
+    supabase.from("members").select("id"),
+  ]);
+  for (const r of [rows, recipes, members]) if (r.error) return r.error.message;
+  const dateOf = new Map((rows.data ?? []).map((m) => [m.id, m.date as string]));
+  const recipeIds = new Set((recipes.data ?? []).map((r) => r.id));
+  const memberIds = new Set((members.data ?? []).map((m) => m.id));
+  const open = new Set(dates);
+
+  const people = async (mealId: string, meal: DraftMeal): Promise<string | null> => {
+    await supabase.from("meal_members").delete().eq("meal_id", mealId);
+    const chosen = meal.memberIds.filter((id) => memberIds.has(id));
+    // Everyone (or nobody) ticked means everyone: no rows.
+    if (chosen.length === 0 || chosen.length >= memberIds.size) return null;
+    const { error } = await supabase.from("meal_members").insert(chosen.map((member_id) => ({ meal_id: mealId, member_id, household_id: householdId })));
+    return error?.message ?? null;
+  };
+
+  for (const [id, meal] of entries) {
+    if (isNewMeal(id)) {
+      if (!meal || !open.has(meal.date)) continue;
+      const { data, error } = await supabase
+        .from("meals")
+        .insert({
+          household_id: householdId,
+          date: meal.date,
+          meal_time_id: meal.mealTimeId,
+          category_id: meal.categoryId,
+          recipe_id: meal.recipeId && recipeIds.has(meal.recipeId) ? meal.recipeId : null,
+          servings: meal.servings,
+          sort_order: 10,
+        })
+        .select("id")
+        .single();
+      if (error) return error.message;
+      const bad = await people(data.id, meal);
+      if (bad) return bad;
+      await syncHeadsUps(householdId, data.id, timeZone);
+      continue;
+    }
+    const date = dateOf.get(id);
+    if (!date || !open.has(date)) continue;
+    if (meal === null) {
+      const { error } = await supabase.from("meals").delete().eq("id", id);
+      if (error) return error.message;
+      continue;
+    }
+    const { error } = await supabase
+      .from("meals")
+      .update({
+        category_id: meal.categoryId,
+        recipe_id: meal.recipeId && recipeIds.has(meal.recipeId) ? meal.recipeId : null,
+        servings: meal.servings,
+        from_preset: false,
+      })
+      .eq("id", id);
+    if (error) return error.message;
+    const bad = await people(id, meal);
+    if (bad) return bad;
+    await syncHeadsUps(householdId, id, timeZone);
+  }
+  return null;
 }

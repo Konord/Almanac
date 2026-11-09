@@ -8,14 +8,14 @@ import { Notice, ScreenHeader, Segmented } from "@/components/ui";
  * pop-up card that never scrolls, and page arrows for long lists.
  */
 
-export type MealsTab = "plan" | "library" | "groceries" | "backups" | "setup";
+export type MealsTab = "library" | "groceries" | "backups" | "setup";
 
 const TABS: { tab: MealsTab; href: string; label: string }[] = [
-  { tab: "plan", href: "/meals", label: "Plan" },
+  // The Menu Manager (Connor, 2026-11-09): meals are planned in the weekly review.
   { tab: "library", href: "/meals/library", label: "Recipes" },
-  { tab: "groceries", href: "/meals/groceries", label: "Groceries" },
-  { tab: "backups", href: "/meals/backups", label: "Backups" },
-  { tab: "setup", href: "/meals/setup", label: "Setup" },
+  { tab: "backups", href: "/meals/backups", label: "Backup meals" },
+  { tab: "groceries", href: "/meals/groceries", label: "Grocery list" },
+  { tab: "setup", href: "/meals/setup", label: "Meal times" },
 ];
 
 export function MealsHeader({
@@ -36,7 +36,7 @@ export function MealsHeader({
       <ScreenHeader title={title}>
         {children}
         <div className="lg:ml-auto">
-          <Segmented label="Meals" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
+          <Segmented label="Menu Manager" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
         </div>
       </ScreenHeader>
       {error ? <Notice tone="error">{error}</Notice> : null}

@@ -44,7 +44,7 @@ async function Setup({ searchParams }: { searchParams: PageProps<"/meals/setup">
 
   return (
     <>
-      <MealsHeader title="Meals setup" tab="setup" error={firstParam(params.error)} message={firstParam(params.message)}>
+      <MealsHeader title="Meal times" tab="setup" error={firstParam(params.error)} message={firstParam(params.message)}>
         <nav aria-label="Setup" className="flex gap-1 rounded-2xl bg-panel p-1.25">
           {TABS.map((t) => (
             <Link

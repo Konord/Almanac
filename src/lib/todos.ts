@@ -73,7 +73,8 @@ export function dailyOrder<T extends TodoTiming>(todos: T[], today: LocalDate): 
 
 /** The parts of the app a to-do can open. */
 export const FEATURE_LINKS = [
-  { path: "/meals", label: "Meal planner" },
+  { path: "/review", label: "Weekly review" },
+  { path: "/meals", label: "Menu Manager" },
   { path: "/meals/groceries", label: "Grocery list" },
   { path: "/meals/backups", label: "Backup meals" },
   { path: "/chores", label: "Chores" },

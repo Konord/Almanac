@@ -4,12 +4,12 @@ import { dayFor } from "@/lib/day-types";
 import type { Household } from "@/lib/household";
 import { EATING_MINUTES, weekDates, weekStartOf } from "@/lib/meals";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { reviewDue, type ReviewDay, type ReviewDraft } from "@/lib/weekly-review";
+import { reviewDue, type DraftMeal, type ReviewDay, type ReviewDraft } from "@/lib/weekly-review";
 import { loadCalendar, profilesFor, rangeOf } from "../calendar/data";
-import { eventsOnDay, isAllDayStyle, shortTime } from "../calendar/views";
+import { eventsOnDay, isAllDayStyle } from "../calendar/views";
 import { choreSchedule, loadChoreDayMoves } from "../chores/plan";
 import { loadChoreDays } from "../chores/data";
-import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
+import { loadMealBasics, loadMeals } from "../meals/data";
 import { ensurePresets } from "../meals/shared";
 import { loadRoutines } from "../routines/data";
 
@@ -17,12 +17,12 @@ import { loadRoutines } from "../routines/data";
 export type ReviewColumn = ReviewDay & {
   /** "Mon 16" */
   label: string;
-  /** A glance at its plans: the first few, with times. */
-  events: { id: string; time: string | null; title: string; icon: string | null }[];
-  moreEvents: number;
-  /** How each meal looks before any swap. */
-  mealLooks: Record<string, { title: string; icon: string }>;
+  /** Its plans, all-day ones first, in the colour of the first person in each (no times). */
+  events: { id: string; title: string; icon: string | null; memberId: string | null }[];
 };
+
+/** The meals the review can choose from. */
+export type ReviewRecipe = { id: string; name: string; icon: string | null; categoryIds: string[]; isBackup: boolean; serves: number };
 
 export type ReviewData = {
   week: LocalDate;
@@ -30,10 +30,13 @@ export type ReviewData = {
   members: { id: string; name: string; colour: string; icon: string | null }[];
   dayTypes: { id: string; member_id: string; name: string; icon: string | null }[];
   choreDays: ChoreDay[];
-  /** Meal themes to swap to, and which meal times each suits (empty: any). */
+  /** The meal times shown as tiles on each day, in order. */
+  mealTimes: { id: string; name: string; icon: string | null }[];
+  /** Kinds of meal, and which meal times each suits (empty: any). */
   categories: { id: string; name: string; icon: string | null; meal_time_ids: string[] }[];
-  /** Meal id → its meal time, for the swap picker. */
-  mealTimeOf: Record<string, string>;
+  recipes: ReviewRecipe[];
+  /** The week's meals as saved (the draft holds changes to them). */
+  meals: DraftMeal[];
   hardChores: { id: string; name: string }[];
   initial: ReviewDraft;
   reviewed: boolean;
@@ -79,8 +82,6 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     loadWeekReview(week),
   ]);
   const profiles = profilesFor(dates, calendar.items, calendar.layers, household);
-  const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
-  const categories = new Map(basics.categories.map((c) => [c.id, c]));
   const plannerTimes = basics.mealTimes.filter((t) => t.show_on_planner);
   const memberIds = routines.members.map((m) => m.id);
 
@@ -89,10 +90,10 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     const items = eventsOnDay(calendar.items, date, timeZone).toSorted((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
     const allDay = items.filter((e) => isAllDayStyle(e, timeZone));
     const timed = items.filter((e) => !isAllDayStyle(e, timeZone));
-    const shown = [...allDay, ...timed];
+    const shown = [...allDay, ...timed].slice(0, 12);
     const dayMeals = plannerTimes.flatMap((t) =>
       meals
-        .filter((m) => m.date === date && m.meal_time_id === t.id && m.status !== "skipped")
+        .filter((m) => m.date === date && m.meal_time_id === t.id && m.status !== "skipped" && m.status !== "swapped")
         .map((m) => {
           const start = zonedToUtc(date, t.usual_time, timeZone).getTime();
           const end = start + EATING_MINUTES * 60_000;
@@ -117,14 +118,12 @@ export async function loadReview(household: Household, week: LocalDate, today: L
       busy: profile?.kind === "busy",
       busyMinutes: profile?.busyMinutes ?? 0,
       meals: dayMeals.map(({ meal, time, everyoneOut }) => ({ id: meal.id, mealTimeName: time.name, categoryId: meal.category_id, everyoneOut })),
-      mealLooks: Object.fromEntries(dayMeals.map(({ meal }) => [meal.id, { title: mealName(meal, recipes, categories), icon: mealIcon(meal, recipes, categories) }])),
-      events: shown.slice(0, 3).map((e) => ({
+      events: shown.map((e) => ({
         id: `${e.id}-${e.starts_at}`,
-        time: isAllDayStyle(e, timeZone) ? null : shortTime(new Date(e.starts_at), household),
         title: e.title,
         icon: e.icon ?? null,
+        memberId: e.member_ids.find((id) => memberIds.includes(id)) ?? null,
       })),
-      moreEvents: Math.max(0, shown.length - 3),
     };
   });
 
@@ -151,8 +150,20 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     members: routines.members.map((m) => ({ id: m.id, name: m.name, colour: m.colour, icon: m.icon })),
     dayTypes: routines.dayTypes.map((t) => ({ id: t.id, member_id: t.member_id, name: t.name, icon: t.icon })),
     choreDays,
+    mealTimes: plannerTimes.map((t) => ({ id: t.id, name: t.name, icon: t.icon })),
     categories: basics.categories.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, icon: c.icon, meal_time_ids: c.meal_time_ids })),
-    mealTimeOf: Object.fromEntries(meals.map((m) => [m.id, m.meal_time_id])),
+    recipes: basics.recipes.map((r) => ({ id: r.id, name: r.name, icon: r.icon, categoryIds: r.category_ids, isBackup: r.is_backup, serves: r.serves })),
+    meals: meals
+      .filter((m) => m.status !== "skipped" && m.status !== "swapped" && plannerTimes.some((t) => t.id === m.meal_time_id))
+      .map((m) => ({
+        id: m.id,
+        date: m.date,
+        mealTimeId: m.meal_time_id,
+        categoryId: m.category_id,
+        recipeId: m.recipe_id,
+        memberIds: m.member_ids,
+        servings: m.servings,
+      })),
     hardChores: schedule.chores.filter((c) => schedule.hard.has(c.id)).map((c) => ({ id: c.id, name: c.name })),
     initial,
     reviewed: review !== null,

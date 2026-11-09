@@ -513,7 +513,7 @@ export function WeekView({
                 </div>
                 {anyDinner ? (
                   <Link
-                    href={`/meals?week=${day}`}
+                    href={`/review?week=${day}`}
                     className={`flex h-9 min-w-0 items-center gap-1.5 rounded-xl px-2 text-base font-bold ${
                       dinner ? "bg-meal text-meal-ink" : "text-ink-muted"
                     }`}
