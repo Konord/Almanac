@@ -1,66 +1,94 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CaretLeft, CaretRight, CheckCircle, Plus, Sparkle, Suitcase, X } from "@phosphor-icons/react";
-import { Avatar, Emoji } from "@/components/ui";
-import { LeaveDialog, useUnsavedChanges } from "@/components/unsaved-changes";
+import { CaretDown, CaretLeft, CaretRight, ShoppingCart, Sparkle, Suitcase } from "@phosphor-icons/react";
+import { Emoji } from "@/components/ui";
+import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { eventEmoji } from "@/lib/emoji";
+import { strong } from "@/lib/colours";
 import {
   addChoreDay,
   applyFix,
   dismiss,
-  mealIsOff,
+  kindGroups,
+  mealsIn,
   moveChoreDay,
   reviewProblems,
   setDayType,
   setMeal,
   takeOffChoreDay,
+  type DraftMeal,
+  type KindGroup,
   type ReviewDraft,
 } from "@/lib/weekly-review";
 import { saveReview } from "./actions";
+import { ChecksBox, KindBox, PickerBox, type KindChoice, type Picker } from "./boxes";
 import type { ReviewColumn, ReviewData } from "./data";
-
-/** What the picker box offers. */
-type Picker = { title: string; options: { key: string; label: string; icon?: string | null; danger?: boolean; pick: () => void }[] };
-
-/** How many problems show at once (fixing one shows the next). */
-const PROBLEMS_SHOWN = 3;
-/** How many choices fit in the picker box before it pages. */
-const PICKS_SHOWN = 12;
+import { GrocerySheet } from "./grocery-sheet";
+import { MealBox, type MealTarget } from "./meal-box";
+import { Face, SectionTitle, type Person } from "./parts";
 
 /**
- * The weekly review: seven days side by side, each with everyone's kind of
- * day, its chore days, its meals and a glance at its plans. Tap any of them
- * to change it. Problems show along the bottom with a fix to approve. All
- * changes wait for Confirm week.
+ * The weekly review, where the coming week is planned (Connor's redesign,
+ * 2026-11-09). It looks like the Week calendar without times: seven days
+ * side by side, each with big meal tiles and a grey box summing up the
+ * rest. Tapping the grey box opens it up over the day's meals to show and
+ * change its kinds of day, chore days and plans; Close shrinks it back.
+ * Tapping a meal tile opens the meal picker. One Save in the header keeps
+ * it all; the grocery list beside it is live.
  */
-export function ReviewBoard({ data, range, weekHref }: { data: ReviewData; range: string; weekHref: { prev: string; next: string; coming: string; isComing: boolean } }) {
+export function ReviewBoard({
+  data,
+  range,
+  weekHref,
+  openMeal = null,
+}: {
+  data: ReviewData;
+  range: string;
+  weekHref: { prev: string; next: string; coming: string; isComing: boolean };
+  /** A meal to open the picker on straight away. */
+  openMeal?: { id: string; date: string; mealTimeId: string } | null;
+}) {
   const router = useRouter();
   const [draft, setDraft] = useState<ReviewDraft>(data.initial);
+  const [openDay, setOpenDay] = useState<string | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
-  const [page, setPage] = useState(0);
+  const [mealAt, setMealAt] = useState<{ mealId: string | null; date: string; mealTimeId: string } | null>(
+    openMeal && data.meals.some((m) => m.id === openMeal.id) ? { mealId: openMeal.id, date: openMeal.date, mealTimeId: openMeal.mealTimeId } : null,
+  );
+  const [kindAt, setKindAt] = useState<{ date: string; start: string | null } | null>(null);
+  const [checks, setChecks] = useState(false);
+  const [groceries, setGroceries] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [goTo, setGoTo] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.initial);
   const guard = useUnsavedChanges(dirty);
 
+  const members: Person[] = data.members;
+  const person = new Map(members.map((m) => [m.id, m]));
+  const memberOrder = members.map((m) => m.id);
   const choreDay = new Map(data.choreDays.map((d) => [d.id, d]));
   const freeDay = data.choreDays.find((d) => d.is_free);
   const dayType = new Map(data.dayTypes.map((t) => [t.id, t]));
   const category = new Map(data.categories.map((c) => [c.id, c]));
+  const recipe = new Map(data.recipes.map((r) => [r.id, r]));
   const open = data.columns.filter((c) => !c.past);
+
+  /** Every kind of day by name, with each person's own version of it. */
+  const kinds: KindChoice[] = [];
+  for (const t of data.dayTypes) {
+    const key = t.name.trim().toLowerCase();
+    let k = kinds.find((x) => x.key === key);
+    if (!k) kinds.push((k = { key, name: t.name, icon: t.icon, typeOf: {} }));
+    if (!(t.member_id in k.typeOf)) k.typeOf[t.member_id] = t.id;
+  }
 
   const change = (f: (d: ReviewDraft) => ReviewDraft) => {
     setError(null);
     setDraft(f);
     setPicker(null);
-  };
-  const ask = (p: Picker) => {
-    setPage(0);
-    setPicker(p);
   };
 
   const problems = reviewProblems({
@@ -70,9 +98,8 @@ export function ReviewBoard({ data, range, weekHref }: { data: ReviewData; range
     categoryNames: Object.fromEntries(data.categories.map((c) => [c.id, c.name])),
     hardChores: data.hardChores,
   });
-  const flagged = new Set(problems.map((p) => p.date));
 
-  const confirm = async (then?: string | null) => {
+  const save = async (then?: string | null) => {
     setSaving(true);
     const result = await saveReview(data.week, draft);
     setSaving(false);
@@ -88,24 +115,30 @@ export function ReviewBoard({ data, range, weekHref }: { data: ReviewData; range
   /** Another week: ask first when there are changes (the menu's links ask by themselves). */
   const go = (href: string) => (dirty ? setGoTo(href) : router.push(href));
 
-  // --- What tapping each thing offers --------------------------------------
+  // --- How things look ------------------------------------------------------
 
-  const pickDayType = (col: ReviewColumn, memberId: string, name: string) =>
-    ask({
-      title: `${name} on ${col.name}`,
-      options: data.dayTypes
-        .filter((t) => t.member_id === memberId)
-        .map((t) => ({ key: t.id, label: t.name, icon: t.icon, pick: () => change((d) => setDayType(d, col.date, memberId, t.id)) })),
-    });
+  const mealLook = (m: DraftMeal) => {
+    const r = m.recipeId ? recipe.get(m.recipeId) : undefined;
+    const c = m.categoryId ? category.get(m.categoryId) : undefined;
+    const variants = c ? data.recipes.filter((x) => !x.isBackup && x.categoryIds.includes(c.id)).length : 0;
+    return { title: r?.name ?? c?.name ?? "Meal", icon: r?.icon ?? c?.icon ?? "🍽️", kind: r && c ? c.name : null, pick: !r && variants > 1 };
+  };
+  const mealChanged = (id: string) => id in draft.meals;
+  const groupsOn = (date: string): KindGroup[] => kindGroups(draft.dayTypes[date] ?? {}, memberOrder, dayType);
+  const kindChanged = (date: string, g: KindGroup) => g.memberIds.some((id) => (data.initial.dayTypes[date]?.[id] ?? "") !== (draft.dayTypes[date]?.[id] ?? ""));
+  const choresOn = (date: string) => draft.choreDays[date] ?? [];
+  const choreChanged = (date: string, id: string) => !(data.initial.choreDays[date] ?? []).includes(id);
+
+  // --- What tapping things offers --------------------------------------------
 
   const pickChoreDay = (col: ReviewColumn, id: string) => {
     const cd = choreDay.get(id);
     if (!cd) return;
-    ask({
+    setPicker({
       title: `${cd.name} on ${col.name}`,
       options: [
         ...open
-          .filter((c) => c.date !== col.date && !(draft.choreDays[c.date] ?? []).includes(id))
+          .filter((c) => c.date !== col.date && !choresOn(c.date).includes(id))
           .map((c) => ({ key: c.date, label: `Move to ${c.name}`, icon: cd.icon, pick: () => change((d) => moveChoreDay(d, id, col.date, c.date)) })),
         { key: "off", label: `Take off ${col.name}`, danger: true, pick: () => change((d) => takeOffChoreDay(d, col.date, id)) },
       ],
@@ -113,225 +146,287 @@ export function ReviewBoard({ data, range, weekHref }: { data: ReviewData; range
   };
 
   const addChore = (col: ReviewColumn) =>
-    ask({
-      title: `Another chore day on ${col.name}`,
+    setPicker({
+      title: `Add a chore day on ${col.name}`,
       options: data.choreDays
-        .filter((cd) => !cd.is_free && !(draft.choreDays[col.date] ?? []).includes(cd.id))
+        .filter((cd) => !cd.is_free && !choresOn(col.date).includes(cd.id))
         .map((cd) => ({ key: cd.id, label: cd.name, icon: cd.icon, pick: () => change((d) => addChoreDay(d, col.date, cd.id)) })),
     });
 
-  const pickMeal = (col: ReviewColumn, mealId: string, title: string) => {
-    const time = data.mealTimeOf[mealId];
-    const now = mealId in draft.meals ? draft.meals[mealId] : undefined;
-    ask({
-      title: `${title} on ${col.name}`,
-      options: [
-        ...data.categories
-          .filter((c) => (c.meal_time_ids.length === 0 || c.meal_time_ids.includes(time)) && c.id !== now)
-          .map((c) => ({ key: c.id, label: c.name, icon: c.icon, pick: () => change((d) => setMeal(d, mealId, c.id)) })),
-        mealIsOff(draft, mealId)
-          ? {
-              key: "back",
-              label: "Put it back",
-              pick: () =>
-                change((d) => {
-                  const meals = { ...d.meals };
-                  delete meals[mealId];
-                  return { ...d, meals };
-                }),
-            }
-          : { key: "off", label: "Take it off", danger: true, pick: () => change((d) => setMeal(d, mealId, null)) },
-      ],
-    });
-  };
+  // The meal picker follows the draft, so it shows each change as it's made.
+  const mealTarget: MealTarget | null = (() => {
+    if (!mealAt) return null;
+    const col = data.columns.find((c) => c.date === mealAt.date);
+    const time = data.mealTimes.find((t) => t.id === mealAt.mealTimeId);
+    const meal = mealAt.mealId ? (mealsIn(data.meals, draft, mealAt.date, mealAt.mealTimeId).find((m) => m.id === mealAt.mealId) ?? null) : null;
+    return { meal, date: mealAt.date, mealTimeId: mealAt.mealTimeId, where: `${time?.name ?? "Meal"} · ${col?.label ?? ""}` };
+  })();
 
-  // --- The screen ----------------------------------------------------------
+  // --- The screen ------------------------------------------------------------
 
   return (
     <>
-      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
+      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 lg:h-18 lg:flex-nowrap">
         <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Weekly review</h1>
         <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25">
           <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
-          <span className="px-2 text-lg font-bold text-ink">{range}</span>
+          <span className="px-2 text-lg font-bold whitespace-nowrap text-ink">{range}</span>
           <WeekButton label="Week after" onClick={() => go(weekHref.next)} icon="next" />
         </div>
         {weekHref.isComing ? null : (
-          <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl px-3 text-base font-bold text-accent">
+          <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl px-3 text-base font-bold whitespace-nowrap text-accent">
             The coming week
           </button>
         )}
-        {data.reviewed ? (
-          <span className="flex items-center gap-1.5 text-base font-bold text-success">
-            <CheckCircle size="1.375rem" weight="fill" aria-hidden />
-            Confirmed
-          </span>
-        ) : null}
-        <p className="text-base text-ink-muted lg:ml-auto">Tap anything to change it.</p>
+        <button
+          type="button"
+          onClick={() => setChecks(true)}
+          className={`flex min-h-13 items-center gap-2 rounded-2xl px-4 text-lg font-bold whitespace-nowrap ${
+            problems.length > 0 ? "bg-[color-mix(in_srgb,var(--color-accent)_11%,white)] text-accent" : "text-ink-muted hover:bg-rail"
+          }`}
+        >
+          <Sparkle size="1.375rem" weight="fill" aria-hidden />
+          {problems.length > 0 ? `${problems.length} to check` : "Nothing to check"}
+        </button>
+        <div className="flex-1" />
+        <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-meal px-5 text-lg font-bold whitespace-nowrap text-meal-ink">
+          <ShoppingCart size="1.625rem" weight="bold" aria-hidden />
+          Grocery list
+        </button>
+        <SaveButton
+          dirty={dirty}
+          saving={saving}
+          error={error}
+          onSave={() => save()}
+          onUndo={() => {
+            setDraft(data.initial);
+            setError(null);
+          }}
+        />
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
-        {data.columns.map((col) => (
-          <section
-            key={col.date}
-            className={`flex min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden rounded-[var(--radius-card)] border px-2.5 py-3 ${
-              col.past ? "border-frame bg-rail opacity-55" : flagged.has(col.date) ? "border-accent bg-board" : "border-frame bg-board"
-            }`}
-            aria-label={col.name}
-          >
-            <div className="flex items-center gap-1.5">
-              <h2 className="min-w-0 flex-1 truncate text-2xl font-extrabold text-ink">{col.label}</h2>
-              {col.away ? <Badge icon="away" label="Away" /> : col.busy ? <Badge icon="busy" label="Busy" /> : null}
-            </div>
+      <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-grid sm:grid-cols-4 lg:grid-cols-7">
+        {data.columns.map((col, i) => {
+          const isOpen = openDay === col.date && !col.past;
+          const groups = groupsOn(col.date);
+          const chores = choresOn(col.date);
+          const slots = data.mealTimes.map((t) => ({ time: t, meals: mealsIn(data.meals, draft, col.date, t.id) }));
+          const roomy = slots.length <= 2;
+          return (
+            <section
+              key={col.date}
+              aria-label={col.name}
+              className={`relative flex min-h-0 min-w-0 flex-col gap-2.5 px-3 pt-3 pb-3 ${i > 0 ? "border-l border-grid" : ""} ${col.past ? "bg-rail" : ""}`}
+            >
+              <div className={`flex h-12 shrink-0 items-center gap-2.5 px-1 ${col.past ? "opacity-50" : ""}`}>
+                <h2 className="truncate text-[1.75rem] text-ink">
+                  <span className="font-extrabold">{col.label.split(" ")[0]}</span> <span className="font-medium text-ink-soft">{col.label.split(" ").slice(1).join(" ")}</span>
+                </h2>
+                {col.away ? <Badge away /> : col.busy ? <Badge /> : null}
+              </div>
 
-            <Group title="Kind of day">
-              {data.members.map((m) => {
-                const t = dayType.get(draft.dayTypes[col.date]?.[m.id] ?? "");
-                const changed = (data.initial.dayTypes[col.date]?.[m.id] ?? "") !== (draft.dayTypes[col.date]?.[m.id] ?? "");
-                return (
-                  <Tap key={m.id} disabled={col.past} changed={changed} onClick={() => pickDayType(col, m.id, m.name)} title={`${m.name}: ${t?.name ?? "No kind of day"}`}>
-                    <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" />
-                    <Emoji emoji={t?.icon} className="size-6" />
-                    <span className="min-w-0 truncate">{t?.name ?? "—"}</span>
-                  </Tap>
-                );
-              })}
-            </Group>
+              {/* Meal tiles, one row per meal time. */}
+              <div className={`flex min-h-0 flex-1 flex-col gap-2 ${col.past ? "opacity-50" : ""}`}>
+                {slots.map(({ time, meals }) =>
+                  meals.length === 0 ? (
+                    <button
+                      key={time.id}
+                      type="button"
+                      disabled={col.past}
+                      onClick={() => setMealAt({ mealId: null, date: col.date, mealTimeId: time.id })}
+                      className="flex min-h-14 shrink-0 basis-[6.875rem] items-center justify-center rounded-[1.375rem] border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_28%,var(--color-meal))] text-lg font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,white)] disabled:opacity-60"
+                    >
+                      + {time.name}
+                    </button>
+                  ) : (
+                    <div key={time.id} className="flex min-h-0 shrink flex-col gap-1.5" style={{ flex: `${meals.length} 1 0` }}>
+                      {meals.map((m) => {
+                        const look = mealLook(m);
+                        const big = roomy && meals.length === 1;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            disabled={col.past}
+                            onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
+                            title={`${time.name}: ${look.title}`}
+                            className={`relative flex min-h-14 min-w-0 flex-1 rounded-[1.375rem] border-2 bg-meal px-2.5 text-meal-ink ${big ? "max-h-[11rem] flex-col items-center justify-center gap-1.5 text-center" : "max-h-[6rem] items-center gap-2.5 text-left"} ${
+                              mealChanged(m.id) ? "border-dashed border-accent" : "border-transparent"
+                            }`}
+                          >
+                            {m.memberIds.length > 0 ? (
+                              <span className={`flex ${big ? "absolute top-2 right-2" : "order-last ml-auto"}`}>
+                                {m.memberIds.map((id) => (
+                                  <span key={id} className="-ml-1.5 first:ml-0">
+                                    <Face person={person.get(id)} size="size-6 text-[0.6875rem]" />
+                                  </span>
+                                ))}
+                              </span>
+                            ) : null}
+                            <Emoji emoji={look.icon} className={big ? "size-[4.75rem]" : "size-10"} />
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate text-xs font-bold tracking-wide uppercase opacity-70">{time.name}</span>
+                              <span className={`line-clamp-2 leading-tight font-extrabold ${big ? "text-xl" : "text-lg"}`}>{look.title}</span>
+                              {look.pick ? <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">Pick which one</span> : null}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ),
+                )}
+              </div>
 
-            <Group title="Chores">
-              {(draft.choreDays[col.date] ?? []).length === 0 ? (
-                <span className="flex min-h-11 items-center gap-2 px-1.5 text-lg font-bold text-ink-muted">
-                  <Emoji emoji={col.away ? "🧳" : (freeDay?.icon ?? "🌿")} className="size-6" />
-                  <span className="truncate">{col.away ? "None: away" : (freeDay?.name ?? "Free day")}</span>
-                </span>
-              ) : (
-                (draft.choreDays[col.date] ?? []).map((id) => {
-                  const cd = choreDay.get(id);
-                  const changed = !(data.initial.choreDays[col.date] ?? []).includes(id);
-                  return (
-                    <Tap key={id} disabled={col.past} changed={changed} onClick={() => pickChoreDay(col, id)} title={cd?.name ?? ""}>
-                      <Emoji emoji={cd?.icon ?? "🧹"} className="size-6" />
-                      <span className="min-w-0 truncate">{cd?.name}</span>
-                    </Tap>
-                  );
-                })
-              )}
-              {col.past ? null : (
-                <button
-                  type="button"
-                  onClick={() => addChore(col)}
-                  className="flex min-h-11 items-center gap-1 rounded-xl px-1.5 text-base font-bold text-ink-muted hover:bg-rail"
-                  aria-label={`Add a chore day on ${col.name}`}
-                >
-                  <Plus size="1rem" weight="bold" aria-hidden />
-                  Chore day
-                </button>
-              )}
-            </Group>
-
-            <Group title="Meals">
-              {col.meals.length === 0 ? <span className="px-1.5 text-lg text-ink-muted">Nothing planned</span> : null}
-              {col.meals.map((meal) => {
-                const swapped = draft.meals[meal.id];
-                const off = mealIsOff(draft, meal.id);
-                const look = swapped ? { title: category.get(swapped)?.name ?? "Meal", icon: category.get(swapped)?.icon ?? "🍽️" } : col.mealLooks[meal.id];
-                return (
-                  <Tap
-                    key={meal.id}
-                    disabled={col.past}
-                    changed={meal.id in draft.meals}
-                    meal
-                    onClick={() => pickMeal(col, meal.id, meal.mealTimeName)}
-                    title={`${meal.mealTimeName}: ${look?.title}`}
-                  >
-                    <Emoji emoji={look?.icon} className="size-6" faded={off} />
-                    <span className={`min-w-0 truncate ${off ? "text-ink-muted line-through" : ""}`}>{look?.title}</span>
-                  </Tap>
-                );
-              })}
-            </Group>
-
-            <Group title="Plans" grow>
-              {col.events.length === 0 ? <span className="px-1.5 text-lg text-ink-muted">Nothing on</span> : null}
-              {col.events.map((e) => (
-                <span key={e.id} className="flex min-h-8 items-center gap-1.5 px-1.5 text-base text-ink">
-                  <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-5" />
-                  {e.time ? <span className="shrink-0 font-bold text-ink-muted">{e.time}</span> : null}
-                  <span className="min-w-0 truncate">{e.title}</span>
-                </span>
-              ))}
-              {col.moreEvents > 0 ? <span className="px-1.5 text-sm font-bold text-ink-muted">+ {col.moreEvents} more</span> : null}
-            </Group>
-          </section>
-        ))}
-      </div>
-
-      <div className="flex shrink-0 flex-col gap-2.5 lg:flex-row">
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 rounded-[var(--radius-card)] bg-rail px-4 py-3" aria-label="Things to check">
-          <h2 className="flex items-center gap-2 text-lg font-extrabold text-ink">
-            <Sparkle size="1.25rem" weight="fill" className="text-accent" aria-hidden />
-            {problems.length === 0 ? "Nothing to check this week" : `Things to check (${problems.length})`}
-          </h2>
-          {problems.length === 0 ? <p className="text-base text-ink-muted">Every day has its usual kind of day, chore days and meals, with nothing in the way.</p> : null}
-          {problems.slice(0, PROBLEMS_SHOWN).map((p) => (
-            <div key={p.id} className="flex min-h-10 items-center gap-2.5">
-              <p className="min-w-0 flex-1 truncate text-base text-ink" title={p.text}>
-                {p.text}
-              </p>
-              {p.fix ? (
-                <button
-                  type="button"
-                  onClick={() => change((d) => applyFix(d, p.fix!.apply))}
-                  className="flex min-h-10 shrink-0 items-center rounded-xl bg-ink px-3.5 text-base font-bold text-board"
-                >
-                  {p.fix.label}
-                </button>
-              ) : null}
-              {p.link ? (
-                <Link href={p.link.href} className="flex min-h-10 shrink-0 items-center rounded-xl bg-board px-3.5 text-base font-bold text-ink">
-                  {p.link.label}
-                </Link>
-              ) : null}
+              {/* The grey box: a glance at the rest of the day. */}
               <button
                 type="button"
-                onClick={() => change((d) => dismiss(d, p.id))}
-                className="flex min-h-10 shrink-0 items-center rounded-xl px-2.5 text-base font-bold text-ink-muted hover:bg-board"
+                disabled={col.past}
+                onClick={() => setOpenDay(col.date)}
+                aria-label={`Open ${col.name}`}
+                className={`flex shrink-0 flex-col gap-2.5 rounded-[1.25rem] bg-rail p-3 text-left ${col.past ? "opacity-50" : "hover:bg-panel"}`}
               >
-                Leave it
+                <span className="flex flex-wrap gap-1.5">
+                  {groups.map((g) => (
+                    <span key={g.key} className={`flex items-center gap-0.5 rounded-xl border-2 bg-board py-0.5 pr-1.5 pl-1 ${kindChanged(col.date, g) ? "border-dashed border-accent" : "border-transparent"}`} title={g.name}>
+                      <Emoji emoji={g.icon ?? "📅"} className="mr-0.5 size-7" />
+                      {g.memberIds.map((id) => (
+                        <Face key={id} person={person.get(id)} size="size-6 text-[0.6875rem]" />
+                      ))}
+                    </span>
+                  ))}
+                </span>
+                <span className="flex min-h-10 flex-wrap items-center gap-1.5">
+                  {chores.length === 0 ? (
+                    <span className="text-base text-ink-muted">{col.away ? "Away" : (freeDay?.name ?? "Free day")}</span>
+                  ) : (
+                    chores.map((id) => (
+                      <span
+                        key={id}
+                        title={choreDay.get(id)?.name}
+                        className={`flex size-11 items-center justify-center rounded-[0.875rem] border-2 bg-board ${choreChanged(col.date, id) ? "border-dashed border-accent" : "border-transparent"}`}
+                      >
+                        <Emoji emoji={choreDay.get(id)?.icon ?? "🧹"} className="size-7" />
+                      </span>
+                    ))
+                  )}
+                </span>
+                <span className="flex min-h-6 flex-wrap items-center gap-1.5 text-[0.9375rem] font-bold text-ink-soft">
+                  {col.events.length === 0 ? (
+                    <span className="font-normal text-ink-muted">Nothing on</span>
+                  ) : (
+                    <>
+                      {col.events.slice(0, 6).map((e) => (
+                        <Dot key={e.id} colour={person.get(e.memberId ?? "")?.colour} />
+                      ))}
+                      {col.events.length === 1 ? "1 plan" : `${col.events.length} plans`}
+                    </>
+                  )}
+                </span>
               </button>
-            </div>
-          ))}
-          {problems.length > PROBLEMS_SHOWN ? <p className="text-sm font-bold text-ink-muted">+ {problems.length - PROBLEMS_SHOWN} more after these</p> : null}
-        </section>
 
-        <section className={`flex shrink-0 flex-col justify-center gap-2.5 rounded-[var(--radius-card)] px-4 py-3 lg:w-80 ${dirty ? "bg-[color-mix(in_srgb,var(--color-accent)_9%,white)]" : "bg-rail"}`}>
-          <p className={`text-base font-bold ${error ? "text-danger" : dirty ? "text-accent" : "text-ink-muted"}`} role="status">
-            {error ?? (dirty ? "You have changes that aren't saved yet." : data.reviewed ? "This week is confirmed. Change anything and confirm again." : "Looks right? Confirm the week.")}
-          </p>
-          <div className="flex gap-2">
-            {dirty ? (
-              <button type="button" onClick={() => setDraft(data.initial)} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-xl px-3 text-base font-bold text-ink hover:bg-board">
-                Undo changes
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => confirm()}
-              disabled={saving || open.length === 0}
-              className="ml-auto flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board disabled:opacity-40"
-            >
-              {saving ? "Saving…" : "Confirm week"}
-            </button>
-          </div>
-        </section>
+              {isOpen ? (
+                <OpenDay
+                  onClose={() => setOpenDay(null)}
+                  meals={slots.map(({ time, meals }) => ({
+                    time,
+                    meals: meals.map((m) => ({ ...mealLook(m), id: m.id, changed: mealChanged(m.id) })),
+                  }))}
+                  onMeal={(mealId, mealTimeId) => setMealAt({ mealId, date: col.date, mealTimeId })}
+                  kinds={
+                    <>
+                      <SectionTitle title="Kind of day" onAdd={() => setKindAt({ date: col.date, start: null })} addLabel={`Add a kind of day on ${col.name}`} />
+                      {groups.map((g) => (
+                        <Row key={g.key} changed={kindChanged(col.date, g)} onClick={() => setKindAt({ date: col.date, start: g.key })}>
+                          <Emoji emoji={g.icon ?? "📅"} className="size-7" />
+                          <span className="min-w-0 flex-1 truncate">{g.name}</span>
+                          <span className="flex gap-0.5">
+                            {g.memberIds.map((id) => (
+                              <Face key={id} person={person.get(id)} size="size-6 text-[0.6875rem]" />
+                            ))}
+                          </span>
+                        </Row>
+                      ))}
+                    </>
+                  }
+                  chores={
+                    <>
+                      <SectionTitle title="Chores" onAdd={() => addChore(col)} addLabel={`Add a chore day on ${col.name}`} />
+                      {chores.length === 0 ? (
+                        <Row muted>
+                          <Emoji emoji={col.away ? "🧳" : (freeDay?.icon ?? "🌿")} className="size-7" />
+                          <span className="truncate">{col.away ? "None: away" : (freeDay?.name ?? "Free day")}</span>
+                        </Row>
+                      ) : (
+                        chores.map((id) => (
+                          <Row key={id} changed={choreChanged(col.date, id)} onClick={() => pickChoreDay(col, id)}>
+                            <Emoji emoji={choreDay.get(id)?.icon ?? "🧹"} className="size-7" />
+                            <span className="min-w-0 truncate">{choreDay.get(id)?.name}</span>
+                          </Row>
+                        ))
+                      )}
+                    </>
+                  }
+                  plans={col.events}
+                  roomFor={Math.max(1, 9 - groups.length - Math.max(1, chores.length) - slots.reduce((n, s) => n + Math.max(1, s.meals.length), 0))}
+                  person={person}
+                />
+              ) : null}
+            </section>
+          );
+        })}
       </div>
 
-      {picker ? <PickerBox picker={picker} page={page} setPage={setPage} onClose={() => setPicker(null)} /> : null}
+      {mealTarget ? (
+        <MealBox
+          target={mealTarget}
+          data={data}
+          members={members}
+          onChange={(meal) => {
+            change((d) => setMeal(d, meal.id, meal));
+            setMealAt((at) => (at ? { ...at, mealId: meal.id } : at));
+          }}
+          onRemove={(id) => change((d) => setMeal(d, id, null))}
+          onAddAnother={() => setMealAt((at) => (at ? { ...at, mealId: null } : at))}
+          onClose={() => setMealAt(null)}
+        />
+      ) : null}
+      {kindAt
+        ? (() => {
+            const col = data.columns.find((c) => c.date === kindAt.date)!;
+            const current = Object.fromEntries(
+              memberOrder.map((id) => [id, dayType.get(draft.dayTypes[col.date]?.[id] ?? "")?.name.trim().toLowerCase() ?? ""]),
+            );
+            return (
+              <KindBox
+                dayName={col.name}
+                kinds={kinds}
+                start={kindAt.start}
+                members={members}
+                current={current}
+                onApply={(moves) => {
+                  change((d) => moves.reduce((acc, m) => setDayType(acc, col.date, m.memberId, m.typeId), d));
+                  setKindAt(null);
+                }}
+                onClose={() => setKindAt(null)}
+              />
+            );
+          })()
+        : null}
+      {picker ? <PickerBox picker={picker} onClose={() => setPicker(null)} /> : null}
+      {checks ? (
+        <ChecksBox
+          problems={problems}
+          onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))}
+          onLeave={(p) => change((d) => dismiss(d, p.id))}
+          onClose={() => setChecks(false)}
+        />
+      ) : null}
+      {groceries ? <GrocerySheet week={data.week} dirty={dirty} onClose={() => setGroceries(false)} /> : null}
       {guard.leaving || goTo ? (
         <LeaveDialog
           what="this week"
           saving={saving}
-          onSave={() => confirm(guard.leaving ?? goTo)}
+          onSave={() => save(guard.leaving ?? goTo)}
           onStay={() => {
             guard.stay();
             setGoTo(null);
@@ -350,6 +445,95 @@ export function ReviewBoard({ data, range, weekHref }: { data: ReviewData; range
   );
 }
 
+/** A day opened up: its grey box grows over the meals to show and change everything. */
+function OpenDay({
+  meals,
+  onMeal,
+  kinds,
+  chores,
+  plans,
+  roomFor,
+  person,
+  onClose,
+}: {
+  meals: { time: { id: string; name: string }; meals: { id: string; title: string; icon: string; changed: boolean }[] }[];
+  onMeal: (mealId: string | null, mealTimeId: string) => void;
+  kinds: ReactNode;
+  chores: ReactNode;
+  plans: ReviewColumn["events"];
+  /** How many plans fit below everything else. */
+  roomFor: number;
+  person: Map<string, Person>;
+  onClose: () => void;
+}) {
+  const shown = plans.slice(0, roomFor);
+  return (
+    <div className="absolute inset-x-2 top-[4.25rem] bottom-3 z-10 flex flex-col gap-1.5 overflow-hidden rounded-[1.375rem] bg-rail p-3 shadow-[0_0_0_2px_var(--color-frame),0_18px_40px_rgba(20,30,50,0.14)]">
+      <button type="button" onClick={onClose} className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-[0.875rem] bg-board text-base font-bold text-ink-soft hover:bg-panel">
+        <CaretDown size="1.125rem" weight="bold" aria-hidden />
+        Close
+      </button>
+      <div className="flex shrink-0 flex-col gap-1.5 pt-1">
+        {meals.map(({ time, meals: list }) =>
+          list.length === 0 ? (
+            <button
+              key={time.id}
+              type="button"
+              onClick={() => onMeal(null, time.id)}
+              className="flex min-h-11 items-center justify-center rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_28%,var(--color-meal))] text-base font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,white)]"
+            >
+              + {time.name}
+            </button>
+          ) : (
+            list.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onMeal(m.id, time.id)}
+                className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl border-2 bg-meal px-2 text-left text-[0.9375rem] font-extrabold text-meal-ink ${m.changed ? "border-dashed border-accent" : "border-transparent"}`}
+              >
+                <Emoji emoji={m.icon} className="size-7" />
+                <span className="min-w-0 truncate">{m.title}</span>
+              </button>
+            ))
+          ),
+        )}
+      </div>
+      <div className="flex shrink-0 flex-col gap-1.5">{kinds}</div>
+      <div className="flex shrink-0 flex-col gap-1.5">{chores}</div>
+      <div className="flex min-h-0 flex-col gap-1">
+        <SectionTitle title="Plans" />
+        {plans.length === 0 ? <span className="px-0.5 text-base text-ink-muted">Nothing on</span> : null}
+        {shown.map((e) => (
+          <span key={e.id} className="flex min-h-8 min-w-0 items-center gap-2 px-0.5 text-base font-bold text-ink">
+            <Dot colour={person.get(e.memberId ?? "")?.colour} />
+            <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-5" />
+            <span className="min-w-0 truncate">{e.title}</span>
+          </span>
+        ))}
+        {plans.length > shown.length ? <span className="px-0.5 text-sm font-bold text-ink-muted">+ {plans.length - shown.length} more on the calendar</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function Row({ children, onClick, changed = false, muted = false }: { children: ReactNode; onClick?: () => void; changed?: boolean; muted?: boolean }) {
+  const className = `flex min-h-12 w-full min-w-0 items-center gap-2 rounded-[0.875rem] border-2 bg-board px-2 text-left text-base font-extrabold ${
+    changed ? "border-dashed border-accent" : "border-transparent"
+  } ${muted ? "font-bold text-ink-muted" : "text-ink"}`;
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${className} hover:bg-panel`}>
+      {children}
+    </button>
+  ) : (
+    <span className={className}>{children}</span>
+  );
+}
+
+function Dot({ colour }: { colour: string | null | undefined }) {
+  return <span aria-hidden className="size-3 shrink-0 rounded-full" style={{ background: colour ? strong(colour) : "var(--color-check-border)" }} />;
+}
+
 function WeekButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: "prev" | "next" }) {
   const Icon = icon === "prev" ? CaretLeft : CaretRight;
   return (
@@ -359,94 +543,15 @@ function WeekButton({ label, onClick, icon }: { label: string; onClick: () => vo
   );
 }
 
-function Badge({ icon, label }: { icon: "away" | "busy"; label: string }) {
+function Badge({ away = false }: { away?: boolean }) {
   return (
-    <span className="flex shrink-0 items-center gap-1 rounded-lg bg-panel px-1.5 py-0.5 text-xs font-bold text-ink-soft">
-      {icon === "away" ? <Suitcase size="0.875rem" aria-hidden /> : null}
-      {label}
-    </span>
-  );
-}
-
-function Group({ title, grow = false, children }: { title: string; grow?: boolean; children: ReactNode }) {
-  return (
-    <div className={`flex min-h-0 flex-col gap-0.5 ${grow ? "flex-1 overflow-hidden" : "shrink-0"}`}>
-      <h3 className="px-1.5 text-sm font-bold tracking-wide text-ink-muted uppercase">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-/** A tappable row in a day: a kind of day, a chore day or a meal. Dashed when changed. */
-function Tap({
-  children,
-  onClick,
-  disabled,
-  changed,
-  meal = false,
-  title,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled: boolean;
-  changed: boolean;
-  meal?: boolean;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`flex min-h-11 w-full min-w-0 items-center gap-2 rounded-xl border-2 px-1.5 text-left text-lg font-bold text-ink ${
-        changed ? "border-dashed border-accent" : "border-transparent"
-      } ${meal ? "bg-meal text-meal-ink" : "hover:bg-rail"}`}
+    <span
+      className={`ml-auto flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-bold ${
+        away ? "bg-panel text-ink-soft" : "bg-[color-mix(in_srgb,var(--color-now)_14%,white)] text-now"
+      }`}
     >
-      {children}
-    </button>
-  );
-}
-
-function PickerBox({ picker, page, setPage, onClose }: { picker: Picker; page: number; setPage: (p: number) => void; onClose: () => void }) {
-  const pages = Math.max(1, Math.ceil(picker.options.length / PICKS_SHOWN));
-  const shown = picker.options.slice(page * PICKS_SHOWN, (page + 1) * PICKS_SHOWN);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,35,45,0.35)]" role="dialog" aria-label={picker.title} onClick={onClose}>
-      <div className="flex w-[44rem] max-w-[92vw] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3">
-          <h2 className="min-w-0 flex-1 truncate text-2xl font-extrabold text-ink">{picker.title}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex size-[var(--touch-target)] items-center justify-center rounded-xl text-ink hover:bg-rail">
-            <X size="1.5rem" weight="bold" aria-hidden />
-          </button>
-        </div>
-        {shown.length === 0 ? <p className="text-lg text-ink-muted">Nothing else to pick.</p> : null}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {shown.map((o) => (
-            <button
-              key={o.key}
-              type="button"
-              onClick={o.pick}
-              className={`flex min-h-[var(--touch-target)] min-w-0 items-center gap-2 rounded-[var(--radius)] px-3 text-left text-lg font-bold ${
-                o.danger ? "bg-[color-mix(in_srgb,var(--color-danger)_8%,white)] text-danger" : "bg-rail text-ink hover:bg-panel"
-              }`}
-            >
-              {o.icon ? <Emoji emoji={o.icon} className="size-7" /> : null}
-              <span className="min-w-0 truncate">{o.label}</span>
-            </button>
-          ))}
-        </div>
-        {pages > 1 ? (
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-base text-ink-muted">
-              {page + 1} of {pages}
-            </span>
-            <button type="button" onClick={() => setPage((page + 1) % pages)} className="flex min-h-11 items-center rounded-xl bg-rail px-4 text-base font-bold text-ink">
-              More
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </div>
+      {away ? <Suitcase size="0.875rem" aria-hidden /> : null}
+      {away ? "Away" : "Busy"}
+    </span>
   );
 }

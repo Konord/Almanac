@@ -8,7 +8,10 @@ import {
   movesFor,
   reviewDue,
   reviewProblems,
+  kindGroups,
+  mealsIn,
   setMeal,
+  type DraftMeal,
   type ReviewDay,
   type ReviewDraft,
 } from "./weekly-review.ts";
@@ -93,9 +96,51 @@ test("saving turns the draft into moves away from the usual weekdays", () => {
   assert.deepEqual(movesFor([free, marketing, laundry], draft(), dates), []);
 });
 
-test("swapping a meal keeps the new theme; null takes it off", () => {
-  assert.equal(setMeal(draft(), "m1", "tacos").meals.m1, "tacos");
+const meal = (id: string, extra: Partial<DraftMeal> = {}): DraftMeal => ({
+  id,
+  date: TUE,
+  mealTimeId: "dinner",
+  categoryId: "pasta",
+  recipeId: null,
+  memberIds: [],
+  servings: null,
+  ...extra,
+});
+
+test("changing a meal keeps the new version; null takes it off", () => {
+  const tacos = meal("m1", { categoryId: "tacos" });
+  assert.deepEqual(setMeal(draft(), "m1", tacos).meals.m1, tacos);
   assert.equal(setMeal(draft(), "m1", null).meals.m1, null);
+  // A meal added on the review and then taken off is simply gone.
+  const added = setMeal(draft(), "new-1", meal("new-1"));
+  assert.equal("new-1" in setMeal(added, "new-1", null).meals, false);
+});
+
+test("a meal time shows saved meals as changed, minus those taken off, plus new ones", () => {
+  const saved = [meal("m1"), meal("m2", { memberIds: ["dad"] }), meal("m3", { date: WED })];
+  let d = setMeal(draft(), "m1", meal("m1", { categoryId: "tacos" }));
+  d = setMeal(d, "m2", null);
+  d = setMeal(d, "new-1", meal("new-1", { categoryId: "soup", memberIds: ["kid"] }));
+  assert.deepEqual(
+    mealsIn(saved, d, TUE, "dinner").map((m) => [m.id, m.categoryId]),
+    [
+      ["m1", "tacos"],
+      ["new-1", "soup"],
+    ],
+  );
+  assert.deepEqual(mealsIn(saved, d, TUE, "lunch"), []);
+});
+
+test("kinds of day show once each, with everyone who has them", () => {
+  const types = new Map([
+    ["c-wk", { name: "Weekday", icon: "💼" }],
+    ["a-wk", { name: "weekday", icon: "💼" }],
+    ["e-we", { name: "Weekend", icon: "☀️" }],
+  ]);
+  assert.deepEqual(kindGroups({ c: "c-wk", a: "a-wk", e: "e-we" }, ["c", "a", "e"], types), [
+    { key: "weekday", name: "Weekday", icon: "💼", memberIds: ["c", "a"] },
+    { key: "weekend", name: "Weekend", icon: "☀️", memberIds: ["e"] },
+  ]);
 });
 
 test("the reminder shows from Saturday morning until the week is confirmed", () => {

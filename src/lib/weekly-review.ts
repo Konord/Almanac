@@ -20,11 +20,33 @@ export type ReviewDraft = {
   choreDays: Record<LocalDate, string[]>;
   /** Each person's kind of day on each date: date → member id → day type id. */
   dayTypes: Record<LocalDate, Record<string, string>>;
-  /** Meals changed: meal id → the theme it's now, or null to take it off. */
-  meals: Record<string, string | null>;
+  /**
+   * Meals changed or added on the review: meal id → how it is now, or null
+   * to take it off. Meals added here have ids starting "new-".
+   */
+  meals: Record<string, DraftMeal | null>;
   /** Problems someone chose to leave as they are. */
   dismissed: string[];
 };
+
+/** A meal as the review plans it (the weekly review is where all planning happens). */
+export type DraftMeal = {
+  id: string;
+  date: LocalDate;
+  mealTimeId: string;
+  /** The kind of meal ("Tacos"). */
+  categoryId: string | null;
+  /** Which one ("Beef tacos"); null while it's still to pick. */
+  recipeId: string | null;
+  /** Who it's for; empty means everyone. */
+  memberIds: string[];
+  servings: number | null;
+};
+
+/** A meal added on the review, not yet saved. */
+export function isNewMeal(id: string): boolean {
+  return id.startsWith("new-");
+}
 
 /** What the review knows about each day that the draft doesn't change. */
 export type ReviewDay = {
@@ -92,9 +114,59 @@ export function setDayType(draft: ReviewDraft, date: LocalDate, memberId: string
   return { ...draft, dayTypes: { ...draft.dayTypes, [date]: { ...draft.dayTypes[date], [memberId]: dayTypeId } } };
 }
 
-/** Swaps a meal to another theme, or takes it off (null). */
-export function setMeal(draft: ReviewDraft, mealId: string, categoryId: string | null): ReviewDraft {
-  return { ...draft, meals: { ...draft.meals, [mealId]: categoryId } };
+/** Changes a meal (or adds one), or takes it off (null). A new meal taken off is just forgotten. */
+export function setMeal(draft: ReviewDraft, mealId: string, meal: DraftMeal | null): ReviewDraft {
+  const meals = { ...draft.meals };
+  if (meal === null && isNewMeal(mealId)) delete meals[mealId];
+  else meals[mealId] = meal;
+  return { ...draft, meals };
+}
+
+/** Undoes the review's change to one meal. */
+export function resetMeal(draft: ReviewDraft, mealId: string): ReviewDraft {
+  const meals = { ...draft.meals };
+  delete meals[mealId];
+  return { ...draft, meals };
+}
+
+/**
+ * The meals in one day's meal time as the draft has them: the saved ones
+ * (changed or not, minus those taken off), then any added on the review.
+ */
+export function mealsIn(saved: DraftMeal[], draft: ReviewDraft, date: LocalDate, mealTimeId: string): DraftMeal[] {
+  const here = (m: DraftMeal) => m.date === date && m.mealTimeId === mealTimeId;
+  const kept = saved.filter(here).flatMap((m) => {
+    if (!(m.id in draft.meals)) return [m];
+    const now = draft.meals[m.id];
+    return now ? [now] : [];
+  });
+  const added = Object.values(draft.meals).filter((m): m is DraftMeal => m !== null && isNewMeal(m.id) && here(m));
+  return [...kept, ...added];
+}
+
+/** One kind of day on a date, with everyone who has it ("Weekday · C, A"). */
+export type KindGroup = { key: string; name: string; icon: string | null; memberIds: string[] };
+
+/**
+ * Each person's kind of day on a date, grouped by the kind's name so each
+ * kind shows once with its people beside it. Kinds of day belong to one
+ * person each, so "Weekday" for two people is two kinds with one name.
+ */
+export function kindGroups(
+  onDate: Record<string, string>,
+  memberOrder: string[],
+  dayTypes: Map<string, { name: string; icon: string | null }>,
+): KindGroup[] {
+  const groups = new Map<string, KindGroup>();
+  for (const memberId of memberOrder) {
+    const type = dayTypes.get(onDate[memberId] ?? "");
+    if (!type) continue;
+    const key = type.name.trim().toLowerCase();
+    const group = groups.get(key) ?? { key, name: type.name, icon: type.icon, memberIds: [] };
+    group.memberIds.push(memberId);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }
 
 export function dismiss(draft: ReviewDraft, problemId: string): ReviewDraft {
@@ -182,7 +254,7 @@ export function reviewProblems(input: {
     }
     for (const meal of day.meals) {
       if (mealIsOff(draft, meal.id) || !(day.away || meal.everyoneOut)) continue;
-      const theme = draft.meals[meal.id] ?? meal.categoryId;
+      const theme = draft.meals[meal.id]?.categoryId ?? meal.categoryId;
       const name = (theme && input.categoryNames[theme]) || meal.mealTimeName;
       out.push({
         id: `meal|${meal.id}`,
