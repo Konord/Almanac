@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { draftProblem, ruleColumns, seasonTabs, type ChoreManagerDraft, type DraftOccasional } from "./chore-manager.ts";
+import { autoFirstDues, draftProblem, ruleColumns, seasonTabs, type ChoreManagerDraft, type DraftOccasional } from "./chore-manager.ts";
 
 const occasional = (extra: Partial<DraftOccasional> = {}): DraftOccasional => ({
   id: "c1",
@@ -25,6 +25,7 @@ const occasional = (extra: Partial<DraftOccasional> = {}): DraftOccasional => ({
   notes: null,
   active: true,
   heads_ups: [],
+  first_due: null,
   ...extra,
 });
 
@@ -90,4 +91,19 @@ test("season tabs start with this season and file chores by when they're next du
     tabs[2].chores.map((c) => c.id),
     ["spring"],
   );
+});
+
+test("new occasional chores get quiet first days, apart from each other", () => {
+  const today = "2026-11-09";
+  const saved = occasional({ id: "saved", repeat_every: 1, repeat_unit: "month" });
+  const a = occasional({ id: "new-a", repeat_every: 1, repeat_unit: "month" });
+  const b = occasional({ id: "new-b", repeat_every: 1, repeat_unit: "month" });
+  const set = occasional({ id: "new-c", repeat_every: 1, repeat_unit: "month", first_due: "2026-11-30" });
+  const picked = autoFirstDues([saved, a, b, set], { saved: today }, today);
+  // The one with a date set keeps it; the others avoid today, the 30th and each other.
+  assert.equal(picked.has("new-c"), false);
+  assert.equal(picked.has("saved"), false);
+  const days = [today, "2026-11-30", picked.get("new-a"), picked.get("new-b")].map((d) => Number((d as string).slice(8)) + (d!.startsWith("2026-12") ? 30 : 0));
+  days.sort((x, y) => x - y);
+  for (let i = 1; i < days.length; i++) assert.ok(days[i] - days[i - 1] >= 4, days.join(","));
 });

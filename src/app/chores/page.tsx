@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame, ScreenHeader, firstParam } from "@/components/ui";
+import { AppFrame, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { placeable } from "@/lib/chore-days";
 import { snapOf, type Season } from "@/lib/chores";
@@ -34,7 +34,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
   const params = await searchParams;
   const { locale, timeZone, weekStartsOn } = household.settings;
   const today = localDateOf(new Date(), timeZone);
-  const { chores, members, choreDays, plan, hard } = await choreSchedule(household, today, timeZone);
+  const { chores, rounds, members, choreDays, plan, hard } = await choreSchedule(household, today, timeZone);
   const supabase = await createClient();
   const [{ todos }, heads, onToday] = await Promise.all([
     loadTodos(),
@@ -96,6 +96,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
         visibility: c.visibility,
         notes: c.notes,
         active: c.active,
+        first_due: c.first_due ?? null,
         heads_ups: (heads.data ?? [])
           .filter((h) => h.chore_id === c.id)
           .map((h) => ({ id: h.id, label: h.label, minutes_before: h.minutes_before, makes: h.makes === "grocery" ? "grocery" : "todo" })),
@@ -114,6 +115,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
       lastDone: c.timing.lastDone,
       placedOn: placedOn.get(c.id) ?? null,
       onToday: today_.has(c.id),
+      firstTime: !rounds.some((r) => r.template_id === c.id),
       hard: hard.has(c.id) ? (placeable(choreDays, c.chore_day_ids) ? "No room on its chore days" : "No chore day takes it") : null,
     };
   }
@@ -149,11 +151,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
   }
 
   return (
-    <>
-      <ScreenHeader title="Chore Manager">
-        <HeaderClock locale={locale} timeZone={timeZone} />
-      </ScreenHeader>
-      <ChoreManager
+    <ChoreManager
         // A fresh start after each save, so the screen shows what was saved.
         key={hash(JSON.stringify(initial))}
         initial={initial}
@@ -164,9 +162,9 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
         locale={locale}
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
-        startWith={{ chore: firstParam(params.edit), day: firstParam(params.day) }}
-      />
-    </>
+      startWith={{ chore: firstParam(params.edit), day: firstParam(params.day) }}
+      clock={<HeaderClock locale={locale} timeZone={timeZone} />}
+    />
   );
 }
 

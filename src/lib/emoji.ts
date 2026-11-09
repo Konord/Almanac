@@ -62,10 +62,10 @@ const GUESSES: [RegExp, string][] = [
   [/\b(bed|sleep|nap)\b/i, "🛏️"],
 ];
 
-/** The picture to show for an event: its own, else one guessed from its title. */
-export function eventEmoji(icon: string | null | undefined, title: string): string {
+/** The picture to show for an event: its own, else one guessed from its title (else `fallback`). */
+export function eventEmoji(icon: string | null | undefined, title: string, fallback = "📅"): string {
   if (icon && icon.trim()) return icon.trim();
-  return GUESSES.find(([pattern]) => pattern.test(title))?.[1] ?? "📅";
+  return GUESSES.find(([pattern]) => pattern.test(title))?.[1] ?? fallback;
 }
 
 // ---------------------------------------------------------------------------
