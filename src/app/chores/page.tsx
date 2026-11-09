@@ -1,40 +1,23 @@
-import { Suspense, type ReactNode } from "react";
-import Link from "next/link";
-import { Broom, CalendarCheck, CalendarDots, CheckCircle, Plus, Repeat, Warning } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Avatar, Button, Card, Emoji, Notice, ScreenHeader, SoftLink, firstParam } from "@/components/ui";
-import { Sheet } from "@/components/sheet";
+import { Suspense } from "react";
+import { AppFrame, ScreenHeader, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
-import { daysBetween, describeRule } from "@/lib/chores";
-import { weekdaysLabel, type ChoreDay } from "@/lib/chore-days";
-import { requireHousehold, type Household } from "@/lib/household";
+import { placeable } from "@/lib/chore-days";
+import { snapOf, type Season } from "@/lib/chores";
+import type { ChoreManagerDraft, DraftOccasional, OnlyIn, Snap } from "@/lib/chore-manager";
+import { requireHousehold } from "@/lib/household";
+import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
-import { Pager, pageOf } from "../meals/parts";
-import { HeadsUpEditor, loadHeadsUps } from "../heads-ups/editor";
-import { loadTodos, type ChoreMember, type ChoreWithTiming } from "./data";
+import { loadTodos } from "./data";
+import { ChoreManager, type DayPreview, type OccasionalInfo } from "./manager";
 import { choreSchedule } from "./plan";
-import { removeChore, setChoreActive, updateChore } from "./actions";
-import { ChoreDayFields, removeChoreDayForm } from "./day-form";
-import { ChoreFields } from "./forms";
-import { RoundRow, dayLabel, dayPhrase, tagText } from "./rows";
-
-/** How many days back "Done lately" looks. */
-const RECENT_DAYS = 7;
-/** Rows that fit in each column without scrolling. */
-const DAYS_PER_PAGE = 6;
-const CHORES_PER_PAGE = 8;
-const SOON_SHOWN = 3;
-const HARD_SHOWN = 2;
-const RECENT_SHOWN = 2;
 
 /**
- * Chores (tasks rework, step 2): the household's chore days, the chores
- * that show every chore day, the ones that come due by a date rule, and
- * on the right what's coming up, what's hard to schedule, and what was
- * done lately. Tap anything to change it.
+ * The Chore Manager (2026-11-09): one screen for setting chores up.
+ * Occasional chores (on a repeat rule) on top, then the chore days with
+ * their regular chores. Chores run by themselves once set up; today's
+ * show on the daily list in the Today panel.
  *
- * Chores run in the background: the generator (src/lib/chore-days.ts)
- * puts each one on a chore day with room, and today's go on the daily
- * list on the Today panel.
+ * ?edit=<chore> opens an occasional chore, ?day=<chore day> a chore day.
  */
 export default function ChoresPage(props: PageProps<"/chores">) {
   return (
@@ -49,345 +32,147 @@ export default function ChoresPage(props: PageProps<"/chores">) {
 async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["searchParams"] }) {
   const household = await requireHousehold();
   const params = await searchParams;
-  const { locale, timeZone } = household.settings;
+  const { locale, timeZone, weekStartsOn } = household.settings;
   const today = localDateOf(new Date(), timeZone);
-  const { chores, rounds, members, choreDays, plan, hard } = await choreSchedule(household, today, timeZone);
-  const { todos } = await loadTodos();
-  const memberById = new Map(members.map((m) => [m.id, m]));
-  const choreById = new Map(chores.map((c) => [c.id, c]));
-  const dayById = new Map(choreDays.map((d) => [d.id, d]));
-  const todoById = new Map(todos.map((t) => [t.id, t]));
-  const recent = rounds.filter((r) => r.status === "done" && daysBetween(r.completed_on, today) <= RECENT_DAYS);
-  const error = firstParam(params.error);
-  const message = firstParam(params.message);
+  const { chores, members, choreDays, plan, hard } = await choreSchedule(household, today, timeZone);
+  const supabase = await createClient();
+  const [{ todos }, heads, onToday] = await Promise.all([
+    loadTodos(),
+    supabase.from("heads_ups").select("id, chore_id, label, minutes_before, makes").not("chore_id", "is", null).order("sort_order").order("minutes_before", { ascending: false }),
+    supabase.from("task_instances").select("template_id").not("template_id", "is", null).eq("status", "open").eq("due_date", today),
+  ]);
+  if (heads.error) throw heads.error;
+  if (onToday.error) throw onToday.error;
 
-  // Which page each column is on, kept in the address.
-  const pages: Record<string, string> = {};
-  for (const k of ["p0", "p1", "p2"]) {
-    const v = firstParam(params[k]);
-    if (v) pages[k] = v;
-  }
-  const here = (extra: Record<string, string> = {}) => {
-    const q = new URLSearchParams({ ...pages, ...extra }).toString();
-    return q ? `/chores?${q}` : "/chores";
-  };
-  const returnTo = here();
+  const days = [...choreDays.filter((d) => !d.is_free), ...choreDays.filter((d) => d.is_free)];
+  const free = days.find((d) => d.is_free);
+  const regular = chores.filter((c) => c.kind === "preset");
+  const occasional = chores.filter((c) => c.kind === "generated");
 
-  const presets = chores.filter((c) => c.kind === "preset");
-  const generated = chores.filter((c) => c.kind === "generated");
-  // Coming up: what the generator has placed after today, soonest first.
-  const soon = plan.days.slice(1).flatMap((d) =>
-    d.items.map((item) => ({
-      date: d.date,
-      id: item.id,
-      name: item.kind === "generated" ? choreById.get(item.id)?.name : todoById.get(item.id)?.title,
-      icon: item.kind === "generated" ? choreById.get(item.id)?.icon : todoById.get(item.id)?.icon,
-      day: d.choreDays.map((cd) => cd.name).join(" + "),
+  const initial: ChoreManagerDraft = {
+    days: days.map((d) => ({
+      id: d.id,
+      name: d.name,
+      icon: d.icon,
+      weekdays: [...d.weekdays].sort(),
+      span: d.span,
+      restrictive: d.restrictive,
+      max_tasks: d.max_tasks,
+      max_big: d.max_big,
+      is_free: d.is_free,
     })),
-  );
-  const hardList = [...hard].map((id) => choreById.get(id)).filter((c): c is ChoreWithTiming => Boolean(c));
-  const daysText = (c: ChoreWithTiming) =>
-    c.chore_day_ids.length === 0 ? "Any day" : c.chore_day_ids.map((id) => dayById.get(id)?.name ?? "?").join(", ");
-
-  const editing = chores.find((c) => c.id === firstParam(params.edit));
-  const dayParam = firstParam(params.day);
-  const editingDay = dayParam === "new" ? "new" : choreDays.find((d) => d.id === dayParam);
-
-  const chorePage = (list: ChoreWithTiming[], key: string, meta: (c: ChoreWithTiming) => string) => {
-    const shown = pageOf(list, Number(pages[key] ?? 0), CHORES_PER_PAGE);
-    return (
-      <>
-        <ul className="flex flex-col lg:min-h-0 lg:flex-1">
-          {shown.items.map((c) => (
-            <ChoreLine
-              key={c.id}
-              chore={c}
-              href={here({ edit: c.id })}
-              meta={meta(c)}
-              who={c.default_assignee_id ? memberById.get(c.default_assignee_id) : undefined}
-              hard={hard.has(c.id)}
-            />
-          ))}
-        </ul>
-        <Pager page={shown.page} pages={shown.pages} href={(n) => here({ [key]: String(n) })} />
-      </>
-    );
+    regular: regular
+      .map((c) => ({
+        id: c.id,
+        chore_day_id: c.chore_day_ids[0] ?? free?.id ?? "",
+        name: c.name,
+        icon: c.icon,
+        assignee_id: c.default_assignee_id,
+        due_time: c.at_time,
+        notes: c.notes,
+        active: c.active,
+      }))
+      .filter((c) => c.chore_day_id),
+    occasional: occasional.map(
+      (c): DraftOccasional => ({
+        id: c.id,
+        name: c.name,
+        icon: c.icon,
+        assignee_id: c.default_assignee_id,
+        tags: c.tags,
+        chore_day_ids: c.chore_day_ids,
+        repeat_every: c.repeat_every,
+        repeat_unit: c.repeat_unit,
+        repeat_from: c.repeat_from === "date" ? "date" : "done",
+        start_date: c.start_date ?? null,
+        snap: snapOf(c) as Snap,
+        preferred_weekday: c.preferred_weekday ?? 6,
+        only_in: (c.season_start ? "dates" : c.only_seasons?.length ? "seasons" : c.only_months?.length ? "months" : "any") as OnlyIn,
+        only_seasons: (c.only_seasons ?? []) as Season[],
+        only_months: c.only_months ?? [],
+        season_start: c.season_start ?? "10-01",
+        season_end: c.season_end ?? "10-31",
+        at_time: c.at_time,
+        visibility: c.visibility,
+        notes: c.notes,
+        active: c.active,
+        heads_ups: (heads.data ?? [])
+          .filter((h) => h.chore_id === c.id)
+          .map((h) => ({ id: h.id, label: h.label, minutes_before: h.minutes_before, makes: h.makes === "grocery" ? "grocery" : "todo" })),
+      }),
+    ),
   };
-  const shownDays = pageOf(choreDays, Number(pages.p0 ?? 0), DAYS_PER_PAGE);
+
+  // Where each occasional chore stands: due, placed, on today's list, or hard to place.
+  const today_ = new Set((onToday.data ?? []).map((t) => t.template_id));
+  const placedOn = new Map<string, string>();
+  for (const d of plan.days) for (const item of d.items) if (item.kind === "generated" && !placedOn.has(item.id)) placedOn.set(item.id, d.date);
+  const info: Record<string, OccasionalInfo> = {};
+  for (const c of occasional) {
+    info[c.id] = {
+      dueOn: c.timing.dueOn,
+      lastDone: c.timing.lastDone,
+      placedOn: placedOn.get(c.id) ?? null,
+      onToday: today_.has(c.id),
+      hard: hard.has(c.id) ? (placeable(choreDays, c.chore_day_ids) ? "No room on its chore days" : "No chore day takes it") : null,
+    };
+  }
+
+  // The next time each chore day comes round, and what's on it.
+  const choreById = new Map(chores.map((c) => [c.id, c]));
+  const todoById = new Map(todos.map((t) => [t.id, t]));
+  const previews: Record<string, DayPreview> = {};
+  for (const d of days) {
+    const next = plan.days.find((p) => p.choreDays.some((cd) => cd.id === d.id));
+    if (!next) {
+      previews[d.id] = null;
+      continue;
+    }
+    const mine = (ids: string[]) => ids.includes(d.id);
+    previews[d.id] = {
+      date: next.date,
+      items: [
+        ...next.presets.flatMap((id) => {
+          const c = choreById.get(id);
+          return c && mine(c.chore_day_ids) ? [{ icon: c.icon, name: c.name, occasional: false }] : [];
+        }),
+        ...next.items.flatMap((item) => {
+          if (item.kind === "generated") {
+            const c = choreById.get(item.id);
+            return c ? [{ icon: c.icon, name: c.name, occasional: true }] : [];
+          }
+          const t = todoById.get(item.id);
+          return t ? [{ icon: t.icon, name: t.title, occasional: true }] : [];
+        }),
+      ],
+    };
+  }
 
   return (
     <>
-      <ScreenHeader title="Chores">
+      <ScreenHeader title="Chore Manager">
         <HeaderClock locale={locale} timeZone={timeZone} />
-        <div className="flex flex-wrap gap-3 lg:ml-auto">
-          <SoftLink href="/chores/add">
-            <Plus size="1.5rem" aria-hidden />
-            Add a chore
-          </SoftLink>
-          <SoftLink href={here({ day: "new" })}>
-            <Plus size="1.5rem" aria-hidden />
-            Add a chore day
-          </SoftLink>
-        </div>
       </ScreenHeader>
-
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {message ? <Notice tone="success">{message}</Notice> : null}
-
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-4 lg:grid-rows-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
-        <Card
-          title="Chore days"
-          icon={CalendarCheck}
-          tint="teal"
-          className="lg:row-span-3"
-          aside={<span className="text-lg font-bold text-ink-muted">{choreDays.length}</span>}
-        >
-          <ul className="flex flex-col lg:min-h-0 lg:flex-1">
-            {shownDays.items.map((d) => (
-              <li key={d.id} className="border-b border-panel last:border-0">
-                <Link href={here({ day: d.id })} scroll={false} className="flex min-h-17 items-center gap-3 py-1.5">
-                  <Emoji emoji={d.icon ?? "🗓️"} className="size-9" />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-lg font-semibold text-ink">{d.name}</span>
-                    <span className="truncate text-sm font-semibold text-ink-muted">{dayMeta(d)}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <Pager page={shownDays.page} pages={shownDays.pages} href={(n) => here({ p0: String(n) })} />
-        </Card>
-
-        <Card
-          title="Every chore day"
-          icon={Broom}
-          tint="blue"
-          className="lg:row-span-3"
-          aside={<span className="text-lg font-bold text-ink-muted">{presets.length}</span>}
-        >
-          {presets.length === 0 ? (
-            <Empty href="/chores/add?kind=preset">
-              Chores that happen every time a chore day comes round, like &ldquo;Wash the bedding&rdquo; on Laundry day.
-            </Empty>
-          ) : (
-            chorePage(presets, "p1", (c) => [daysText(c), tagText(c)].filter(Boolean).join(" · ") + (c.active ? "" : " · paused"))
-          )}
-        </Card>
-
-        <Card
-          title="When it comes due"
-          icon={Repeat}
-          tint="orange"
-          className="lg:row-span-3"
-          aside={<span className="text-lg font-bold text-ink-muted">{generated.length}</span>}
-        >
-          {generated.length === 0 ? (
-            <Empty href="/chores/add">
-              Chores on a schedule, like &ldquo;Wash the blankets every 3 months&rdquo;. Each goes on a chore day with room.
-            </Empty>
-          ) : (
-            chorePage(generated, "p2", (c) => `${repeatText(c, household)} · ${daysText(c)}${c.active ? "" : " · paused"}`)
-          )}
-        </Card>
-
-        <Card title="Coming up" icon={CalendarDots} tint="blue">
-          {soon.length === 0 ? (
-            <p className="py-2 text-lg text-ink-muted">Nothing placed in the next two weeks.</p>
-          ) : (
-            <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-              {soon.slice(0, SOON_SHOWN).map((s) => (
-                <li key={`${s.date}-${s.id}`} className="flex min-h-14 items-center gap-3 border-b border-panel last:border-0">
-                  <Emoji emoji={s.icon ?? "🧹"} className="size-8" />
-                  <span className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{s.name ?? "A chore"}</span>
-                  <span className="shrink-0 text-sm font-bold text-ink-muted">
-                    {dayLabel(s.date, today, household)}
-                    {s.day ? ` · ${s.day}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {soon.length > SOON_SHOWN ? <p className="mt-auto text-base font-bold text-ink-muted">+{soon.length - SOON_SHOWN} more</p> : null}
-        </Card>
-
-        <Card
-          title="Hard to schedule"
-          icon={Warning}
-          tint="pink"
-          aside={<span className="text-lg font-bold text-ink-muted">{hardList.length}</span>}
-        >
-          {hardList.length === 0 ? (
-            <p className="py-2 text-lg text-ink-muted">Every chore has a day with room.</p>
-          ) : (
-            <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-              {hardList.slice(0, HARD_SHOWN).map((c) => (
-                <li key={c.id} className="border-b border-panel last:border-0">
-                  <Link href={here({ edit: c.id })} scroll={false} className="flex min-h-14 items-center gap-3">
-                    <Emoji emoji={c.icon ?? "🧹"} className="size-8" />
-                    <span className="min-w-0 flex-1 truncate text-lg font-semibold text-ink">{c.name}</span>
-                    <span className="shrink-0 text-sm font-bold text-ink-muted">
-                      {c.chore_day_ids.length ? "No room" : "No day takes it"}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          {hardList.length > HARD_SHOWN ? (
-            <p className="mt-auto text-base font-bold text-ink-muted">+{hardList.length - HARD_SHOWN} more</p>
-          ) : null}
-        </Card>
-
-        <Card title="Done lately" icon={CheckCircle} tint="teal">
-          {recent.length === 0 ? (
-            <p className="py-2 text-lg text-ink-muted">Nothing this week yet.</p>
-          ) : (
-            <ul className="flex flex-col lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-              {recent.slice(0, RECENT_SHOWN).map((r) => (
-                <RoundRow
-                  key={r.id}
-                  round={r}
-                  chore={choreById.get(r.template_id)}
-                  members={memberById}
-                  today={today}
-                  household={household}
-                  returnTo={returnTo}
-                />
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      {editing ? (
-        <Sheet title={editing.name} closeHref={returnTo}>
-          <div className="flex h-full flex-col gap-5">
-            <p className="shrink-0 text-lg text-ink-muted">
-              {editing.timing.lastDone ? `Last done ${dayPhrase(editing.timing.lastDone, today, household)}. ` : "Not done yet. "}
-              {!editing.active
-                ? "Paused."
-                : editing.kind === "generated"
-                  ? `Next due ${dayPhrase(editing.timing.dueOn, today, household)}.`
-                  : ""}
-              {hard.has(editing.id) ? " Hard to schedule: give it another chore day, or more room on its days." : ""}
-            </p>
-            <form id="edit-chore" action={updateChore} className="group flex min-h-0 flex-1 flex-col">
-              <input type="hidden" name="id" value={editing.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <ChoreFields
-                chore={editing}
-                members={members}
-                choreDays={choreDays}
-                initialTab={firstParam(params.tab)}
-                headsUps={
-                  <HeadsUpEditor
-                    headsUps={await loadHeadsUps({ choreId: editing.id })}
-                    source={{ choreId: editing.id }}
-                    returnTo={here({ edit: editing.id, tab: "heads-ups" })}
-                    what="it comes due"
-                    example="Buy a new filter"
-                  />
-                }
-              />
-            </form>
-            <div className="flex shrink-0 flex-wrap gap-3">
-              <Button form="edit-chore">Save chore</Button>
-              <form action={setChoreActive} className="ml-auto">
-                <input type="hidden" name="id" value={editing.id} />
-                <input type="hidden" name="active" value={String(!editing.active)} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <Button variant="secondary">{editing.active ? "Pause it" : "Turn it back on"}</Button>
-              </form>
-              <form action={removeChore}>
-                <input type="hidden" name="id" value={editing.id} />
-                <input type="hidden" name="name" value={editing.name} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <Button variant="danger">Remove</Button>
-              </form>
-            </div>
-          </div>
-        </Sheet>
-      ) : null}
-
-      {editingDay ? (
-        <Sheet title={editingDay === "new" ? "New chore day" : editingDay.name} closeHref={returnTo}>
-          <div className="flex h-full flex-col gap-5">
-            <ChoreDayFields day={editingDay === "new" ? undefined : editingDay} returnTo={here({ day: dayParam ?? "new" })} />
-            {editingDay !== "new" && !editingDay.is_free ? removeChoreDayForm(editingDay, returnTo) : null}
-          </div>
-        </Sheet>
-      ) : null}
+      <ChoreManager
+        // A fresh start after each save, so the screen shows what was saved.
+        key={hash(JSON.stringify(initial))}
+        initial={initial}
+        members={members}
+        info={info}
+        previews={previews}
+        today={today}
+        locale={locale}
+        timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
+        startWith={{ chore: firstParam(params.edit), day: firstParam(params.day) }}
+      />
     </>
   );
 }
 
-/** "Tue · only its own · 2 chores, 1 Big" */
-function dayMeta(d: ChoreDay): string {
-  const parts = [weekdaysLabel(d.weekdays)];
-  if (d.span) parts.push("one stretch");
-  if (d.restrictive) parts.push("only its own");
-  parts.push(`room for ${d.max_tasks}${d.max_big ? `, ${d.max_big} Big` : ", no Big"}`);
-  return parts.join(" · ");
-}
-
-function ChoreLine({
-  chore,
-  href,
-  meta,
-  who,
-  hard,
-}: {
-  chore: ChoreWithTiming;
-  href: string;
-  meta: string;
-  who?: ChoreMember;
-  hard: boolean;
-}) {
-  return (
-    <li className="border-b border-panel last:border-0">
-      <Link href={href} scroll={false} className={`flex min-h-17 items-center gap-3 py-1.5 ${chore.active ? "" : "opacity-55"}`}>
-        <Emoji emoji={chore.icon ?? "🧹"} className="size-9" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-lg font-semibold text-ink">{chore.name}</span>
-          <span className="truncate text-sm font-semibold text-ink-muted">{meta}</span>
-        </span>
-        {hard ? <Warning size="1.5rem" weight="fill" className="shrink-0 text-now" aria-label="Hard to schedule" /> : null}
-        {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
-      </Link>
-    </li>
-  );
-}
-
-function Empty({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col items-start gap-4 py-3">
-      <p className="text-lg text-ink-muted">{children}</p>
-      <SoftLink href={href}>
-        <Plus size="1.5rem" aria-hidden />
-        Add one
-      </SoftLink>
-    </div>
-  );
-}
-
-/** "Every week · Sat · Big" or "Once a year, Oct 15 – Nov 30 · Outdoor" */
-function repeatText(c: ChoreWithTiming, household: Household): string {
-  const { locale } = household.settings;
-  const fmt = (md: string) => {
-    const [m, d] = md.split("-").map(Number);
-    return new Intl.DateTimeFormat(locale, {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    }).format(new Date(Date.UTC(2026, m - 1, d)));
-  };
-  const day = (d: string) =>
-    new Intl.DateTimeFormat(locale, {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    }).format(new Date(`${d}T12:00:00Z`));
-  const parts = [describeRule(c, day, c.season_start && c.season_end ? `${fmt(c.season_start)} – ${fmt(c.season_end)}` : undefined)];
-  if (tagText(c)) parts.push(tagText(c));
-  return parts.join(" · ");
+/** A short fingerprint of what was loaded. */
+function hash(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return String(h >>> 0);
 }
