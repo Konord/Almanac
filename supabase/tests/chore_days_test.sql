@@ -1,7 +1,7 @@
 -- Checks for chore days and chore tags. Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(10);
 
 insert into auth.users (id, email, aud, role) values
   ('96969696-9696-9696-9696-969696969696', 'days-a@test', 'authenticated', 'authenticated'),
@@ -37,6 +37,15 @@ select throws_ok(
     select public.current_household_id(), t.id, (select id from public.task_lists limit 1), t.name, '2026-11-07'
     from public.task_templates t where t.name = 'Wash the blankets'$$,
   '23505', null, 'A chore has one open to-do at a time'
+);
+
+insert into public.task_instances (household_id, list_id, title, is_chore, tags)
+values (public.current_household_id(), (select id from public.task_lists limit 1), 'Repair eaves trough', true, '{big,outdoor}');
+select is((select tags from public.task_instances where title = 'Repair eaves trough'), '{big,outdoor}'::text[], 'A list task can be a chore with tags');
+select throws_ok(
+  $$insert into public.task_instances (household_id, list_id, title, is_chore, tags)
+    values (public.current_household_id(), (select id from public.task_lists limit 1), 'Mystery', true, '{shiny}')$$,
+  '23514', null, 'List task tags come from the preset list'
 );
 
 select set_config('request.jwt.claims', '{"sub":"97979797-9797-9797-9797-979797979797","role":"authenticated"}', true);

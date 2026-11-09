@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
+import { isChoreTag, placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
 import { spreadSlack } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { addDays, type LocalDate } from "@/lib/time";
@@ -66,9 +66,9 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     loadChoreDayMoves(addDays(today, -6), last),
     supabase
       .from("task_instances")
-      .select("id, template_id, chore_day_id, status, due_date, list_id")
+      .select("id, template_id, chore_day_id, is_chore, tags, status, due_date, list_id")
       .not("list_id", "is", null)
-      .or(`template_id.not.is.null,chore_day_id.not.is.null`)
+      .or(`template_id.not.is.null,is_chore.eq.true`)
       .or(`status.eq.open,due_date.gte.${addDays(today, -7)}`),
   ]);
   if (tasks.error) throw tasks.error;
@@ -76,7 +76,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
   const open = tasks.data.filter((t) => t.status === "open");
   const chorePending = open.filter((t) => t.template_id);
   // One-offs: undated or placed on an earlier day (back in the bucket), or already on today.
-  const oneOffs = open.filter((t) => !t.template_id && t.chore_day_id && (t.due_date === null || t.due_date <= today));
+  const oneOffs = open.filter((t) => !t.template_id && t.is_chore && (t.due_date === null || t.due_date <= today));
   const keptToday = new Set([
     ...chorePending.filter((t) => t.due_date === today).map((t) => t.template_id as string),
     ...oneOffs.filter((t) => t.due_date === today).map((t) => t.id),
@@ -97,7 +97,8 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     })),
     oneOffs: oneOffs.map((t) => ({
       id: t.id,
-      chore_day_id: t.chore_day_id as string,
+      chore_day_id: t.chore_day_id,
+      tags: t.tags.filter(isChoreTag),
     })),
     today,
     away,

@@ -59,10 +59,16 @@ export type Todo = {
   link: string | null;
   /** Set when a chore made this to-do. */
   template_id: string | null;
+  /** Set when a heads-up made this to-do. */
+  heads_up_id: string | null;
   /** How long it takes. */
   minutes: number | null;
   /** A one-off chore: waits for the next one of this chore day with room. */
   chore_day_id: string | null;
+  /** A list task switched to a chore: the chore planner picks its day. */
+  is_chore: boolean;
+  /** Its chore tags (Essential, Big, Outdoor, Errand). */
+  tags: string[];
 };
 
 export type ChoreWithTiming = Chore & { timing: ChoreTiming };
@@ -135,7 +141,7 @@ export async function loadTodos() {
     supabase.from("task_lists").select("id, name, icon, visibility").order("sort_order").order("name"),
     supabase
       .from("task_instances")
-      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, minutes, chore_day_id")
+      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, heads_up_id, minutes, chore_day_id, is_chore, tags")
       .not("list_id", "is", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at"),

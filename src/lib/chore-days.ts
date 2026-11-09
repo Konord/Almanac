@@ -17,8 +17,11 @@ import { addDays, type LocalDate } from "./time.ts";
  *     few days early when an earlier day is quieter. Overdue ones go on the first day
  *     with room from today. Essential overdue ones go on today whatever the
  *     room.
- *   - A one-off chore (a list task with a chore day) waits for the next
- *     matching day with room.
+ *   - A one-off chore (a list task switched to a chore, maybe with a chore
+ *     day and tags) waits for the next day that takes it and has room.
+ *     With no chore day it goes on any day that isn't restrictive. Big
+ *     ones count against the Big limit, errands join a day that has one,
+ *     and essential ones go on today when today takes them.
  *
  * A day "accepts" a chore when the chore is tagged for one of its chore
  * days, or when the chore has no chore-day tags and the chore day isn't
@@ -82,8 +85,8 @@ export type PlannableChore = {
   slackDays?: number;
 };
 
-/** A one-off chore: a list task waiting for a chore day. */
-export type OneOffChore = { id: string; chore_day_id: string; big?: boolean };
+/** A one-off chore: a list task waiting for a day (its chore day's, if it has one). */
+export type OneOffChore = { id: string; chore_day_id: string | null; tags?: ChoreTag[]; big?: boolean };
 
 export type PlanItem = {
   id: string;
@@ -212,11 +215,13 @@ export function planChoreDays(input: {
   const oneOffItem = (one: OneOffChore): PlanItem => ({
     id: one.id,
     kind: "one-off",
-    big: Boolean(one.big),
-    errand: false,
+    big: Boolean(one.big) || Boolean(one.tags?.includes("big")),
+    errand: Boolean(one.tags?.includes("errand")),
     pinned: false,
   });
-  const waiting = (input.oneOffs ?? []).filter((one) => !keep(oneOffItem(one)));
+  const waiting = (input.oneOffs ?? [])
+    .filter((one) => !keep(oneOffItem(one)))
+    .sort((a, b) => Number(Boolean(b.tags?.includes("essential"))) - Number(Boolean(a.tags?.includes("essential"))));
   const generated = chores
     // A chore put on today's list by hand ("+" on the Chore Manager) stays there even when it isn't due yet.
     .filter((c) => c.active && c.kind === "generated" && (c.dueOn <= last || kept.has(c.id)))
@@ -271,10 +276,15 @@ export function planChoreDays(input: {
     else if (chore.dueOn <= addDays(today, 6)) unplaced.push(chore.id);
   }
 
-  // One-off chores: the next day of their chore day with room.
+  // One-off chores: the next day that takes them with room (an errand joins a day that has one).
   for (const one of waiting) {
     const item = oneOffItem(one);
-    const chosen = days.find((d) => takes(d, [one.chore_day_id]) && room(d, item));
+    const ids = one.chore_day_id ? [one.chore_day_id] : [];
+    const fits = (d: PlanDay) => takes(d, ids) && room(d, item);
+    let chosen: PlanDay | undefined;
+    if (one.tags?.includes("essential") && first && takes(first, ids)) chosen = first;
+    if (item.errand) chosen ??= days.find((d) => d.items.some((i) => i.errand) && fits(d));
+    chosen ??= days.find(fits);
     if (chosen) chosen.items.push(item);
     else unplaced.push(one.id);
   }

@@ -71,6 +71,26 @@ export function dailyOrder<T extends TodoTiming>(todos: T[], today: LocalDate): 
   );
 }
 
+/*
+ * Chores and heads-ups make tasks too, and they're filed under the first
+ * list only because every task needs one. They belong on the daily list,
+ * not on a list, so the Lists screen and the Today panel's list chips
+ * leave them out (2026-11-09: the To-do list was repeating the daily list).
+ */
+
+/** True for a task someone put on a list (not one a chore or heads-up made). */
+export function onItsList(todo: { template_id: string | null; heads_up_id: string | null }): boolean {
+  return todo.template_id === null && todo.heads_up_id === null;
+}
+
+/**
+ * True for a list task with a day and a time: it shows as a point on the
+ * Agenda and Week views at that time (2026-11-09).
+ */
+export function onCalendar(todo: TodoTiming & { template_id: string | null; heads_up_id: string | null }): boolean {
+  return todo.status === "open" && todo.due_date !== null && todo.at_time !== null && onItsList(todo);
+}
+
 /** The parts of the app a to-do can open. */
 export const FEATURE_LINKS = [
   { path: "/review", label: "Weekly review" },

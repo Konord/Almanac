@@ -6,6 +6,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
 import { isFeatureLink } from "@/lib/todos";
+import { isChoreTag, type ChoreTag } from "@/lib/chore-days";
 import { skipChoreNow } from "./skip";
 
 /*
@@ -140,14 +141,41 @@ function readTodo(formData: FormData) {
     icon: readIcon(formData),
     due_date: dueDate || null,
     date_kind: dateKind,
-    // Only a to-do that starts on a day can have a time.
-    at_time: dueDate && dateKind === "start" && atTime ? atTime : null,
+    // Only a to-do with a day can have a time ("by 3 p.m." or "at 3 p.m.").
+    at_time: dueDate && atTime ? atTime : null,
     lead_days: dateKind === "due" ? leadDays : null,
     link: link || null,
     assignee_id: text(formData, "assigneeId") || null,
     notes: text(formData, "notes") || null,
-    // A one-off chore: no date of its own, it waits for this chore day.
-    chore_day_id: dueDate ? null : text(formData, "choreDayId") || null,
+    chore_day_id: null as string | null,
+    is_chore: false,
+    tags: [] as ChoreTag[],
+  };
+}
+
+/**
+ * A list task's fields, or a one-off chore's (Connor, 2026-11-09): a chore
+ * has tags and maybe a chore day, and the chore planner picks its day, so
+ * the day fields are left alone (`dated: false`) and only cleared when a
+ * task first becomes a chore.
+ */
+function readListTask(formData: FormData, wasChore: boolean) {
+  const todo = readTodo(formData);
+  // The Lists screen's quick add has "Chore" beside "Done by" and "On".
+  const kind = text(formData, "kind") || (text(formData, "dateKind") === "chore" ? "chore" : "task");
+  if (kind !== "chore") return { ...todo, ...(wasChore ? { must_do: false } : {}) };
+  const tags = formData.getAll("tags").map(String).filter(isChoreTag);
+  return {
+    title: todo.title,
+    icon: todo.icon,
+    link: todo.link,
+    assignee_id: todo.assignee_id,
+    notes: todo.notes,
+    ...(wasChore ? {} : { due_date: null, date_kind: "start" as const, at_time: null, lead_days: null }),
+    is_chore: true,
+    tags,
+    must_do: tags.includes("essential"),
+    chore_day_id: text(formData, "choreDayId") || null,
   };
 }
 
@@ -155,20 +183,34 @@ export async function addTodo(formData: FormData) {
   const household = await requireHousehold();
   const listId = text(formData, "listId");
   if (!listId) back(formData, "error", "Choose a list.");
-  const todo = readTodo(formData);
+  const todo = readListTask(formData, false);
   const supabase = await createClient();
-  const { error } = await supabase.from("task_instances").insert({ ...todo, list_id: listId, household_id: household.id });
+  const { data, error } = await supabase
+    .from("task_instances")
+    .insert({ ...todo, list_id: listId, household_id: household.id })
+    .select("id")
+    .single();
   if (error) back(formData, "error", error.message);
   refresh();
+  // A new chore opens straight away, so its tags can be picked.
+  if (todo.is_chore) {
+    const [base, query = ""] = returnPath(formData).split("?");
+    const params = new URLSearchParams(query);
+    params.delete("error");
+    params.delete("message");
+    params.set("edit", data.id);
+    redirect(`${base}?${params.toString()}`);
+  }
   back(formData, "message", `Added "${todo.title}".`);
 }
 
 export async function updateTodo(formData: FormData) {
   await requireHousehold();
   const id = text(formData, "id");
-  const todo = readTodo(formData);
-  const listId = text(formData, "listId");
   const supabase = await createClient();
+  const { data: before } = await supabase.from("task_instances").select("is_chore").eq("id", id).maybeSingle();
+  const todo = readListTask(formData, Boolean(before?.is_chore));
+  const listId = text(formData, "listId");
   const { error } = await supabase
     .from("task_instances")
     .update({ ...todo, ...(listId ? { list_id: listId } : {}) })

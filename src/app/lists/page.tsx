@@ -7,7 +7,8 @@ import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
-import { localDateOf } from "@/lib/time";
+import { localDateOf, type LocalDate } from "@/lib/time";
+import { onItsList } from "@/lib/todos";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
 import { loadTodos, type ChoreMember } from "../chores/data";
 import { choreSchedule } from "../chores/plan";
@@ -36,12 +37,17 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const today = localDateOf(new Date(), timeZone);
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
-  const { choreDays } = await choreSchedule(household, today, timeZone);
+  const { choreDays, plan } = await choreSchedule(household, today, timeZone);
+  // Where the chore planner has put each one-off chore (none: no room in the next two weeks).
+  const plannedOn = new Map<string, LocalDate>();
+  for (const day of plan.days) for (const item of day.items) if (item.kind === "one-off" && !plannedOn.has(item.id)) plannedOn.set(item.id, day.date);
   const supabase = await createClient();
-  const [{ lists, todos }, { data: memberRows }] = await Promise.all([
+  const [{ lists, todos: allTodos }, { data: memberRows }] = await Promise.all([
     loadTodos(),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
   ]);
+  // Chores and heads-ups live on the daily list (Today panel), not here.
+  const todos = allTodos.filter(onItsList);
   const members = (memberRows ?? []) as ChoreMember[];
   const memberById = new Map(members.map((m) => [m.id, m]));
   const listParam = firstParam(params.list);
@@ -126,10 +132,14 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 <Select name="dateKind" aria-label="What the day means" defaultValue="due" className="w-full">
                   <option value="due">Done by</option>
                   <option value="start">On</option>
+                  <option value="chore">Chore</option>
                 </Select>
               </div>
               <div className="min-w-44 flex-1">
                 <Input name="dueDate" type="date" aria-label="Day (optional)" className="w-full" />
+              </div>
+              <div className="min-w-32 flex-1">
+                <Input name="atTime" type="time" aria-label="Time (optional)" title="Time (optional): with a day, it shows on the calendar" className="w-full" />
               </div>
               <div className="min-w-36 flex-1">
                 <Select name="assigneeId" aria-label="For someone (optional)" defaultValue="" className="w-full">
@@ -177,6 +187,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                         household={household}
                         returnTo={returnTo}
                         editHref={here(`&edit=${t.id}`)}
+                        plannedOn={plannedOn}
                       />
                     ))}
                   </ul>
@@ -222,7 +233,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
       {editing ? (
         <Sheet title="Edit to-do" closeHref={returnTo}>
-          <form id="edit-todo" action={updateTodo} className="grid gap-4 sm:grid-cols-2">
+          <form id="edit-todo" action={updateTodo} className="group grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={editing.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
             <TodoFields members={members} lists={lists} choreDays={choreDays} todo={editing} showList />

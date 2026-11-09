@@ -209,6 +209,28 @@ test("one-off chores wait for their chore day", () => {
   assert.equal(where(plan, "dresser"), SAT);
 });
 
+test("a one-off chore with no chore day goes on the next day that isn't restrictive", () => {
+  const plan = planChoreDays({
+    choreDays: [free, laundry],
+    chores: [chore("big-one", { tags: ["big"], dueOn: MON })],
+    oneOffs: [{ id: "eaves", chore_day_id: null, tags: ["big", "outdoor"] }],
+    today: MON,
+  });
+  // Monday's one Big slot is taken and Tuesday is laundry only, so Wednesday.
+  assert.equal(where(plan, "big-one"), MON);
+  assert.equal(where(plan, "eaves"), WED);
+});
+
+test("an essential one-off chore goes on today, room or not", () => {
+  const plan = planChoreDays({
+    choreDays: [{ ...free, max_tasks: 1 }],
+    chores: [chore("first", { dueOn: MON })],
+    oneOffs: [{ id: "furnace", chore_day_id: null, tags: ["essential"] }],
+    today: MON,
+  });
+  assert.equal(where(plan, "furnace"), MON);
+});
+
 test("a chore with no room anywhere this week is hard to schedule", () => {
   const plan = planChoreDays({
     choreDays: [free, laundry],

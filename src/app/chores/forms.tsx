@@ -1,10 +1,16 @@
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Chips, Field, Input, Select } from "@/components/ui";
 import { FEATURE_LINKS } from "@/lib/todos";
-import type { ChoreDay } from "@/lib/chore-days";
+import { CHORE_TAGS, isChoreTag, type ChoreDay } from "@/lib/chore-days";
 import type { ChoreMember } from "./data";
 
-/** The fields for adding or editing a to-do. */
+/*
+ * While the form (marked `group`) has "A chore" picked, the day fields hide
+ * and the chore fields show, with no script: the group-has-[…] classes
+ * below. Tailwind only finds whole class names, so they're written out.
+ */
+
+/** The fields for adding or editing a to-do (the form needs the `group` class). */
 export function TodoFields({
   members,
   lists,
@@ -28,9 +34,12 @@ export function TodoFields({
     lead_days: number | null;
     link: string | null;
     chore_day_id?: string | null;
+    is_chore?: boolean;
+    tags?: string[];
   };
   showList?: boolean;
 }) {
+  const chore = Boolean(todo?.is_chore);
   return (
     <>
       <Field label="What needs doing">
@@ -39,28 +48,49 @@ export function TodoFields({
       <Field label="Picture" hint="Optional. Tap to pick one.">
         <EmojiPicker initial={todo?.icon ?? ""} nameField="title" className="self-start!" fullScreen />
       </Field>
-      <Field label="Day" hint="Optional.">
-        <Input name="dueDate" type="date" defaultValue={todo?.due_date ?? ""} />
-      </Field>
       <Chips
-        name="dateKind"
-        label="That day is"
+        name="kind"
+        label="It's"
+        className="sm:col-span-2"
         options={[
-          { value: "due", label: "Done by then" },
-          { value: "start", label: "When it starts" },
+          { value: "task", label: "A task" },
+          { value: "chore", label: "A chore: the planner picks a day with room" },
         ]}
-        defaultValue={todo?.date_kind ?? "due"}
+        defaultValue={chore ? "chore" : "task"}
       />
-      <Field label="Starts at" hint="Optional, for one that starts on its day.">
-        <Input name="atTime" type="time" defaultValue={todo?.at_time?.slice(0, 5) ?? ""} />
-      </Field>
-      <Field label="Show it ahead (days)" hint="For one done by a day. Empty: show it all along.">
-        <Input name="leadDays" type="number" min={0} max={60} defaultValue={todo?.lead_days ?? ""} />
-      </Field>
-      {choreDays.length > 0 ? (
-        <Field label="Or on a chore day" hint="With no day: it waits for the next one with room.">
+      {/* A task's day and time (hidden while "A chore" is picked). */}
+      <div className="contents group-has-[input[name=kind][value=chore]:checked]:hidden">
+        <Field label="Day" hint="Optional.">
+          <Input name="dueDate" type="date" defaultValue={chore ? "" : (todo?.due_date ?? "")} />
+        </Field>
+        <Chips
+          name="dateKind"
+          label="That day is"
+          options={[
+            { value: "due", label: "Done by then" },
+            { value: "start", label: "When it starts" },
+          ]}
+          defaultValue={todo?.date_kind ?? "due"}
+        />
+        <Field label="Time" hint="Optional. With a day, it shows on the calendar then.">
+          <Input name="atTime" type="time" defaultValue={chore ? "" : (todo?.at_time?.slice(0, 5) ?? "")} />
+        </Field>
+        <Field label="Show it ahead (days)" hint="For one done by a day. Empty: show it all along.">
+          <Input name="leadDays" type="number" min={0} max={60} defaultValue={todo?.lead_days ?? ""} />
+        </Field>
+      </div>
+      {/* A chore's tags and chore day (shown while "A chore" is picked). */}
+      <div className="hidden group-has-[input[name=kind][value=chore]:checked]:contents">
+        <Chips
+          name="tags"
+          label="Tags"
+          multiple
+          options={CHORE_TAGS.map((t) => ({ value: t.value, label: t.label }))}
+          defaultValue={(todo?.tags ?? []).filter(isChoreTag)}
+        />
+        <Field label="Chore day" hint="Optional. Empty: any day that isn't kept for one kind of chore.">
           <Select name="choreDayId" defaultValue={todo?.chore_day_id ?? ""}>
-            <option value="">No</option>
+            <option value="">Any day with room</option>
             {choreDays.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
@@ -68,7 +98,7 @@ export function TodoFields({
             ))}
           </Select>
         </Field>
-      ) : null}
+      </div>
       <Field label="Opens" hint="Optional: tapping it goes there.">
         <Select name="link" defaultValue={todo?.link ?? ""}>
           <option value="">Nothing</option>

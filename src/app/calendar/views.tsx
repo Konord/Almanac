@@ -425,6 +425,54 @@ export function EventPoint({
   );
 }
 
+/** A list task with a day and a time on a timeline: a hollow dot, its words in handwriting. */
+export type TaskPointItem = {
+  id: string;
+  list_id: string;
+  title: string;
+  due_date: LocalDate | null;
+  at_time: string | null;
+  date_kind: "due" | "start";
+  assignee_id: string | null;
+  link: string | null;
+  template_id: string | null;
+};
+
+/** Minutes into the day of a task's "09:30" time. */
+export function taskMinute(task: Pick<TaskPointItem, "at_time">): number {
+  return Number(task.at_time!.slice(0, 2)) * 60 + Number(task.at_time!.slice(3, 5));
+}
+
+export function TodoPoint({
+  todo,
+  top,
+  box,
+  colour,
+  big = true,
+}: {
+  todo: TaskPointItem;
+  top: number;
+  box: { left: string; width: string };
+  colour: string;
+  big?: boolean;
+}) {
+  // A list task opens its edit card on the Lists screen; a chore its link or its list.
+  const href = todo.template_id ? (todo.link ?? `/lists?list=${todo.list_id}`) : `/lists?list=${todo.list_id}&edit=${todo.id}`;
+  return (
+    <Link
+      href={href}
+      title={todo.date_kind === "due" ? `${todo.title} (by then)` : todo.title}
+      className={`pointer-events-auto absolute z-[2] flex -translate-y-1/2 items-center gap-1.5 overflow-hidden ${big ? "h-8" : "h-7"}`}
+      style={{ top: `${top}%`, ...box }}
+    >
+      <span className="size-3.5 shrink-0 rounded-full border-[3px] bg-board" style={{ borderColor: strong(colour) }} aria-hidden />
+      <span className={`min-w-0 truncate rounded-lg bg-board/90 px-1.5 font-hand leading-none text-ink ${big ? "text-xl" : "text-lg"}`}>
+        {todo.title}
+      </span>
+    </Link>
+  );
+}
+
 /** Where "now" sits on a timeline, as a percentage (outside 0–100 when off the timeline). */
 export function nowPercent(now: Date, first: number, last: number, timeZone: string): number {
   return ((minutesIntoDay(now, timeZone) - first * 60) / ((last - first) * 60)) * 100;
@@ -588,9 +636,17 @@ export function WeekView({
   dinners,
   breaks,
   specials,
-}: ViewProps & { dinners: Map<LocalDate, Dinner> }) {
+  tasks = [],
+}: ViewProps & {
+  dinners: Map<LocalDate, Dinner>;
+  /** List tasks with a day and a time this week, shown as points. */
+  tasks?: TaskPointItem[];
+}) {
   const { timeZone } = household.settings;
-  const { first, last } = timelineRange(events, days, timeZone);
+  const range = timelineRange(events, days, timeZone);
+  // Stretch the timeline to take in an early or late task.
+  const first = Math.min(range.first, ...tasks.map((t) => Math.floor(taskMinute(t) / 60)));
+  const last = Math.max(range.last, ...tasks.map((t) => Math.ceil((taskMinute(t) + 1) / 60)));
   const now = new Date();
   const editLink = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
   // The rows under the dates (all-day things, then dinner) only show when they have something.
@@ -744,6 +800,18 @@ export function WeekView({
                 linkFor={editLink}
                 draggable={{ week: days }}
               />
+              {tasks
+                .filter((t) => t.due_date === day)
+                .map((t) => (
+                  <TodoPoint
+                    key={t.id}
+                    todo={t}
+                    top={((taskMinute(t) - first * 60) / ((last - first) * 60)) * 100}
+                    box={{ left: "4px", width: "calc(100% - 8px)" }}
+                    colour={(t.assignee_id ? memberById.get(t.assignee_id)?.colour : undefined) ?? EVERYONE_COLOUR}
+                    big={false}
+                  />
+                ))}
               {day === today ? (
                 <NowLine percent={nowPercent(now, first, last, timeZone)} label={`Now, ${shortTime(now, household)}`} />
               ) : null}
