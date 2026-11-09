@@ -1,5 +1,6 @@
 import { isChoreTag, type ChoreTag } from "./chore-days.ts";
-import { SEASONS, seasonOf, type RepeatUnit, type Season } from "./chores.ts";
+import { SEASONS, seasonOf, spreadFirstDue, upcomingDue, type ChoreRule, type RepeatUnit, type Season } from "./chores.ts";
+import { addDays } from "./time.ts";
 import { MAX_LEAD_MINUTES } from "./heads-ups.ts";
 import type { LocalDate } from "./time.ts";
 
@@ -86,6 +87,11 @@ export type DraftOccasional = {
   notes: string | null;
   active: boolean;
   heads_ups: DraftHeadsUp[];
+  /**
+   * The first time it's due, for a chore never done. Null: picked for you
+   * (a quiet day when it's new; see `autoFirstDues`).
+   */
+  first_due: LocalDate | null;
 };
 
 /** Everything on the Chore Manager. Regular chores are in order within each chore day. */
@@ -151,6 +157,7 @@ export function draftProblem(draft: ChoreManagerDraft): string | null {
     if (c.only_in === "seasons" && c.only_seasons.length === 0) return `Pick at least one season for ${name}.`;
     if (c.only_in === "months" && c.only_months.length === 0) return `Pick at least one month for ${name}.`;
     if (c.at_time && !TIME.test(c.at_time)) return `The time for ${name} should look like 7:00 p.m.`;
+    if (c.first_due && !DATE.test(c.first_due)) return `Pick the first date for ${name} again.`;
     if (!VISIBILITIES.includes(c.visibility)) return `Choose who can see ${name}.`;
     if (c.notes && c.notes.length > 2000) return `The notes for ${name} are too long.`;
     if (c.heads_ups.length > MAX_HEADS_UPS) return `${name} can have ${MAX_HEADS_UPS} heads-ups at most.`;
@@ -200,4 +207,42 @@ export function seasonTabs<T extends { dueOn: LocalDate }>(chores: T[], today: L
     label: s.label,
     chores: sorted.filter((c) => (c.dueOn <= today ? now : seasonOf(c.dueOn).season) === s.season),
   }));
+}
+
+/** An occasional chore's rule, as the timing code reads it. */
+export function draftRule(c: DraftOccasional): ChoreRule {
+  return { ...ruleColumns(c), first_due: c.first_due } as ChoreRule;
+}
+
+/** How far ahead other chores' due dates are counted when picking a quiet day. */
+const LOOK_AHEAD_DAYS = 70;
+
+/**
+ * The quiet first day picked for each new occasional chore that doesn't
+ * have one set: away from the other chores' coming due dates (`dueOn` for
+ * saved chores), and from the new ones picked before it.
+ */
+export function autoFirstDues(occasional: DraftOccasional[], dueOn: Record<string, LocalDate>, today: LocalDate): Map<string, LocalDate> {
+  const until = addDays(today, LOOK_AHEAD_DAYS);
+  const others: LocalDate[] = [];
+  for (const c of occasional) {
+    if (!c.active) continue;
+    const due = isNewId(c.id) ? c.first_due : dueOn[c.id];
+    if (due) others.push(...upcomingDue(due, draftRule(c), today, until));
+  }
+  const picked = new Map<string, LocalDate>();
+  for (const c of occasional) {
+    if (!isNewId(c.id) || c.first_due || !c.active) continue;
+    const rule = draftRule(c);
+    const d = spreadFirstDue(rule, today, others);
+    if (!d) continue;
+    picked.set(c.id, d);
+    others.push(...upcomingDue(d, rule, today, until));
+  }
+  return picked;
+}
+
+/** Whether a chore's first date can be picked: not a set schedule or a once-a-year window. */
+export function hasFirstDue(c: DraftOccasional): boolean {
+  return c.only_in !== "dates" && c.repeat_from !== "date";
 }

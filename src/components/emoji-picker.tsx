@@ -35,6 +35,7 @@ export function EmojiPicker({
   fieldName = "icon",
   label,
   className = "",
+  fallback,
 }: {
   initial?: string;
   /** For screens that keep their own changes (no form): called with each pick. */
@@ -53,6 +54,8 @@ export function EmojiPicker({
   letter?: boolean;
   /** Cover the whole screen instead of just the card it sits in. */
   fullScreen?: boolean;
+  /** With no picture and no good guess from the name: show this (the same as the list it's in). */
+  fallback?: string;
 }) {
   const [icon, setIcon] = useState(initial ?? "");
   const [open, setOpen] = useState(false);
@@ -76,7 +79,7 @@ export function EmojiPicker({
     return () => field.removeEventListener("input", read);
   }, [nameField, nameText]);
 
-  const shown = icon || eventEmoji(null, title);
+  const shown = icon || eventEmoji(null, title, fallback);
   const pick = (emoji: string) => {
     setIcon(emoji);
     onChange?.(emoji);

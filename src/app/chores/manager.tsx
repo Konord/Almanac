@@ -6,12 +6,15 @@ import { Avatar, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
+import { eventEmoji } from "@/lib/emoji";
 import { CHORE_TAGS, weekdaysLabel, type ChoreTag } from "@/lib/chore-days";
 import { SEASONS, describeRule, type ChoreRule, type RepeatUnit, type Season } from "@/lib/chores";
 import {
   MAX_HEADS_UPS,
   NEW_PREFIX,
+  autoFirstDues,
   draftProblem,
+  hasFirstDue,
   ruleColumns,
   sameDraft,
   seasonTabs,
@@ -44,6 +47,8 @@ export type OccasionalInfo = {
   /** The day the generator put it on, in the next two weeks. */
   placedOn: string | null;
   onToday: boolean;
+  /** Never done or skipped yet: its first date can still be moved. */
+  firstTime: boolean;
   /** Why it's hard to schedule, if it is. */
   hard: string | null;
 };
@@ -58,6 +63,9 @@ const DAYS_PER_PAGE = 8;
 const OCCASIONAL_PER_PAGE = 9;
 const REGULAR_PER_PAGE = 9;
 const PREVIEW_SHOWN = 6;
+/** The picture for a chore day or chore with none picked and no good guess from its name (the same in lists and editors). */
+const DAY_PICTURE = "🗓️";
+const CHORE_PICTURE = "🧹";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const VISIBILITY = [
   { value: "everyone", label: "Everyone" },
@@ -180,7 +188,9 @@ export function ChoreManager({
       return;
     }
     setSaving(true);
-    const result = await saveChoreManager(draft);
+    // New chores go on the quiet first day shown on screen.
+    const picked = autoFirstDues(draft.occasional, dueOnOf(info), today);
+    const result = await saveChoreManager({ ...draft, occasional: draft.occasional.map((c) => ({ ...c, first_due: c.first_due ?? picked.get(c.id) ?? null })) });
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
@@ -203,7 +213,11 @@ export function ChoreManager({
 
   const addDay = () => {
     const id = newId();
-    const day: DraftChoreDay = { id, name: "New chore day", icon: null, weekdays: [], span: false, restrictive: false, max_tasks: 3, max_big: 1, is_free: false };
+    // It starts on the next weekday from today that no other chore day has.
+    const taken = new Set(draft.days.flatMap((x) => x.weekdays));
+    const todayWeekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+    const free = [1, 2, 3, 4, 5, 6, 7].map((n) => (todayWeekday + n) % 7).find((w) => !taken.has(w));
+    const day: DraftChoreDay = { id, name: "New chore day", icon: null, weekdays: free === undefined ? [] : [free], span: false, restrictive: false, max_tasks: 3, max_big: 1, is_free: false };
     update((d) => ({ ...d, days: [...d.days.filter((x) => !x.is_free), day, ...d.days.filter((x) => x.is_free)] }));
     setSelection({ kind: "day", id });
     setDayPage(Math.floor(days.filter((x) => !x.is_free).length / DAYS_PER_PAGE));
@@ -262,7 +276,7 @@ export function ChoreManager({
                   aria-pressed={active}
                   className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : "hover:bg-rail"}`}
                 >
-                  <Emoji emoji={d.icon ?? (d.is_free ? "🌤️" : "🗓️")} className="size-9" />
+                  <Emoji emoji={eventEmoji(d.icon, d.name, DAY_PICTURE)} className="size-9" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-lg font-bold text-ink">{d.name || "Unnamed"}</span>
                     <span className="truncate text-sm font-semibold text-ink-muted">
@@ -410,7 +424,7 @@ function DayPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <EmojiPicker initial={day.icon ?? ""} fieldName="" nameText={day.name} onChange={(e) => setDay({ icon: e || null })} label={`Picture for ${day.name}`} className="size-14! self-center!" fullScreen />
+        <EmojiPicker initial={day.icon ?? ""} fallback={DAY_PICTURE} fieldName="" nameText={day.name} onChange={(e) => setDay({ icon: e || null })} label={`Picture for ${day.name}`} className="size-14! self-center!" fullScreen />
         <input
           value={day.name}
           onChange={(e) => setDay({ name: e.target.value })}
@@ -436,7 +450,7 @@ function DayPanel({
         <div className="flex min-h-0 flex-col gap-2">
           <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">Regular chores · every {day.is_free ? "free day" : /\bday$/i.test(day.name.trim()) ? day.name.trim() : `${day.name.trim() || "chore"} day`}</h3>
           <div className="flex items-center gap-2">
-            <EmojiPicker key={round} initial="" fieldName="" nameText={name} onChange={setIcon} label="Picture for the new chore" className="size-12! self-center!" fullScreen />
+            <EmojiPicker key={round} initial="" fallback={CHORE_PICTURE} fieldName="" nameText={name} onChange={setIcon} label="Picture for the new chore" className="size-12! self-center!" fullScreen />
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -474,7 +488,7 @@ function DayPanel({
                 return (
                   <li key={c.id} className="my-1 flex flex-col gap-2 rounded-2xl bg-rail p-2.5">
                     <div className="flex items-center gap-2">
-                      <EmojiPicker initial={c.icon ?? ""} fieldName="" nameText={c.name} onChange={(e) => setChore(c.id, { icon: e || null })} label={`Picture for ${c.name}`} className="size-12! self-center!" fullScreen />
+                      <EmojiPicker initial={c.icon ?? ""} fallback={CHORE_PICTURE} fieldName="" nameText={c.name} onChange={(e) => setChore(c.id, { icon: e || null })} label={`Picture for ${c.name}`} className="size-12! self-center!" fullScreen />
                       <input value={c.name} onChange={(e) => setChore(c.id, { name: e.target.value })} maxLength={80} aria-label="Chore name" className={`${control} min-w-0 flex-1`} />
                       <select value={c.assignee_id ?? ""} onChange={(e) => setChore(c.id, { assignee_id: e.target.value || null })} aria-label="Who does it" className={`${control} w-[9.5rem]`}>
                         <option value="">Anyone</option>
@@ -506,7 +520,7 @@ function DayPanel({
               return (
                 <li key={c.id} className="border-b border-panel last:border-0">
                   <button type="button" onClick={() => setOpen(c.id)} className={`flex min-h-15 w-full items-center gap-3 text-left ${c.active ? "" : "opacity-55"}`}>
-                    <Emoji emoji={c.icon ?? "🧹"} className="size-9" />
+                    <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-9" />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-lg font-semibold text-ink">{c.name || "Unnamed"}</span>
                       {c.notes ? <span className="truncate text-sm font-semibold text-ink-muted">{c.notes}</span> : null}
@@ -553,7 +567,7 @@ function DayPanel({
               <ul className="flex flex-col gap-1">
                 {preview.items.slice(0, PREVIEW_SHOWN).map((item, i) => (
                   <li key={i} className={`flex items-center gap-2 text-base font-semibold ${item.occasional ? "text-accent" : "text-ink"}`}>
-                    <Emoji emoji={item.occasional ? "🔁" : (item.icon ?? "🧹")} className="size-6" />
+                    <Emoji emoji={item.occasional ? "🔁" : eventEmoji(item.icon, item.name, CHORE_PICTURE)} className="size-6" />
                     <span className="truncate">{item.name}</span>
                   </li>
                 ))}
@@ -589,6 +603,11 @@ function DayPanel({
 
 // ---------------------------------------------------------------------------
 // Occasional chores: the season list and the editor
+/** When each saved occasional chore is next due. */
+function dueOnOf(info: Record<string, OccasionalInfo>): Record<string, string> {
+  return Object.fromEntries(Object.entries(info).map(([id, i]) => [id, i.dueOn]));
+}
+
 // ---------------------------------------------------------------------------
 
 function OccasionalPanel({
@@ -622,8 +641,10 @@ function OccasionalPanel({
   locale: string;
   timeZone: string;
 }) {
-  // New chores (not saved yet) count as due today, so they show on this season's tab.
-  const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id]?.dueOn ?? today }));
+  // New chores (not saved yet) show under their first date: the one set, or a quiet day picked for them.
+  const picked = autoFirstDues(draft.occasional, dueOnOf(info), today);
+  const firstOf = (c: DraftOccasional) => c.first_due ?? picked.get(c.id) ?? today;
+  const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id] ? (c.first_due && info[c.id].firstTime ? c.first_due : info[c.id].dueOn) : firstOf(c) }));
   const tabs = seasonTabs(withDue, today);
   const selected = draft.occasional.find((c) => c.id === choreId) ?? null;
   const selectedSeason = selected ? tabs.find((t) => t.chores.some((x) => x.chore.id === selected.id))?.season : undefined;
@@ -673,6 +694,7 @@ function OccasionalPanel({
       notes: null,
       active: true,
       heads_ups: [],
+      first_due: null,
     };
     update((d) => ({ ...d, occasional: [...d.occasional, chore] }));
     setChoreId(id);
@@ -714,11 +736,11 @@ function OccasionalPanel({
             const i = info[c.id];
             const isNew = c.id.startsWith(NEW_PREFIX);
             const hard = c.active ? i?.hard : null;
-            const due = !i ? "Not saved" : i.onToday ? "" : i.dueOn < today ? "Overdue" : i.dueOn === today ? "Due today" : dateLabel(i.placedOn ?? i.dueOn);
+            const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : i.dueOn < today ? "Overdue" : i.dueOn === today ? "Due today" : dateLabel(i.placedOn ?? i.dueOn);
             return (
               <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-panel last:border-0 ${c.id === choreId ? "rounded-xl bg-rail px-1.5" : ""}`}>
                 <button type="button" onClick={() => setChoreId(c.id)} className={`flex min-w-0 flex-1 items-center gap-3 self-stretch text-left ${c.active ? "" : "opacity-55"}`}>
-                  <Emoji emoji={c.icon ?? "🧹"} className="size-9" />
+                  <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-9" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-lg font-semibold text-ink">{c.name || "Unnamed"}</span>
                     <span className={`truncate text-sm font-semibold ${hard ? "text-now" : "text-ink-muted"}`}>{!c.active ? "Paused" : (hard ?? ruleText(c))}</span>
@@ -762,6 +784,7 @@ function OccasionalPanel({
           key={selected.id}
           chore={selected}
           info={info[selected.id]}
+          firstDue={selected.first_due ?? picked.get(selected.id) ?? info[selected.id]?.dueOn ?? null}
           draft={draft}
           update={update}
           members={members}
@@ -796,9 +819,12 @@ function OccasionalEditor({
   weekdays,
   weekdayName,
   onRemoved,
+  firstDue,
 }: {
   chore: DraftOccasional;
   info: OccasionalInfo | undefined;
+  /** When it first comes due: the date set, or the one picked for it. */
+  firstDue: string | null;
   draft: ChoreManagerDraft;
   update: (change: (d: ChoreManagerDraft) => ChoreManagerDraft) => void;
   members: ManagerMember[];
@@ -828,10 +854,25 @@ function OccasionalEditor({
   return (
     <div className="flex min-h-0 flex-col gap-2.5 rounded-2xl border border-frame p-3.5">
       <div className="flex items-center gap-2.5">
-        <EmojiPicker initial={c.icon ?? ""} fieldName="" nameText={c.name} onChange={(e) => set({ icon: e || null })} label={`Picture for ${c.name}`} className="size-13! self-center!" fullScreen />
+        <EmojiPicker initial={c.icon ?? ""} fallback={CHORE_PICTURE} fieldName="" nameText={c.name} onChange={(e) => set({ icon: e || null })} label={`Picture for ${c.name}`} className="size-13! self-center!" fullScreen />
         <input value={c.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} aria-label="Chore name" className={`${control} min-w-0 flex-1 text-xl! font-bold`} />
       </div>
-      <p className="text-base font-semibold text-ink-muted">{status}</p>
+      {hasFirstDue(c) && c.active && (!info || info.firstTime) && firstDue ? (
+        // Never done yet: its first date can be moved. New chores get a quiet day.
+        <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-muted">
+          <span>{info ? "Not done yet · first time" : "First time"}</span>
+          <input type="date" value={firstDue} onChange={(e) => set({ first_due: e.target.value || null })} aria-label="First time it's due" className={`${control} py-1!`} />
+          {info ? null : c.first_due ? (
+            <button type="button" onClick={() => set({ first_due: null })} className="flex min-h-11 items-center rounded-xl px-3 font-bold text-accent hover:bg-rail">
+              Pick a quiet day
+            </button>
+          ) : (
+            <span>· a quiet day</span>
+          )}
+        </div>
+      ) : (
+        <p className="text-base font-semibold text-ink-muted">{status}</p>
+      )}
       <div className="flex gap-1 self-start rounded-2xl bg-panel p-1" role="tablist" aria-label="Chore settings">
         {(
           [

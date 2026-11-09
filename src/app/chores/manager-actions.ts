@@ -36,7 +36,7 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
     supabase
       .from("task_templates")
       .select(
-        "id, kind, name, icon, tags, at_time, default_assignee_id, notes, active, visibility, repeat_every, repeat_unit, preferred_weekday, snap, repeat_from, start_date, only_seasons, only_months, season_start, season_end",
+        "id, kind, name, icon, tags, at_time, default_assignee_id, notes, active, visibility, repeat_every, repeat_unit, preferred_weekday, snap, repeat_from, start_date, only_seasons, only_months, season_start, season_end, first_due",
       ),
     supabase.from("task_template_chore_days").select("template_id, chore_day_id"),
     supabase.from("heads_ups").select("id, chore_id, label, minutes_before, makes").not("chore_id", "is", null),
@@ -166,7 +166,7 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
   // A new occasional chore's first time goes on a quiet day, so chores
   // made together don't keep coming due together.
   const firstDue = new Map<string, string | null>();
-  const fresh = draft.occasional.filter((c) => isNewId(c.id));
+  const fresh = draft.occasional.filter((c) => isNewId(c.id) && !c.first_due);
   if (fresh.length > 0) {
     const timeZone = household.settings.timeZone;
     const today = localDateOf(new Date(), timeZone);
@@ -177,6 +177,7 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
       .flatMap((c) => upcomingDue(c.timing.dueOn, c, today, until));
     for (const c of fresh) {
       const rule = { ...ruleColumns(c), first_due: null } as ChoreRule;
+      // Normally the screen sends the quiet day it showed; this is the fallback.
       const picked = c.active ? spreadFirstDue(rule, today, others) : null;
       firstDue.set(c.id, picked);
       if (picked) others.push(...upcomingDue(picked, rule, today, until));
@@ -198,7 +199,7 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
         visibility: c.visibility,
         sort_order: 100 + i,
         ...ruleColumns(c),
-        ...(firstDue.has(c.id) ? { first_due: firstDue.get(c.id) } : {}),
+        first_due: firstDue.get(c.id) ?? c.first_due ?? null,
       },
       c.chore_day_ids,
     );
