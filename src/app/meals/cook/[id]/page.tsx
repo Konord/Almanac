@@ -27,11 +27,12 @@ async function Cook({ params }: { params: PageProps<"/meals/cook/[id]">["params"
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  if (!meal || !meal.recipe_id) notFound();
+  if (!meal) notFound();
   type DishRow = { position: number; recipe_id: string | null; batches: number; recipes: { id: string; name: string; icon: string | null; notes: string | null } | null };
   let rows = ((meal.meal_dishes ?? []) as unknown as DishRow[]).filter((d) => d.recipes).toSorted((a, b) => a.position - b.position);
   if (rows.length === 0) {
     // An older meal with no dishes of its own: cook its recipe.
+    if (!meal.recipe_id) notFound();
     const { data: recipe } = await supabase.from("recipes").select("id, name, icon, notes").eq("id", meal.recipe_id).maybeSingle();
     if (!recipe) notFound();
     rows = [{ position: 0, recipe_id: recipe.id, batches: 1, recipes: recipe }];

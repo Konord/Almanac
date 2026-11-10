@@ -621,8 +621,11 @@ function allDayBars({
 }
 
 
-/** A day's dinner, shown under the date in the week view. */
-export type Dinner = { name: string; icon: string; more: number };
+/**
+ * A meal on the week view: a butter-yellow block at its eating time, like an
+ * event (Connor, 2026-11-10). Tapping it opens Cooking Mode.
+ */
+export type WeekMeal = { id: string; name: string; icon: string; startMin: number; endMin: number; href: string; cooked: boolean };
 
 export function WeekView({
   household,
@@ -633,24 +636,26 @@ export function WeekView({
   href,
   profiles,
   adding,
-  dinners,
+  meals,
   breaks,
   specials,
   tasks = [],
 }: ViewProps & {
-  dinners: Map<LocalDate, Dinner>;
+  /** Each day's planned meals, placed at their eating times. */
+  meals: Map<LocalDate, WeekMeal[]>;
   /** List tasks with a day and a time this week, shown as points. */
   tasks?: TaskPointItem[];
 }) {
   const { timeZone } = household.settings;
   const range = timelineRange(events, days, timeZone);
   // Stretch the timeline to take in an early or late task.
-  const first = Math.min(range.first, ...tasks.map((t) => Math.floor(taskMinute(t) / 60)));
-  const last = Math.max(range.last, ...tasks.map((t) => Math.ceil((taskMinute(t) + 1) / 60)));
+  // Stretch it for a meal too.
+  const allMeals = [...meals.values()].flat();
+  const first = Math.min(range.first, ...tasks.map((t) => Math.floor(taskMinute(t) / 60)), ...allMeals.map((m) => Math.floor(m.startMin / 60)));
+  const last = Math.max(range.last, ...tasks.map((t) => Math.ceil((taskMinute(t) + 1) / 60)), ...allMeals.map((m) => Math.min(24, Math.ceil(m.endMin / 60))));
   const now = new Date();
   const editLink = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
-  // The rows under the dates (all-day things, then dinner) only show when they have something.
-  const anyDinner = dinners.size > 0;
+  // The row under the dates (all-day things) only shows when it has something.
   const allDayRow = allDayBars({ days, events, breaks, household, memberById, editLink });
 
   return (
@@ -752,35 +757,6 @@ export function WeekView({
           </div>
         ) : null}
 
-        {anyDinner ? (
-          <div className="mt-2 grid shrink-0 grid-cols-7 pl-16.5">
-            {days.map((day) => {
-              const dinner = dinners.get(day);
-              return (
-                <div key={day} className="flex min-w-0 px-1">
-                  <Link
-                    href={`/review?week=${day}`}
-                    className={`flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2 text-base font-bold ${
-                      dinner ? "bg-meal text-meal-ink" : "text-ink-muted"
-                    }`}
-                    title={dinner ? `Dinner: ${dinner.name}` : "No dinner planned"}
-                  >
-                    {dinner ? (
-                      <>
-                        <Emoji emoji={dinner.icon} className="size-6.5" />
-                        <span className="min-w-0 truncate">{dinner.name}</span>
-                        {dinner.more > 0 ? <span className="ml-auto shrink-0 text-sm opacity-75">+{dinner.more}</span> : null}
-                      </>
-                    ) : (
-                      <span className="truncate pl-0.5 text-sm">No dinner yet</span>
-                    )}
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-
         {/* The timeline */}
         <div className="relative mt-5 mb-1 flex min-h-0 flex-1 pl-16.5">
           <HourLines first={first} last={last} />
@@ -790,6 +766,10 @@ export function WeekView({
               data-drop-day={day}
               className={`relative min-w-0 flex-1 basis-0 border-l border-panel ${day === today ? "bg-[#FCFCFD]" : ""}`}
             >
+              {/* Meals sit under the events: they move out of the way of family plans, so they rarely overlap. */}
+              {(meals.get(day) ?? []).map((m) => (
+                <WeekMealBlock key={m.id} meal={m} first={first} last={last} household={household} day={day} />
+              ))}
               <DayBlocks
                 events={events}
                 day={day}
@@ -831,6 +811,27 @@ export function WeekView({
         </div>
       </div>
     </div>
+  );
+}
+
+/** A meal on the week's timeline: picture, name and eating time. Tap to start cooking. */
+function WeekMealBlock({ meal, first, last, household, day }: { meal: WeekMeal; first: number; last: number; household: Household; day: LocalDate }) {
+  const span = (last - first) * 60;
+  const top = ((meal.startMin - first * 60) / span) * 100;
+  const height = (Math.max(20, meal.endMin - meal.startMin) / span) * 100;
+  const hh = String(Math.floor(meal.startMin / 60) % 24).padStart(2, "0");
+  const mm = String(meal.startMin % 60).padStart(2, "0");
+  const time = shortTime(zonedToUtc(day, `${hh}:${mm}`, household.settings.timeZone), household);
+  return (
+    <Link
+      href={meal.href}
+      title={`${meal.name}, ${time}${meal.cooked ? " (cooked)" : ""}. Tap to start cooking.`}
+      className={`absolute flex min-h-0 items-center gap-1.5 overflow-hidden rounded-xl bg-meal px-2 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`}
+      style={{ top: `${top}%`, height: `${height}%`, left: "4px", width: "calc(100% - 8px)" }}
+    >
+      <Emoji emoji={meal.icon} className="size-6.5 shrink-0" />
+      <span className="min-w-0 flex-1 truncate font-hand text-lg leading-none">{meal.name}</span>
+    </Link>
   );
 }
 

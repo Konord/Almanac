@@ -17,7 +17,7 @@ import { dailyOrder, onDailyList, onItsList, timedToday } from "@/lib/todos";
 import { toggleTodo } from "../chores/actions";
 import { loadTodos, type Todo } from "../chores/data";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
-import { mealsForRoutines, placeTodayMeals, startCooking } from "../meals/today";
+import { cookHref, mealsForRoutines, placeTodayMeals, startCooking } from "../meals/today";
 import { tickSteps, toggleStep } from "../routines/actions";
 import { loadRoutines } from "../routines/data";
 import { floatingRoutines } from "../routines/floating";
@@ -463,7 +463,11 @@ export async function TodayPanel({
 
       {/* 3. The bottom box: the next meal. */}
       <Link
-        href={nextMeal ? `/review?meal=${nextMeal.meal.id}` : `/review?week=${today}`}
+        href={
+          nextMeal
+            ? cookHref({ id: nextMeal.meal.id, canCook: Boolean(nextMeal.meal.recipe_id) || nextMeal.meal.dishes.some((d) => d.recipe_id) })
+            : `/review?week=${today}`
+        }
         className="mt-4 flex min-h-22 items-center gap-4 rounded-[1.375rem] bg-meal px-5 py-3 text-meal-ink"
       >
         {nextMeal ? (

@@ -44,8 +44,9 @@ import { loadSpecialDays } from "../holidays/data";
 import { PeopleRow } from "../routines/people-row";
 import { loadTodos } from "../chores/data";
 import { onCalendar } from "@/lib/todos";
-import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime, type Dinner } from "./views";
-import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
+import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime, type WeekMeal } from "./views";
+import { loadMealBasics, loadMeals } from "../meals/data";
+import { cookHref, placeTodayMeals } from "../meals/today";
 import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
 import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
@@ -103,7 +104,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
   // The week view shows each day's dinner under the date, and list tasks with a time as points.
-  const dinners = view === "week" ? await dinnersFor(days) : new Map<LocalDate, Dinner>();
+  const weekMeals = view === "week" ? await mealsFor(days, events, members, timeZone) : new Map<LocalDate, WeekMeal[]>();
   const weekTasks =
     view === "week" ? (await loadTodos()).todos.filter((t) => onCalendar(t) && t.due_date! >= days[0] && t.due_date! <= days[days.length - 1]) : [];
   const profiles = profilesFor(days, items, layers, household);
@@ -231,7 +232,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           memberById={memberById}
           href={href}
           profiles={profiles}
-          dinners={dinners}
+          meals={weekMeals}
           tasks={weekTasks}
           adding={{ placing, pending, addHref }}
           breaks={breaks}
@@ -692,21 +693,32 @@ function CloseLink({ href, label = "Cancel" }: { href: string; label?: string })
 }
 
 /**
- * Each day's dinner: the planned meals at the dinner meal time (the one
- * called Dinner or Supper, else the latest in the day).
+ * The week's meals as blocks: each planned meal at its eating time, moved
+ * out of the way of plans the same way the Agenda does it.
  */
-async function dinnersFor(days: LocalDate[]): Promise<Map<LocalDate, Dinner>> {
+async function mealsFor(days: LocalDate[], events: CalendarItem[], members: Member[], timeZone: string): Promise<Map<LocalDate, WeekMeal[]>> {
   const [basics, meals] = await Promise.all([loadMealBasics(), loadMeals(days[0], days[days.length - 1])]);
-  const times = basics.mealTimes.toSorted((x, y) => (x.usual_time ?? "").localeCompare(y.usual_time ?? ""));
-  const dinner = times.find((t) => /dinner|supper/i.test(t.name)) ?? times.at(-1);
-  const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
-  const categories = new Map(basics.categories.map((c) => [c.id, c]));
-  const result = new Map<LocalDate, Dinner>();
-  if (!dinner) return result;
+  const memberIds = new Set(members.map((m) => m.id));
+  const result = new Map<LocalDate, WeekMeal[]>();
   for (const day of days) {
-    const here = meals.filter((m) => m.date === day && m.meal_time_id === dinner.id && (m.status === "planned" || m.status === "cooked"));
-    if (here.length === 0) continue;
-    result.set(day, { name: mealName(here[0], recipes, categories), icon: mealIcon(here[0], recipes, categories), more: here.length - 1 });
+    const plans = eventsOnDay(events, day, timeZone)
+      .filter((e) => !isAllDayStyle(e, timeZone))
+      .map((e) => ({
+        startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
+        endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
+        title: e.title,
+        memberIds: e.member_ids.filter((id) => memberIds.has(id)),
+      }));
+    const placed = placeTodayMeals(
+      meals.filter((m) => m.date === day),
+      basics,
+      plans,
+    );
+    if (placed.length === 0) continue;
+    result.set(
+      day,
+      placed.map((m) => ({ id: m.id, name: m.name, icon: m.icon, startMin: m.startMin, endMin: m.endMin, href: cookHref(m), cooked: m.cooked })),
+    );
   }
   return result;
 }
