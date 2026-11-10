@@ -11,16 +11,14 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
 select public.create_household('House A');
 
-insert into public.events (household_id, layer_id, title, starts_at, ends_at, timezone, recurrence_rule)
-select public.current_household_id(), id, 'Hockey', '2026-11-03 18:00-05', '2026-11-03 19:00-05', 'America/Toronto', 'FREQ=WEEKLY;BYDAY=TU'
-from public.layers where name = 'Kids';
+insert into public.events (household_id, title, starts_at, ends_at, timezone, recurrence_rule)
+values (public.current_household_id(), 'Hockey', '2026-11-03 18:00-05', '2026-11-03 19:00-05', 'America/Toronto', 'FREQ=WEEKLY;BYDAY=TU');
 select set_config('test.event', (select id::text from public.events where title = 'Hockey'), true);
 select set_config('test.household_a', public.current_household_id()::text, true);
 
 select throws_ok(
-  $$ insert into public.events (household_id, layer_id, title, starts_at, ends_at, timezone, recurrence_rule)
-     select public.current_household_id(), id, 'Bad', now(), now(), 'America/Toronto', 'FREQ=WEEKLY; DROP TABLE x'
-     from public.layers where name = 'Kids' $$,
+  $$ insert into public.events (household_id, title, starts_at, ends_at, timezone, recurrence_rule)
+     values (public.current_household_id(), 'Bad', now(), now(), 'America/Toronto', 'FREQ=WEEKLY; DROP TABLE x') $$,
   '23514', null, 'Odd recurrence rules are refused'
 );
 

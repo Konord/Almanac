@@ -1,7 +1,7 @@
 -- Checks for heads-ups. Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(5);
+select plan(6);
 
 insert into auth.users (id, email, aud, role) values
   ('93939393-9393-9393-9393-939393939393', 'heads-a@test', 'authenticated', 'authenticated'),
@@ -10,8 +10,8 @@ insert into auth.users (id, email, aud, role) values
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"93939393-9393-9393-9393-939393939393","role":"authenticated"}', true);
 select public.create_household('Heads House');
-insert into public.events (household_id, layer_id, title, starts_at, ends_at, timezone)
-select public.current_household_id(), id, 'Hockey game', '2026-11-14 18:00-05', '2026-11-14 19:30-05', 'America/Toronto' from public.layers limit 1;
+insert into public.events (household_id, title, starts_at, ends_at, timezone)
+values (public.current_household_id(), 'Hockey game', '2026-11-14 18:00-05', '2026-11-14 19:30-05', 'America/Toronto');
 
 insert into public.heads_ups (household_id, event_id, label, minutes_before)
 select public.current_household_id(), id, 'Pack the bag', 1440 from public.events;
@@ -19,8 +19,14 @@ select is((select count(*)::int from public.heads_ups), 1, 'An event can have a 
 
 select throws_ok(
   $$insert into public.heads_ups (household_id, label, minutes_before) values (public.current_household_id(), 'Nothing', 60)$$,
-  '23514', null, 'A heads-up needs an event or a chore'
+  '23514', null, 'A heads-up needs an event, a chore or a kind of day'
 );
+
+select lives_ok(
+  $$insert into public.heads_ups (household_id, day_kind, label, minutes_before) values (public.current_household_id(), 'Office day', 'Pack a lunch', 720)$$,
+  'A kind of day can have a heads-up'
+);
+delete from public.heads_ups where day_kind is not null;
 
 insert into public.task_instances (household_id, list_id, title, due_date, heads_up_id, heads_up_for)
 select public.current_household_id(), (select id from public.task_lists limit 1), 'Pack the bag', '2026-11-13', id, '2026-11-14' from public.heads_ups;

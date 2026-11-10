@@ -18,7 +18,7 @@ select is(
    join public.recipe_categories rc on rc.recipe_id = r.id
    join public.meal_categories c on c.id = rc.category_id where c.name = 'Tacos'),
   'Bean tacos,Beef tacos,Chicken tacos', 'Tacos come with beef, chicken and bean');
-select is((select count(*)::int from public.weekly_buys), 4, 'And a few weekly buys');
+select is((select count(*)::int from public.grocery_repeats), 4, 'And a few repeating groceries');
 
 -- Two lunches on one day, for different people.
 insert into public.members (household_id, name, role) values
