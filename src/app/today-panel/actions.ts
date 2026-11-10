@@ -37,7 +37,7 @@ export async function pickPanelTab(formData: FormData) {
   await requireHousehold();
   const tab = String(formData.get("tab") ?? "");
   const store = await cookies();
-  if (/^(upnext|today|[0-9a-f-]{36})$/.test(tab)) {
+  if (/^(upnext|today|routines|bucket|[0-9a-f-]{36})$/.test(tab)) {
     store.set(PANEL_TAB_COOKIE, tab, {
       path: "/",
       maxAge: YEAR,

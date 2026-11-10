@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
-import { isFeatureLink } from "@/lib/todos";
 import { isChoreTag } from "@/lib/chore-days";
 import { skipChoreNow } from "./skip";
 
@@ -134,8 +133,6 @@ function readTodo(formData: FormData) {
   const leadText = text(formData, "leadDays");
   const leadDays = leadText === "" ? null : Number(leadText);
   if (leadDays !== null && !(Number.isInteger(leadDays) && leadDays >= 0 && leadDays <= 60)) back(formData, "error", "Show it between 0 and 60 days before.");
-  const link = text(formData, "link");
-  if (link && !isFeatureLink(link)) back(formData, "error", "Choose a part of the app for it to open.");
   return {
     title,
     icon: readIcon(formData),
@@ -144,7 +141,8 @@ function readTodo(formData: FormData) {
     // Only a to-do with a day can have a time ("by 3 p.m." or "at 3 p.m.").
     at_time: dueDate && atTime ? atTime : null,
     lead_days: dateKind === "due" ? leadDays : null,
-    link: link || null,
+    // Tasks no longer open a part of the app (Connor, 2026-11-10).
+    link: null,
     assignee_id: text(formData, "assigneeId") || null,
     notes: text(formData, "notes") || null,
   };
@@ -159,13 +157,12 @@ function readChore(formData: FormData) {
   const title = text(formData, "title");
   if (!title) back(formData, "error", "Write what needs doing.");
   if (title.length > 120) back(formData, "error", "Keep it under 120 letters.");
-  const link = text(formData, "link");
-  if (link && !isFeatureLink(link)) back(formData, "error", "Choose a part of the app for it to open.");
   const tags = formData.getAll("tags").map(String).filter(isChoreTag);
   return {
     title,
     icon: readIcon(formData),
-    link: link || null,
+    // Tasks no longer open a part of the app (Connor, 2026-11-10).
+    link: null,
     assignee_id: text(formData, "assigneeId") || null,
     notes: text(formData, "notes") || null,
     tags,

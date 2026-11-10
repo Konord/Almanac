@@ -14,7 +14,6 @@ import { createClient } from "@/lib/supabase/server";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { dailyListPart } from "@/lib/routines";
 import { dailyOrder, onDailyList, onItsList, timedToday } from "@/lib/todos";
-import { toggleTodo } from "../chores/actions";
 import { loadTodos, type Todo } from "../chores/data";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
 import { cookHref, mealsForRoutines, placeTodayMeals, startCooking } from "../meals/today";
@@ -25,6 +24,9 @@ import { pickPanelTab, setPanelOpen } from "./actions";
 import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
 import { PanelPages } from "@/components/panel-pages";
+import { panelBoxes, stepBox } from "@/lib/panel-boxes";
+import { addTodo, toggleTodo } from "../chores/actions";
+import { choreSchedule } from "../chores/plan";
 
 /**
  * The Today panel: a column on the left of the calendar with three parts.
@@ -74,8 +76,8 @@ type Row =
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
-/** How many list chips fit beside "Today" (and "Up next", which needs one of their places). */
-const LIST_CHIPS = 3;
+/** The chore bucket's rows, leaving room for its add box. */
+const BUCKET_ROWS = 4;
 
 export async function TodayPanel({
   household,
@@ -110,16 +112,13 @@ export async function TodayPanel({
   ]);
   const colourOf = new Map((memberRows ?? []).map((m) => [m.id, m.colour]));
 
-  // The tab, if its list still exists; Up next where it's offered; otherwise the daily list.
-  const list = lists.find((l) => l.id === tab);
-  const showing = list ? list.id : tab === "upnext" && !day ? "upnext" : "today";
+  // The boxes this household flips between (Settings), and the one this screen showed last.
+  const boxes = panelBoxes(household.settings.panelBoxes, lists, day);
+  const box = boxes.find((b) => b.id === tab) ?? boxes[0];
+  const showing = box.id;
+  const list = lists.find((l) => l.id === showing);
   // The grocery list shows its own lines (quick adds while you cook or plan).
   const groceries = list?.is_groceries ? await loadGroceries(household.settings.measures) : null;
-  // The first few lists get chips, always including the one showing.
-  const chipCount = day ? LIST_CHIPS : LIST_CHIPS - 1;
-  const chipLists = lists.slice(0, chipCount);
-  if (list && !chipLists.includes(list)) chipLists[chipCount - 1] = list;
-
   const nowMinutes = (() => {
     const [h, m] = localTimeOf(new Date(), timeZone).split(":").map(Number);
     return h * 60 + m;
@@ -262,20 +261,39 @@ export async function TodayPanel({
       .format(zonedToUtc(today, time.slice(0, 5), timeZone))
       .replace(":00", "");
 
-  const tabButton = (value: string, label: string) => (
-    <form key={value} action={pickPanelTab}>
-      <input type="hidden" name="tab" value={value} />
+  const arrowButton = (by: 1 | -1) => (
+    <form action={pickPanelTab}>
+      <input type="hidden" name="tab" value={stepBox(boxes, showing, by)} />
       <input type="hidden" name="returnTo" value={returnTo} />
       <button
-        aria-pressed={showing === value}
-        className={`min-h-[var(--touch-target)] max-w-44 truncate rounded-full px-4.5 text-base font-bold ${
-          showing === value ? "bg-ink text-board" : "bg-board text-ink-soft"
-        }`}
+        aria-label={by === 1 ? "Next box" : "Previous box"}
+        className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-board text-ink"
       >
-        {label}
+        {by === 1 ? <CaretRight size="1.5rem" weight="bold" aria-hidden /> : <CaretLeft size="1.5rem" weight="bold" aria-hidden />}
       </button>
     </form>
   );
+
+  // Today's routines, for the Routines box: tapping one opens its checklist in the panel.
+  const routineRows =
+    showing === "routines"
+      ? routineData.members
+          .flatMap((m) =>
+            floatingRoutines(routineData, m.id, today, [], timeZone, household.settings.routineFlexMinutes, mealsForRoutines(todayMeals)).map((r) => ({
+              key: `${m.id}:${r.assignment.id}`,
+              member: m,
+              routine: r,
+              startMin: r.placement.startMin,
+            })),
+          )
+          .sort((a, b) => a.startMin - b.startMin)
+      : [];
+  const routineHref = (templateId: string, memberId: string) =>
+    `${returnTo}${returnTo.includes("?") ? "&" : "?"}routine=${templateId}&member=${memberId}`;
+
+  // The chore bucket: occasional and one-off chores the planner has put on the coming days.
+  const bucket = showing === "bucket" ? await bucketRows(household, today, todos) : null;
+  const choresList = lists.find((l) => l.is_chores);
 
   return (
     <aside
@@ -309,14 +327,12 @@ export async function TodayPanel({
         <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">{routine}</div>
       ) : (
       <>
-      <nav
-        aria-label="What the panel shows"
-        className="mt-6 flex flex-wrap gap-2"
-      >
-        {tabButton("today", "Today")}
-        {day ? null : tabButton("upnext", "Up next")}
-        {chipLists.map((l) => tabButton(l.id, l.name))}
-      </nav>
+      {/* Which box: arrows flip between the ones chosen in Settings. */}
+      <div className="mt-6 flex items-center gap-2">
+        {boxes.length > 1 ? arrowButton(-1) : null}
+        <h3 className="min-w-0 flex-1 truncate text-center text-2xl font-extrabold text-ink">{box.name}</h3>
+        {boxes.length > 1 ? arrowButton(1) : null}
+      </div>
       <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">
         {showing === "upnext" ? (
           upNext.length === 0 ? (
@@ -351,6 +367,67 @@ export async function TodayPanel({
               ))}
             </ul>
           )
+        ) : showing === "routines" ? (
+          routineRows.length === 0 ? (
+            <p className="py-3 text-lg text-ink-muted">No routines today.</p>
+          ) : (
+            <PanelPages
+              link={{ href: "/routines", label: "Routine Manager" }}
+              pages={pagesOf(routineRows, ROWS).map((rows, p) => (
+                <ul key={p} className="flex flex-col">
+                  {rows.map(({ key, member, routine: r, startMin }) => (
+                    <li key={key} className="border-b border-panel last:border-0">
+                      <Link href={routineHref(r.template.id, member.id)} scroll={false} className="flex min-h-16 items-center gap-3">
+                        <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ background: strong(member.colour) }} aria-hidden />
+                        <Emoji emoji={r.progress.next?.icon ?? r.steps[0]?.icon ?? "✨"} className="size-8" />
+                        <span className={`min-w-0 flex-1 truncate font-hand text-2xl ${r.progress.complete ? "text-ink-muted line-through" : "text-ink"}`}>{r.template.name}</span>
+                        <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">
+                          {r.progress.done}/{r.progress.total}
+                        </span>
+                        <span className="shrink-0 text-right text-lg font-bold whitespace-nowrap text-ink-muted tabular-nums">{taskTime(hhmm(startMin))}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ))}
+            />
+          )
+        ) : showing === "bucket" && bucket ? (
+          <>
+            {bucket.length === 0 ? <p className="py-3 text-lg text-ink-muted">Nothing waiting in the next two weeks.</p> : null}
+            <PanelPages
+              link={{ href: "/chores", label: "Chore Manager" }}
+              pages={pagesOf(bucket, BUCKET_ROWS).map((rows, p) => (
+                <ul key={p} className="flex flex-col">
+                  {rows.map((row) => (
+                    <li key={row.key} className="flex min-h-16 items-center gap-3 border-b border-panel last:border-0">
+                      <Emoji emoji={row.icon} className="size-8" />
+                      <span className="min-w-0 flex-1 truncate font-hand text-2xl text-ink">{row.title}</span>
+                      <span className={`shrink-0 text-lg font-bold tabular-nums ${row.date ? "text-ink-muted" : "text-danger"}`}>
+                        {row.date ? weekdayShort(row.date, household) : "No room"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ))}
+            />
+            {/* Adding to the bucket adds a one-off chore to the Chores list; the planner finds it a day. */}
+            {choresList ? (
+              <form action={addTodo} className="mt-2 flex shrink-0 items-center gap-2 border-t border-panel pt-2">
+                <input type="hidden" name="listId" value={choresList.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <input
+                  name="title"
+                  required
+                  maxLength={120}
+                  placeholder="Add a chore"
+                  aria-label="Add a chore to the bucket"
+                  className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 font-hand text-xl text-ink outline-none focus:border-accent"
+                />
+                <button className="min-h-[var(--touch-target)] shrink-0 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board">Add</button>
+              </form>
+            ) : null}
+          </>
         ) : groceries ? (
           <GroceryView initial={groceries} compact rows={8} />
         ) : open.length === 0 ? (
@@ -438,7 +515,7 @@ export async function TodayPanel({
           />
         )}
         {/* Paged lists have their own bottom row; Up next, groceries and empty lists get a link. */}
-        {showing !== "upnext" && !groceries && open.length > 0 ? null : (() => {
+        {showing === "routines" || showing === "bucket" || (showing !== "upnext" && !groceries && open.length > 0) ? null : (() => {
           const extra =
             showing === "upnext" ? upNext.length - ROWS : open.length - ROWS;
           const href = showing === "upnext" ? "/" : showing === "today" ? "/lists" : `/lists?list=${showing}`;
@@ -535,4 +612,46 @@ function pagesOf<T>(items: T[], size: number): T[][] {
   const pages: T[][] = [];
   for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size));
   return pages.length ? pages : [[]];
+}
+
+/** One chore waiting in the bucket, and the day the planner has it on (null: no room in the next two weeks). */
+type BucketRow = { key: string; title: string; icon: string; date: LocalDate | null };
+
+/** The chore bucket: chores the planner has placed after today, soonest first, then the ones with no room. */
+async function bucketRows(household: Household, today: LocalDate, todos: Todo[]): Promise<BucketRow[]> {
+  const { chores, plan } = await choreSchedule(household, today, household.settings.timeZone, false);
+  const choreById = new Map(chores.map((c) => [c.id, c]));
+  const todoById = new Map(todos.map((t) => [t.id, t]));
+  const nameOf = (id: string, kind: "generated" | "one-off") => {
+    if (kind === "generated") {
+      const c = choreById.get(id);
+      return c ? { title: c.name, icon: c.icon ?? "🧹" } : null;
+    }
+    const t = todoById.get(id);
+    return t && t.status === "open" ? { title: t.title, icon: t.icon ?? "🧹" } : null;
+  };
+  const rows: BucketRow[] = [];
+  const seen = new Set<string>();
+  for (const day of plan.days) {
+    if (day.date <= today) continue;
+    for (const item of day.items) {
+      if (seen.has(item.id)) continue;
+      const named = nameOf(item.id, item.kind);
+      if (!named) continue;
+      seen.add(item.id);
+      rows.push({ key: `${item.kind}:${item.id}`, ...named, date: day.date });
+    }
+  }
+  for (const id of plan.unplaced) {
+    if (seen.has(id)) continue;
+    const named = nameOf(id, "generated") ?? nameOf(id, "one-off");
+    if (named) rows.push({ key: `unplaced:${id}`, ...named, date: null });
+  }
+  return rows;
+}
+
+function weekdayShort(date: LocalDate, household: Household): string {
+  return new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, weekday: "short" }).format(
+    zonedToUtc(date, "12:00", household.settings.timeZone),
+  );
 }

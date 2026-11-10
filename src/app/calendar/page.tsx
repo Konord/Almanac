@@ -42,6 +42,7 @@ import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
 import { loadSpecialDays } from "../holidays/data";
 import { PeopleRow } from "../routines/people-row";
+import { RoutineChecklist } from "../routines/routine-checklist";
 import { loadTodos } from "../chores/data";
 import { onCalendar } from "@/lib/todos";
 import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime, type WeekMeal } from "./views";
@@ -148,6 +149,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // The Today panel on the left: what's still to come today, soonest first.
   const panelPrefs = await readPanelPrefs();
   const panelReturn = `/calendar?${returnTo}`;
+  const openRoutine = firstParam(params.routine) ?? "";
+  const openMember = firstParam(params.member) ?? "";
+  const routineOpen = Boolean(openRoutine && openMember) && !placing;
   const now = new Date();
   // Up next is always about today, even when the calendar shows another month.
   let todayEvents = events;
@@ -171,8 +175,29 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       <RememberDisplay display={view} />
       <WallRefresh timeZone={timeZone} />
       <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
-      {panelPrefs.open ? (
-        <TodayPanel household={household} today={today} upNext={upNext} tab={panelPrefs.tab} returnTo={panelReturn} />
+      {panelPrefs.open || routineOpen ? (
+        <TodayPanel
+          household={household}
+          today={today}
+          upNext={upNext}
+          tab={panelPrefs.tab}
+          returnTo={panelReturn}
+          routine={
+            // A routine tapped in the Routines box takes over the panel until it's closed.
+            routineOpen ? (
+              <RoutineChecklist
+                data={routineData}
+                memberId={openMember}
+                templateId={openRoutine}
+                date={today}
+                today={today}
+                page={Number(firstParam(params.rpage) ?? 0) || 0}
+                closeHref={panelReturn}
+                hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
+              />
+            ) : undefined
+          }
+        />
       ) : (
         <OpenPanelTab returnTo={panelReturn} />
       )}

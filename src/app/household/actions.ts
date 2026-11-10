@@ -168,6 +168,14 @@ export async function saveSettings(formData: FormData) {
     handwriting: formData.get("handwriting") === "on",
     dayProfile,
     weeklyReview: { weekday: reviewWeekday, time: reviewTime },
+    // The Today panel's boxes (only when the form sent its checkboxes).
+    panelBoxes:
+      formData.get("panelBoxesSent") === "1"
+        ? formData
+            .getAll("panelBoxes")
+            .map(String)
+            .filter((v) => /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(v))
+        : household.settings.panelBoxes,
   };
 
   const supabase = await createClient();
