@@ -130,12 +130,13 @@ export function MenuTray({ section }: { section: Section }) {
                 href={s === "calendar" ? calendarHref : href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex min-h-24 min-w-28 flex-col items-center justify-center gap-1.5 rounded-[1.25rem] px-3 text-base font-bold ${
+                className={`flex min-h-24 w-30 flex-col items-center justify-start gap-1.5 rounded-[1.25rem] px-2 pt-3 pb-2 text-base font-bold ${
                   active ? "bg-rail text-ink" : "text-ink-muted hover:bg-rail"
                 }`}
               >
                 <IconComponent size="2.5rem" weight={active ? "fill" : "regular"} aria-hidden />
-                {label}
+                {/* Two lines kept for every label, so the icons all line up. */}
+                <span className="flex min-h-[2lh] items-start text-center leading-tight text-balance">{label}</span>
               </Link>
             );
           })}

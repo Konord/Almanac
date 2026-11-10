@@ -39,6 +39,9 @@ import { Face, SectionTitle, type Person } from "./parts";
  * Tapping a meal tile opens the meal picker. One Save in the header keeps
  * it all; the grocery list beside it is live.
  */
+
+/** How many of a day's plans its box names before "+ N more". */
+const PLANS_SHOWN = 3;
 export function ReviewBoard({
   data,
   range,
@@ -247,7 +250,7 @@ export function ReviewBoard({
                       type="button"
                       disabled={col.past}
                       onClick={() => setMealAt({ mealId: null, date: col.date, mealTimeId: time.id })}
-                      className="flex min-h-14 shrink-0 basis-[6.875rem] items-center justify-center rounded-[1.375rem] border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_28%,var(--color-meal))] text-lg font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,white)] disabled:opacity-60"
+                      className="flex min-h-14 flex-1 basis-[6.875rem] items-center justify-center rounded-[1.375rem] border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_28%,var(--color-meal))] text-lg font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,white)] disabled:opacity-60"
                     >
                       + {time.name}
                     </button>
@@ -263,7 +266,7 @@ export function ReviewBoard({
                             disabled={col.past}
                             onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
                             title={`${time.name}: ${look.title}`}
-                            className={`relative flex min-h-14 min-w-0 flex-1 rounded-[1.375rem] border-2 bg-meal px-2.5 text-meal-ink ${big ? "max-h-[11rem] flex-col items-center justify-center gap-1.5 text-center" : "max-h-[6rem] items-center gap-2.5 text-left"} ${
+                            className={`relative flex min-h-14 min-w-0 flex-1 rounded-[1.375rem] border-2 bg-meal px-2.5 text-meal-ink ${big ? "flex-col items-center justify-center gap-1.5 text-center" : "max-h-[6rem] items-center gap-2.5 text-left"} ${
                               mealChanged(m.id) ? "border-dashed border-accent" : "border-transparent"
                             }`}
                           >
@@ -329,18 +332,22 @@ export function ReviewBoard({
                     ))
                   )}
                 </span>
-                <span className="flex min-h-6 flex-wrap items-center gap-1.5 text-sm font-bold text-ink-soft">
-                  {col.events.length === 0 ? (
-                    <span className="font-normal text-ink-muted">Nothing on</span>
-                  ) : (
-                    <>
-                      {col.events.slice(0, 6).map((e) => (
-                        <Dot key={e.id} colour={person.get(e.memberId ?? "")?.colour} />
-                      ))}
-                      {col.events.length === 1 ? "1 plan" : `${col.events.length} plans`}
-                    </>
-                  )}
-                </span>
+                {/* The day's plans by name, so the box says what's on (2026-11-10). */}
+                {col.events.length > 0 ? (
+                  <span className="flex min-h-[4.25rem] flex-col gap-1">
+                    {col.events.slice(0, PLANS_SHOWN).map((e) => (
+                      <span key={e.id} className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink">
+                        <Dot colour={person.get(e.memberId ?? "")?.colour} />
+                        <span className="truncate">{e.title}</span>
+                      </span>
+                    ))}
+                    {col.events.length > PLANS_SHOWN ? (
+                      <span className="text-sm font-bold text-ink-muted">+ {col.events.length - PLANS_SHOWN} more</span>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="min-h-[4.25rem]" />
+                )}
               </button>
 
               {isOpen ? (

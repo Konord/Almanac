@@ -30,7 +30,7 @@ export default function LibraryPage(props: PageProps<"/meals/library">) {
 }
 
 const KIND_PAGE = 12;
-const DISH_PAGE = 6;
+const DISH_PAGE = 8;
 /** The pretend kinds: every dish, and dishes with no kind. */
 const ALL = "all";
 const NONE = "none";

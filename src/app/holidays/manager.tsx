@@ -18,7 +18,7 @@ import { saveHolidays, type HolidayDraft } from "./actions";
 type Tab = "holidays" | "birthdays";
 type Selection = { kind: "holiday"; id: string } | { kind: "birthday"; id: string } | { kind: "public" } | null;
 
-const PER_PAGE = 7;
+const PER_PAGE = 10;
 const PUBLIC_PER_PAGE = 12;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
