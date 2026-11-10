@@ -2,21 +2,15 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, X } from "@phosphor-icons/react/dist/ssr";
 import { Notice, ScreenHeader, Segmented } from "@/components/ui";
+import { MENU_TABS, type MealsTab } from "./menu-tabs";
 
 /*
  * Pieces shared by the Meals screens: the header with the Meals tabs, a
  * pop-up card that never scrolls, and page arrows for long lists.
  */
 
-export type MealsTab = "library" | "groceries" | "backups" | "setup";
-
-const TABS: { tab: MealsTab; href: string; label: string }[] = [
-  // The Menu Manager (Connor, 2026-11-09): meals are planned in the weekly review.
-  { tab: "library", href: "/meals/library", label: "Recipes" },
-  { tab: "backups", href: "/meals/backups", label: "Backup meals" },
-  { tab: "groceries", href: "/meals/groceries", label: "Grocery list" },
-  { tab: "setup", href: "/meals/setup", label: "Meal times" },
-];
+export type { MealsTab } from "./menu-tabs";
+const TABS = MENU_TABS;
 
 export function MealsHeader({
   title,

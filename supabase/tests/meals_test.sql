@@ -33,10 +33,11 @@ select m.id, mem.id, m.household_id from public.meals m, public.members mem
 where mem.name = 'Connor' and m.recipe_id = (select id from public.recipes where name = 'Leftovers');
 select is((select count(*)::int from public.meal_members), 1, 'A meal can be for just some people');
 
+-- A meal's dishes live in meal_dishes now; each one needs a kind or a dish.
 select throws_ok(
-  $$ insert into public.meals (household_id, date, meal_time_id)
-     select public.current_household_id(), '2026-11-05', id from public.meal_times limit 1 $$,
-  '23514', null, 'A meal needs a category or a variant');
+  $$ insert into public.meal_dishes (household_id, meal_id, position)
+     select public.current_household_id(), id, 5 from public.meals limit 1 $$,
+  '23514', null, 'A dish on a meal needs a kind or a recipe');
 
 select throws_ok(
   $$ insert into public.step_helpers (household_id, step_id, kind) values (public.current_household_id(), gen_random_uuid(), 'timer') $$,

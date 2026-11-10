@@ -22,6 +22,8 @@ import { tickSteps, toggleStep } from "../routines/actions";
 import { loadRoutines } from "../routines/data";
 import { floatingRoutines } from "../routines/floating";
 import { pickPanelTab, setPanelOpen } from "./actions";
+import { loadGroceries } from "../groceries/data";
+import { GroceryView } from "../groceries/view";
 
 /**
  * The Today panel: a column on the left of the calendar with three parts.
@@ -110,6 +112,8 @@ export async function TodayPanel({
   // The tab, if its list still exists; Up next where it's offered; otherwise the daily list.
   const list = lists.find((l) => l.id === tab);
   const showing = list ? list.id : tab === "upnext" && !day ? "upnext" : "today";
+  // The grocery list shows its own lines (quick adds while you cook or plan).
+  const groceries = list?.is_groceries ? await loadGroceries(household.settings.measures) : null;
   // The first few lists get chips, always including the one showing.
   const chipCount = day ? LIST_CHIPS : LIST_CHIPS - 1;
   const chipLists = lists.slice(0, chipCount);
@@ -346,6 +350,8 @@ export async function TodayPanel({
               ))}
             </ul>
           )
+        ) : groceries ? (
+          <GroceryView initial={groceries} compact rows={8} />
         ) : open.length === 0 ? (
           <p className="py-3 text-lg text-ink-muted">
             {showing === "today" ? "Nothing on today's list." : "Nothing on this list."}

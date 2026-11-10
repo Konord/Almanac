@@ -23,30 +23,44 @@ async function Cook({ params }: { params: PageProps<"/meals/cook/[id]">["params"
   const supabase = await createClient();
   const { data: meal, error } = await supabase
     .from("meals")
-    .select("id, date, servings, status, recipe_id, recipes(id, name, icon, serves, notes), meal_times(name)")
+    .select("id, recipe_id, menu_meals(name), meal_dishes(position, recipe_id, batches, recipes(id, name, icon, notes))")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   if (!meal || !meal.recipe_id) notFound();
-  const recipe = meal.recipes as unknown as { id: string; name: string; icon: string | null; serves: number; notes: string | null };
-  const detail = await loadRecipeDetail(recipe.id);
-  const { data: lunch } = await supabase.from("meal_times").select("id").ilike("name", "lunch").limit(1).maybeSingle();
+  type DishRow = { position: number; recipe_id: string | null; batches: number; recipes: { id: string; name: string; icon: string | null; notes: string | null } | null };
+  let rows = ((meal.meal_dishes ?? []) as unknown as DishRow[]).filter((d) => d.recipes).toSorted((a, b) => a.position - b.position);
+  if (rows.length === 0) {
+    // An older meal with no dishes of its own: cook its recipe.
+    const { data: recipe } = await supabase.from("recipes").select("id, name, icon, notes").eq("id", meal.recipe_id).maybeSingle();
+    if (!recipe) notFound();
+    rows = [{ position: 0, recipe_id: recipe.id, batches: 1, recipes: recipe }];
+  }
+  const [details, { data: lunch }] = await Promise.all([
+    Promise.all(rows.map((d) => loadRecipeDetail(d.recipes!.id))),
+    supabase.from("meal_times").select("id").ilike("name", "lunch").limit(1).maybeSingle(),
+  ]);
+  const menuName = (meal.menu_meals as unknown as { name: string | null } | null)?.name;
 
   return (
     <CookingMode
       mealId={meal.id}
-      name={recipe.name}
-      icon={recipe.icon}
-      serves={recipe.serves}
-      servings={meal.servings ?? recipe.serves}
-      notes={recipe.notes}
+      title={menuName || rows[0].recipes!.name}
       temperatureUnit={household.settings.temperatureUnit}
+      measures={household.settings.measures}
       canPlanLeftovers={Boolean(lunch)}
-      ingredients={detail.ingredients.map((i) => ({ id: i.id, name: i.item.name, icon: i.item.icon, amount: i.amount, unit: i.unit, note: i.note }))}
-      steps={detail.steps.map((s) => ({
-        id: s.id,
-        text: s.text,
-        helpers: s.helpers.map((h) => ({ kind: h.kind, minutes: h.minutes, temperature: h.temperature, label: h.label })),
+      dishes={rows.map((d, i) => ({
+        recipeId: d.recipes!.id,
+        name: d.recipes!.name,
+        icon: d.recipes!.icon,
+        notes: d.recipes!.notes,
+        batches: d.batches,
+        ingredients: details[i].ingredients.map((ing) => ({ id: ing.id, name: ing.item.name, icon: ing.item.icon, amount: ing.amount, unit: ing.unit, note: ing.note })),
+        steps: details[i].steps.map((s) => ({
+          id: s.id,
+          text: s.text,
+          helpers: s.helpers.map((h) => ({ kind: h.kind, minutes: h.minutes, temperature: h.temperature, label: h.label })),
+        })),
       }))}
     />
   );

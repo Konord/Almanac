@@ -101,9 +101,9 @@ const meal = (id: string, extra: Partial<DraftMeal> = {}): DraftMeal => ({
   date: TUE,
   mealTimeId: "dinner",
   categoryId: "pasta",
-  recipeId: null,
+  menuMealId: null,
+  dishes: [],
   memberIds: [],
-  servings: null,
   ...extra,
 });
 

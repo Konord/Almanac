@@ -13,6 +13,8 @@ export type HouseholdSettings = {
   locale: string;
   units: "metric" | "imperial";
   temperatureUnit: "celsius" | "fahrenheit";
+  /** Kitchen measures for converting and adding up: Canadian (1 cup = 250 ml) or US (1 cup = 237 ml). */
+  measures: "canadian" | "us";
   currency: string;
   /** 0 = Sunday, 1 = Monday */
   weekStartsOn: 0 | 1;
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   locale: "en-CA",
   units: "metric",
   temperatureUnit: "celsius",
+  measures: "canadian",
   currency: "CAD",
   weekStartsOn: 0,
   monthStyle: "rolling",
@@ -62,6 +65,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     locale: pick("locale", (v) => typeof v === "string" && v.length > 0),
     units: pick("units", (v) => v === "metric" || v === "imperial"),
     temperatureUnit: pick("temperatureUnit", (v) => v === "celsius" || v === "fahrenheit"),
+    measures: pick("measures", (v) => v === "canadian" || v === "us"),
     currency: pick("currency", (v) => typeof v === "string" && /^[A-Z]{3}$/.test(v)),
     weekStartsOn: pick("weekStartsOn", (v) => v === 0 || v === 1),
     monthStyle: pick("monthStyle", (v) => v === "rolling" || v === "calendar"),

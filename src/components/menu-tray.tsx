@@ -29,7 +29,7 @@ const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "routines", href: "/routines", label: "Routine Manager", icon: Alarm },
   { section: "lists", href: "/lists", label: "List Manager", icon: ListChecks },
   { section: "chores", href: "/chores", label: "Chore Manager", icon: Broom },
-  { section: "meals", href: "/meals/library", label: "Menu Manager", icon: ForkKnife },
+  { section: "meals", href: "/meals/menu", label: "Menu Manager", icon: ForkKnife },
   { section: "settings", href: "/household", label: "Settings", icon: GearSix },
 ];
 

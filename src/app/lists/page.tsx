@@ -16,6 +16,8 @@ import { choreSchedule } from "../chores/plan";
 import { TodoFields } from "../chores/forms";
 import { TodoRow } from "../chores/rows";
 import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
+import { loadGroceries } from "../groceries/data";
+import { GroceryView } from "../groceries/view";
 
 /**
  * To-do lists. Each to-do can have a day and a person, both optional.
@@ -43,9 +45,10 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const plannedOn = new Map<string, LocalDate>();
   for (const day of plan.days) for (const item of day.items) if (item.kind === "one-off" && !plannedOn.has(item.id)) plannedOn.set(item.id, day.date);
   const supabase = await createClient();
-  const [{ lists, todos: allTodos }, { data: memberRows }] = await Promise.all([
+  const [{ lists, todos: allTodos }, { data: memberRows }, groceries] = await Promise.all([
     loadTodos(),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
+    loadGroceries(household.settings.measures),
   ]);
   // Chores and heads-ups live on the daily list (Today panel), not here.
   const todos = allTodos.filter(onItsList);
@@ -80,7 +83,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
         <Card title="Lists" icon={ListChecks} tint="blue">
           <ul className="flex flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
             {lists.map((l) => {
-              const count = todos.filter((t) => t.list_id === l.id && t.status === "open").length;
+              const count = l.is_groceries ? groceries.filter((g) => !g.checked).length : todos.filter((t) => t.list_id === l.id && t.status === "open").length;
               const active = l.id === list?.id;
               return (
                 <li key={l.id}>
@@ -120,7 +123,15 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               </Link>
             }
           >
-            {list.is_chores ? (
+            {list.is_groceries ? (
+              // The grocery list: its own lines, with amounts and aisles (saving the weekly review fills it).
+              <div className="mt-2 flex flex-col lg:min-h-0 lg:flex-1">
+                <GroceryView initial={groceries} rows={10} columns={4} />
+                <p className="mt-2 shrink-0 text-base text-ink-muted">
+                  Things you buy every week are set in the <Link href="/meals/setup" className="font-bold text-accent">Menu Manager</Link>.
+                </p>
+              </div>
+            ) : list.is_chores ? (
               // The Chores list: just the words and tags; the chore planner picks the day.
               <form action={addTodo} className="mt-2 mb-2 flex flex-col gap-2">
                 <input type="hidden" name="listId" value={list.id} />
@@ -180,6 +191,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               </Button>
             </form>
             )}
+            {list.is_groceries ? null : (
             <div className="flex flex-col lg:min-h-0 lg:flex-1">
               {showingDone ? (
                 <>
@@ -222,6 +234,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 </>
               )}
             </div>
+            )}
           </Card>
         ) : (
           <Card title="No lists yet" icon={ListChecks} tint="teal">
@@ -236,7 +249,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           <form id="edit-todo" action={updateTodo} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={editing.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <TodoFields members={members} lists={lists.filter((l) => !l.is_chores)} choreDays={choreDays} todo={editing} showList chore={editing.is_chore} />
+            <TodoFields members={members} lists={lists.filter((l) => !l.is_chores && !l.is_groceries)} choreDays={choreDays} todo={editing} showList chore={editing.is_chore} />
           </form>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button form="edit-todo">Save</Button>
@@ -259,7 +272,9 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <Button>Save list</Button>
             </div>
           </form>
-          {list.is_chores ? (
+          {list.is_groceries ? (
+            <p className="mt-6 text-lg text-ink-muted">This is the grocery list: saving the weekly review puts the menu on it. The list stays, but you can rename it.</p>
+          ) : list.is_chores ? (
             <p className="mt-6 text-lg text-ink-muted">Everything on this list is a chore. The list stays, but you can rename it.</p>
           ) : (
             <form action={removeList} className="mt-6">

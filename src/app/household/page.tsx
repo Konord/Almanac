@@ -152,6 +152,12 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               <option value="fahrenheit">Fahrenheit</option>
             </Select>
           </Field>
+          <Field label="Kitchen measures">
+            <Select name="measures" defaultValue={settings.measures}>
+              <option value="canadian">Canadian (1 cup = 250 ml)</option>
+              <option value="us">US (1 cup = 237 ml)</option>
+            </Select>
+          </Field>
           <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-2">
             <input type="checkbox" name="handwriting" defaultChecked={settings.handwriting} className="size-6 accent-accent" />
             <span>

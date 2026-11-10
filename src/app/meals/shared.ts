@@ -42,37 +42,61 @@ export async function ensurePresets(householdId: string, weekStart: LocalDate, t
   await applyPresets(supabase, householdId, weekDates(weekStart).filter((d) => d >= today));
 }
 
-/** Adds preset meals to these dates where that meal time doesn't already have that category. */
+/**
+ * Adds preset meals to these dates where that meal time doesn't already
+ * have that category. A category with one meal gets that meal (and its
+ * dishes, with last time's picks left to choose); with several, the kind
+ * waits for someone to pick one in the review.
+ */
 export async function applyPresets(supabase: Supabase, householdId: string, dates: LocalDate[]): Promise<void> {
   if (dates.length === 0) return;
-  const [presets, existing, links] = await Promise.all([
+  const [presets, existing, links, spots] = await Promise.all([
     supabase.from("meal_presets").select("weekday, meal_time_id, category_id"),
     supabase.from("meals").select("date, meal_time_id, category_id").gte("date", dates[0]).lte("date", dates[dates.length - 1]),
-    supabase.from("recipe_categories").select("recipe_id, category_id"),
+    supabase.from("menu_meal_categories").select("menu_meal_id, category_id"),
+    supabase.from("menu_meal_spots").select("menu_meal_id, position, kind_id, recipe_id, batches").order("position"),
   ]);
-  for (const r of [presets, existing, links]) if (r.error) throw r.error;
+  for (const r of [presets, existing, links, spots]) if (r.error) throw r.error;
   const have = new Set((existing.data ?? []).map((m) => `${m.date}|${m.meal_time_id}|${m.category_id}`));
-  const variantsOf = new Map<string, string[]>();
-  for (const l of links.data ?? []) variantsOf.set(l.category_id, [...(variantsOf.get(l.category_id) ?? []), l.recipe_id]);
+  const spotsOf = new Map<string, NonNullable<typeof spots.data>>();
+  for (const sp of spots.data ?? []) spotsOf.set(sp.menu_meal_id, [...(spotsOf.get(sp.menu_meal_id) ?? []), sp]);
+  const mealsOf = new Map<string, string[]>();
+  for (const l of links.data ?? []) if (spotsOf.has(l.menu_meal_id)) mealsOf.set(l.category_id, [...(mealsOf.get(l.category_id) ?? []), l.menu_meal_id]);
   const rows = dates.flatMap((date) =>
     (presets.data ?? [])
       .filter((p) => p.weekday === weekdayOf(date) && !have.has(`${date}|${p.meal_time_id}|${p.category_id}`))
       .map((p) => {
-        const variants = variantsOf.get(p.category_id) ?? [];
+        const options = mealsOf.get(p.category_id) ?? [];
+        const only = options.length === 1 ? options[0] : null;
         return {
           household_id: householdId,
           date,
           meal_time_id: p.meal_time_id,
           category_id: p.category_id,
-          // A category with one variant needs no choosing.
-          recipe_id: variants.length === 1 ? variants[0] : null,
+          menu_meal_id: only,
+          recipe_id: only ? (spotsOf.get(only)!.find((sp) => sp.recipe_id)?.recipe_id ?? null) : null,
           from_preset: true,
         };
       }),
   );
   if (rows.length === 0) return;
-  const { error } = await supabase.from("meals").insert(rows);
+  const { data, error } = await supabase.from("meals").insert(rows).select("id, menu_meal_id");
   if (error) throw error;
+  const dishes = (data ?? []).flatMap((m) =>
+    (m.menu_meal_id ? (spotsOf.get(m.menu_meal_id) ?? []) : []).map((sp, position) => ({
+      household_id: householdId,
+      meal_id: m.id,
+      position,
+      kind_id: sp.kind_id,
+      recipe_id: sp.recipe_id,
+      batches: sp.batches,
+      spot_position: sp.position,
+    })),
+  );
+  if (dishes.length) {
+    const { error: dishError } = await supabase.from("meal_dishes").insert(dishes);
+    if (dishError) throw dishError;
+  }
 }
 
 /** Future weeks that already had their presets placed (so a new preset can join them). */
@@ -107,7 +131,7 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   if (helperError) throw helperError;
   if (!helpers || helpers.length === 0) return;
 
-  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").limit(1).maybeSingle();
+  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").limit(1).maybeSingle();
   if (!list) return;
 
   const usual = (meal.meal_times as unknown as { usual_time: string } | null)?.usual_time?.slice(0, 5) ?? "18:00";
