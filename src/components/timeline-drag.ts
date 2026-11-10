@@ -134,6 +134,8 @@ export function useTimelineDrag({
       transform: shown.dx ? `translateX(${shown.dx}px)` : undefined,
     },
     dragging: preview !== null,
+    /** Where the block is right now (minutes since midnight and length). */
+    shown: { start: shown.start, minutes: shown.minutes },
     label: `${clock(shown.start)}–${clock(shown.start + shown.minutes)}`,
     clearPreview: () => setPreview(null),
     bodyHandlers: { onPointerDown: (e: React.PointerEvent) => begin("move", e), onPointerMove: move, onPointerUp: up, onPointerCancel: cancel },

@@ -20,7 +20,10 @@ export function SideHandles({
   onPreview,
   onDone,
   byDay = false,
+  fullHeight = false,
 }: {
+  /** Strips run the block's whole height (for short blocks with a thin bottom handle). */
+  fullHeight?: boolean;
   /** Columns are days (the week view) rather than people (Today). */
   byDay?: boolean;
   columns: string[];
@@ -63,7 +66,7 @@ export function SideHandles({
   });
 
   const strip =
-    "absolute top-0 bottom-5 z-10 flex w-4 cursor-ew-resize touch-none items-end justify-center pb-0.5 opacity-60 hover:opacity-100";
+    `absolute top-0 ${fullHeight ? "bottom-0 items-center" : "bottom-5 items-end"} z-10 flex w-4 cursor-ew-resize touch-none justify-center pb-0.5 opacity-60 hover:opacity-100`;
   return (
     <>
       <div {...handlers("left")} aria-hidden className={`${strip} left-0`}>
