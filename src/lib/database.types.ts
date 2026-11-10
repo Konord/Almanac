@@ -191,6 +191,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"chore_day_tags": {
+                  Row: {
+                    "chore_day_id": string,"household_id": string,"tag_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chore_day_id": string,"household_id": string,"tag_id": string
+                  }
+                  Update: {
+                    "chore_day_id"?: string,"household_id"?: string,"tag_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "chore_day_tags_chore_day_id_household_id_fkey"
+      columns: ["chore_day_id","household_id"]
+isOneToOne: false
+      referencedRelation: "chore_days"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "chore_day_tags_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "chore_day_tags_tag_id_household_id_fkey"
+      columns: ["tag_id","household_id"]
+isOneToOne: false
+      referencedRelation: "tags"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"chore_days": {
                   Row: {
                     "created_at": string,"household_id": string,"icon": string | null,"id": string,"is_free": boolean,"max_big": number,"max_tasks": number,"name": string,"restrictive": boolean,"sort_order": number,"span": boolean,"updated_at": string,"weekdays": (number)[]
@@ -1375,14 +1407,14 @@ isOneToOne: false
                   ]
                 },"tags": {
                   Row: {
-                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"sort_order": number,"updated_at": string
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"role": string | null,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"sort_order"?: number,"updated_at"?: string
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"role"?: string | null,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"role"?: string | null,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1555,14 +1587,14 @@ isOneToOne: false
                   ]
                 },"views": {
                   Row: {
-                    "created_at": string,"household_id": string,"id": string,"layer_ids": (string)[],"name": string,"sort_order": number,"updated_at": string
+                    "created_at": string,"household_id": string,"id": string,"layer_ids": (string)[],"name": string,"sort_order": number,"tag_ids": (string)[],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"household_id": string,"id"?: string,"layer_ids"?: (string)[],"name": string,"sort_order"?: number,"updated_at"?: string
+                    "created_at"?: string,"household_id": string,"id"?: string,"layer_ids"?: (string)[],"name": string,"sort_order"?: number,"tag_ids"?: (string)[],"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"household_id"?: string,"id"?: string,"layer_ids"?: (string)[],"name"?: string,"sort_order"?: number,"updated_at"?: string
+                    "created_at"?: string,"household_id"?: string,"id"?: string,"layer_ids"?: (string)[],"name"?: string,"sort_order"?: number,"tag_ids"?: (string)[],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1687,6 +1719,9 @@ isOneToOne: false
 { Args: { "target_member": string }; Returns: undefined
                            },
 "add_free_chore_day":
+{ Args: { "target_household": string }; Returns: undefined
+                           },
+"add_role_tags":
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_chores":

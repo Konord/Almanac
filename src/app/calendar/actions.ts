@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isPersonColour } from "@/lib/colours";
 import { requireHousehold, type HouseholdSettings } from "@/lib/household";
 import { fillTimes } from "@/lib/quick-times";
 import { createClient } from "@/lib/supabase/server";
@@ -22,8 +21,10 @@ import { VIEW_COOKIE } from "./data";
 function back(formData: FormData, kind: "error" | "message", text: string): never {
   const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
   const params = new URLSearchParams();
-  for (const key of ["view", "date", "panel", "tpl"]) {
+  for (const key of ["view", "date", "panel", "tpl", "ov"]) {
     const value = from.get(key);
+    // After a save, the overlays panel goes back to its list.
+    if (key === "ov" && kind === "message") continue;
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
   params.set(kind, text);
@@ -36,10 +37,6 @@ function text(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
-function optionalId(formData: FormData, key: string): string | null {
-  return text(formData, key) || null;
-}
-
 async function log(householdId: string, action: string, targetType: string, targetId: string, name: string) {
   const supabase = await createClient();
   await supabase.from("activity_log").insert({
@@ -49,65 +46,6 @@ async function log(householdId: string, action: string, targetType: string, targ
     target_id: targetId,
     details: { name },
   });
-}
-
-// ---------------------------------------------------------------------------
-// Layers
-// ---------------------------------------------------------------------------
-
-function readLayer(formData: FormData) {
-  const name = text(formData, "name");
-  const colour = text(formData, "colour");
-  const visibility = text(formData, "visibility");
-  if (!name) back(formData, "error", "A layer needs a name.");
-  if (!isPersonColour(colour)) back(formData, "error", "Choose a colour.");
-  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this layer.");
-  return {
-    name,
-    colour,
-    visibility,
-    owner_member_id: optionalId(formData, "ownerMemberId"),
-    counts_toward_busyness: formData.get("countsTowardBusyness") === "on",
-  };
-}
-
-export async function addLayer(formData: FormData) {
-  const household = await requireHousehold();
-  const layer = readLayer(formData);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("layers")
-    .insert({ ...layer, household_id: household.id, sort_order: 100 })
-    .select("id")
-    .single();
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "layer_added", "layer", data.id, layer.name);
-  revalidatePath("/calendar");
-  back(formData, "message", `Added the ${layer.name} layer.`);
-}
-
-export async function updateLayer(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const layer = readLayer(formData);
-  const supabase = await createClient();
-  const { error } = await supabase.from("layers").update(layer).eq("id", id);
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "layer_updated", "layer", id, layer.name);
-  revalidatePath("/calendar");
-  back(formData, "message", `Saved the ${layer.name} layer.`);
-}
-
-export async function removeLayer(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const supabase = await createClient();
-  const { error } = await supabase.from("layers").delete().eq("id", id);
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "layer_removed", "layer", id, name);
-  revalidatePath("/calendar");
-  back(formData, "message", `Removed the ${name} layer and its events.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,10 +317,10 @@ export async function resetOccurrence(formData: FormData) {
 
 function readView(formData: FormData) {
   const name = text(formData, "name");
-  const layerIds = formData.getAll("layerIds").map(String).filter(Boolean);
-  if (!name) back(formData, "error", "A view needs a name.");
-  if (layerIds.length === 0) back(formData, "error", "Pick at least one layer for the view.");
-  return { name, layer_ids: layerIds };
+  const tagIds = formData.getAll("tagIds").map(String).filter((id) => /^[0-9a-f-]{36}$/.test(id));
+  if (!name) back(formData, "error", "An overlay needs a name.");
+  if (tagIds.length === 0) back(formData, "error", "Pick at least one tag for the overlay.");
+  return { name, tag_ids: tagIds };
 }
 
 export async function addView(formData: FormData) {
@@ -394,10 +332,10 @@ export async function addView(formData: FormData) {
     .insert({ ...view, household_id: household.id })
     .select("id")
     .single();
-  if (error) back(formData, "error", error.code === "23505" ? `There's already a view called ${view.name}.` : error.message);
+  if (error) back(formData, "error", error.code === "23505" ? `There's already an overlay called ${view.name}.` : error.message);
   await log(household.id, "view_added", "view", data.id, view.name);
   revalidatePath("/calendar");
-  back(formData, "message", `Added the ${view.name} view.`);
+  back(formData, "message", `Added the ${view.name} overlay.`);
 }
 
 export async function updateView(formData: FormData) {
@@ -406,10 +344,10 @@ export async function updateView(formData: FormData) {
   const view = readView(formData);
   const supabase = await createClient();
   const { error } = await supabase.from("views").update(view).eq("id", id);
-  if (error) back(formData, "error", error.code === "23505" ? `There's already a view called ${view.name}.` : error.message);
+  if (error) back(formData, "error", error.code === "23505" ? `There's already an overlay called ${view.name}.` : error.message);
   await log(household.id, "view_updated", "view", id, view.name);
   revalidatePath("/calendar");
-  back(formData, "message", `Saved the ${view.name} view.`);
+  back(formData, "message", `Saved the ${view.name} overlay.`);
 }
 
 export async function removeView(formData: FormData) {
@@ -421,7 +359,7 @@ export async function removeView(formData: FormData) {
   if (error) back(formData, "error", error.message);
   await log(household.id, "view_removed", "view", id, name);
   revalidatePath("/calendar");
-  back(formData, "message", `Removed the ${name} view.`);
+  back(formData, "message", `Removed the ${name} overlay.`);
 }
 
 /**

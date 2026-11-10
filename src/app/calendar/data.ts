@@ -47,7 +47,7 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
       .order("sort_order")
       .order("name"),
     supabase.from("members").select("id, name, colour, icon").order("role", { ascending: false }).order("name"),
-    supabase.from("views").select("id, name, layer_ids").order("sort_order").order("name"),
+    supabase.from("views").select("id, name, tag_ids").order("sort_order").order("name"),
     supabase
       .from("events")
       .select(EVENT_COLUMNS)
@@ -58,7 +58,7 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
     // Repeating events that have started by the end of the range; their
     // individual dates are worked out below.
     supabase.from("events").select(EVENT_COLUMNS).not("recurrence_rule", "is", null).lt("starts_at", rangeEnd.toISOString()),
-    supabase.from("tags").select("id, name, icon").order("sort_order").order("name"),
+    supabase.from("tags").select("id, name, icon, role").order("sort_order").order("name"),
     supabase
       .from("event_templates")
       .select("id, title, icon, start_time, minutes, all_day, member_ids, tag_ids, notes")
@@ -128,15 +128,15 @@ export function profilesFor(
   return new Map(days.map((day) => [day, profileDay(day, busy, dayProfile, timeZone)]));
 }
 
-/** The saved view this screen shows, or null for every layer. */
+/** The overlay this screen shows, or null for everything. */
 export async function deviceView(views: SavedView[]): Promise<SavedView | null> {
   const id = (await cookies()).get(VIEW_COOKIE)?.value;
   return views.find((v) => v.id === id) ?? null;
 }
 
-/** Only the items on the view's layers (or all of them, with no view). */
+/** Only the events with one of the overlay's tags (or all of them, with no overlay). */
 export function itemsInView(items: CalendarItem[], view: SavedView | null): CalendarItem[] {
   if (!view) return items;
-  const shown = new Set(view.layer_ids);
-  return items.filter((item) => shown.has(item.layer_id));
+  const shown = new Set(view.tag_ids);
+  return items.filter((item) => item.tag_ids.some((id) => shown.has(id)));
 }

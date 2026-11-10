@@ -20,7 +20,8 @@ import { addDays, type LocalDate } from "./time.ts";
  *   - A one-off chore (a list task switched to a chore, maybe with a chore
  *     day and tags) waits for the next day that takes it and has room.
  *     With no chore day it goes on any day that isn't restrictive. Big
- *     ones count against the Big limit, errands join a day that has one,
+ *     ones count against the Big limit, errands go on a day good for
+ *     errands (a chore day or an event tagged Errand) or join one that has one,
  *     and essential ones go on today when today takes them.
  *
  * A day "accepts" a chore when the chore is tagged for one of its chore
@@ -66,6 +67,8 @@ export type ChoreDay = {
   max_tasks: number;
   max_big: number;
   is_free: boolean;
+  /** Tagged Errand: errands go on this day first. */
+  errands?: boolean;
 };
 
 /** What the generator needs to know about a chore. */
@@ -100,6 +103,8 @@ export type PlanDay = {
   date: LocalDate;
   away: boolean;
   choreDays: ChoreDay[];
+  /** Good for errands: a chore day tagged Errand, or an event tagged Errand (an office day). */
+  errands: boolean;
   /** Preset chores whose stretch starts on this day. */
   presets: string[];
   items: PlanItem[];
@@ -168,6 +173,8 @@ export function planChoreDays(input: {
   keptToday?: Set<string>;
   /** Chore days moved on single dates (the weekly review). */
   moves?: ChoreDayMove[];
+  /** Dates with an event tagged Errand (an office day): good for errands. */
+  errandDates?: Set<LocalDate>;
 }): ChorePlan {
   const { choreDays, chores, today } = input;
   const count = input.days ?? PLAN_DAYS;
@@ -176,10 +183,12 @@ export function planChoreDays(input: {
   const last = addDays(today, count - 1);
   const days: PlanDay[] = Array.from({ length: count }, (_, i) => {
     const date = addDays(today, i);
+    const on = away.has(date) ? [] : choreDaysOn(choreDays, date, moves);
     return {
       date,
       away: away.has(date),
-      choreDays: away.has(date) ? [] : choreDaysOn(choreDays, date, moves),
+      errands: !away.has(date) && (on.some((cd) => cd.errands) || Boolean(input.errandDates?.has(date))),
+      choreDays: on,
       presets: [],
       items: [],
     };
@@ -268,22 +277,25 @@ export function planChoreDays(input: {
       const quietest = before
         .filter((d) => d.date >= soonest)
         .reduce<PlanDay | undefined>((best, d) => (!best || load(d) <= load(best) ? d : best), undefined);
-      // Errands join a day that already has one, if there is one.
-      chosen = (item.errand ? before.findLast((d) => d.items.some((i) => i.errand)) : undefined) ?? quietest ?? before.at(-1);
+      // Errands go on a day that's good for errands, else join a day that already has one.
+      if (item.errand) chosen = before.findLast((d) => d.errands) ?? before.findLast((d) => d.items.some((i) => i.errand));
+      chosen ??= quietest ?? before.at(-1);
+      // Nothing before it's due: the first day after with room (an errand day if one is coming soon).
+      if (!chosen && item.errand) chosen = window.find((d) => d.date > chore.dueOn && d.date <= addDays(chore.dueOn, 3) && d.errands && fits(d));
       chosen ??= window.find((d) => d.date > chore.dueOn && fits(d));
     }
     if (chosen) chosen.items.push(item);
     else if (chore.dueOn <= addDays(today, 6)) unplaced.push(chore.id);
   }
 
-  // One-off chores: the next day that takes them with room (an errand joins a day that has one).
+  // One-off chores: the next day that takes them with room (an errand goes on an errand day, or joins a day that has one).
   for (const one of waiting) {
     const item = oneOffItem(one);
     const ids = one.chore_day_id ? [one.chore_day_id] : [];
     const fits = (d: PlanDay) => takes(d, ids) && room(d, item);
     let chosen: PlanDay | undefined;
     if (one.tags?.includes("essential") && first && takes(first, ids)) chosen = first;
-    if (item.errand) chosen ??= days.find((d) => d.items.some((i) => i.errand) && fits(d));
+    if (item.errand) chosen ??= days.find((d) => d.errands && fits(d)) ?? days.find((d) => d.items.some((i) => i.errand) && fits(d));
     chosen ??= days.find(fits);
     if (chosen) chosen.items.push(item);
     else unplaced.push(one.id);

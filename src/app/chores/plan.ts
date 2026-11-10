@@ -2,8 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { isChoreTag, placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
 import { spreadSlack } from "@/lib/chores";
 import type { Household } from "@/lib/household";
-import { addDays, type LocalDate } from "@/lib/time";
-import { loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
+import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { loadCalendar } from "../calendar/data";
+import { errandTagId, loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
 
 /*
  * The chore generator on the server (tasks rework, step 2). Each time a
@@ -47,6 +48,26 @@ async function loadAway(today: LocalDate, last: LocalDate): Promise<Set<LocalDat
   return away;
 }
 
+/**
+ * Dates with an event tagged Errand between two dates (an office day, a
+ * trip into town): good days for errands.
+ */
+async function loadErrandDates(today: LocalDate, last: LocalDate, timeZone: string): Promise<Set<LocalDate>> {
+  const errand = await errandTagId();
+  const dates = new Set<LocalDate>();
+  if (!errand) return dates;
+  const { items } = await loadCalendar(zonedToUtc(today, "00:00", timeZone), zonedToUtc(addDays(last, 1), "00:00", timeZone));
+  for (const item of items) {
+    if (!item.tag_ids.includes(errand)) continue;
+    const start = localDateOf(new Date(item.starts_at), timeZone);
+    // An all-day event ends at midnight after its last day.
+    const before = localDateOf(new Date(new Date(item.ends_at).getTime() - 1), timeZone);
+    const end = before < start ? start : before;
+    for (let d = start; d <= end && d <= last; d = addDays(d, 1)) if (d >= today) dates.add(d);
+  }
+  return dates;
+}
+
 /** Chore days moved on single dates (by the weekly review) between two dates. */
 export async function loadChoreDayMoves(from: LocalDate, to: LocalDate): Promise<ChoreDayMove[]> {
   const supabase = await createClient();
@@ -59,12 +80,13 @@ export async function loadChoreDayMoves(from: LocalDate, to: LocalDate): Promise
 export async function choreSchedule(household: Household, today: LocalDate, timeZone: string, sync = true): Promise<ChoreSchedule> {
   const supabase = await createClient();
   const last = addDays(today, 13);
-  const [{ chores, rounds, members }, choreDays, away, moves, tasks] = await Promise.all([
+  const [{ chores, rounds, members }, choreDays, away, moves, tasks, errandDates] = await Promise.all([
     loadChores(today, timeZone),
     loadChoreDays(),
     loadAway(today, last),
     loadChoreDayMoves(addDays(today, -6), last),
     choreTasks(supabase, today),
+    loadErrandDates(today, last, timeZone),
   ]);
   if (tasks.error) throw tasks.error;
 
@@ -99,6 +121,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     away,
     keptToday,
     moves,
+    errandDates,
   });
 
   const hard = new Set(plan.unplaced);

@@ -74,6 +74,19 @@ export async function saveChoreManager(draft: ChoreManagerDraft): Promise<SaveRe
   }
   const dayId = (id: string) => realId.get(id) ?? id;
 
+  // Chore days tagged Errand (from the shared tag pool): errands go there first.
+  const { data: errandTag } = await supabase.from("tags").select("id").eq("role", "errand").maybeSingle();
+  if (errandTag) {
+    const ids = draft.days.map((d) => dayId(d.id));
+    const cleared = fail((await supabase.from("chore_day_tags").delete().eq("tag_id", errandTag.id).in("chore_day_id", ids)).error);
+    if (cleared) return cleared;
+    const tagged = draft.days.filter((d) => d.errands).map((d) => ({ household_id: household.id, chore_day_id: dayId(d.id), tag_id: errandTag.id }));
+    if (tagged.length > 0) {
+      const bad = fail((await supabase.from("chore_day_tags").insert(tagged)).error);
+      if (bad) return bad;
+    }
+  }
+
   // 2. Chores: remove the ones taken away.
   const keepChores = new Set([...draft.regular, ...draft.occasional].filter((c) => !isNewId(c.id)).map((c) => c.id));
   const goneChores = (choresNow.data ?? []).filter((c) => !keepChores.has(c.id)).map((c) => c.id);

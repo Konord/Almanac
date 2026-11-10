@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Chips, Emoji, Field, Input, Select } from "@/components/ui";
-import { PERSON_COLOURS } from "@/lib/colours";
+import { Chips, Emoji, Field, Input } from "@/components/ui";
 import { eventEmoji } from "@/lib/emoji";
 import { VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
@@ -12,54 +11,7 @@ import { EmojiPicker } from "@/components/emoji-picker";
 import { Stickers } from "./stickers";
 import type { EventTemplate, Layer, Member, SavedView, Tag } from "./types";
 
-/** The form fields for events and layers. */
-
-export function LayerFields({ layer, members }: { layer?: Layer; members: Member[] }) {
-  return (
-    <>
-      <Field label="Name">
-        <Input name="name" defaultValue={layer?.name} required maxLength={40} />
-      </Field>
-      <Field label="Colour">
-        <Select name="colour" defaultValue={layer?.colour ?? "blue"}>
-          {PERSON_COLOURS.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Whose layer" hint="Optional, e.g. Dad's court schedule.">
-        <Select name="ownerMemberId" defaultValue={layer?.owner_member_id ?? ""}>
-          <option value="">The whole family</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Who can see it">
-        <Select name="visibility" defaultValue={layer?.visibility ?? "everyone"}>
-          {VISIBILITY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-2">
-        <input
-          type="checkbox"
-          name="countsTowardBusyness"
-          defaultChecked={layer?.counts_toward_busyness ?? true}
-          className="size-6 accent-accent"
-        />
-        Events here make a day count as busy
-      </label>
-    </>
-  );
-}
+/** The form fields for events and overlays. */
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -103,29 +55,27 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
   )
 }
 
-/** Name and layers for a saved view. */
-export function ViewFields({ layers, view }: { layers: Layer[]; view?: SavedView }) {
+/** How many tags the overlay card offers (nothing scrolls). */
+export const OVERLAY_TAGS = 24;
+
+/** Name and tags for an overlay. */
+export function ViewFields({ tags, view }: { tags: Tag[]; view?: SavedView }) {
   return (
     <>
       <Field label="Name">
         <Input name="name" defaultValue={view?.name} required maxLength={40} placeholder="e.g. Court and appointments" />
       </Field>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-base font-medium text-ink">Layers it shows</legend>
-        <div className="flex flex-wrap gap-2">
-          {layers.map((layer) => (
+        <legend className="mb-1.5 text-base font-medium text-ink">Shows events tagged</legend>
+        <div className="grid grid-cols-3 gap-2">
+          {tags.slice(0, OVERLAY_TAGS).map((tag) => (
             <label
-              key={layer.id}
-              className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base text-ink"
+              key={tag.id}
+              className="flex min-h-[var(--touch-target)] min-w-0 items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base font-semibold text-ink has-[:checked]:border-accent has-[:checked]:bg-rail"
             >
-              <input
-                type="checkbox"
-                name="layerIds"
-                value={layer.id}
-                defaultChecked={view?.layer_ids.includes(layer.id)}
-                className="size-5 accent-accent"
-              />
-              {layer.name}
+              <input type="checkbox" name="tagIds" value={tag.id} defaultChecked={view?.tag_ids.includes(tag.id)} className="size-5 shrink-0 accent-accent" />
+              <Emoji emoji={tag.icon || eventEmoji(null, tag.name)} className="size-6" />
+              <span className="truncate">{tag.name}</span>
             </label>
           ))}
         </div>

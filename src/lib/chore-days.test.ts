@@ -199,6 +199,30 @@ test("errands are grouped onto a day that already has one", () => {
   assert.equal(where(plan, "library"), TUE);
 });
 
+test("errands go on a chore day tagged Errand", () => {
+  const marketing = day("marketing", { weekdays: [3], errands: true });
+  const plan = planChoreDays({
+    choreDays: [free, marketing],
+    chores: [chore("post", { tags: ["errand"], dueOn: "2026-11-12" }), chore("dust", { dueOn: "2026-11-12" })],
+    oneOffs: [{ id: "returns", chore_day_id: null, tags: ["errand"] }],
+    today: MON,
+  });
+  assert.equal(where(plan, "post"), WED);
+  assert.equal(where(plan, "returns"), WED);
+  assert.equal(where(plan, "dust"), "2026-11-12");
+});
+
+test("a day with an event tagged Errand (an office day) takes errands", () => {
+  const plan = planChoreDays({
+    choreDays: [free],
+    chores: [chore("post", { tags: ["errand"], dueOn: "2026-11-12" })],
+    today: MON,
+    errandDates: new Set([TUE]),
+  });
+  assert.equal(where(plan, "post"), TUE);
+  assert.ok(plan.days.find((d) => d.date === TUE)?.errands);
+});
+
 test("one-off chores wait for their chore day", () => {
   const plan = planChoreDays({
     choreDays: [free, kitchen],

@@ -217,7 +217,7 @@ export function ChoreManager({
     const taken = new Set(draft.days.flatMap((x) => x.weekdays));
     const todayWeekday = new Date(`${today}T12:00:00Z`).getUTCDay();
     const free = [1, 2, 3, 4, 5, 6, 7].map((n) => (todayWeekday + n) % 7).find((w) => !taken.has(w));
-    const day: DraftChoreDay = { id, name: "New chore day", icon: null, weekdays: free === undefined ? [] : [free], span: false, restrictive: false, max_tasks: 3, max_big: 1, is_free: false };
+    const day: DraftChoreDay = { id, name: "New chore day", icon: null, weekdays: free === undefined ? [] : [free], span: false, restrictive: false, max_tasks: 3, max_big: 1, is_free: false, errands: false };
     update((d) => ({ ...d, days: [...d.days.filter((x) => !x.is_free), day, ...d.days.filter((x) => x.is_free)] }));
     setSelection({ kind: "day", id });
     setDayPage(Math.floor(days.filter((x) => !x.is_free).length / DAYS_PER_PAGE));
@@ -557,6 +557,9 @@ function DayPanel({
               </Toggle>
             </>
           )}
+          <Toggle on={day.errands} onChange={(v) => setDay({ errands: v })}>
+            Good for errands
+          </Toggle>
           <div className="my-1 h-px bg-frame" />
           {preview ? (
             <>
