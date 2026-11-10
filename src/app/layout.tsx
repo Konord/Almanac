@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense, type CSSProperties } from "react";
-// Fonts are bundled with the app (no Google Fonts call): Atkinson Hyperlegible
-// Next for everything, and Kalam handwriting for family-written things.
-import "@fontsource-variable/atkinson-hyperlegible-next";
+// Fonts are bundled with the app (no Google Fonts call): Figtree for
+// everything (Connor, 2026-11-10), and Kalam handwriting for family-written things.
+import "@fontsource-variable/figtree";
 import "@fontsource/kalam/400.css";
 import "@fontsource/kalam/700.css";
 import { brightTheme, themeToCssVariables } from "@/theme/tokens";

@@ -25,7 +25,7 @@
   --color-meal-ink: var(--color-meal-ink, #5e4806);
 
   /* Fonts: one clear sans for everything, handwriting for family-written things. */
-  --font-sans: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-sans: "Figtree Variable", "Figtree", system-ui, sans-serif;
   --font-hand: var(--almanac-font-hand);
 
   /*

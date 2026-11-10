@@ -6,6 +6,7 @@ import { mealSlot } from "@/lib/meals";
 import { placeRoutines, type Busy } from "@/lib/routine-placement";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { mealIcon, mealName, type Meal, type MealBasics } from "./data";
+import { shortClockTime } from "@/lib/time-text";
 
 /*
  * Meals on the Today screen: a block on the timeline for each meal's
@@ -96,9 +97,7 @@ export function mealsForRoutines(meals: TodayMeal[]): { mealTimeId: string; eatS
 function clock(minutes: number, date: LocalDate, household: Household): string {
   const hh = String(Math.floor(minutes / 60) % 24).padStart(2, "0");
   const mm = String(minutes % 60).padStart(2, "0");
-  return new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, hour: "numeric", minute: "2-digit" })
-    .format(zonedToUtc(date, `${hh}:${mm}`, household.settings.timeZone))
-    .replace(":00", "");
+  return shortClockTime(zonedToUtc(date, `${hh}:${mm}`, household.settings.timeZone), household.settings.locale, household.settings.timeZone);
 }
 
 /**

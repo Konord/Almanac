@@ -28,6 +28,7 @@ import {
 } from "@/lib/chore-manager";
 import { LEAD_UNITS, leadLabel, leadMinutes, type LeadUnit } from "@/lib/heads-ups";
 import { doChoreToday, saveChoreManager } from "./manager-actions";
+import { wallTime } from "@/lib/time-text";
 
 /*
  * The Chore Manager (2026-11-09). Left: Occasional chores on top, then the
@@ -168,8 +169,7 @@ export function ChoreManager({
   const dateLabel = (d: string) =>
     d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const nextLabel = (d: string) => (d < today ? "overdue" : dateLabel(d));
-  const timeLabel = (t: string) =>
-    new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(`2026-01-01T${t}:00Z`)).replace(":00", "");
+  const timeLabel = (t: string) => wallTime(t, locale);
 
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
   const dayPages = Math.max(1, Math.ceil(days.length / DAYS_PER_PAGE));

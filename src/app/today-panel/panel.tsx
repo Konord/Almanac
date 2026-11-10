@@ -27,6 +27,7 @@ import { PanelPages } from "@/components/panel-pages";
 import { panelBoxes, stepBox } from "@/lib/panel-boxes";
 import { addTodo, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
+import { shortClockTime } from "@/lib/time-text";
 
 /**
  * The Today panel: a column on the left of the calendar with three parts.
@@ -247,19 +248,11 @@ export async function TodayPanel({
   const fmt = (o: Intl.DateTimeFormatOptions) =>
     new Intl.DateTimeFormat(locale, { timeZone, ...o }).format(now);
   const mealTime = nextMeal
-    ? new Intl.DateTimeFormat(locale, {
-        timeZone,
-        hour: "numeric",
-        minute: "2-digit",
-      })
-        .format(zonedToUtc(nextMeal.meal.date, nextMeal.at, timeZone))
-        .replace(":00", "")
+    ? shortClockTime(zonedToUtc(nextMeal.meal.date, nextMeal.at, timeZone), locale, timeZone)
     : "";
 
   const taskTime = (time: string) =>
-    new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" })
-      .format(zonedToUtc(today, time.slice(0, 5), timeZone))
-      .replace(":00", "");
+    shortClockTime(zonedToUtc(today, time.slice(0, 5), timeZone), locale, timeZone);
 
   const arrowButton = (by: 1 | -1) => (
     <form action={pickPanelTab}>

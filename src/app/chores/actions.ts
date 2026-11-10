@@ -129,7 +129,7 @@ function readTodo(formData: FormData) {
   if (dueDate && !isLocalDate(dueDate)) back(formData, "error", "That date doesn't look right.");
   const dateKind = text(formData, "dateKind") === "start" ? "start" : "due";
   const atTime = text(formData, "atTime");
-  if (atTime && !isLocalTime(atTime)) back(formData, "error", "The time should look like 9:30 a.m.");
+  if (atTime && !isLocalTime(atTime)) back(formData, "error", "The time should look like 9:30 am.");
   const leadText = text(formData, "leadDays");
   const leadDays = leadText === "" ? null : Number(leadText);
   if (leadDays !== null && !(Number.isInteger(leadDays) && leadDays >= 0 && leadDays <= 60)) back(formData, "error", "Show it between 0 and 60 days before.");
@@ -138,7 +138,7 @@ function readTodo(formData: FormData) {
     icon: readIcon(formData),
     due_date: dueDate || null,
     date_kind: dateKind,
-    // Only a to-do with a day can have a time ("by 3 p.m." or "at 3 p.m.").
+    // Only a to-do with a day can have a time ("by 3 pm" or "at 3 pm").
     at_time: dueDate && atTime ? atTime : null,
     lead_days: dateKind === "due" ? leadDays : null,
     // Tasks no longer open a part of the app (Connor, 2026-11-10).

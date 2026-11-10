@@ -13,7 +13,7 @@
     "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
-    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource/kalam": "^5.3.0",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/ssr": "^0.12.7",

@@ -134,7 +134,7 @@ export function draftProblem(draft: ChoreManagerDraft): string | null {
     if (!name) return "Every chore needs a name.";
     if (name.length > 80) return `"${short(name)}" is too long (80 letters at most).`;
     if (!dayIds.has(c.chore_day_id)) return `${name} needs a chore day.`;
-    if (c.due_time && !TIME.test(c.due_time)) return `The time for ${name} should look like 7:00 p.m.`;
+    if (c.due_time && !TIME.test(c.due_time)) return `The time for ${name} should look like 7 pm`;
     if (c.notes && c.notes.length > 2000) return `The notes for ${name} are too long.`;
     if (c.icon && [...c.icon].length > 4) return `The picture for ${name} should be one emoji.`;
   }
@@ -158,7 +158,7 @@ export function draftProblem(draft: ChoreManagerDraft): string | null {
     }
     if (c.only_in === "seasons" && c.only_seasons.length === 0) return `Pick at least one season for ${name}.`;
     if (c.only_in === "months" && c.only_months.length === 0) return `Pick at least one month for ${name}.`;
-    if (c.at_time && !TIME.test(c.at_time)) return `The time for ${name} should look like 7:00 p.m.`;
+    if (c.at_time && !TIME.test(c.at_time)) return `The time for ${name} should look like 7 pm`;
     if (c.first_due && !DATE.test(c.first_due)) return `Pick the first date for ${name} again.`;
     if (!VISIBILITIES.includes(c.visibility)) return `Choose who can see ${name}.`;
     if (c.notes && c.notes.length > 2000) return `The notes for ${name} are too long.`;

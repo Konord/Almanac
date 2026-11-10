@@ -14,6 +14,7 @@ import { SideHandles } from "@/components/side-handles";
 import { clock, useTimelineDrag } from "@/components/timeline-drag";
 import { spanBox } from "@/lib/calendar-layout";
 import { saveRoutineManager } from "./manager-actions";
+import { hourText, minutesText } from "@/lib/time-text";
 
 /*
  * The Routine Manager. Left: routine blocks on a time grid, one column per
@@ -160,9 +161,8 @@ export function RoutineManager({
   const firstHour = Math.max(0, Math.floor(Math.min(6 * 60, ...wakeTimes, ...allBlocks.map((b) => b.start)) / 60));
   const lastHour = Math.min(24, Math.ceil(Math.max(21 * 60, ...wakeTimes, ...allBlocks.map((b) => b.end)) / 60));
   const span = (lastHour - firstHour) * 60;
-  const hourLabel = (h: number) => new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 1, h % 24)));
-  const timeLabel = (min: number) =>
-    new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 1, Math.floor(min / 60) % 24, min % 60)));
+  const hourLabel = (h: number) => hourText(h, locale);
+  const timeLabel = (min: number) => minutesText(min, locale);
 
   // --- Changing the draft ------------------------------------------------------
   const routine = draft.routines.find((r) => r.id === selected) ?? null;
