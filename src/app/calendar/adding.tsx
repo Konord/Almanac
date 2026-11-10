@@ -161,10 +161,9 @@ export function QuickAddSheet({
             Cancel
           </Link>
           {pending.templateId ? null : (
-            <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
-              <input type="checkbox" name="saveTemplate" className="size-5 accent-ink" />
-              Save as a template too
-            </label>
+            <Button variant="secondary" name="saveTemplate" value="on" className="ml-auto">
+              Add and save as a template
+            </Button>
           )}
         </div>
       </form>

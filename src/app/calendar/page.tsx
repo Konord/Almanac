@@ -14,6 +14,7 @@ import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalD
 import {
   moveOccurrence,
   removeEvent,
+  saveEventAsTemplate,
   removeTemplate,
   resetOccurrence,
   skipOccurrence,
@@ -438,6 +439,9 @@ function EditEventPanel({
       </form>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
         <Button form="edit-event">{event.recurrence_rule ? "Save every date" : "Save"}</Button>
+        <Button form="edit-event" formAction={saveEventAsTemplate} variant="secondary">
+          Save as a template
+        </Button>
         <CloseLink href={closeHref} />
         <form action={removeEvent} className="ml-auto">
           <input type="hidden" name="id" value={event.id} />
@@ -613,7 +617,7 @@ function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household:
 
 /**
  * The templates you've made, with a way to remove each; tap one to change
- * it. New ones are made on the add card ("Save as a template too").
+ * it. New ones are made on the add card ("Add and save as a template") or an event's card ("Save as a template").
  */
 /** How many templates the panel lists (nothing scrolls). */
 const TEMPLATES_SHOWN = 16;
@@ -632,7 +636,7 @@ function TemplatesPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="flex flex-col gap-3">
         {templates.length === 0 ? (
-          <p className="text-lg text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding an event.</p>
+          <p className="text-lg text-ink-muted">No templates yet. Open an event and press &ldquo;Save as a template&rdquo;.</p>
         ) : (
           <p className="text-base text-ink-muted">Tap a template to change it.</p>
         )}
