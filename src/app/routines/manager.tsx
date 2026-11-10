@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
@@ -82,21 +82,28 @@ export function RoutineManager({
   flexMinutes: number;
 }) {
   const [draft, setDraft] = useState<ManagerDraft>(initial);
-  const [selected, setSelected] = useState<string | null>(() => {
-    const id = typeof window === "undefined" ? null : recall(SELECTED_KEY);
-    return id && initial.routines.some((r) => r.id === id) ? id : null;
-  });
+  // The server can't see what was open last time (that's kept in this
+  // browser), so both start plain and the browser puts them back just after
+  // the page appears. Reading it straight away made the server's page and
+  // the browser's differ (a "hydration" error).
+  const [selected, setSelected] = useState<string | null>(null);
   const dayNames = useMemo(() => {
     const names: string[] = [];
     for (const t of dayTypes.toSorted((a, b) => a.sort_order - b.sort_order)) if (!names.includes(t.name)) names.push(t.name);
     return names;
   }, [dayTypes]);
-  const [view, setView] = useState<View>(() => {
-    const saved = typeof window === "undefined" ? null : recall(VIEW_KEY);
-    if (saved?.startsWith("person:") && members.some((m) => `person:${m.id}` === saved)) return { by: "person", memberId: saved.slice(7) };
-    if (saved?.startsWith("day:") && dayNames.includes(saved.slice(4))) return { by: "day", name: saved.slice(4) };
-    return { by: "day", name: dayNames[0] ?? "" };
-  });
+  const [view, setView] = useState<View>({ by: "day", name: dayNames[0] ?? "" });
+  useEffect(() => {
+    const id = recall(SELECTED_KEY);
+    const saved = recall(VIEW_KEY);
+    /* eslint-disable react-hooks/set-state-in-effect -- restoring what this browser remembered, once, after the first render */
+    if (id && initial.routines.some((r) => r.id === id)) setSelected(id);
+    if (saved?.startsWith("person:") && members.some((m) => `person:${m.id}` === saved)) setView({ by: "person", memberId: saved.slice(7) });
+    else if (saved?.startsWith("day:") && dayNames.includes(saved.slice(4))) setView({ by: "day", name: saved.slice(4) });
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // Only on the first render: later changes come from taps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [stepPage, setStepPage] = useState(0);
   const [whoOpen, setWhoOpen] = useState<string | null>(null);
   /** A line under the routine's name: what just happened, or why something wasn't allowed. */
