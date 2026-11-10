@@ -6,6 +6,8 @@ import { expandEvents } from "@/lib/recurrence";
 import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { EVENT_COLUMNS, toEvent } from "../calendar/data";
 import { loadChores } from "../chores/data";
+import { loadDaysBetween } from "../routines/data";
+import { dayFor, sameKind } from "@/lib/day-types";
 import { findOrCreateItem } from "../meals/shared";
 
 /*
@@ -20,6 +22,7 @@ type HeadsUpRow = {
   id: string;
   event_id: string | null;
   chore_id: string | null;
+  day_kind: string | null;
   label: string;
   minutes_before: number;
   makes: "todo" | "grocery";
@@ -48,7 +51,7 @@ export async function syncEventAndChoreHeadsUps(household: Household, force = fa
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("heads_ups")
-    .select("id, event_id, chore_id, label, minutes_before, makes, assignee_id, last_grocery_for");
+    .select("id, event_id, chore_id, day_kind, label, minutes_before, makes, assignee_id, last_grocery_for");
   if (error) throw error;
   const headsUps = (data ?? []) as HeadsUpRow[];
 
@@ -107,6 +110,37 @@ export async function syncEventAndChoreHeadsUps(household: Household, force = fa
           icon: chore.icon,
           memberId: h.assignee_id ?? chore.default_assignee_id,
           about: chore.name,
+        });
+      }
+    }
+  }
+
+  // Kinds of day: each upcoming date someone has that kind of day, counted back from their wake-up.
+  const forKinds = headsUps.filter((h) => h.day_kind);
+  if (forKinds.length > 0) {
+    const longestDays = Math.ceil(Math.max(...forKinds.map((h) => h.minutes_before)) / 1440);
+    const until = addDays(lastDay, longestDays);
+    const { members, data: days } = await loadDaysBetween(today, until);
+    for (let date = today; date <= until; date = addDays(date, 1)) {
+      for (const h of forKinds) {
+        const having = members.flatMap((m) => {
+          const day = dayFor(m, days, date);
+          return day.dayType && sameKind(day.dayType.name, h.day_kind as string) ? [{ id: m.id, wake: day.wake, icon: day.dayType.icon }] : [];
+        });
+        if (having.length === 0) continue;
+        const wake = having.map((x) => x.wake).sort()[0];
+        const start = zonedToUtc(date, wake, timeZone);
+        if (start.getTime() < now) continue;
+        const when = headsUpTime(start, h.minutes_before, timeZone);
+        if (when.date > lastDay) continue;
+        wanted.push({
+          headsUp: h,
+          forDate: date,
+          date: when.date < today ? today : when.date,
+          time: when.date < today ? null : when.time,
+          icon: having[0].icon,
+          memberId: h.assignee_id ?? (having.length === 1 ? having[0].id : null),
+          about: h.day_kind as string,
         });
       }
     }

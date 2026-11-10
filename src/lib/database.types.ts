@@ -441,14 +441,14 @@ isOneToOne: false
                   ]
                 },"heads_ups": {
                   Row: {
-                    "assignee_id": string | null,"chore_id": string | null,"created_at": string,"event_id": string | null,"household_id": string,"id": string,"label": string,"last_grocery_for": string | null,"makes": string,"minutes_before": number,"sort_order": number,"updated_at": string
+                    "assignee_id": string | null,"chore_id": string | null,"created_at": string,"day_kind": string | null,"event_id": string | null,"household_id": string,"id": string,"label": string,"last_grocery_for": string | null,"makes": string,"minutes_before": number,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "assignee_id"?: string | null,"chore_id"?: string | null,"created_at"?: string,"event_id"?: string | null,"household_id": string,"id"?: string,"label": string,"last_grocery_for"?: string | null,"makes"?: string,"minutes_before": number,"sort_order"?: number,"updated_at"?: string
+                    "assignee_id"?: string | null,"chore_id"?: string | null,"created_at"?: string,"day_kind"?: string | null,"event_id"?: string | null,"household_id": string,"id"?: string,"label": string,"last_grocery_for"?: string | null,"makes"?: string,"minutes_before": number,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "assignee_id"?: string | null,"chore_id"?: string | null,"created_at"?: string,"event_id"?: string | null,"household_id"?: string,"id"?: string,"label"?: string,"last_grocery_for"?: string | null,"makes"?: string,"minutes_before"?: number,"sort_order"?: number,"updated_at"?: string
+                    "assignee_id"?: string | null,"chore_id"?: string | null,"created_at"?: string,"day_kind"?: string | null,"event_id"?: string | null,"household_id"?: string,"id"?: string,"label"?: string,"last_grocery_for"?: string | null,"makes"?: string,"minutes_before"?: number,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {

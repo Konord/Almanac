@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireHousehold } from "@/lib/household";
-import { daysProblem, isNewId, type DaysDraft } from "@/lib/set-days";
+import { daysProblem, groupKey, isNewId, type DaysDraft } from "@/lib/set-days";
+import { syncEventAndChoreHeadsUps } from "../../heads-ups/sync";
 import { createClient } from "@/lib/supabase/server";
 
 export type SaveDaysResult = { ok: true } | { ok: false; error: string };
@@ -134,6 +135,41 @@ export async function saveSetDays(draft: DaysDraft, knownBreakIds: string[]): Pr
     const bad = fail((await supabase.from("break_members").insert(people)).error);
     if (bad) return bad;
   }
+
+  // 6. A kind of day renamed: events, templates and heads-ups that name it follow.
+  const finalName = new Map<string, string>();
+  for (const t of draft.dayTypes) if (!finalName.has(t.group)) finalName.set(t.group, t.name.trim());
+  for (const [group, name] of finalName) {
+    if (isNewId(group) || groupKey(name) === group) continue;
+    // Matched without caring about capitals (ilike), with its wildcards taken literally.
+    const old = group.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const bad =
+      fail((await supabase.from("events").update({ day_kind: name }).ilike("day_kind", old)).error) ??
+      fail((await supabase.from("event_templates").update({ day_kind: name }).ilike("day_kind", old)).error) ??
+      fail((await supabase.from("heads_ups").update({ day_kind: name }).ilike("day_kind", old)).error);
+    if (bad) return bad;
+  }
+
+  // 7. Heads-ups on kinds of day: take away, change and add.
+  const { data: headsUpsNow, error: headsUpsError } = await supabase.from("heads_ups").select("id").not("day_kind", "is", null);
+  if (headsUpsError) return { ok: false, error: headsUpsError.message };
+  const keptHeadsUps = draft.headsUps.filter((h) => finalName.has(h.group));
+  const keepIds = new Set(keptHeadsUps.filter((h) => !isNewId(h.id)).map((h) => h.id));
+  const goneHeadsUps = (headsUpsNow ?? []).filter((h) => !keepIds.has(h.id)).map((h) => h.id);
+  if (goneHeadsUps.length > 0) {
+    // Done to-dos they made are kept as history; open ones go with them.
+    await supabase.from("task_instances").update({ heads_up_id: null }).in("heads_up_id", goneHeadsUps).neq("status", "open");
+    const bad = fail((await supabase.from("heads_ups").delete().in("id", goneHeadsUps)).error);
+    if (bad) return bad;
+  }
+  for (const [i, h] of keptHeadsUps.entries()) {
+    const row = { day_kind: finalName.get(h.group) as string, label: h.label.trim(), minutes_before: h.minutes_before, makes: h.makes, sort_order: i };
+    const bad = isNewId(h.id)
+      ? fail((await supabase.from("heads_ups").insert({ ...row, household_id: household.id })).error)
+      : fail((await supabase.from("heads_ups").update(row).eq("id", h.id)).error);
+    if (bad) return bad;
+  }
+  await syncEventAndChoreHeadsUps(household, true);
 
   await supabase.from("activity_log").insert({
     household_id: household.id,

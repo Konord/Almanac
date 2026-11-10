@@ -4,6 +4,7 @@ import { AppFrame, Notice, firstParam } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { groupKey, type DaysDraft } from "@/lib/set-days";
 import { addDays, localDateOf } from "@/lib/time";
+import { createClient } from "@/lib/supabase/server";
 import { loadBreaks, loadRoutines } from "../data";
 import { SetDays, type Tab } from "./set-days";
 
@@ -27,7 +28,13 @@ async function Days({ searchParams }: { searchParams: PageProps<"/routines/manag
   const params = await searchParams;
   const { locale, weekStartsOn } = household.settings;
   const today = localDateOf(new Date(), household.settings.timeZone);
-  const [data, breaks] = await Promise.all([loadRoutines(today), loadBreaks(today, addDays(today, 3 * 366))]);
+  const supabase = await createClient();
+  const [data, breaks, headsUps] = await Promise.all([
+    loadRoutines(today),
+    loadBreaks(today, addDays(today, 3 * 366)),
+    supabase.from("heads_ups").select("id, day_kind, label, minutes_before, makes").not("day_kind", "is", null).order("minutes_before", { ascending: false }),
+  ]);
+  if (headsUps.error) throw headsUps.error;
 
   if (data.members.length === 0) {
     return (
@@ -65,6 +72,13 @@ async function Days({ searchParams }: { searchParams: PageProps<"/routines/manag
       end: b.end_date,
       away: b.away ?? false,
       people: data.members.flatMap((m) => b.people.filter((p) => p.member_id === m.id)),
+    })),
+    headsUps: headsUps.data.map((h) => ({
+      id: h.id,
+      group: groupKey(h.day_kind ?? ""),
+      label: h.label,
+      minutes_before: h.minutes_before,
+      makes: h.makes === "grocery" ? ("grocery" as const) : ("todo" as const),
     })),
   };
   const routineCounts: Record<string, number> = {};
