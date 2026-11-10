@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { dayFor } from "@/lib/day-types";
 import { combineDays, datesBetween, habitDay, habitStats, type HabitDay, type HabitStats } from "@/lib/habits";
-import { assignmentsForDay } from "@/lib/routines";
+import { assignmentsForDay, stepsForMember } from "@/lib/routines";
 import { addDays, type LocalDate } from "@/lib/time";
 import { loadBreaks, type RoutineData, type RoutineStep, type RoutineTemplate } from "./data";
 
@@ -42,7 +42,8 @@ export function trackedSteps(template: RoutineTemplate, steps: RoutineStep[]): R
 export async function loadHabitHistory(data: RoutineData, memberId: string, from: LocalDate, to: LocalDate, today: LocalDate): Promise<HabitHistory> {
   const member = data.members.find((m) => m.id === memberId);
   const tracked = data.templates
-    .map((template) => ({ template, steps: trackedSteps(template, data.steps) }))
+    // Only this person's own steps in a shared routine.
+    .map((template) => ({ template, steps: stepsForMember(trackedSteps(template, data.steps), memberId) }))
     .filter((t) => t.steps.length > 0 && data.assignments.some((a) => a.member_id === memberId && a.template_id === t.template.id));
   const dates = datesBetween(from, to);
   if (!member || tracked.length === 0) return { dates, routines: [] };

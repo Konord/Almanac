@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { draftProblem, kindFor, type ManagerDraft } from "./routine-manager.ts";
+import { dailyListState, draftProblem, kindFor, stepPeople, type ManagerDraft } from "./routine-manager.ts";
 
 test("kind comes from when the routine happens", () => {
   assert.equal(kindFor({ anchor: "wake", usual_start: null }, null), "morning");
@@ -21,12 +21,11 @@ const routine = {
   usual_minutes: 30,
   loose: false,
   habit_since: null,
-  show_on_daily_list: false,
   visibility: "everyone",
 };
 const draft = (changes: Partial<ManagerDraft> = {}): ManagerDraft => ({
   routines: [routine],
-  steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit: true }],
+  steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit: true, member_ids: [], daily_list: false }],
   uses: [],
   ...changes,
 });
@@ -36,5 +35,24 @@ test("drafts are checked before saving", () => {
   assert.match(draftProblem(draft({ routines: [{ ...routine, name: " " }] })) ?? "", /needs a name/);
   assert.match(draftProblem(draft({ routines: [{ ...routine, anchor: "clock" }] })) ?? "", /Choose a time/);
   assert.match(draftProblem(draft({ routines: [{ ...routine, usual_minutes: Number.NaN }] })) ?? "", /between 5 and 240/);
-  assert.match(draftProblem(draft({ steps: [{ id: "x", routine_id: "new-1", text: "", icon: null, habit: true }] })) ?? "", /step is empty/);
+  assert.match(draftProblem(draft({ steps: [{ id: "x", routine_id: "new-1", text: "", icon: null, habit: true, member_ids: [], daily_list: false }] })) ?? "", /step is empty/);
+});
+
+test("a step's people are only ones who still have the routine", () => {
+  const uses = [
+    { id: "u1", routine_id: "new-1", member_id: "ava", day_type_id: "weekday" },
+    { id: "u2", routine_id: "new-1", member_id: "mom", day_type_id: "weekday" },
+  ];
+  const step = { id: "s", routine_id: "new-1", text: "Clear the table", icon: null, habit: true, member_ids: ["ava", "ben"], daily_list: false };
+  assert.deepEqual(stepPeople({ uses }, step), ["ava"]);
+  assert.equal(draftProblem(draft({ uses, steps: [step] })), null);
+  // Ava and Ben both gone: nobody does it, so it must be fixed before saving.
+  assert.match(draftProblem(draft({ uses: [uses[1]], steps: [step] })) ?? "", /Nobody on Morning does "Clear the table"/);
+});
+
+test("the routine's daily list switch is all, some or none of its steps", () => {
+  assert.equal(dailyListState([{ daily_list: true }, { daily_list: true }]), "all");
+  assert.equal(dailyListState([{ daily_list: true }, { daily_list: false }]), "some");
+  assert.equal(dailyListState([{ daily_list: false }]), "none");
+  assert.equal(dailyListState([]), "none");
 });

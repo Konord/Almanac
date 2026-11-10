@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ChartLineUp, GearSix, Plus, Trash, X } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, ChartLineUp, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { EATING_MINUTES } from "@/lib/meals";
-import { NEW_PREFIX, draftProblem, sameDraft, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
+import { NEW_PREFIX, dailyListState, draftProblem, routinePeople, sameDraft, stepPeople, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
 import { placeRoutines, toMinutes, wantedSlot, type Anchor, type DayAnchors } from "@/lib/routine-placement";
 import { saveRoutineManager } from "./manager-actions";
 
@@ -95,6 +95,7 @@ export function RoutineManager({
     return { by: "day", name: dayNames[0] ?? "" };
   });
   const [stepPage, setStepPage] = useState(0);
+  const [whoOpen, setWhoOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +159,7 @@ export function RoutineManager({
   const select = (id: string | null) => {
     setSelected(id);
     setStepPage(0);
+    setWhoOpen(null);
     setAdding(null);
     remember(SELECTED_KEY, id);
   };
@@ -178,9 +180,26 @@ export function RoutineManager({
       return { ...d, steps: list };
     });
   const removeStep = (id: string) => update((d) => ({ ...d, steps: d.steps.filter((s) => s.id !== id) }));
+  /** The routine's daily list switch: all steps on, or (when all are on) all off. */
+  const setWholeDailyList = (on: boolean) => {
+    if (!routine) return;
+    update((d) => ({ ...d, steps: d.steps.map((s) => (s.routine_id === routine.id ? { ...s, daily_list: on } : s)) }));
+  };
+  /** Adds or takes a person off a step. Everyone ticked again means "everyone". */
+  const toggleStepPerson = (step: DraftStep, memberId: string, people: string[]) => {
+    const current = stepPeople(draft, step);
+    const chosen = current.length === 0 ? [...people] : current;
+    const next = chosen.includes(memberId) ? chosen.filter((id) => id !== memberId) : [...chosen, memberId];
+    setStep(step.id, { member_ids: next.length === people.length ? [] : next.length === 0 ? current : next });
+  };
   const addStep = (text: string, icon: string) => {
     if (!routine || !text.trim()) return;
-    update((d) => ({ ...d, steps: [...d.steps, { id: newId(), routine_id: routine.id, text: text.trim(), icon: icon || null, habit: true }] }));
+    // A new step joins the daily list when the whole routine is on it.
+    const onList = steps.length > 0 && dailyListState(steps) === "all";
+    update((d) => ({
+      ...d,
+      steps: [...d.steps, { id: newId(), routine_id: routine.id, text: text.trim(), icon: icon || null, habit: true, member_ids: [], daily_list: onList }],
+    }));
     setStepPage(Math.floor(steps.length / STEPS_PER_PAGE));
   };
   const removeRoutine = () => {
@@ -220,7 +239,6 @@ export function RoutineManager({
       usual_minutes: 30,
       loose: false,
       habit_since: null,
-      show_on_daily_list: false,
       visibility: "everyone",
     };
     const use: DraftUse = { id: newId(), routine_id: id, member_id: column.member.id, day_type_id: column.dayType.id };
@@ -269,6 +287,9 @@ export function RoutineManager({
         }))
     : [];
   const selectedMember = usedBy[0]?.member;
+  /** Everyone who has the selected routine, for the step "who does it" buttons. */
+  const people = routine ? routinePeople(draft, routine.id).flatMap((id) => members.filter((m) => m.id === id)) : [];
+  const listState = dailyListState(steps);
   const pages = Math.max(1, Math.ceil(steps.length / STEPS_PER_PAGE));
   const page = Math.min(stepPage, pages - 1);
 
@@ -290,7 +311,7 @@ export function RoutineManager({
               }}
               className={`flex min-h-[var(--touch-target)] min-w-28 items-center justify-center rounded-xl px-4 text-base font-bold ${view.by === by ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
             >
-              {by === "day" ? "By day" : "By person"}
+              {by === "day" ? "Whole family" : "One person"}
             </button>
           ))}
         </div>
@@ -445,7 +466,7 @@ export function RoutineManager({
                 {steps.slice(page * STEPS_PER_PAGE, page * STEPS_PER_PAGE + STEPS_PER_PAGE).map((step, i) => {
                   const index = page * STEPS_PER_PAGE + i;
                   return (
-                    <li key={step.id} className="flex items-center gap-1.5">
+                    <li key={step.id} className="relative flex items-center gap-1.5">
                       <EmojiPicker
                         initial={step.icon ?? ""}
                         fieldName=""
@@ -462,6 +483,24 @@ export function RoutineManager({
                         aria-label={`Step ${index + 1}`}
                         className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
                       />
+                      {people.length > 1 ? (
+                        <StepWho
+                          step={step}
+                          people={people}
+                          chosen={stepPeople(draft, step)}
+                          open={whoOpen === step.id}
+                          onOpen={() => setWhoOpen(whoOpen === step.id ? null : step.id)}
+                          onToggle={(memberId) => toggleStepPerson(step, memberId, people.map((p) => p.id))}
+                        />
+                      ) : null}
+                      <SmallButton
+                        label={step.daily_list ? `Take ${step.text} off the daily list` : `Show ${step.text} on the daily list`}
+                        pressed={step.daily_list}
+                        onClick={() => setStep(step.id, { daily_list: !step.daily_list })}
+                        tone={step.daily_list ? "list" : "plain"}
+                      >
+                        <ListChecks size="1.125rem" weight="bold" aria-hidden />
+                      </SmallButton>
                       {routine.habit_since ? (
                         <SmallButton
                           label={step.habit ? `Stop tracking ${step.text}` : `Track ${step.text} as a habit`}
@@ -500,12 +539,18 @@ export function RoutineManager({
                     </button>
                   </>
                 ) : null}
-                {routine.habit_since ? (
-                  <span className="ml-auto flex items-center gap-1.5 text-sm text-success">
-                    <ChartLineUp size="1rem" weight="bold" aria-hidden />
-                    Green = tracked
+                <span className="ml-auto flex items-center gap-3 text-sm">
+                  <span className="flex items-center gap-1.5 text-accent">
+                    <ListChecks size="1rem" weight="bold" aria-hidden />
+                    Blue = on the daily list
                   </span>
-                ) : null}
+                  {routine.habit_since ? (
+                    <span className="flex items-center gap-1.5 text-success">
+                      <ChartLineUp size="1rem" weight="bold" aria-hidden />
+                      Green = tracked
+                    </span>
+                  ) : null}
+                </span>
               </div>
               <AddStep key={routine.id} onAdd={addStep} />
 
@@ -565,10 +610,11 @@ export function RoutineManager({
                     hint="Keeps a habit history"
                   />
                   <Switch
-                    on={routine.show_on_daily_list}
-                    onClick={() => setRoutine({ show_on_daily_list: !routine.show_on_daily_list })}
-                    label="Show on daily list"
-                    hint="Extra reminder, like a new medicine"
+                    on={listState === "all"}
+                    partly={listState === "some"}
+                    onClick={() => setWholeDailyList(listState !== "all")}
+                    label={listState === "some" ? "Daily list: some steps" : "Whole routine on daily list"}
+                    hint="Shows as one row on the daily list; ticking it ticks every step. Or pick single steps with the list buttons."
                   />
                   <label className="ml-auto flex items-center gap-2 text-sm font-bold text-ink-muted">
                     Who sees it
@@ -632,10 +678,11 @@ function SmallButton({
   onClick: () => void;
   disabled?: boolean;
   pressed?: boolean;
-  tone?: "plain" | "danger" | "on";
+  tone?: "plain" | "danger" | "on" | "list";
   children: React.ReactNode;
 }) {
-  const look = tone === "danger" ? "bg-rail text-danger" : tone === "on" ? "bg-success text-white" : "bg-rail text-ink";
+  const look =
+    tone === "danger" ? "bg-rail text-danger" : tone === "on" ? "bg-success text-white" : tone === "list" ? "bg-accent text-white" : "bg-rail text-ink";
   return (
     <button type="button" aria-label={label} title={label} aria-pressed={pressed} disabled={disabled} onClick={onClick} className={`flex size-11 shrink-0 items-center justify-center rounded-xl disabled:opacity-30 ${look}`}>
       {children}
@@ -666,21 +713,95 @@ function NumberField({ value, min, max, onChange }: { value: number; min: number
   );
 }
 
-function Switch({ on, onClick, label, hint }: { on: boolean; onClick: () => void; label: string; hint?: string }) {
+function Switch({ on, partly = false, onClick, label, hint }: { on: boolean; partly?: boolean; onClick: () => void; label: string; hint?: string }) {
   return (
     <button
       type="button"
       role="switch"
-      aria-checked={on}
+      aria-checked={partly ? "mixed" : on}
       onClick={onClick}
       title={hint}
       className={`flex min-h-11 items-center gap-2.5 rounded-2xl px-3 text-base font-bold ${on ? "bg-[color-mix(in_srgb,var(--color-success)_12%,white)] text-success" : "bg-rail text-ink"}`}
     >
-      <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 ${on ? "justify-end bg-success" : "justify-start bg-check-border"}`} aria-hidden>
+      <span
+        className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 ${on ? "justify-end bg-success" : partly ? "justify-center bg-[color-mix(in_srgb,var(--color-success)_55%,white)]" : "justify-start bg-check-border"}`}
+        aria-hidden
+      >
         <span className="size-5 rounded-full bg-white" />
       </span>
       {label}
     </button>
+  );
+}
+
+/**
+ * Who does a step in a shared routine: their faces on the button (or a
+ * group sign for everyone); tap to pick people.
+ */
+function StepWho({
+  step,
+  people,
+  chosen,
+  open,
+  onOpen,
+  onToggle,
+}: {
+  step: DraftStep;
+  people: ManagerMember[];
+  chosen: string[];
+  open: boolean;
+  onOpen: () => void;
+  onToggle: (memberId: string) => void;
+}) {
+  const everyone = chosen.length === 0;
+  const faces = people.filter((p) => chosen.includes(p.id));
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-expanded={open}
+        aria-label={`Who does ${step.text}: ${everyone ? "everyone" : faces.map((p) => p.name).join(", ")}`}
+        title="Who does this step"
+        className={`flex h-11 shrink-0 items-center justify-center rounded-xl px-1.5 ${open ? "bg-ink text-board" : "bg-rail text-ink"}`}
+      >
+        {everyone ? (
+          <span className="flex w-8 justify-center">
+            <Users size="1.25rem" weight="bold" aria-hidden />
+          </span>
+        ) : (
+          <span className="flex -space-x-2">
+            {faces.slice(0, 3).map((p) => (
+              <Avatar key={p.id} name={p.name} colour={p.colour} icon={p.icon} size="sm" />
+            ))}
+          </span>
+        )}
+      </button>
+      {open ? (
+        <div className="absolute top-full right-0 z-20 mt-1 flex flex-wrap items-center gap-1.5 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)]">
+          <span className="px-1 text-sm font-bold text-ink-muted">Who does it?</span>
+          {people.map((p) => {
+            const on = everyone || chosen.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onToggle(p.id)}
+                className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 pr-3 pl-1.5 text-base font-bold ${on ? "text-ink" : "border-frame text-ink-muted opacity-60"}`}
+                style={on ? { borderColor: strong(p.colour), background: soft(p.colour) } : undefined}
+              >
+                <Avatar name={p.name} colour={p.colour} icon={p.icon} size="sm" />
+                {p.name}
+              </button>
+            );
+          })}
+          <button type="button" onClick={onOpen} aria-label="Done" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
+            <X size="1rem" weight="bold" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 }
 

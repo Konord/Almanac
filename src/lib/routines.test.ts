@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assignmentsForDay, glanceRoutine, isLate, kindForTime, routineProgress, type AssignmentLike, type RoutineKind } from "./routines.ts";
+import { assignmentsForDay, dailyListPart, glanceRoutine, isLate, kindForTime, routineProgress, stepsForMember, type AssignmentLike, type RoutineKind } from "./routines.ts";
 
 const kinds: Record<string, RoutineKind> = {
   school: "morning",
@@ -97,4 +97,29 @@ test("the glance shows the routine for this time of day", () => {
   assert.equal(glanceRoutine([day[0], day[2]], "daily")?.name, "Bedtime");
   // Everything done: show the last one (as finished).
   assert.equal(glanceRoutine(day.map((r) => ({ ...r, complete: true })), "night")?.name, "Bedtime");
+});
+
+test("a shared routine gives each person their own steps", () => {
+  const steps = [
+    { id: "clear", member_ids: ["ava", "ben"] },
+    { id: "dishwasher", member_ids: ["mom"] },
+    { id: "wipe", member_ids: [] },
+  ];
+  assert.deepEqual(stepsForMember(steps, "ava").map((s) => s.id), ["clear", "wipe"]);
+  assert.deepEqual(stepsForMember(steps, "mom").map((s) => s.id), ["dishwasher", "wipe"]);
+});
+
+test("the daily list shows a whole routine as one row, or just the chosen steps", () => {
+  const s = (id: string, daily_list: boolean) => ({ id, daily_list });
+  const none = new Set<string>();
+  assert.equal(dailyListPart([s("a", false), s("b", false)], none).kind, "none");
+  const whole = dailyListPart([s("a", true), s("b", true)], new Set(["a"]));
+  assert.equal(whole.kind, "routine");
+  assert.deepEqual(whole.kind === "routine" ? whole.steps.map((x) => x.id) : [], ["b"]);
+  const some = dailyListPart([s("a", true), s("b", false), s("c", true)], new Set(["c"]));
+  assert.equal(some.kind, "steps");
+  assert.deepEqual(some.kind === "steps" ? some.steps.map((x) => x.id) : [], ["a"]);
+  // A one-step routine is just a step.
+  assert.equal(dailyListPart([s("a", true)], none).kind, "steps");
+  assert.equal(dailyListPart([s("a", true), s("b", true)], new Set(["a", "b"])).kind, "none");
 });

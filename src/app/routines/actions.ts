@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
-import { routineProgress } from "@/lib/routines";
+import { routineProgress, stepsForMember } from "@/lib/routines";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalDate } from "@/lib/time";
 
@@ -107,11 +107,15 @@ export async function toggleStep(formData: FormData) {
 
     // Note when someone starts or finishes a routine (the doc's activity hooks).
     const [{ data: steps }, { data: checks }, { data: template }] = await Promise.all([
-      supabase.from("routine_steps").select("id, position, target_time, essential").eq("template_id", templateId),
+      supabase.from("routine_steps").select("id, position, target_time, essential, routine_step_members (member_id)").eq("template_id", templateId),
       supabase.from("routine_checks").select("step_id").eq("member_id", memberId).eq("check_date", date),
       supabase.from("routine_templates").select("name").eq("id", templateId).maybeSingle(),
     ]);
-    const routineSteps = steps ?? [];
+    // Only this person's own steps count in a shared routine.
+    const routineSteps = stepsForMember(
+      (steps ?? []).map(({ routine_step_members, ...step }) => ({ ...step, member_ids: (routine_step_members ?? []).map((m) => m.member_id) })),
+      memberId,
+    );
     const ids = new Set(routineSteps.map((s) => s.id));
     const done = new Set((checks ?? []).map((c) => c.step_id).filter((id) => ids.has(id)));
     const details = { member_id: memberId, date, name: template?.name ?? "" };
@@ -119,6 +123,31 @@ export async function toggleStep(formData: FormData) {
     if (routineProgress(routineSteps, done).complete) await log(household.id, "routine_done", "routine", templateId, details);
   }
 
+  refresh();
+  redirect(returnPath(formData));
+}
+
+/**
+ * Ticks several steps at once: the daily list's one row for a whole
+ * routine ticks every step of it that's still open.
+ */
+export async function tickSteps(formData: FormData) {
+  const household = await requireHousehold();
+  const memberId = text(formData, "memberId");
+  const templateId = text(formData, "templateId");
+  const date = text(formData, "date");
+  const stepIds = formData.getAll("stepId").map(String).filter(Boolean);
+  if (!isLocalDate(date)) back(formData, "error", "That date doesn't look right.");
+  if (stepIds.length === 0) redirect(returnPath(formData));
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("routine_checks").upsert(
+    stepIds.map((step_id) => ({ household_id: household.id, member_id: memberId, step_id, check_date: date })),
+    { onConflict: "member_id,step_id,check_date", ignoreDuplicates: true },
+  );
+  if (error) back(formData, "error", error.message);
+  const { data: template } = await supabase.from("routine_templates").select("name").eq("id", templateId).maybeSingle();
+  await log(household.id, "routine_done", "routine", templateId, { member_id: memberId, date, name: template?.name ?? "" });
   refresh();
   redirect(returnPath(formData));
 }

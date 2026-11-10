@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireHousehold } from "@/lib/household";
-import { draftProblem, isNewId, kindFor, type ManagerDraft } from "@/lib/routine-manager";
+import { draftProblem, isNewId, kindFor, stepPeople, type ManagerDraft } from "@/lib/routine-manager";
 import { createClient } from "@/lib/supabase/server";
 import { isVisibility } from "../calendar/options";
 
@@ -50,7 +50,6 @@ export async function saveRoutineManager(draft: ManagerDraft): Promise<SaveResul
       usual_minutes: r.usual_minutes,
       loose: r.loose,
       habit_since: r.habit_since,
-      show_on_daily_list: r.show_on_daily_list,
       visibility: r.visibility,
       sort_order: i,
     };
@@ -74,13 +73,35 @@ export async function saveRoutineManager(draft: ManagerDraft): Promise<SaveResul
     if (error) return { ok: false, error: error.message };
   }
   const position = new Map<string, number>();
+  const stepIds: string[] = [];
+  const stepMembers: { step_id: string; member_id: string; household_id: string }[] = [];
   for (const s of draft.steps) {
     const at = position.get(s.routine_id) ?? 0;
     position.set(s.routine_id, at + 1);
-    const row = { text: s.text.trim(), icon: s.icon || null, habit: s.habit, position: at, target_time: null };
-    const { error } = isNewId(s.id)
-      ? await supabase.from("routine_steps").insert({ ...row, household_id: household.id, template_id: routineId(s.routine_id) })
-      : await supabase.from("routine_steps").update(row).eq("id", s.id);
+    const row = { text: s.text.trim(), icon: s.icon || null, habit: s.habit, daily_list: s.daily_list, position: at, target_time: null };
+    let id = s.id;
+    if (isNewId(s.id)) {
+      const { data, error } = await supabase
+        .from("routine_steps")
+        .insert({ ...row, household_id: household.id, template_id: routineId(s.routine_id) })
+        .select("id")
+        .single();
+      if (error) return { ok: false, error: error.message };
+      id = data.id;
+    } else {
+      const { error } = await supabase.from("routine_steps").update(row).eq("id", s.id);
+      if (error) return { ok: false, error: error.message };
+    }
+    stepIds.push(id);
+    // Who does it (only people who still have the routine; none = everyone).
+    for (const member_id of stepPeople(draft, s)) stepMembers.push({ step_id: id, member_id, household_id: household.id });
+  }
+  if (stepIds.length > 0) {
+    const { error } = await supabase.from("routine_step_members").delete().in("step_id", stepIds);
+    if (error) return { ok: false, error: error.message };
+  }
+  if (stepMembers.length > 0) {
+    const { error } = await supabase.from("routine_step_members").insert(stepMembers);
     if (error) return { ok: false, error: error.message };
   }
 

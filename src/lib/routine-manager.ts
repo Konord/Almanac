@@ -27,8 +27,6 @@ export type DraftRoutine = {
   loose: boolean;
   /** When habit tracking was switched on; null when off. */
   habit_since: string | null;
-  /** Also shows on the daily list in the Today panel. */
-  show_on_daily_list: boolean;
   visibility: string;
 };
 
@@ -38,6 +36,10 @@ export type DraftStep = {
   text: string;
   icon: string | null;
   habit: boolean;
+  /** Who does this step. Empty: everyone who has the routine. */
+  member_ids: string[];
+  /** Also shows on the daily list in the Today panel. */
+  daily_list: boolean;
 };
 
 /** A routine given to one person's kind of day. */
@@ -89,7 +91,37 @@ export function draftProblem(draft: ManagerDraft): string | null {
     if (text.length > 80) return `"${text.slice(0, 20)}…" is too long for a step (80 letters at most).`;
   }
   for (const u of draft.uses) if (!ids.has(u.routine_id)) return "A routine is given to someone but isn't there any more.";
+  for (const s of draft.steps) {
+    if (s.member_ids.length === 0) continue;
+    if (stepPeople(draft, s).length === 0) {
+      const name = draft.routines.find((r) => r.id === s.routine_id)?.name.trim() ?? "";
+      return `Nobody on ${name} does "${s.text.trim().slice(0, 30)}" now. Choose who does it, or delete it.`;
+    }
+  }
   return null;
+}
+
+/** The people who have a routine on at least one kind of day, in the order they were added. */
+export function routinePeople(draft: Pick<ManagerDraft, "uses">, routineId: string): string[] {
+  const people: string[] = [];
+  for (const u of draft.uses) if (u.routine_id === routineId && !people.includes(u.member_id)) people.push(u.member_id);
+  return people;
+}
+
+/**
+ * Who a step is for, leaving out anyone who no longer has its routine.
+ * Empty means everyone on the routine.
+ */
+export function stepPeople(draft: Pick<ManagerDraft, "uses">, step: Pick<DraftStep, "routine_id" | "member_ids">): string[] {
+  const on = routinePeople(draft, step.routine_id);
+  return step.member_ids.filter((id) => on.includes(id));
+}
+
+/** Whether a routine's steps are on the daily list: all of them, some, or none. */
+export function dailyListState(steps: Pick<DraftStep, "daily_list">[]): "all" | "some" | "none" {
+  const on = steps.filter((s) => s.daily_list).length;
+  if (on === 0) return "none";
+  return on === steps.length ? "all" : "some";
 }
 
 /** True when two drafts would save the same thing. */

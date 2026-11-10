@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { dayFor, type Break, type DayTypeData } from "@/lib/day-types";
 import type { Anchor } from "@/lib/routine-placement";
-import { assignmentsForDay, isRoutineKind, routineProgress, type Progress, type RoutineKind } from "@/lib/routines";
+import { assignmentsForDay, isRoutineKind, routineProgress, stepsForMember, type Progress, type RoutineKind } from "@/lib/routines";
 import { addDays, type LocalDate } from "@/lib/time";
 
 export type RoutineMember = {
@@ -29,8 +29,6 @@ export type RoutineTemplate = {
   loose: boolean;
   /** When habit tracking was switched on; null when it's off. */
   habit_since: string | null;
-  /** Also shows on the daily list (rare extra emphasis, like a new medicine). */
-  show_on_daily_list: boolean;
 };
 export type RoutineStep = {
   id: string;
@@ -42,6 +40,10 @@ export type RoutineStep = {
   essential: boolean;
   /** Tracked as a habit when the routine is tracked. */
   habit: boolean;
+  /** Also shows on the daily list in the Today panel. */
+  daily_list: boolean;
+  /** Who does this step. Empty: everyone who has the routine. */
+  member_ids: string[];
 };
 export type RoutineAssignment = {
   id: string;
@@ -74,10 +76,13 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       .order("name"),
     supabase
       .from("routine_templates")
-      .select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes, anchor, anchor_meal_time_id, anchor_offset, loose, habit_since, show_on_daily_list")
+      .select("id, name, kind, audience, premade, visibility, usual_start, usual_minutes, anchor, anchor_meal_time_id, anchor_offset, loose, habit_since")
       .order("sort_order")
       .order("name"),
-    supabase.from("routine_steps").select("id, template_id, text, icon, position, target_time, essential, habit").order("position"),
+    supabase
+      .from("routine_steps")
+      .select("id, template_id, text, icon, position, target_time, essential, habit, daily_list, routine_step_members (member_id)")
+      .order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, day_type_id, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),
     supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order").order("sort_order").order("name"),
@@ -96,7 +101,10 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       kind: isRoutineKind(t.kind) ? t.kind : "daily",
       anchor: (["wake", "bed", "meal", "clock"] as const).find((a) => a === t.anchor) ?? "clock",
     })),
-    steps: steps.data ?? [],
+    steps: (steps.data ?? []).map(({ routine_step_members, ...step }) => ({
+      ...step,
+      member_ids: (routine_step_members ?? []).map((m) => m.member_id),
+    })),
     assignments: assignments.data ?? [],
     checked: new Set((checks.data ?? []).map((c) => `${c.member_id}:${c.step_id}`)),
     ended: new Set((ends.data ?? []).map((e) => `${e.member_id}:${e.template_id}`)),
@@ -145,7 +153,11 @@ export function dayRoutinesFor(data: RoutineData, memberId: string, date: LocalD
   return assignmentsForDay(data.assignments, memberId, date, dayTypeId, (id) => templateById.get(id)?.kind).flatMap((assignment) => {
     const template = templateById.get(assignment.template_id);
     if (!template) return [];
-    const steps = data.steps.filter((s) => s.template_id === template.id);
+    // A shared routine: each person only gets their own steps.
+    const all = data.steps.filter((s) => s.template_id === template.id);
+    const steps = stepsForMember(all, memberId);
+    // On the routine but with nothing of their own to do: nothing to show.
+    if (all.length > 0 && steps.length === 0) return [];
     const done = new Set(steps.filter((s) => data.checked.has(`${memberId}:${s.id}`)).map((s) => s.id));
     return [{ assignment, template, steps, doneIds: done, progress: routineProgress(steps, done) }];
   });

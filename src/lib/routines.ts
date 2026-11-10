@@ -115,3 +115,34 @@ export function glanceRoutine<R extends { kind: RoutineKind; complete: boolean }
     routines.at(-1)
   );
 }
+
+// ---------------------------------------------------------------------------
+// Shared routines: whose steps are whose
+// ---------------------------------------------------------------------------
+
+/** A step with the people who do it. No people means everyone on the routine. */
+export type SharedStepLike = { member_ids: readonly string[] };
+
+/** The steps one person does in a routine (theirs, plus the ones for everyone). */
+export function stepsForMember<S extends SharedStepLike>(steps: S[], memberId: string): S[] {
+  return steps.filter((s) => s.member_ids.length === 0 || s.member_ids.includes(memberId));
+}
+
+/**
+ * What a routine puts on a person's daily list, from their steps (in order)
+ * and the ones they've ticked today:
+ * - nothing, when no step is switched on for the list or all of those are done;
+ * - the whole routine as one row, when every one of their steps is on
+ *   (ticking that row ticks all of them);
+ * - otherwise each switched-on step that isn't done, one row each.
+ */
+export type DailyListPart<S> = { kind: "none" } | { kind: "routine"; steps: S[] } | { kind: "steps"; steps: S[] };
+
+export function dailyListPart<S extends { id: string; daily_list: boolean }>(steps: S[], doneIds: ReadonlySet<string>): DailyListPart<S> {
+  const on = steps.filter((s) => s.daily_list);
+  if (on.length === 0) return { kind: "none" };
+  const open = on.filter((s) => !doneIds.has(s.id));
+  if (open.length === 0) return { kind: "none" };
+  if (on.length === steps.length && steps.length > 1) return { kind: "routine", steps: open };
+  return { kind: "steps", steps: open };
+}
