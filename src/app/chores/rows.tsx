@@ -26,12 +26,12 @@ export function todoWhen(todo: Pick<Todo, "due_date" | "date_kind" | "at_time" |
   if (!todo.due_date) return "";
   const day = dayLabel(todo.due_date, today, household);
   if (carriedOver(todo, today)) return `from ${day}`;
-  if (todo.date_kind === "due") return `by ${day}`;
-  if (!todo.at_time) return day;
-  const time = new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, hour: "numeric", minute: "2-digit" })
-    .format(zonedToUtc(todo.due_date, todo.at_time.slice(0, 5), household.settings.timeZone))
-    .replace(":00", "");
-  return `${day} ${time}`;
+  const time = todo.at_time
+    ? ` ${new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, hour: "numeric", minute: "2-digit" })
+        .format(zonedToUtc(todo.due_date, todo.at_time.slice(0, 5), household.settings.timeZone))
+        .replace(":00", "")}`
+    : "";
+  return todo.date_kind === "due" ? `by ${day}${time}` : `${day}${time}`;
 }
 
 /** dayLabel for the middle of a sentence: "done today", "done Nov 3". */
@@ -168,6 +168,7 @@ export function TodoRow({
   household,
   returnTo,
   editHref,
+  plannedOn,
 }: {
   todo: Todo;
   members: Map<string, ChoreMember>;
@@ -176,13 +177,23 @@ export function TodoRow({
   returnTo: string;
   /** Tapping the words opens it for editing. */
   editHref?: string;
+  /** Where the chore planner put each one-off chore; given, chores say when. */
+  plannedOn?: Map<string, LocalDate>;
 }) {
   const who = todo.assignee_id ? members.get(todo.assignee_id) : undefined;
   const done = todo.status === "done";
   const late = !done && carriedOver(todo, today);
   const opens = linkLabel(todo.link);
+  // A one-off chore: its tags under the words, and the day the planner picked.
+  const tagNames = todo.is_chore ? CHORE_TAGS.filter((t) => todo.tags.includes(t.value)).map((t) => t.label) : [];
+  const planned = todo.is_chore && plannedOn ? (todo.due_date === today ? today : (plannedOn.get(todo.id) ?? null)) : undefined;
   const words = (
-    <span className={`line-clamp-2 font-hand text-2xl leading-[1.1] break-words ${done ? "text-ink-muted line-through" : "text-ink"}`}>{todo.title}</span>
+    <>
+      <span className={`line-clamp-2 font-hand text-2xl leading-[1.1] break-words ${done ? "text-ink-muted line-through" : "text-ink"}`}>{todo.title}</span>
+      {todo.is_chore && !done ? (
+        <span className="mt-0.5 block truncate text-sm font-bold text-ink-muted">{["Chore", ...tagNames].join(" · ")}</span>
+      ) : null}
+    </>
   );
   return (
     <li className="flex min-h-19 items-center gap-3.5 border-b border-panel last:border-0">
@@ -213,12 +224,17 @@ export function TodoRow({
           <span className="min-w-0 flex-1 py-2">{words}</span>
         )}
       </span>
+      {planned !== undefined && !done ? (
+        <span className={`shrink-0 text-sm font-bold ${planned ? "text-ink-muted" : "text-now"}`} title="The day the chore planner picked">
+          {planned ? dayLabel(planned, today, household) : "No room yet"}
+        </span>
+      ) : null}
       {todo.must_do && !done ? (
         <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
-      ) : todo.due_date && !done ? (
+      ) : todo.due_date && !done && planned === undefined ? (
         <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{todoWhen(todo, today, household)}</span>
-      ) : !done ? (
-        // No date: it stays on its list until it's put on today's daily list.
+      ) : !done && planned !== today ? (
+        // No date (or a chore not planned for today): it stays put until it's put on today's daily list.
         <form action={doToday} className="shrink-0">
           <input type="hidden" name="id" value={todo.id} />
           <input type="hidden" name="returnTo" value={returnTo} />

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
+import { isChoreTag, placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
 import { spreadSlack } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { addDays, type LocalDate } from "@/lib/time";
@@ -64,19 +64,14 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     loadChoreDays(),
     loadAway(today, last),
     loadChoreDayMoves(addDays(today, -6), last),
-    supabase
-      .from("task_instances")
-      .select("id, template_id, chore_day_id, status, due_date, list_id")
-      .not("list_id", "is", null)
-      .or(`template_id.not.is.null,chore_day_id.not.is.null`)
-      .or(`status.eq.open,due_date.gte.${addDays(today, -7)}`),
+    choreTasks(supabase, today),
   ]);
   if (tasks.error) throw tasks.error;
 
   const open = tasks.data.filter((t) => t.status === "open");
   const chorePending = open.filter((t) => t.template_id);
   // One-offs: undated or placed on an earlier day (back in the bucket), or already on today.
-  const oneOffs = open.filter((t) => !t.template_id && t.chore_day_id && (t.due_date === null || t.due_date <= today));
+  const oneOffs = open.filter((t) => !t.template_id && !t.heads_up_id && (t.due_date === null || t.due_date <= today));
   const keptToday = new Set([
     ...chorePending.filter((t) => t.due_date === today).map((t) => t.template_id as string),
     ...oneOffs.filter((t) => t.due_date === today).map((t) => t.id),
@@ -97,7 +92,8 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     })),
     oneOffs: oneOffs.map((t) => ({
       id: t.id,
-      chore_day_id: t.chore_day_id as string,
+      chore_day_id: t.chore_day_id,
+      tags: t.tags.filter(isChoreTag),
     })),
     today,
     away,
@@ -119,6 +115,17 @@ export async function choreSchedule(household: Household, today: LocalDate, time
       moves,
     );
   return { chores, rounds, members, choreDays, plan, hard };
+}
+
+/** Tasks chores made, and one-off chores on the Chores list. */
+async function choreTasks(supabase: Awaited<ReturnType<typeof createClient>>, today: LocalDate) {
+  const { data: choresList } = await supabase.from("task_lists").select("id").eq("is_chores", true).maybeSingle();
+  return supabase
+    .from("task_instances")
+    .select("id, template_id, heads_up_id, chore_day_id, tags, status, due_date, list_id")
+    .not("list_id", "is", null)
+    .or(choresList ? `template_id.not.is.null,list_id.eq.${choresList.id}` : "template_id.not.is.null")
+    .or(`status.eq.open,due_date.gte.${addDays(today, -7)}`);
 }
 
 type TaskRow = {
@@ -166,7 +173,7 @@ async function makeToday(
   const have = new Set(openChores.filter((t) => !stale.includes(t.id)).map((t) => t.template_id));
   const missing = [...wanted].filter(([id]) => !have.has(id));
   if (missing.length > 0) {
-    const { data: list } = await supabase.from("task_lists").select("id").order("sort_order").order("name").limit(1).maybeSingle();
+    const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").order("name").limit(1).maybeSingle();
     if (list) {
       for (const [id, date] of missing) {
         const c = byId.get(id) as ChoreWithTiming;

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
-import { EVERYONE_COLOUR, soft, strong } from "@/lib/colours";
+import { EVERYONE_COLOUR, soft } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold, type Household } from "@/lib/household";
@@ -22,6 +22,7 @@ import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./c
 import { PROFILE_COLOUR } from "./calendar/profile-tag";
 import type { CalendarItem, Member } from "./calendar/types";
 import { loadTodos, type Todo } from "./chores/data";
+import { onCalendar } from "@/lib/todos";
 import { loadSpecialDays } from "./holidays/data";
 import { loadRoutines, type RoutineData } from "./routines/data";
 import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
@@ -54,6 +55,8 @@ import {
   shortTime,
   timelineRange,
   weekdayLabel,
+  TodoPoint,
+  taskMinute,
 } from "./calendar/views";
 
 /** The space between people's columns on the timeline. */
@@ -230,7 +233,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           pending={pending}
           meals={todayMeals}
           mealBasics={mealBasics}
-          timedTodos={todoData.todos.filter((t) => t.status === "open" && t.date_kind === "start" && t.due_date === today && t.at_time)}
+          timedTodos={todoData.todos.filter(
+            (t) => t.due_date === today && (onCalendar(t) || (t.status === "open" && t.date_kind === "start" && t.at_time !== null)),
+          )}
         />
       </div>
       </div>
@@ -336,8 +341,8 @@ function PeopleTimeline({
     ...placedMeals,
   ];
   const range = timelineRange(timed, [today], timeZone);
-  const first = Math.min(range.first, ...placements.map((p) => Math.floor(p.startMin / 60)));
-  const last = Math.max(range.last, ...placements.map((p) => Math.ceil(p.endMin / 60)));
+  const first = Math.min(range.first, ...placements.map((p) => Math.floor(p.startMin / 60)), ...timedTodos.map((t) => Math.floor(taskMinute(t) / 60)));
+  const last = Math.max(range.last, ...placements.map((p) => Math.ceil(p.endMin / 60)), ...timedTodos.map((t) => Math.ceil((taskMinute(t) + 1) / 60)));
   // No "Everyone" column (Connor, 2026-11-05): things for everyone span the row.
   // A household with nobody in it yet still gets one column to add things to.
   const columns: {
@@ -531,7 +536,7 @@ function PeopleTimeline({
               ];
             })}
             {timedTodos.map((t) => {
-              const minute = Number(t.at_time!.slice(0, 2)) * 60 + Number(t.at_time!.slice(3, 5));
+              const minute = taskMinute(t);
               if (minute < first * 60 || minute > last * 60) return null;
               const c = t.assignee_id ? columnIds.indexOf(t.assignee_id) : -1;
               return (
@@ -619,17 +624,3 @@ function sortForDay(items: CalendarItem[], timeZone: string): CalendarItem[] {
   });
 }
 
-/** A to-do at a time: a point on the line, not a block (it has no length). Tapping opens its list. */
-function TodoPoint({ todo, top, box, colour }: { todo: Todo; top: number; box: { left: string; width: string }; colour: string }) {
-  return (
-    <Link
-      href={todo.link ?? `/lists?list=${todo.list_id}`}
-      title={todo.title}
-      className="pointer-events-auto absolute z-[2] flex h-8 -translate-y-1/2 items-center gap-1.5 overflow-hidden"
-      style={{ top: `${top}%`, ...box }}
-    >
-      <span className="size-3.5 shrink-0 rounded-full border-[3px] bg-board" style={{ borderColor: strong(colour) }} aria-hidden />
-      <span className="min-w-0 truncate rounded-lg bg-board/90 px-1.5 font-hand text-xl leading-none text-ink">{todo.title}</span>
-    </Link>
-  );
-}

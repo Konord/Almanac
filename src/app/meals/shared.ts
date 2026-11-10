@@ -107,7 +107,7 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   if (helperError) throw helperError;
   if (!helpers || helpers.length === 0) return;
 
-  const { data: list } = await supabase.from("task_lists").select("id").order("sort_order").limit(1).maybeSingle();
+  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").limit(1).maybeSingle();
   if (!list) return;
 
   const usual = (meal.meal_times as unknown as { usual_time: string } | null)?.usual_time?.slice(0, 5) ?? "18:00";

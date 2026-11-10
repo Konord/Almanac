@@ -12,7 +12,7 @@ import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { dailyOrder, onDailyList, timedToday } from "@/lib/todos";
+import { dailyOrder, onDailyList, onItsList, timedToday } from "@/lib/todos";
 import { toggleTodo } from "../chores/actions";
 import { loadTodos, type Todo } from "../chores/data";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
@@ -184,7 +184,7 @@ export async function TodayPanel({
           today,
         )
       : list
-        ? todos.filter((t) => t.list_id === list.id && t.status === "open")
+        ? todos.filter((t) => t.list_id === list.id && t.status === "open" && onItsList(t))
         : []
   ).map((todo) => ({
     kind: "todo",

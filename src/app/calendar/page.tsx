@@ -41,6 +41,8 @@ import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
 import { loadSpecialDays } from "../holidays/data";
 import { PeopleRow } from "../routines/people-row";
+import { loadTodos } from "../chores/data";
+import { onCalendar } from "@/lib/todos";
 import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime, type Dinner } from "./views";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
 import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
@@ -92,8 +94,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   ]);
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
-  // The week view shows each day's dinner under the date.
+  // The week view shows each day's dinner under the date, and list tasks with a time as points.
   const dinners = view === "week" ? await dinnersFor(days) : new Map<LocalDate, Dinner>();
+  const weekTasks =
+    view === "week" ? (await loadTodos()).todos.filter((t) => onCalendar(t) && t.due_date! >= days[0] && t.due_date! <= days[days.length - 1]) : [];
   const profiles = profilesFor(days, items, layers, household);
   const layerById = new Map(layers.map((l) => [l.id, l]));
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
@@ -219,6 +223,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           href={href}
           profiles={profiles}
           dinners={dinners}
+          tasks={weekTasks}
           adding={{ placing, pending, addHref }}
           breaks={breaks}
           specials={specials}

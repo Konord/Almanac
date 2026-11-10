@@ -312,7 +312,7 @@ export async function doChoreToday(choreId: string): Promise<{ ok: true } | { ok
   const { data: open } = await supabase.from("task_instances").select("id, due_date").eq("template_id", choreId).eq("status", "open");
   if ((open ?? []).some((t) => t.due_date === today)) return { ok: true };
   if ((open ?? []).length > 0) await supabase.from("task_instances").delete().eq("template_id", choreId).eq("status", "open");
-  const { data: list } = await supabase.from("task_lists").select("id").order("sort_order").order("name").limit(1).maybeSingle();
+  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").order("name").limit(1).maybeSingle();
   if (!list) return { ok: false, error: "Make a list first, on Lists." };
   const { error: insertError } = await supabase.from("task_instances").insert({
     household_id: household.id,

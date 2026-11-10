@@ -1,13 +1,15 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarDots, ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
+import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
-import { localDateOf } from "@/lib/time";
+import { localDateOf, type LocalDate } from "@/lib/time";
+import { onItsList } from "@/lib/todos";
+import { CHORE_TAGS } from "@/lib/chore-days";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
 import { loadTodos, type ChoreMember } from "../chores/data";
 import { choreSchedule } from "../chores/plan";
@@ -36,12 +38,17 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const today = localDateOf(new Date(), timeZone);
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
-  const { choreDays } = await choreSchedule(household, today, timeZone);
+  const { choreDays, plan } = await choreSchedule(household, today, timeZone);
+  // Where the chore planner has put each one-off chore (none: no room in the next two weeks).
+  const plannedOn = new Map<string, LocalDate>();
+  for (const day of plan.days) for (const item of day.items) if (item.kind === "one-off" && !plannedOn.has(item.id)) plannedOn.set(item.id, day.date);
   const supabase = await createClient();
-  const [{ lists, todos }, { data: memberRows }] = await Promise.all([
+  const [{ lists, todos: allTodos }, { data: memberRows }] = await Promise.all([
     loadTodos(),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
   ]);
+  // Chores and heads-ups live on the daily list (Today panel), not here.
+  const todos = allTodos.filter(onItsList);
   const members = (memberRows ?? []) as ChoreMember[];
   const memberById = new Map(members.map((m) => [m.id, m]));
   const listParam = firstParam(params.list);
@@ -50,8 +57,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const returnTo = here();
   const open = todos.filter((t) => t.list_id === list?.id && t.status === "open");
   const done = todos.filter((t) => t.list_id === list?.id && t.status === "done");
-  const dated = todos.filter((t) => t.status === "open" && t.due_date).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1));
-  const listById = new Map(lists.map((l) => [l.id, l]));
   const editId = firstParam(params.edit);
   const editing = editId ? todos.find((t) => t.id === editId) : undefined;
   const editingList = firstParam(params.editList) === "1" && list;
@@ -60,7 +65,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const message = firstParam(params.message);
   const showingDone = firstParam(params.done) === "1";
   const page = Math.max(0, Number(firstParam(params.page) ?? 0) || 0);
-  const dayPage = Math.max(0, Number(firstParam(params.dayPage) ?? 0) || 0);
 
   return (
     <>
@@ -71,7 +75,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
         {/* Which list */}
         <Card title="Lists" icon={ListChecks} tint="blue">
           <ul className="flex flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
@@ -116,6 +120,32 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               </Link>
             }
           >
+            {list.is_chores ? (
+              // The Chores list: just the words and tags; the chore planner picks the day.
+              <form action={addTodo} className="mt-2 mb-2 flex flex-col gap-2">
+                <input type="hidden" name="listId" value={list.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <div className="flex items-center gap-2">
+                  <Input name="title" placeholder="Add a chore… the planner picks a day" required maxLength={120} aria-label="New chore" className="min-w-0 flex-1" />
+                  <Button>
+                    <Plus size="1.25rem" weight="bold" aria-hidden />
+                    Add
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Tags">
+                  {CHORE_TAGS.map((t) => (
+                    <label
+                      key={t.value}
+                      title={t.hint}
+                      className="flex min-h-11 cursor-pointer items-center rounded-full border-2 border-frame bg-board px-3.5 text-base text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold"
+                    >
+                      <input type="checkbox" name="tags" value={t.value} className="sr-only" />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+              </form>
+            ) : (
             <form action={addTodo} className="mt-2 mb-2 flex flex-wrap items-center gap-2">
               <input type="hidden" name="listId" value={list.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -130,6 +160,9 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               </div>
               <div className="min-w-44 flex-1">
                 <Input name="dueDate" type="date" aria-label="Day (optional)" className="w-full" />
+              </div>
+              <div className="min-w-32 flex-1">
+                <Input name="atTime" type="time" aria-label="Time (optional)" title="Time (optional): with a day, it shows on the calendar" className="w-full" />
               </div>
               <div className="min-w-36 flex-1">
                 <Select name="assigneeId" aria-label="For someone (optional)" defaultValue="" className="w-full">
@@ -146,6 +179,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 Add
               </Button>
             </form>
+            )}
             <div className="flex flex-col lg:min-h-0 lg:flex-1">
               {showingDone ? (
                 <>
@@ -177,6 +211,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                         household={household}
                         returnTo={returnTo}
                         editHref={here(`&edit=${t.id}`)}
+                        plannedOn={plannedOn}
                       />
                     ))}
                   </ul>
@@ -194,30 +229,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           </Card>
         )}
 
-        {/* Everything with a day, across all lists */}
-        <Card title="By day" icon={CalendarDots} tint="purple">
-          {dated.length === 0 ? (
-            <p className="py-4 text-xl text-ink-muted">No to-dos with a day yet.</p>
-          ) : (
-            <>
-            <ul className="flex flex-col">
-              {pageOf(dated, dayPage, DAY_PAGE).map((t) => (
-                <TodoRow
-                  key={t.id}
-                  todo={{ ...t, icon: t.icon ?? listById.get(t.list_id)?.icon ?? null }}
-                  members={memberById}
-                  today={today}
-                  household={household}
-                  returnTo={returnTo}
-                />
-              ))}
-            </ul>
-            <div className="mt-auto pt-2">
-              <Pager count={dated.length} page={dayPage} perPage={DAY_PAGE} href={(p) => here(`&dayPage=${p}`)} />
-            </div>
-            </>
-          )}
-        </Card>
       </div>
 
       {editing ? (
@@ -225,7 +236,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           <form id="edit-todo" action={updateTodo} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={editing.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <TodoFields members={members} lists={lists} choreDays={choreDays} todo={editing} showList />
+            <TodoFields members={members} lists={lists.filter((l) => !l.is_chores)} choreDays={choreDays} todo={editing} showList chore={editing.is_chore} />
           </form>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button form="edit-todo">Save</Button>
@@ -248,12 +259,16 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <Button>Save list</Button>
             </div>
           </form>
-          <form action={removeList} className="mt-6">
-            <input type="hidden" name="id" value={list.id} />
-            <input type="hidden" name="name" value={list.name} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <Button variant="danger">Remove the list and its to-dos</Button>
-          </form>
+          {list.is_chores ? (
+            <p className="mt-6 text-lg text-ink-muted">Everything on this list is a chore. The list stays, but you can rename it.</p>
+          ) : (
+            <form action={removeList} className="mt-6">
+              <input type="hidden" name="id" value={list.id} />
+              <input type="hidden" name="name" value={list.name} />
+              <input type="hidden" name="returnTo" value={returnTo} />
+              <Button variant="danger">Remove the list and its to-dos</Button>
+            </form>
+          )}
         </Sheet>
       ) : null}
 
@@ -289,8 +304,7 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
 }
 
 /* Long lists turn into pages, so nothing scrolls on the wall screen. */
-const LIST_PAGE = 7;
-const DAY_PAGE = 8;
+const LIST_PAGE = 8;
 
 function pageOf<T>(items: T[], page: number, perPage: number): T[] {
   const last = Math.max(0, Math.ceil(items.length / perPage) - 1);
