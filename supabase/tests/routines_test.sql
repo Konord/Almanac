@@ -1,7 +1,7 @@
 -- Checks for routines. Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(13);
 
 insert into auth.users (id, email, aud, role) values
   ('11111111-1111-1111-1111-111111111111', 'a@test', 'authenticated', 'authenticated'),
@@ -54,6 +54,18 @@ select throws_ok(
   '23505', null, 'A step is only ticked once per person per day'
 );
 
+select lives_ok(
+  $$ insert into public.routine_step_members (household_id, step_id, member_id)
+     select public.current_household_id(), id, current_setting('test.ava')::uuid
+     from public.routine_steps where template_id <> current_setting('test.bedtime')::uuid limit 1 $$,
+  'A step in a shared routine can be given to one person'
+);
+select is(
+  (select daily_list from public.routine_steps where id = current_setting('test.step')::uuid),
+  false,
+  'Steps stay off the daily list unless switched on'
+);
+
 delete from public.routine_templates where name = 'Bedtime';
 select is(
   (select count(*)::int from public.routine_checks),
@@ -76,6 +88,12 @@ select throws_ok(
      select public.current_household_id(), current_setting('test.ava')::uuid, id, '2026-11-04'
      from public.routine_steps limit 1 $$,
   '23503', null, 'B cannot tick steps for A''s family members'
+);
+
+select is(
+  (select count(*)::int from public.routine_step_members),
+  0,
+  'B cannot see who does A''s steps'
 );
 
 select * from finish();

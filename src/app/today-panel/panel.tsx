@@ -12,12 +12,13 @@ import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { dailyListPart } from "@/lib/routines";
 import { dailyOrder, onDailyList, onItsList, timedToday } from "@/lib/todos";
 import { toggleTodo } from "../chores/actions";
 import { loadTodos, type Todo } from "../chores/data";
 import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
 import { mealsForRoutines, placeTodayMeals, startCooking } from "../meals/today";
-import { toggleStep } from "../routines/actions";
+import { tickSteps, toggleStep } from "../routines/actions";
 import { loadRoutines } from "../routines/data";
 import { floatingRoutines } from "../routines/floating";
 import { pickPanelTab, setPanelOpen } from "./actions";
@@ -49,7 +50,7 @@ export type UpNextItem = {
   colour: string;
 };
 
-/** A row on the daily list: a task, a routine switched on to show there, or the cook's "Start dinner". */
+/** A row on the daily list: a task, a routine (or some of its steps) switched on to show there, or the cook's "Start dinner". */
 type Row =
   | { kind: "todo"; key: string; todo: Todo; time: string | null }
   | {
@@ -61,9 +62,10 @@ type Row =
       time: string;
       memberId: string;
       templateId: string;
-      /** A one-step routine (a point) ticks right here; a chain opens its checklist. */
-      stepId: string | null;
-      count: string;
+      /** The steps ticking this row ticks: one step, or all of a routine's open steps. */
+      stepIds: string[];
+      /** "2/5" on a whole-routine row; null on a single step. */
+      count: string | null;
     }
   | { kind: "start"; key: string; title: string; colour: string | null; time: string; href: string };
 
@@ -140,26 +142,39 @@ export async function TodayPanel({
               household.settings.routineFlexMinutes,
               mealsForRoutines(todayMeals),
             )
-              .filter(
-                (r) =>
-                  r.template.show_on_daily_list &&
-                  !r.progress.complete &&
-                  !routineData.ended.has(`${m.id}:${r.template.id}`),
-              )
-              .map(
-                (r): Row => ({
-                  kind: "routine",
-                  key: `routine:${r.assignment.id}`,
-                  title: r.steps.length === 1 ? r.steps[0].text : r.template.name,
-                  icon: r.progress.next?.icon ?? r.steps[0]?.icon ?? null,
+              .filter((r) => !r.progress.complete && !routineData.ended.has(`${m.id}:${r.template.id}`))
+              .flatMap((r): Row[] => {
+                // Steps switched on for the list. All of them: the routine is
+                // one row that ticks them all. Some: those steps, one row each.
+                const part = dailyListPart(r.steps, r.doneIds);
+                const base = {
+                  kind: "routine" as const,
                   colour: m.colour,
                   time: hhmm(r.placement.startMin),
                   memberId: m.id,
                   templateId: r.template.id,
-                  stepId: r.steps.length === 1 ? r.steps[0].id : null,
-                  count: `${r.progress.done}/${r.progress.total}`,
-                }),
-              ),
+                };
+                if (part.kind === "none") return [];
+                if (part.kind === "routine")
+                  return [
+                    {
+                      ...base,
+                      key: `routine:${r.assignment.id}`,
+                      title: r.template.name,
+                      icon: r.progress.next?.icon ?? r.steps[0]?.icon ?? null,
+                      stepIds: part.steps.map((s) => s.id),
+                      count: `${r.progress.done}/${r.progress.total}`,
+                    },
+                  ];
+                return part.steps.map((s) => ({
+                  ...base,
+                  key: `routine:${r.assignment.id}:${s.id}`,
+                  title: s.text,
+                  icon: s.icon,
+                  stepIds: [s.id],
+                  count: null,
+                }));
+              }),
           ),
           ...todayMeals.flatMap((m): Row[] => {
             const start = startCooking(m);
@@ -364,10 +379,12 @@ export async function TodayPanel({
                         {box}
                       </button>
                     </form>
-                  ) : row.kind === "routine" && row.stepId ? (
-                    <form action={toggleStep}>
+                  ) : row.kind === "routine" ? (
+                    <form action={row.stepIds.length === 1 ? toggleStep : tickSteps}>
                       <input type="hidden" name="memberId" value={row.memberId} />
-                      <input type="hidden" name="stepId" value={row.stepId} />
+                      {row.stepIds.map((id) => (
+                        <input key={id} type="hidden" name="stepId" value={id} />
+                      ))}
                       <input type="hidden" name="templateId" value={row.templateId} />
                       <input type="hidden" name="date" value={today} />
                       <input type="hidden" name="returnTo" value={returnTo} />
@@ -376,9 +393,9 @@ export async function TodayPanel({
                       </button>
                     </form>
                   ) : (
-                    // A routine with several steps opens its checklist; Start dinner opens the cook's view.
+                    // Start dinner opens the cook's view.
                     <Link
-                      href={row.kind === "routine" ? `/?routine=${row.templateId}&member=${row.memberId}` : row.href}
+                      href={row.href}
                       aria-label={`Open ${title}`}
                       className="flex size-[var(--touch-target)] items-center justify-center text-ink-muted"
                     >
@@ -392,7 +409,7 @@ export async function TodayPanel({
                   >
                     {title}
                   </span>
-                  {row.kind === "routine" && !row.stepId ? (
+                  {row.kind === "routine" && row.count ? (
                     <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">{row.count}</span>
                   ) : null}
                   {row.time ? (
