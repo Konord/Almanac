@@ -118,7 +118,7 @@ export async function TodayPanel({
   const showing = box.id;
   const list = lists.find((l) => l.id === showing);
   // The grocery list shows its own lines (quick adds while you cook or plan).
-  const groceries = list?.is_groceries ? await loadGroceries(household.settings.measures) : null;
+  const groceries = list?.is_groceries ? await loadGroceries(household) : null;
   const nowMinutes = (() => {
     const [h, m] = localTimeOf(new Date(), timeZone).split(":").map(Number);
     return h * 60 + m;

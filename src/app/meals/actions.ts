@@ -485,7 +485,7 @@ export async function importRecipe(formData: FormData) {
 }
 
 // ---------------------------------------------------------------------------
-// Setup: meal times, presets, weekly buys
+// Setup: meal times and presets
 // ---------------------------------------------------------------------------
 
 export async function addMealTime(formData: FormData) {
@@ -580,35 +580,6 @@ export async function savePresets(formData: FormData) {
   }
   refresh();
   back(formData, "message", "Presets saved.");
-}
-
-export async function addWeeklyBuy(formData: FormData) {
-  const household = await requireHousehold();
-  const name = text(formData, "name");
-  if (!name) back(formData, "error", "What do you buy every week?");
-  const every = wholeNumber(text(formData, "everyWeeks") || "1", 1, 12);
-  if (!every) back(formData, "error", "Every 1 to 12 weeks.");
-  const supabase = await createClient();
-  const itemId = await findOrCreateItem(supabase, household.id, name);
-  const { error } = await supabase.from("weekly_buys").insert({
-    household_id: household.id,
-    item_id: itemId,
-    amount: positive(text(formData, "amount")),
-    unit: text(formData, "unit").slice(0, 20) || null,
-    every_weeks: every,
-  });
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Added ${name} to the weekly buys.`);
-}
-
-export async function removeWeeklyBuy(formData: FormData) {
-  await requireHousehold();
-  const supabase = await createClient();
-  const { error } = await supabase.from("weekly_buys").delete().eq("id", text(formData, "id"));
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", "Removed.");
 }
 
 export async function setItemAisle(formData: FormData) {

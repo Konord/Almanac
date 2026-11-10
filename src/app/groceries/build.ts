@@ -4,7 +4,7 @@ import type { Household } from "@/lib/household";
 import { batchAmount, weekDates } from "@/lib/meals";
 import { partLabel } from "@/lib/menu";
 import { addUp, type NeedPart } from "@/lib/units";
-import { addDays, zonedToUtc, type LocalDate } from "@/lib/time";
+import { zonedToUtc, type LocalDate } from "@/lib/time";
 
 /*
  * Putting a week's menu on the grocery list (Connor, 2026-11-10). Saving
@@ -15,7 +15,9 @@ import { addDays, zonedToUtc, type LocalDate } from "@/lib/time";
  *   - Every planned dish's ingredients, times its batches, added together
  *     by item ("Onions: 3", "Milk: 750 ml needed for meals"). Each line
  *     remembers its parts, so a combined line can show which meals it's for.
- *   - Weekly buys that are due.
+ *
+ * Things bought every so often (milk every week) are repeating groceries:
+ * they put themselves on the list when due (./data.ts), review or not.
  *
  * Changing a meal and saving again redoes the week's lines, but anything
  * ticked off (or cleared) stays as it is, and things added by hand are
@@ -26,7 +28,7 @@ type Line = {
   item_id: string;
   amount: number | null;
   unit: string | null;
-  source: "meal" | "weekly";
+  source: "meal";
   detail: string | null;
   parts: NeedPart[];
 };
@@ -36,7 +38,7 @@ export async function putMenuOnList(household: Household, week: LocalDate): Prom
   const dates = weekDates(week);
   const { locale, timeZone, measures } = household.settings;
 
-  const [meals, kept, buys] = await Promise.all([
+  const [meals, kept] = await Promise.all([
     supabase
       .from("meals")
       .select("date, status, meal_dishes(recipe_id, batches, recipes(name, is_backup))")
@@ -45,9 +47,8 @@ export async function putMenuOnList(household: Household, week: LocalDate): Prom
       .lte("date", dates[6]),
     // Lines already ticked off (or cleared) this week: the menu doesn't put them back.
     supabase.from("shopping_list").select("item_id").eq("week_of", week).or("checked.eq.true,hidden.eq.true"),
-    supabase.from("weekly_buys").select("item_id, amount, unit, every_weeks, last_week"),
   ]);
-  for (const r of [meals, kept, buys]) if (r.error) throw r.error;
+  for (const r of [meals, kept]) if (r.error) throw r.error;
   const done = new Set((kept.data ?? []).map((k) => k.item_id));
 
   // Each planned dish, with its batches and the day it's for.
@@ -89,30 +90,12 @@ export async function putMenuOnList(household: Household, week: LocalDate): Prom
     }
   }
 
-  // Weekly buys that are due this week.
-  const onList = new Set(lines.map((l) => l.item_id));
-  const weekly: string[] = [];
-  for (const b of buys.data ?? []) {
-    if (done.has(b.item_id) || onList.has(b.item_id)) continue;
-    const due = !b.last_week || b.last_week === week || b.last_week <= addDays(week, -7 * b.every_weeks);
-    if (!due) continue;
-    weekly.push(b.item_id);
-    lines.push({
-      item_id: b.item_id,
-      amount: b.amount === null ? null : Number(b.amount),
-      unit: b.unit,
-      source: "weekly",
-      detail: b.every_weeks === 1 ? "Every week" : `Every ${b.every_weeks} weeks`,
-      parts: [],
-    });
-  }
-
   // The week's lines from the menu (not ticked yet) are made again.
   const { error: clearError } = await supabase
     .from("shopping_list")
     .delete()
     .eq("week_of", week)
-    .in("source", ["meal", "weekly"])
+    .eq("source", "meal")
     .eq("checked", false)
     .eq("hidden", false);
   if (clearError) throw clearError;
@@ -122,6 +105,5 @@ export async function putMenuOnList(household: Household, week: LocalDate): Prom
       .insert(lines.map((l) => ({ ...l, parts: l.parts as unknown as NonNullable<Json>, household_id: household.id, week_of: week, status: "approved" })));
     if (error) throw error;
   }
-  if (weekly.length) await supabase.from("weekly_buys").update({ last_week: week }).in("item_id", weekly);
   return { count: lines.length };
 }

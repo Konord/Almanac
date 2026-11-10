@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CaretLeft, CaretRight, Check, Plus, Stack, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, CaretLeft, CaretRight, Check, Plus, Stack, X } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import { addGrocery, clearTickedGroceries, readGroceries, tickGrocery, type GroceriesResult } from "./actions";
 import type { GroceryLine } from "./data";
+import { RepeatsCard } from "./repeats";
 
 /*
  * The grocery list (Connor, 2026-11-10): one list, shown in the List
@@ -70,6 +71,7 @@ export function GroceryView({
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
+  const [repeatsOpen, setRepeatsOpen] = useState(false);
   const [name, setName] = useState("");
   const [pending, start] = useTransition();
 
@@ -157,6 +159,17 @@ export function GroceryView({
             </button>
           </div>
         ) : null}
+        {compact ? null : (
+          <button
+            type="button"
+            onClick={() => setRepeatsOpen(!repeatsOpen)}
+            aria-expanded={repeatsOpen}
+            className="flex min-h-12 items-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel"
+          >
+            <ArrowsClockwise size="1.125rem" weight="bold" aria-hidden />
+            Repeats
+          </button>
+        )}
         {got > 0 ? (
           <button type="button" disabled={pending} onClick={() => run(clearTickedGroceries)} className="flex min-h-12 items-center rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel">
             Clear ticked
@@ -191,7 +204,7 @@ export function GroceryView({
                       <span className="flex min-w-0 flex-col">
                         <span className={`truncate font-hand text-[1.375rem] leading-tight ${l.checked ? "text-ink-muted line-through" : "text-ink"}`}>{l.name}</span>
                         {l.need || l.detail ? (
-                          <span className="truncate text-[0.875rem] font-bold text-ink-muted">{l.need || (l.source === "weekly" ? l.detail : "")}</span>
+                          <span className="truncate text-[0.875rem] font-bold text-ink-muted">{l.need || (l.source === "repeat" ? l.detail : "")}</span>
                         ) : null}
                       </span>
                     </button>
@@ -207,6 +220,16 @@ export function GroceryView({
           </div>
         ))}
       </div>
+
+      {repeatsOpen ? (
+        <div className="absolute top-[7.5rem] right-0 left-0">
+          <RepeatsCard
+            onLines={setLines}
+            onClose={() => setRepeatsOpen(false)}
+            dateLabel={(d) => new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`))}
+          />
+        </div>
+      ) : null}
 
       {openLine ? (
         <div className="absolute top-[7.5rem] left-1/2 z-10 flex w-[28rem] max-w-full -translate-x-1/2 flex-col gap-2.5 rounded-[1.375rem] border-2 border-meal bg-board p-5 shadow-[0_14px_40px_rgba(35,38,43,0.22)]" role="dialog" aria-label={`${openLine.name}: what it's for`}>

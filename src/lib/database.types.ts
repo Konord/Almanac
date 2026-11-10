@@ -483,6 +483,32 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"grocery_repeats": {
+                  Row: {
+                    "amount": number | null,"created_at": string,"every": number,"every_unit": string,"household_id": string,"id": string,"item_id": string,"next_on": string,"unit": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: number | null,"created_at"?: string,"every"?: number,"every_unit"?: string,"household_id": string,"id"?: string,"item_id": string,"next_on"?: string,"unit"?: string | null
+                  }
+                  Update: {
+                    "amount"?: number | null,"created_at"?: string,"every"?: number,"every_unit"?: string,"household_id"?: string,"id"?: string,"item_id"?: string,"next_on"?: string,"unit"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "grocery_repeats_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "grocery_repeats_item_id_household_id_fkey"
+      columns: ["item_id","household_id"]
+isOneToOne: false
+      referencedRelation: "items"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
                 },"heads_ups": {
                   Row: {
                     "assignee_id": string | null,"chore_id": string | null,"created_at": string,"event_id": string | null,"household_id": string,"id": string,"label": string,"last_grocery_for": string | null,"makes": string,"minutes_before": number,"sort_order": number,"updated_at": string
@@ -1660,32 +1686,6 @@ isOneToOne: false
       columns: ["member_id","household_id"]
 isOneToOne: false
       referencedRelation: "members"
-      referencedColumns: ["id","household_id"]
-    }
-                  ]
-                },"weekly_buys": {
-                  Row: {
-                    "amount": number | null,"created_at": string,"every_weeks": number,"household_id": string,"id": string,"item_id": string,"last_week": string | null,"unit": string | null
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "amount"?: number | null,"created_at"?: string,"every_weeks"?: number,"household_id": string,"id"?: string,"item_id": string,"last_week"?: string | null,"unit"?: string | null
-                  }
-                  Update: {
-                    "amount"?: number | null,"created_at"?: string,"every_weeks"?: number,"household_id"?: string,"id"?: string,"item_id"?: string,"last_week"?: string | null,"unit"?: string | null
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "weekly_buys_household_id_fkey"
-      columns: ["household_id"]
-isOneToOne: false
-      referencedRelation: "households"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "weekly_buys_item_id_household_id_fkey"
-      columns: ["item_id","household_id"]
-isOneToOne: false
-      referencedRelation: "items"
       referencedColumns: ["id","household_id"]
     }
                   ]

@@ -1,18 +1,17 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Chips, Emoji, Field, Input, Select, firstParam } from "@/components/ui";
+import { AppFrame, Button, Card, Emoji, Field, Input, Select, firstParam } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
-import { amountText } from "@/lib/meals";
-import { createClient } from "@/lib/supabase/server";
-import { addMealTime, addWeeklyBuy, moveMealTime, removeMealTime, removeWeeklyBuy, savePresets, updateMealTime } from "../actions";
+import { addMealTime, moveMealTime, removeMealTime, savePresets, updateMealTime } from "../actions";
 import { loadMealBasics, loadPresets } from "../data";
 import { MealsHeader, Pager, linker, pageOf } from "../parts";
 
 /**
- * Meals setup: the meal times (rows on the planner), presets (Tuesday
- * dinner is Tacos) and the things you buy every week.
+ * Meals setup: the meal times (rows on the planner) and presets (Tuesday
+ * dinner is Tacos). Things bought every so often are repeating groceries,
+ * set on the grocery list itself.
  */
 export default function MealsSetupPage(props: PageProps<"/meals/setup">) {
   return (
@@ -27,7 +26,6 @@ export default function MealsSetupPage(props: PageProps<"/meals/setup">) {
 const TABS = [
   { tab: "times", label: "Meal times" },
   { tab: "presets", label: "Presets" },
-  { tab: "buys", label: "Weekly buys" },
 ] as const;
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -61,10 +59,8 @@ async function Setup({ searchParams }: { searchParams: PageProps<"/meals/setup">
 
       {tab === "times" ? (
         <MealTimes basics={basics} page={page} here={here} returnTo={returnTo} />
-      ) : tab === "presets" ? (
-        <Presets basics={basics} weekStartsOn={household.settings.weekStartsOn} returnTo={returnTo} />
       ) : (
-        <WeeklyBuys page={page} here={here} returnTo={returnTo} />
+        <Presets basics={basics} weekStartsOn={household.settings.weekStartsOn} returnTo={returnTo} />
       )}
     </>
   );
@@ -193,70 +189,3 @@ async function Presets({ basics, weekStartsOn, returnTo }: { basics: Awaited<Ret
   );
 }
 
-const BUY_PAGE = 16;
-
-async function WeeklyBuys({ page, here, returnTo }: { page: number; here: ReturnType<typeof linker>; returnTo: string }) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("weekly_buys").select("id, amount, unit, every_weeks, items(name, icon)").order("created_at");
-  if (error) throw error;
-  const buys = (data ?? []).map((b) => ({ ...b, amount: b.amount === null ? null : Number(b.amount), item: b.items as unknown as { name: string; icon: string | null } }));
-  const shown = pageOf(buys, page, BUY_PAGE);
-  return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5">
-      <Card title="Things you buy every week">
-        <p className="mb-3 text-lg text-ink-muted">These are suggested for the grocery list each week (or every few weeks). You still approve them.</p>
-        <ul className="grid min-h-0 flex-1 grid-flow-col grid-cols-2 content-start gap-x-6 gap-y-1.5" style={{ gridTemplateRows: `repeat(${BUY_PAGE / 2}, auto)` }}>
-          {shown.items.map((b) => (
-            <li key={b.id} className="flex min-h-14 items-center gap-3 border-b border-frame">
-              <Emoji emoji={b.item.icon} className="size-9" />
-              <span className="min-w-0 flex-1 truncate text-xl text-ink">
-                <span className="font-bold">{b.item.name}</span>
-                {b.amount || b.unit ? <span className="text-ink-muted"> · {amountText(b.amount, b.unit)}</span> : null}
-              </span>
-              <span className="text-base text-ink-muted">{b.every_weeks === 1 ? "Weekly" : `Every ${b.every_weeks} wks`}</span>
-              <form action={removeWeeklyBuy}>
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <input type="hidden" name="id" value={b.id} />
-                <button aria-label={`Remove ${b.item.name}`} className="flex size-12 items-center justify-center rounded-full text-ink-muted hover:bg-rail">
-                  <Trash size="1.25rem" aria-hidden />
-                </button>
-              </form>
-            </li>
-          ))}
-          {buys.length === 0 ? <li className="text-lg text-ink-muted">Nothing yet.</li> : null}
-        </ul>
-        <Pager page={shown.page} pages={shown.pages} href={(n) => here({ page: n || null })} />
-      </Card>
-      <Card title="Add a weekly buy">
-        <form action={addWeeklyBuy} className="mt-2 flex flex-col gap-4">
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <Field label="What">
-            <Input name="name" placeholder="Milk" maxLength={60} required />
-          </Field>
-          <div className="flex gap-3">
-            <Field label="How much">
-              <Input name="amount" inputMode="decimal" placeholder="2" className="w-28" />
-            </Field>
-            <Field label="Unit">
-              <Input name="unit" placeholder="L" maxLength={20} className="w-28" />
-            </Field>
-          </div>
-          <Chips
-            name="everyWeeks"
-            label="How often"
-            defaultValue="1"
-            options={[
-              { value: "1", label: "Every week" },
-              { value: "2", label: "Every 2 weeks" },
-              { value: "4", label: "Every 4 weeks" },
-            ]}
-          />
-          <Button className="self-start">
-            <Plus size="1.25rem" weight="bold" aria-hidden />
-            Add
-          </Button>
-        </form>
-      </Card>
-    </div>
-  );
-}
