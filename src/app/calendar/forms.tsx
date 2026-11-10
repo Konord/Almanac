@@ -9,7 +9,7 @@ import { WhenFields } from "./when-fields";
 import { PendingSync } from "./pending-sync";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Stickers } from "./stickers";
-import type { EventTemplate, Layer, Member, SavedView, Tag } from "./types";
+import type { EventTemplate, Member, SavedView, Tag } from "./types";
 
 /** The form fields for events and overlays. */
 
@@ -99,7 +99,6 @@ export type CardDefaults = QuickDefaults & {
   title?: string;
   icon?: string;
   notes?: string;
-  layerId?: string;
   visibility?: string;
   repeat?: RepeatOptions;
   /** Last day, for all-day events over several days. */
@@ -112,7 +111,6 @@ export type CardDefaults = QuickDefaults & {
  * buttons and an All day switch. Repeats and the rest are behind tabs. Put it inside a <form className="group ...">.
  */
 export function EventCardFields({
-  layers,
   members,
   tags,
   defaults,
@@ -121,7 +119,6 @@ export function EventCardFields({
   headsUps,
   initialTab,
 }: {
-  layers: Layer[];
   members: Member[];
   tags: Tag[];
   defaults: CardDefaults;
@@ -137,8 +134,6 @@ export function EventCardFields({
   return (
     <>
       {adding ? <PendingSync defaults={defaults} /> : null}
-      {/* Tags replace layers on the card; events still quietly belong to one (Connor, 2026-11-05). */}
-      <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />
       <CardTabs
         initial={initialTab === "heads-ups" ? 3 : 0}
         tabs={[

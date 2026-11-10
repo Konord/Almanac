@@ -15,17 +15,15 @@ import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { EVERYONE_COLOUR, soft } from "@/lib/colours";
-import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold, type Household } from "@/lib/household";
-import { localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { deviceView, itemsInView, loadCalendar, profilesFor, rangeOf } from "./calendar/data";
-import { PROFILE_COLOUR } from "./calendar/profile-tag";
+import { localDateOf, type LocalDate } from "@/lib/time";
+import { deviceView, itemsInView, loadCalendar, rangeOf } from "./calendar/data";
 import type { CalendarItem, Member } from "./calendar/types";
 import { loadTodos, type Todo } from "./chores/data";
 import { onCalendar } from "@/lib/todos";
 import { loadSpecialDays } from "./holidays/data";
-import { loadRoutines, type RoutineData } from "./routines/data";
+import { loadRoutines, personDay, type RoutineData } from "./routines/data";
 import { loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
 import { MealBlock, mealsForRoutines, placeTodayMeals, startCooking } from "./meals/today";
 import { OpenPanelTab, TodayPanel } from "./today-panel/panel";
@@ -54,7 +52,6 @@ import {
   nowPercent,
   shortTime,
   timelineRange,
-  weekdayLabel,
   TodoPoint,
   taskMinute,
 } from "./calendar/views";
@@ -90,7 +87,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   // The chore generator puts today's chores on the daily list before the tasks are read.
   await choreSchedule(household, today, timeZone);
-  const [{ layers, members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
+  const [{ members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadTodos(),
@@ -101,7 +98,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const todaySpecials = (await loadSpecialDays(today, today)).get(today) ?? [];
   const savedView = await deviceView(views);
   const shown = itemsInView(items, savedView);
-  const profiles = profilesFor(days, items, layers, household);
 
   const longDate = new Intl.DateTimeFormat(locale, {
     timeZone,
@@ -109,7 +105,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     month: "long",
     day: "numeric",
   }).format(now);
-  const todayProfile = profiles.get(today);
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -164,9 +159,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             <Ribbon special={todaySpecials[0]} more={todaySpecials.length - 1} big />
           </div>
         ) : null}
-        {todayProfile ? (
-          <DayPill profile={todayProfile} label={profileLabel(todayProfile.kind, weekdayLabel(today, household, "long"))} household={household} today={today} />
-        ) : null}
+        <DayPill data={routineData} today={today} />
         {routineData.breaks
           .filter((b) => b.start_date <= today && today <= b.end_date)
           .slice(0, 1)
@@ -251,7 +244,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
 
       {pending ? (
-        <QuickAddSheet pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
+        <QuickAddSheet pending={pending} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
       ) : null}
 
     </>
@@ -580,44 +573,32 @@ function PeopleTimeline({
   );
 }
 
-/** "Busy Thursday" next to the clock; the detail shows when you hover or hold. */
-function DayPill({ profile, label, household, today }: { profile: DayProfile; label: string; household: Household; today: LocalDate }) {
-  const { timeZone, dayProfile } = household.settings;
-  const time = (t: string) => clockTime(zonedToUtc(today, t, timeZone), household);
-  // Times like "9 p.m." already end in a full stop, so don't add a second.
-  const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
-  const detail =
-    profile.kind === "busy_evening"
-      ? `${formatMinutes(profile.eveningMinutes)} of plans after ${time(dayProfile.eveningStarts)}, and ${formatMinutes(profile.freeMinutes)} free overall`
-      : profile.kind === "busy"
-        ? `${formatMinutes(profile.busyMinutes)} of plans, leaving ${formatMinutes(profile.freeMinutes)} free`
-        : profile.busyMinutes === 0
-          ? `Nothing planned between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`
-          : `${formatMinutes(profile.freeMinutes)} free between ${time(dayProfile.dayStarts)} and ${time(dayProfile.dayEnds)}`;
-  const colour = PROFILE_COLOUR[profile.kind];
+/**
+ * Today's kind of day next to the clock ("Office day"), or each person's
+ * when they differ. Tapping it opens Set days.
+ */
+function DayPill({ data, today }: { data: RoutineData; today: LocalDate }) {
+  const kinds = new Map<string, { icon: string | null; who: string[] }>();
+  for (const m of data.members) {
+    const type = personDay(data, m.id, today).dayType;
+    if (!type) continue;
+    const kind = kinds.get(type.name) ?? { icon: type.icon, who: [] };
+    kind.who.push(m.name);
+    kinds.set(type.name, kind);
+  }
+  if (kinds.size === 0) return null;
+  const list = [...kinds.entries()];
+  const title = list.map(([name, k]) => (kinds.size === 1 ? name : `${name}: ${k.who.join(", ")}`)).join(" · ");
   return (
     <Link
-      href="/household"
-      title={sentence(detail)}
-      className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-full px-4.5 text-xl font-extrabold whitespace-nowrap"
-      style={{ color: colour, background: `color-mix(in srgb, ${colour} 12%, white)` }}
+      href="/routines/manage"
+      title={title}
+      className="flex min-h-[var(--touch-target)] max-w-[24rem] min-w-0 items-center gap-2 rounded-full bg-rail px-4.5 text-xl font-extrabold whitespace-nowrap text-ink"
     >
-      <SunHorizon size="1.75rem" aria-hidden />
-      {label}
+      {list[0][1].icon ? <Emoji emoji={list[0][1].icon} className="size-7 shrink-0" /> : <SunHorizon size="1.75rem" aria-hidden className="shrink-0" />}
+      <span className="truncate">{list.map(([name]) => name).join(" · ")}</span>
     </Link>
   );
-}
-
-/** A time for sentences, like "5 p.m." or "5:30 p.m." (in the household's locale). */
-function clockTime(instant: Date, household: Household): string {
-  const { locale, timeZone } = household.settings;
-  return new Intl.DateTimeFormat(locale, {
-    timeZone,
-    hour: "numeric",
-    minute: "2-digit",
-  })
-    .format(instant)
-    .replace(":00", "");
 }
 
 /** All-day items first, then by start time. */

@@ -1,15 +1,5 @@
-export type Layer = {
-  id: string;
-  name: string;
-  colour: string;
-  owner_member_id: string | null;
-  counts_toward_busyness: boolean;
-  visibility: string;
-};
-
 export type Member = { id: string; name: string; colour: string; icon: string | null };
 
-/** A label stuck on events, like Work or Work from home. */
 /**
  * A tag from the household's one shared pool, used by events, chores and
  * chore days. `role` marks the four the chore planner understands
@@ -33,7 +23,6 @@ export type EventTemplate = {
 export type CalendarEvent = {
   id: string;
   title: string;
-  layer_id: string;
   starts_at: string;
   ends_at: string;
   all_day: boolean;
@@ -57,6 +46,5 @@ export type CalendarItem = CalendarEvent & {
   moved: boolean;
 };
 
-/** A saved set of layers, e.g. "Court + appointments". */
 /** An overlay: a set of tags. A screen showing it shows only events with one of them. */
 export type SavedView = { id: string; name: string; tag_ids: string[] };

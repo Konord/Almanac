@@ -453,14 +453,14 @@ isOneToOne: false
                   ]
                 },"events": {
                   Row: {
-                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"household_id": string,"icon": string | null,"id": string,"layer_id": string,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
+                    "all_day": boolean,"created_at": string,"created_by": string | null,"ends_at": string,"household_id": string,"icon": string | null,"id": string,"notes": string | null,"recurrence_rule": string | null,"starts_at": string,"timezone": string,"title": string,"updated_at": string,"visibility": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"household_id": string,"icon"?: string | null,"id"?: string,"layer_id": string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at": string,"household_id": string,"icon"?: string | null,"id"?: string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at": string,"timezone": string,"title": string,"updated_at"?: string,"visibility"?: string
                   }
                   Update: {
-                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"layer_id"?: string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
+                    "all_day"?: boolean,"created_at"?: string,"created_by"?: string | null,"ends_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"notes"?: string | null,"recurrence_rule"?: string | null,"starts_at"?: string,"timezone"?: string,"title"?: string,"updated_at"?: string,"visibility"?: string
                   }
                   Relationships: [
                     {
@@ -475,12 +475,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "households"
       referencedColumns: ["id"]
-    },{
-      foreignKeyName: "events_layer_id_household_id_fkey"
-      columns: ["layer_id","household_id"]
-isOneToOne: false
-      referencedRelation: "layers"
-      referencedColumns: ["id","household_id"]
     }
                   ]
                 },"grocery_repeats": {
@@ -619,38 +613,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "households"
       referencedColumns: ["id"]
-    }
-                  ]
-                },"layers": {
-                  Row: {
-                    "colour": string,"counts_toward_busyness": boolean,"created_at": string,"created_by": string | null,"household_id": string,"id": string,"name": string,"owner_member_id": string | null,"sort_order": number,"type": string,"updated_at": string,"visibility": string
-                  }
-                  ComputedFields: never
-                  Insert: {
-                    "colour"?: string,"counts_toward_busyness"?: boolean,"created_at"?: string,"created_by"?: string | null,"household_id": string,"id"?: string,"name": string,"owner_member_id"?: string | null,"sort_order"?: number,"type"?: string,"updated_at"?: string,"visibility"?: string
-                  }
-                  Update: {
-                    "colour"?: string,"counts_toward_busyness"?: boolean,"created_at"?: string,"created_by"?: string | null,"household_id"?: string,"id"?: string,"name"?: string,"owner_member_id"?: string | null,"sort_order"?: number,"type"?: string,"updated_at"?: string,"visibility"?: string
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "layers_created_by_household_id_fkey"
-      columns: ["created_by","household_id"]
-isOneToOne: false
-      referencedRelation: "members"
-      referencedColumns: ["id","household_id"]
-    },{
-      foreignKeyName: "layers_household_id_fkey"
-      columns: ["household_id"]
-isOneToOne: false
-      referencedRelation: "households"
-      referencedColumns: ["id"]
-    },{
-      foreignKeyName: "layers_owner_member_id_household_id_fkey"
-      columns: ["owner_member_id","household_id"]
-isOneToOne: false
-      referencedRelation: "members"
-      referencedColumns: ["id","household_id"]
     }
                   ]
                 },"meal_categories": {
@@ -1613,14 +1575,14 @@ isOneToOne: false
                   ]
                 },"views": {
                   Row: {
-                    "created_at": string,"household_id": string,"id": string,"layer_ids": (string)[],"name": string,"sort_order": number,"tag_ids": (string)[],"updated_at": string
+                    "created_at": string,"household_id": string,"id": string,"name": string,"sort_order": number,"tag_ids": (string)[],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"household_id": string,"id"?: string,"layer_ids"?: (string)[],"name": string,"sort_order"?: number,"tag_ids"?: (string)[],"updated_at"?: string
+                    "created_at"?: string,"household_id": string,"id"?: string,"name": string,"sort_order"?: number,"tag_ids"?: (string)[],"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"household_id"?: string,"id"?: string,"layer_ids"?: (string)[],"name"?: string,"sort_order"?: number,"tag_ids"?: (string)[],"updated_at"?: string
+                    "created_at"?: string,"household_id"?: string,"id"?: string,"name"?: string,"sort_order"?: number,"tag_ids"?: (string)[],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1728,9 +1690,6 @@ isOneToOne: false
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_holidays":
-{ Args: { "target_household": string }; Returns: undefined
-                           },
-"add_starter_layers":
 { Args: { "target_household": string }; Returns: undefined
                            },
 "add_starter_meals":

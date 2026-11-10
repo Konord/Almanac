@@ -55,14 +55,12 @@ async function log(householdId: string, action: string, targetType: string, targ
 function readEvent(formData: FormData, settings: HouseholdSettings) {
   const timeZone = settings.timeZone;
   const title = text(formData, "title");
-  const layerId = text(formData, "layerId");
   const startDate = text(formData, "startDate");
   const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
   const icon = text(formData, "icon");
 
   if (!title) back(formData, "error", "An event needs a title.");
-  if (!layerId) back(formData, "error", "Choose a layer.");
   const endDateInput = text(formData, "endDate") || startDate;
   if (!isLocalDate(startDate) || !isLocalDate(endDateInput)) back(formData, "error", "Check the dates.");
   if (endDateInput < startDate) back(formData, "error", "The end date is before the start date.");
@@ -93,7 +91,6 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
 
   return {
     title,
-    layer_id: layerId,
     recurrence_rule: recurrenceRule,
     starts_at: startsAt.toISOString(),
     ends_at: endsAt.toISOString(),

@@ -135,26 +135,6 @@ export async function saveSettings(formData: FormData) {
     back("error", "Pick a day and a time for the weekly review.");
   }
 
-  const dayStarts = text(formData, "dayStarts");
-  const eveningStarts = text(formData, "eveningStarts");
-  const dayEnds = text(formData, "dayEnds");
-  if (![dayStarts, eveningStarts, dayEnds].every(isLocalTime)) back("error", "Day times should look like 07:00.");
-  if (!(dayStarts < eveningStarts && eveningStarts < dayEnds)) {
-    back("error", "The day has to start before the evening, and the evening before the day ends.");
-  }
-  const busyDayHours = Number(text(formData, "busyDayHours"));
-  const busyEveningHours = Number(text(formData, "busyEveningHours"));
-  if (!(busyDayHours > 0 && busyDayHours <= 24) || !(busyEveningHours > 0 && busyEveningHours <= 24)) {
-    back("error", "Busy hours should be a number between 0 and 24, like 4 or 1.5.");
-  }
-  const dayProfile = {
-    dayStarts,
-    eveningStarts,
-    dayEnds,
-    busyDayMinutes: Math.round(busyDayHours * 60),
-    busyEveningMinutes: Math.round(busyEveningHours * 60),
-  };
-
   const settings = {
     ...DEFAULT_SETTINGS,
     ...household.settings,
@@ -166,7 +146,6 @@ export async function saveSettings(formData: FormData) {
     temperatureUnit,
     measures,
     handwriting: formData.get("handwriting") === "on",
-    dayProfile,
     weeklyReview: { weekday: reviewWeekday, time: reviewTime },
     // The Today panel's boxes (only when the form sent its checkboxes).
     panelBoxes:

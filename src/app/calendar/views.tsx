@@ -5,10 +5,8 @@ import { eventEmoji } from "@/lib/emoji";
 import type { Household } from "@/lib/household";
 import { fiveRowMonth, layoutBars, layoutDay, monthOf } from "@/lib/calendar-layout";
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import type { DayProfile } from "@/lib/day-profile";
 import type { Break } from "@/lib/day-types";
 import { specialLabel, type SpecialDay } from "@/lib/holidays";
-import { ProfileTag } from "./profile-tag";
 import type { CalendarItem, Member } from "./types";
 import type { QuickDefaults } from "./forms";
 import { PlaceOnTimeline } from "@/components/place-on-timeline";
@@ -24,8 +22,6 @@ type ViewProps = {
   memberById: Map<string, Member>;
   /** Builds a link back to this page with some settings changed. */
   href: (changes: Record<string, string | null>) => string;
-  /** Each day's free/busy profile. */
-  profiles: Map<LocalDate, DayProfile>;
   /** Adding by placing: whether we're in adding mode, and the event being added. */
   adding?: Adding;
   /** Breaks (summer, a sick day) touching these days. */
@@ -634,7 +630,6 @@ export function WeekView({
   events,
   memberById,
   href,
-  profiles,
   adding,
   meals,
   breaks,
@@ -665,7 +660,6 @@ export function WeekView({
         {/* Day headings */}
         <div className="grid shrink-0 grid-cols-7 pl-16.5">
           {days.map((day, i) => {
-            const profile = profiles.get(day);
             return (
               <div key={day} className="flex min-w-0 px-1">
                 <Link
@@ -683,11 +677,6 @@ export function WeekView({
                   {allDayRow.hidden[i] > 0 ? (
                     <span className="shrink-0 rounded-lg bg-rail px-1.5 text-sm font-bold text-ink-muted" title={allDayRow.hiddenNames[i]}>
                       +{allDayRow.hidden[i]}
-                    </span>
-                  ) : null}
-                  {profile && profile.kind !== "free" ? (
-                    <span className="hidden xl:inline">
-                      <ProfileTag kind={profile.kind} />
                     </span>
                   ) : null}
                 </Link>
@@ -861,7 +850,6 @@ export function MonthView({
   events,
   memberById,
   href,
-  profiles,
   anchor,
   adding,
   mode,
@@ -890,7 +878,6 @@ export function MonthView({
     const editHref = (e: CalendarItem) => href({ edit: e.series_id, occ: e.occurrence_date, add: null, panel: null });
     const inMonth = mode === "weeks" || monthOf(day) === month;
     const past = mode === "weeks" && day < today;
-    const profile = profiles.get(day);
     const weekHref = href({ view: "week", date: day, edit: null, add: null, panel: null });
     // In the rolling view, the 1st of a month (and the first square) says which month.
     const label = mode === "weeks" && (day.endsWith("-01") || day === cells[0]) ? `${shortMonth(day)} ${Number(day.slice(8))}` : String(Number(day.slice(8)));
@@ -956,11 +943,6 @@ export function MonthView({
               <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-8" />
             </Link>
           ))}
-          {inMonth && !past && profile && profile.kind !== "free" ? (
-            <span className="ml-auto">
-              <ProfileTag kind={profile.kind} />
-            </span>
-          ) : null}
         </div>
         {shown.map((e) => (
           <Link

@@ -164,44 +164,6 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               Show to-dos, meals and notes in <span className="font-hand text-xl font-bold">handwriting</span>
             </span>
           </label>
-          <fieldset className="grid gap-4 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2 sm:grid-cols-3">
-            <legend className="px-2 text-lg font-bold text-ink">Free and busy days</legend>
-            <p className="text-base text-ink-muted sm:col-span-3">
-              The Today screen calls a day free or busy from the events in it. Only time between the start and end of
-              the day counts, and only layers set to count toward busy.
-            </p>
-            <Field label="Day starts">
-              <Input name="dayStarts" type="time" defaultValue={settings.dayProfile.dayStarts} required />
-            </Field>
-            <Field label="Evening starts">
-              <Input name="eveningStarts" type="time" defaultValue={settings.dayProfile.eveningStarts} required />
-            </Field>
-            <Field label="Day ends">
-              <Input name="dayEnds" type="time" defaultValue={settings.dayProfile.dayEnds} required />
-            </Field>
-            <Field label="Busy day after (hours of events)">
-              <Input
-                name="busyDayHours"
-                type="number"
-                min="0.25"
-                max="24"
-                step="0.25"
-                defaultValue={settings.dayProfile.busyDayMinutes / 60}
-                required
-              />
-            </Field>
-            <Field label="Busy evening after (hours)">
-              <Input
-                name="busyEveningHours"
-                type="number"
-                min="0.25"
-                max="24"
-                step="0.25"
-                defaultValue={settings.dayProfile.busyEveningMinutes / 60}
-                required
-              />
-            </Field>
-          </fieldset>
           <fieldset className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2">
             <legend className="px-2 text-lg font-bold text-ink">Today panel</legend>
             <p className="text-base text-ink-muted">The boxes its arrows flip between. Up next shows on the Week and Month only.</p>

@@ -30,8 +30,8 @@ import { Stickers } from "./stickers";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { ViewChooser } from "./view-chooser";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
-import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, profilesFor, rangeOf } from "./data";
-import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedView, Tag as TagType } from "./types";
+import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, rangeOf } from "./data";
+import type { CalendarEvent, CalendarItem, EventTemplate, Member, SavedView, Tag as TagType } from "./types";
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
@@ -91,7 +91,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Month never gets them).
   await syncEventAndChoreHeadsUps(household);
   await choreSchedule(household, today, timeZone);
-  const [{ layers, members, views, tags, templates, items, exceptions }, routineData, breaks, specials] = await Promise.all([
+  const [{ members, views, tags, templates, items, exceptions }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadBreaks(days[0], days[days.length - 1]),
@@ -103,7 +103,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const weekMeals = view === "week" ? await mealsFor(days, events, members, timeZone) : new Map<LocalDate, WeekMeal[]>();
   const weekTasks =
     view === "week" ? (await loadTodos()).todos.filter((t) => onCalendar(t) && t.due_date! >= days[0] && t.due_date! <= days[days.length - 1]) : [];
-  const profiles = profilesFor(days, items, layers, household);
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -250,7 +249,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           events={events}
           memberById={memberById}
           href={href}
-          profiles={profiles}
           meals={weekMeals}
           tasks={weekTasks}
           adding={{ placing, pending, addHref }}
@@ -265,7 +263,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           events={events}
           memberById={memberById}
           href={href}
-          profiles={profiles}
           anchor={anchor}
           mode={rolling ? "weeks" : "month"}
           adding={{ placing, pending, addHref }}
@@ -296,7 +293,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             showEveryDate={firstParam(params.scope) === "all"}
             event={editing}
             household={household}
-            layers={layers}
             members={members}
             tags={tags}
             returnTo={returnTo}
@@ -317,7 +313,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         <QuickAddSheet
           // A day late in the week opens the card on the left, so the day stays in view.
           side={(dayOfWeek(pending.date) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right"}
-          pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
+          pending={pending} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
       ) : null}
 
       {panel === "tags" ? (
@@ -449,7 +445,6 @@ function OverlaysPanel({
 function EditEventPanel({
   event,
   household,
-  layers,
   members,
   tags,
   returnTo,
@@ -474,7 +469,6 @@ function EditEventPanel({
   isException: boolean;
   event: CalendarEvent;
   household: Household;
-  layers: Layer[];
   members: Member[];
   tags: TagType[];
   returnTo: string;
@@ -531,12 +525,10 @@ function EditEventPanel({
         <input type="hidden" name="id" value={event.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <EventCardFields
-          layers={layers}
           members={members}
           tags={tags}
           defaults={{
             title: event.title,
-            layerId: event.layer_id,
             date: startDate,
             endDate: event.all_day ? endDate : undefined,
             allDay: event.all_day,

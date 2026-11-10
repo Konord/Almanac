@@ -1,17 +1,15 @@
 import { cookies } from "next/headers";
-import type { Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { expandEvents, type ExceptionLike } from "@/lib/recurrence";
-import { profileDay, type DayProfile } from "@/lib/day-profile";
 import { addDays, zonedToUtc, type LocalDate } from "@/lib/time";
-import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedView, Tag } from "./types";
+import type { CalendarEvent, CalendarItem, EventTemplate, Member, SavedView, Tag } from "./types";
 
 /*
  * Loading calendar data, shared by the Calendar and Today screens.
  */
 
 export const EVENT_COLUMNS =
-  "id, title, layer_id, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, event_members(member_id), event_tags(tag_id)";
+  "id, title, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, event_members(member_id), event_tags(tag_id)";
 
 type EventRow = Omit<CalendarEvent, "member_ids" | "tag_ids"> & {
   event_members: { member_id: string }[];
@@ -27,12 +25,11 @@ export function toEvent({ event_members, event_tags, ...rest }: EventRow): Calen
 export const VIEW_COOKIE = "almanac-view";
 
 export type CalendarData = {
-  layers: Layer[];
   members: Member[];
   views: SavedView[];
   tags: Tag[];
   templates: EventTemplate[];
-  /** Every occurrence in the range, from all layers. */
+  /** Every occurrence in the range. */
   items: CalendarItem[];
   exceptions: ExceptionLike[];
 };
@@ -40,12 +37,7 @@ export type CalendarData = {
 /** Everything on the calendar between two instants, with repeats worked out. */
 export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<CalendarData> {
   const supabase = await createClient();
-  const [layersResult, membersResult, viewsResult, eventsResult, seriesResult, tagsResult, templatesResult] = await Promise.all([
-    supabase
-      .from("layers")
-      .select("id, name, colour, owner_member_id, counts_toward_busyness, visibility")
-      .order("sort_order")
-      .order("name"),
+  const [membersResult, viewsResult, eventsResult, seriesResult, tagsResult, templatesResult] = await Promise.all([
     supabase.from("members").select("id, name, colour, icon").order("role", { ascending: false }).order("name"),
     supabase.from("views").select("id, name, tag_ids").order("sort_order").order("name"),
     supabase
@@ -65,7 +57,6 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
       .order("sort_order")
       .order("title"),
   ]);
-  if (layersResult.error) throw layersResult.error;
   if (membersResult.error) throw membersResult.error;
   if (viewsResult.error) throw viewsResult.error;
   if (eventsResult.error) throw eventsResult.error;
@@ -94,7 +85,6 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
   // Template times come back as "09:00:00"; the card wants "09:00".
   const templates = templatesResult.data.map((t) => ({ ...t, start_time: t.start_time?.slice(0, 5) ?? null }));
   return {
-    layers: layersResult.data,
     members: membersResult.data,
     views: viewsResult.data,
     tags: tagsResult.data,
@@ -110,22 +100,6 @@ export function rangeOf(days: LocalDate[], timeZone: string): { rangeStart: Date
     rangeStart: zonedToUtc(days[0], "00:00", timeZone),
     rangeEnd: zonedToUtc(addDays(days.at(-1) ?? days[0], 1), "00:00", timeZone),
   };
-}
-
-/**
- * Each day's profile. Uses every layer that counts toward busy, whatever
- * view the screen is showing, so "Busy evening" means the same everywhere.
- */
-export function profilesFor(
-  days: LocalDate[],
-  items: CalendarItem[],
-  layers: Layer[],
-  household: Household,
-): Map<LocalDate, DayProfile> {
-  const { timeZone, dayProfile } = household.settings;
-  const counting = new Set(layers.filter((l) => l.counts_toward_busyness).map((l) => l.id));
-  const busy = items.filter((item) => counting.has(item.layer_id));
-  return new Map(days.map((day) => [day, profileDay(day, busy, dayProfile, timeZone)]));
 }
 
 /** The overlay this screen shows, or null for everything. */

@@ -38,7 +38,7 @@ const marketing = cd("marketing", [1]);
 const laundry = cd("laundry", [2]);
 
 const week = (extra: Partial<Record<string, Partial<ReviewDay>>> = {}): ReviewDay[] =>
-  dates.map((date, i) => ({ date, name: names[i], past: false, away: false, busy: false, busyMinutes: 0, meals: [], ...extra[date] }));
+  dates.map((date, i) => ({ date, name: names[i], past: false, away: false, meals: [], ...extra[date] }));
 
 const draft = (): ReviewDraft => ({ choreDays: { [MON]: ["marketing"], [TUE]: ["laundry"] }, dayTypes: {}, meals: {}, dismissed: [] });
 
@@ -58,13 +58,6 @@ test("a holiday on a chore day offers to move it to the nearest good day", () =>
   assert.deepEqual(fixed.choreDays[MON], []);
   assert.deepEqual(fixed.choreDays[TUE], ["laundry", "marketing"]);
   assert.deepEqual(problems(fixed, week({ [MON]: { away: true } })), []);
-});
-
-test("a chore day packed with plans moves to a day that isn't", () => {
-  const found = problems(draft(), week({ [TUE]: { busy: true }, [WED]: { busy: true } }));
-  assert.equal(found[0].fix?.apply.kind, "move");
-  // Monday is one day from Tuesday, Thursday two: the nearest wins.
-  assert.equal(found[0].fix?.label, "Move to Monday");
 });
 
 test("a meal on a night everyone is out can be taken off", () => {
