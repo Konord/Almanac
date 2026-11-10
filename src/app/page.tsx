@@ -30,7 +30,7 @@ import { loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/d
 import { MealBlock, mealsForRoutines, placeTodayMeals, startCooking } from "./meals/today";
 import { OpenPanelTab, TodayPanel } from "./today-panel/panel";
 import { readPanelPrefs } from "./today-panel/prefs";
-import { chainPositions, floatingDay, RoutineChain } from "./routines/floating";
+import { chainPositions, ExpandedRoutine, floatingDay, RoutineChain } from "./routines/floating";
 import { RoutineChecklist } from "./routines/routine-checklist";
 import { dayProgress } from "./routines/people-row";
 import { PlacingBar, QuickAddSheet, readAdding } from "./calendar/adding";
@@ -118,6 +118,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   // they come back with backup meals.
   const openRoutine = firstParam(params.routine) ?? "";
   const openMember = firstParam(params.member) ?? "";
+  const expand = firstParam(params.expand) ?? "";
   const routineOpen = Boolean(openRoutine && openMember) && !placing;
 
   // The Today panel on the left (no Up next here: the timeline already shows today).
@@ -226,6 +227,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           pending={pending}
           meals={todayMeals}
           mealBasics={mealBasics}
+          expand={expand}
           timedTodos={todoData.todos.filter(
             (t) => t.due_date === today && (onCalendar(t) || (t.status === "open" && t.date_kind === "start" && t.at_time !== null)),
           )}
@@ -273,6 +275,7 @@ function PeopleTimeline({
   pending,
   meals,
   mealBasics,
+  expand,
   timedTodos,
 }: {
   allDay: CalendarItem[];
@@ -289,6 +292,8 @@ function PeopleTimeline({
   /** Today's planned meals. */
   meals: Meal[];
   mealBasics: MealBasics;
+  /** The routine opened up to tick its steps, if any. */
+  expand: string;
   /** To-dos that start at a time today: points on the timeline, no length. */
   timedTodos: Todo[];
 }) {
@@ -424,17 +429,27 @@ function PeopleTimeline({
               {(() => {
                 const mine = routinesFor.get(c.id) ?? [];
                 const tops = chainPositions(mine, first, last);
-                return mine.map((r) => (
+                return mine.map((r) =>
+                  r.template.id === expand ? (
+                    <ExpandedRoutine
+                      key={r.assignment.id}
+                      routine={r}
+                      memberId={c.id}
+                      colour={c.colour}
+                      date={today}
+                      top={tops.get(r.assignment.id) ?? 0}
+                    />
+                  ) : (
                   <RoutineChain
                     key={r.assignment.id}
                     routine={r}
-                    memberId={c.id}
                     colour={c.colour}
                     date={today}
                     top={tops.get(r.assignment.id) ?? 0}
                     household={household}
                   />
-                ));
+                  ),
+                );
               })()}
             </div>
           ))}
