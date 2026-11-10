@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarDots, ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
+import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
@@ -57,8 +57,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const returnTo = here();
   const open = todos.filter((t) => t.list_id === list?.id && t.status === "open");
   const done = todos.filter((t) => t.list_id === list?.id && t.status === "done");
-  const dated = todos.filter((t) => t.status === "open" && t.due_date).sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1));
-  const listById = new Map(lists.map((l) => [l.id, l]));
   const editId = firstParam(params.edit);
   const editing = editId ? todos.find((t) => t.id === editId) : undefined;
   const editingList = firstParam(params.editList) === "1" && list;
@@ -67,7 +65,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const message = firstParam(params.message);
   const showingDone = firstParam(params.done) === "1";
   const page = Math.max(0, Number(firstParam(params.page) ?? 0) || 0);
-  const dayPage = Math.max(0, Number(firstParam(params.dayPage) ?? 0) || 0);
 
   return (
     <>
@@ -78,7 +75,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
         {/* Which list */}
         <Card title="Lists" icon={ListChecks} tint="blue">
           <ul className="flex flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
@@ -232,30 +229,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           </Card>
         )}
 
-        {/* Everything with a day, across all lists */}
-        <Card title="By day" icon={CalendarDots} tint="purple">
-          {dated.length === 0 ? (
-            <p className="py-4 text-xl text-ink-muted">No to-dos with a day yet.</p>
-          ) : (
-            <>
-            <ul className="flex flex-col">
-              {pageOf(dated, dayPage, DAY_PAGE).map((t) => (
-                <TodoRow
-                  key={t.id}
-                  todo={{ ...t, icon: t.icon ?? listById.get(t.list_id)?.icon ?? null }}
-                  members={memberById}
-                  today={today}
-                  household={household}
-                  returnTo={returnTo}
-                />
-              ))}
-            </ul>
-            <div className="mt-auto pt-2">
-              <Pager count={dated.length} page={dayPage} perPage={DAY_PAGE} href={(p) => here(`&dayPage=${p}`)} />
-            </div>
-            </>
-          )}
-        </Card>
       </div>
 
       {editing ? (
@@ -331,8 +304,7 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
 }
 
 /* Long lists turn into pages, so nothing scrolls on the wall screen. */
-const LIST_PAGE = 7;
-const DAY_PAGE = 8;
+const LIST_PAGE = 8;
 
 function pageOf<T>(items: T[], page: number, perPage: number): T[] {
   const last = Math.max(0, Math.ceil(items.length / perPage) - 1);
