@@ -113,7 +113,7 @@ export function MealBox({
 
   const mainId = meal ? mainDish(meal.dishes) : null;
   const menuMeal = meal?.menuMealId ? menuMeals.find((m) => m.id === meal.menuMealId) : undefined;
-  const title = meal ? (menuMeal?.name ?? (mainId ? dish.get(mainId)?.name : undefined) ?? category.get(meal.categoryId ?? "")?.name ?? "Custom meal") : "What's for it?";
+  const title = meal ? (menuMeal?.name ?? (mainId ? dish.get(mainId)?.name : undefined) ?? category.get(meal.categoryId ?? "")?.name ?? "Custom meal") : `What's for ${target.where.split(" · ")[0].toLowerCase()}?`;
   const icon = meal ? (menuMeal?.icon ?? (mainId ? dish.get(mainId)?.icon : undefined) ?? category.get(meal.categoryId ?? "")?.icon ?? "🍽️") : "🍽️";
 
   // --- The middle -----------------------------------------------------------
@@ -392,7 +392,7 @@ function Plate({
             >
               <Emoji emoji={r?.icon ?? kind.get(d.kindId ?? "")?.icon ?? "🍽️"} className="size-12" />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className={`text-xs font-extrabold tracking-wide uppercase ${active ? "text-accent" : "text-ink-muted"}`}>{active ? `${kindName} · picking` : kindName}</span>
+                <span className={`text-sm font-extrabold tracking-wide uppercase ${active ? "text-accent" : "text-ink-muted"}`}>{active ? `${kindName} · picking` : kindName}</span>
                 <span className="truncate text-xl font-extrabold text-ink">{r?.name ?? `Pick a ${kindName.toLowerCase()}`}</span>
               </span>
               <div className="flex rounded-2xl bg-panel p-1" role="group" aria-label={`Batches of ${r?.name ?? kindName}`}>
@@ -484,7 +484,7 @@ function Plate({
           />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-4">
-            <p className="text-xl text-ink-soft">Tap Swap on a dish to change it for this day only, or pick ×2 or ×3 to make more (for leftovers or guests).</p>
+            <p className="text-xl text-ink-soft">Swap a dish for this day only, or pick ×2 or ×3 for leftovers or guests.</p>
             <p className="text-lg text-ink-muted">Batches are whole numbers, so the grocery list never asks for half an onion.</p>
             <div className="mt-auto flex flex-col gap-2 rounded-2xl bg-rail p-4">
               <span className="text-lg font-bold text-ink">Want this exact meal again?</span>
@@ -684,7 +684,7 @@ function SaveAsMeal({
                 type="button"
                 aria-pressed={on}
                 onClick={() => setCats(on ? cats.filter((x) => x !== c.id) : [...cats, c.id])}
-                className={`flex min-h-12 items-center gap-2 rounded-xl border-2 px-3 text-base font-bold ${on ? "border-ink bg-ink text-board" : "border-frame bg-board text-ink"}`}
+                className={`flex min-h-12 items-center gap-2 rounded-xl border-2 px-3 text-base font-bold ${on ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink"}`}
               >
                 <Emoji emoji={c.icon} className="size-6" />
                 {c.name}
@@ -693,7 +693,7 @@ function SaveAsMeal({
           })}
         </div>
       </div>
-      <span className="text-base text-ink-muted">Next time it comes with these dishes and batches. Open spots stay open, and any dish can still be swapped.</span>
+      <span className="text-base text-ink-muted">Next time it comes with these dishes. You can still swap any of them.</span>
       {error ? <span className="text-base font-bold text-danger">{error}</span> : null}
       <div className="mt-auto flex gap-2">
         <button type="button" onClick={onCancel} className="min-h-[var(--touch-target)] flex-1 rounded-2xl bg-board text-lg font-bold text-ink">

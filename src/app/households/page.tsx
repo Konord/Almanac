@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { ArrowLeft, CaretLeft, CaretRight, HouseLine, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Card, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { deleteHousehold, newHousehold, switchHousehold } from "./actions";
@@ -15,7 +15,7 @@ const PER_PAGE = 6;
 export default function HouseholdsPage(props: PageProps<"/households">) {
   return (
     <AppFrame section="settings">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <HouseholdsContent searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { AppFrame } from "@/components/ui";
+import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 export default function GroceriesPage() {
   return (
     <AppFrame section="lists">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Forward />
       </Suspense>
     </AppFrame>

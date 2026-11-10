@@ -1,170 +1,92 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { DEFAULT_SETTINGS, isTimeZone, requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalTime } from "@/lib/time";
 import { isPersonColour } from "@/lib/colours";
+import { panelBoxes } from "@/lib/panel-boxes";
+import { draftProblem, isNewId, type SettingsDraft } from "./draft";
 
 /*
- * Every action re-checks who is signed in (requireHousehold) instead of
- * trusting the form. The database's security rules check again on top.
- * Each change is also written to the activity log.
+ * The Settings screen's one Save: the household's settings and everyone
+ * in it, together. It re-checks who is signed in (requireHousehold)
+ * instead of trusting the screen, and the database's security rules check
+ * again on top. Each change is written to the activity log.
  */
 
-function back(kind: "error" | "message", text: string): never {
-  redirect(`/household?${kind}=${encodeURIComponent(text)}`);
-}
+type Result = { ok: true } | { ok: false; error: string };
 
-function text(formData: FormData, key: string): string {
-  return String(formData.get(key) ?? "").trim();
-}
-
-function readMember(formData: FormData) {
-  const name = text(formData, "name");
-  const role = text(formData, "role");
-  const colour = text(formData, "colour");
-  const birthYearText = text(formData, "birthYear");
-  const birthYear = birthYearText ? Number(birthYearText) : null;
-  const icon = text(formData, "icon");
-
-  if (!name) back("error", "Every member needs a name.");
-  if (role !== "parent" && role !== "child") back("error", "Choose parent or child.");
-  if (!isPersonColour(colour)) back("error", "Choose a colour.");
-  if (birthYear !== null && (!Number.isInteger(birthYear) || birthYear < 1900 || birthYear > 2100)) {
-    back("error", "Birth year should look like 2018.");
+export async function saveHousehold(draft: SettingsDraft): Promise<Result> {
+  const household = await requireHousehold();
+  const problem = draftProblem(draft);
+  if (problem) return { ok: false, error: problem };
+  const timeZone = draft.timeZone.trim();
+  if (!isTimeZone(timeZone)) return { ok: false, error: `"${timeZone}" isn't a time zone I recognise.` };
+  if (!isLocalTime(draft.reviewTime)) return { ok: false, error: "Pick a time for the weekly review." };
+  if (draft.members.some((m) => !m.removed && (!isPersonColour(m.colour) || (m.role !== "parent" && m.role !== "child")))) {
+    return { ok: false, error: "Everyone needs a colour and a role." };
   }
-  if (icon && [...icon].length > 8) back("error", "The picture should be one emoji.");
-  return { name, role, colour, birth_year: birthYear, icon: icon || null };
-}
-
-async function log(action: string, targetType: string, targetId: string, details: Record<string, string> = {}) {
-  const household = await requireHousehold();
-  const supabase = await createClient();
-  await supabase.from("activity_log").insert({
-    household_id: household.id,
-    action,
-    target_type: targetType,
-    target_id: targetId,
-    details,
-  });
-}
-
-export async function addMember(formData: FormData) {
-  const household = await requireHousehold();
-  const member = readMember(formData);
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("members")
-    .insert({ ...member, household_id: household.id })
-    .select("id")
-    .single();
-  if (error) back("error", error.message);
-
-  await log("member_added", "member", data.id, { name: member.name });
-  revalidatePath("/household");
-  back("message", `Added ${member.name}.`);
-}
-
-export async function updateMember(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const member = readMember(formData);
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("members").update(member).eq("id", id);
-  if (error) back("error", error.message);
-
-  await log("member_updated", "member", id, { name: member.name });
-  revalidatePath("/household");
-  back("message", `Saved ${member.name}.`);
-}
-
-export async function removeMember(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const supabase = await createClient();
-
-  const { error } = await supabase.from("members").delete().eq("id", id);
-  if (error) back("error", error.message);
-
-  await log("member_removed", "member", id, { name });
-  revalidatePath("/household");
-  back("message", `Removed ${name}.`);
-}
-
-export async function setPin(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const pin = text(formData, "pin");
-  const confirm = text(formData, "confirmPin");
-
-  if (!/^\d{4,8}$/.test(pin)) back("error", "A PIN must be 4 to 8 digits.");
-  if (pin !== confirm) back("error", "The two PINs don't match.");
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("set_member_pin", { member_id: id, pin });
-  if (error) back("error", error.message);
-
-  await log("member_pin_set", "member", id);
-  revalidatePath("/household");
-  back("message", "PIN saved.");
-}
-
-export async function saveSettings(formData: FormData) {
-  const household = await requireHousehold();
-  const name = text(formData, "householdName");
-  const timeZone = text(formData, "timeZone");
-  const currency = text(formData, "currency").toUpperCase();
-  const weekStartsOn = text(formData, "weekStartsOn") === "1" ? 1 : 0;
-  const monthStyle = text(formData, "monthStyle") === "calendar" ? "calendar" : "rolling";
-  const units = text(formData, "units") === "imperial" ? "imperial" : "metric";
-  const temperatureUnit = text(formData, "temperatureUnit") === "fahrenheit" ? "fahrenheit" : "celsius";
-  const measures = text(formData, "measures") === "us" ? "us" : "canadian";
-
-  if (!name) back("error", "The household needs a name.");
-  if (!isTimeZone(timeZone)) back("error", `"${timeZone}" isn't a time zone I recognise.`);
-  if (!/^[A-Z]{3}$/.test(currency)) back("error", "Currency should be a 3-letter code like CAD.");
-
-  const reviewWeekday = Number(text(formData, "reviewWeekday"));
-  const reviewTime = text(formData, "reviewTime");
-  if (!(Number.isInteger(reviewWeekday) && reviewWeekday >= 0 && reviewWeekday <= 6) || !isLocalTime(reviewTime)) {
-    back("error", "Pick a day and a time for the weekly review.");
-  }
+  // Keep "the usual boxes" (null) unless the picks really changed, so a new list still shows up by itself.
+  const { data: lists } = await supabase.from("task_lists").select("id, name, is_chores").order("sort_order").order("name");
+  const before = panelBoxes(household.settings.panelBoxes, lists ?? [], false).map((b) => b.id);
+  const boxesChanged = before.join() !== draft.panelBoxes.join();
+  const logs: { action: string; target_type: string; target_id: string; details: Record<string, string> }[] = [];
 
   const settings = {
     ...DEFAULT_SETTINGS,
     ...household.settings,
     timeZone,
-    currency,
-    weekStartsOn,
-    monthStyle,
-    units,
-    temperatureUnit,
-    measures,
-    handwriting: formData.get("handwriting") === "on",
-    weeklyReview: { weekday: reviewWeekday, time: reviewTime },
-    // The Today panel's boxes (only when the form sent its checkboxes).
-    panelBoxes:
-      formData.get("panelBoxesSent") === "1"
-        ? formData
-            .getAll("panelBoxes")
-            .map(String)
-            .filter((v) => /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(v))
-        : household.settings.panelBoxes,
+    currency: draft.currency.trim().toUpperCase(),
+    weekStartsOn: draft.weekStartsOn === 1 ? 1 : 0,
+    monthStyle: draft.monthStyle === "calendar" ? "calendar" : "rolling",
+    units: draft.units === "imperial" ? "imperial" : "metric",
+    temperatureUnit: draft.temperatureUnit === "fahrenheit" ? "fahrenheit" : "celsius",
+    measures: draft.measures === "us" ? "us" : "canadian",
+    handwriting: Boolean(draft.handwriting),
+    weeklyReview: { weekday: draft.reviewWeekday, time: draft.reviewTime },
+    panelBoxes: boxesChanged ? draft.panelBoxes : household.settings.panelBoxes,
   };
+  const name = draft.name.trim().slice(0, 80);
+  if (name !== household.name || JSON.stringify(settings) !== JSON.stringify({ ...DEFAULT_SETTINGS, ...household.settings })) {
+    const { error } = await supabase.from("households").update({ name, settings }).eq("id", household.id);
+    if (error) return { ok: false, error: error.message };
+    logs.push({ action: "settings_updated", target_type: "household", target_id: household.id, details: {} });
+  }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("households")
-    .update({ name, settings })
-    .eq("id", household.id);
-  if (error) back("error", error.message);
+  for (const m of draft.members) {
+    if (m.removed) {
+      if (isNewId(m.id)) continue;
+      const { error } = await supabase.from("members").delete().eq("id", m.id);
+      if (error) return { ok: false, error: error.message };
+      logs.push({ action: "member_removed", target_type: "member", target_id: m.id, details: { name: m.name } });
+      continue;
+    }
+    const row = { name: m.name.trim(), role: m.role, colour: m.colour, icon: m.icon || null, birth_year: m.birthYear };
+    let id = m.id;
+    if (isNewId(m.id)) {
+      const { data, error } = await supabase
+        .from("members")
+        .insert({ ...row, household_id: household.id })
+        .select("id")
+        .single();
+      if (error) return { ok: false, error: error.message };
+      id = data.id;
+      logs.push({ action: "member_added", target_type: "member", target_id: id, details: { name: row.name } });
+    } else {
+      const { error } = await supabase.from("members").update(row).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+    if (m.role === "parent" && m.pin) {
+      const { error } = await supabase.rpc("set_member_pin", { member_id: id, pin: m.pin });
+      if (error) return { ok: false, error: error.message };
+      logs.push({ action: "member_pin_set", target_type: "member", target_id: id, details: {} });
+    }
+  }
 
-  await log("settings_updated", "household", household.id);
+  if (logs.length) await supabase.from("activity_log").insert(logs.map((l) => ({ ...l, household_id: household.id })));
   revalidatePath("/", "layout");
-  back("message", "Settings saved.");
+  return { ok: true };
 }

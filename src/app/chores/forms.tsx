@@ -117,7 +117,7 @@ export function ChoreFields({
         options={CHORE_TAGS.map((t) => ({ value: t.value, label: t.label }))}
         defaultValue={tags.filter(isChoreTag)}
       />
-      <Field label="Chore day" hint="Optional. Empty: any day that isn't kept for one kind of chore.">
+      <Field label="Chore day" hint="Optional. Leave it empty for any day.">
         <Select name="choreDayId" defaultValue={choreDayId ?? ""}>
           <option value="">Any day with room</option>
           {choreDays.map((d) => (

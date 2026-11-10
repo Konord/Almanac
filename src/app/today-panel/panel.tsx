@@ -4,7 +4,6 @@ import {
   CaretLeft,
   CaretRight,
   Check,
-  CloudSun,
 } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
@@ -27,6 +26,7 @@ import { PanelPages } from "@/components/panel-pages";
 import { panelBoxes, stepBox } from "@/lib/panel-boxes";
 import { addTodo, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
+import { shortClockTime } from "@/lib/time-text";
 
 /**
  * The Today panel: a column on the left of the calendar with three parts.
@@ -247,19 +247,11 @@ export async function TodayPanel({
   const fmt = (o: Intl.DateTimeFormatOptions) =>
     new Intl.DateTimeFormat(locale, { timeZone, ...o }).format(now);
   const mealTime = nextMeal
-    ? new Intl.DateTimeFormat(locale, {
-        timeZone,
-        hour: "numeric",
-        minute: "2-digit",
-      })
-        .format(zonedToUtc(nextMeal.meal.date, nextMeal.at, timeZone))
-        .replace(":00", "")
+    ? shortClockTime(zonedToUtc(nextMeal.meal.date, nextMeal.at, timeZone), locale, timeZone)
     : "";
 
   const taskTime = (time: string) =>
-    new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" })
-      .format(zonedToUtc(today, time.slice(0, 5), timeZone))
-      .replace(":00", "");
+    shortClockTime(zonedToUtc(today, time.slice(0, 5), timeZone), locale, timeZone);
 
   const arrowButton = (by: 1 | -1) => (
     <form action={pickPanelTab}>
@@ -314,10 +306,9 @@ export async function TodayPanel({
           </span>
         </span>
       </div>
+      {/* Weather goes here once it's set up (it needs a weather service). */}
       <div className="mt-5 flex items-center gap-3 text-xl font-semibold text-ink-muted">
-        <CloudSun size="2.5rem" aria-hidden />
-        <span>Weather soon</span>
-        <span className="ml-auto text-3xl font-bold">
+        <span className="text-3xl font-bold">
           <HeaderClock locale={locale} timeZone={timeZone} />
         </span>
       </div>
@@ -436,7 +427,7 @@ export async function TodayPanel({
           </p>
         ) : (
           <PanelPages
-            link={showing === "today" ? { href: "/lists", label: "Open the lists" } : { href: `/lists?list=${showing}`, label: "Open the list" }}
+            link={showing === "today" ? { href: "/lists", label: "See all lists" } : { href: `/lists?list=${showing}`, label: "Open the list" }}
             pages={pagesOf(open, ROWS).map((rows, p) => (
               <ul key={p} className="flex flex-col">
             {rows.map((row) => {
@@ -529,7 +520,7 @@ export async function TodayPanel({
                 : showing === "upnext"
                   ? "Open the agenda"
                   : showing === "today"
-                    ? "Open the lists"
+                    ? "See all lists"
                     : "Open the list"}
             </Link>
           );
@@ -564,9 +555,11 @@ export async function TodayPanel({
             </span>
           </>
         ) : (
-          <span className="text-xl font-bold">
-            No meal planned yet. Plan meals
-          </span>
+          <>
+            <Emoji emoji="🍽️" className="size-12" />
+            <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals yet</span>
+            <span className="shrink-0 rounded-full bg-board/70 px-4 py-2 text-base font-extrabold">Plan meals</span>
+          </>
         )}
       </Link>
 

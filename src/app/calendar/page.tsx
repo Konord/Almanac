@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, Copy, Plus, Trash, X } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
@@ -52,7 +52,7 @@ type View = "week" | "month";
 export default function CalendarPage(props: PageProps<"/calendar">) {
   return (
     <AppFrame section="calendar">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <CalendarContent searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>
@@ -200,15 +200,14 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
         </div>
         <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
-          <Link
-            href="/holidays"
-            aria-label="Holidays and birthdays"
-            title="Holidays and birthdays"
-            className="inline-flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-2xl bg-rail hover:bg-panel"
-          >
+          <SoftLink href="/holidays" className="px-3.5">
             <Emoji emoji="🎉" className="size-7" />
-          </Link>
-          <IconLink href={href({ panel: "templates", edit: null, add: null })} label="Event templates" icon={Copy} />
+            Holidays
+          </SoftLink>
+          <SoftLink href={href({ panel: "templates", edit: null, add: null })} className="px-3.5">
+            <Copy size="1.5rem" aria-hidden />
+            Templates
+          </SoftLink>
           <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
           <Segmented
             label="How much to show"
@@ -602,17 +601,21 @@ function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household:
   const { locale, timeZone } = household.settings;
   const noon = (d: LocalDate) => zonedToUtc(d, "12:00", timeZone);
   // Month is titled with the month either way (today's, unless you've moved).
+  // The year only shows when it isn't this year, so the header fits on one line.
+  const thisYear = localDateOf(new Date(), timeZone).slice(0, 4);
   if (view !== "week") {
-    return new Intl.DateTimeFormat(locale, { timeZone, month: "long", year: "numeric" }).format(noon(anchor));
+    return anchor.slice(0, 4) === thisYear
+      ? new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(noon(anchor))
+      : new Intl.DateTimeFormat(locale, { timeZone, month: "short", year: "numeric" }).format(noon(anchor));
   }
   const first = days[0];
   const last = days[6];
   const sameMonth = first.slice(0, 7) === last.slice(0, 7);
   const fmt = new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" });
-  const year = last.slice(0, 4);
+  const year = last.slice(0, 4) === thisYear ? "" : `, ${last.slice(0, 4)}`;
   return sameMonth
-    ? `${fmt.format(noon(first))} – ${Number(last.slice(8))}, ${year}`
-    : `${fmt.format(noon(first))} – ${fmt.format(noon(last))}, ${year}`;
+    ? `${fmt.format(noon(first))}–${Number(last.slice(8))}${year}`
+    : `${fmt.format(noon(first))} – ${fmt.format(noon(last))}${year}`;
 }
 
 /**

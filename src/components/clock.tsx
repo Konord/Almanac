@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { clockTime } from "@/lib/time-text";
 
 /**
  * The header clock. The server draws the first time; after that this small
@@ -10,7 +11,7 @@ export function Clock({ initial, locale, timeZone }: { initial: string; locale: 
   const [time, setTime] = useState(initial);
   useEffect(() => {
     const format = () =>
-      new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date());
+      clockTime(new Date(), locale, timeZone);
     const id = setInterval(() => setTime(format()), 10_000);
     return () => clearInterval(id);
   }, [locale, timeZone]);

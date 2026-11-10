@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { AppFrame, firstParam } from "@/components/ui";
+import { AppFrame, firstParam, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { isLocalDate } from "@/lib/time";
 
@@ -12,7 +12,7 @@ import { isLocalDate } from "@/lib/time";
 export default function MealsPage(props: PageProps<"/meals">) {
   return (
     <AppFrame section="meals">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Forward searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

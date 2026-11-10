@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, CalendarCheck, CaretLeft, CaretRight, Minus, Plus, Repeat, Trash, X } from "@phosphor-icons/react";
-import { Avatar, Emoji, ScreenHeader } from "@/components/ui";
+import { ArrowDown, ArrowUp, CalendarCheck, CaretLeft, CaretRight, Minus, Plus, Trash, X } from "@phosphor-icons/react";
+import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
@@ -28,6 +28,7 @@ import {
 } from "@/lib/chore-manager";
 import { LEAD_UNITS, leadLabel, leadMinutes, type LeadUnit } from "@/lib/heads-ups";
 import { doChoreToday, saveChoreManager } from "./manager-actions";
+import { wallTime } from "@/lib/time-text";
 
 /*
  * The Chore Manager (2026-11-09). Left: Occasional chores on top, then the
@@ -130,7 +131,6 @@ export function ChoreManager({
   timeZone,
   weekStartsOn,
   startWith,
-  clock,
 }: {
   initial: ChoreManagerDraft;
   members: ManagerMember[];
@@ -142,8 +142,6 @@ export function ChoreManager({
   weekStartsOn: 0 | 1;
   /** ?edit=<chore> or ?day=<chore day> from a link. */
   startWith: { chore?: string; day?: string };
-  /** The header clock (drawn on the server first). */
-  clock: ReactNode;
 }) {
   const [draft, setDraft] = useState<ChoreManagerDraft>(initial);
   // A link (?edit= or ?day=) wins; else what was open before a save.
@@ -168,8 +166,7 @@ export function ChoreManager({
   const dateLabel = (d: string) =>
     d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const nextLabel = (d: string) => (d < today ? "overdue" : dateLabel(d));
-  const timeLabel = (t: string) =>
-    new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(`2026-01-01T${t}:00Z`)).replace(":00", "");
+  const timeLabel = (t: string) => wallTime(t, locale);
 
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
   const dayPages = Math.max(1, Math.ceil(days.length / DAYS_PER_PAGE));
@@ -226,7 +223,6 @@ export function ChoreManager({
   return (
     <>
       <ScreenHeader title="Chore Manager">
-        {clock}
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">
@@ -239,7 +235,7 @@ export function ChoreManager({
           className="flex flex-col gap-1 rounded-2xl p-3.5 text-left"
           style={{
             background: soft("orange"),
-            boxShadow: selection.kind === "occasional" ? `inset 0 0 0 3px ${strong("orange")}` : undefined,
+            boxShadow: selection.kind === "occasional" ? "inset 0 0 0 2px var(--color-ink)" : undefined,
           }}
         >
           <span className="flex items-center gap-3">
@@ -274,13 +270,13 @@ export function ChoreManager({
                   type="button"
                   onClick={() => setSelection({ kind: "day", id: d.id })}
                   aria-pressed={active}
-                  className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : "hover:bg-rail"}`}
+                  className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
                 >
                   <Emoji emoji={eventEmoji(d.icon, d.name, DAY_PICTURE)} className="size-9" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-lg font-bold text-ink">{d.name || "Unnamed"}</span>
                     <span className="truncate text-sm font-semibold text-ink-muted">
-                      {d.is_free ? "Any other day" : d.weekdays.length ? weekdaysLabel(d.weekdays) : "No days yet"} · {count} regular
+                      {d.is_free ? "Any other day" : d.weekdays.length ? weekdaysLabel(d.weekdays) : "No days yet"} · {count === 1 ? "1 chore" : `${count} chores`}
                     </span>
                   </span>
                 </button>
@@ -800,12 +796,7 @@ function OccasionalPanel({
           timeZone={timeZone}
         />
       ) : (
-        <div className="flex flex-col items-start justify-center gap-3 rounded-2xl border border-frame p-6">
-          <Repeat size="2.5rem" className="text-ink-muted" aria-hidden />
-          <p className="text-xl text-ink-muted">
-            Tap a chore to change it, or <b>+</b> to put it on today&rsquo;s list. Done today, it comes back from today; left undone, it goes back to its day.
-          </p>
-        </div>
+        <EmptyState emoji="🧹" title="Tap a chore to change it" hint={<>Tap <b>+</b> to add it to today&rsquo;s list.</>} />
       )}
     </div>
   );
@@ -918,7 +909,7 @@ function OccasionalEditor({
                 </Chip>
               ))}
             </Group>
-            <Group label="Chore days it can go on (none picked: any day that takes all chores)">
+            <Group label="Chore days it can go on (none picked: any day)">
               {draft.days.map((d) => (
                 <Chip key={d.id} on={c.chore_day_ids.includes(d.id)} onClick={() => set({ chore_day_ids: toggle(c.chore_day_ids, d.id) })}>
                   {d.icon ? <Emoji emoji={d.icon} className="size-6" /> : null}
@@ -1142,7 +1133,7 @@ function Chip({ on, onClick, children, small = false }: { on: boolean; onClick: 
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 text-base select-none ${small ? "px-2.5" : "px-3.5"} ${on ? "border-ink bg-ink font-bold text-board" : "border-frame bg-board text-ink"}`}
+      className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 text-base select-none ${small ? "px-2.5" : "px-3.5"} ${on ? "border-ink bg-rail font-bold text-ink" : "border-frame bg-board text-ink"}`}
     >
       {children}
     </button>

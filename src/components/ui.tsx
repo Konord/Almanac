@@ -190,6 +190,21 @@ export function Emoji({ emoji, className = "size-10", faded = false }: { emoji: 
   );
 }
 
+/**
+ * What an editor panel shows before anything is picked: one big picture, a
+ * short line saying what to tap, and at most one line of help. Every manager
+ * uses this, so empty panels look the same everywhere.
+ */
+export function EmptyState({ emoji, title, hint }: { emoji: string; title: ReactNode; hint?: ReactNode }) {
+  return (
+    <div className="m-auto flex max-w-[30rem] flex-col items-center gap-3 p-6 text-center">
+      <Emoji emoji={emoji} className="size-20" />
+      <p className="text-2xl font-bold text-balance text-ink">{title}</p>
+      {hint ? <p className="text-lg text-balance text-ink-muted">{hint}</p> : null}
+    </div>
+  );
+}
+
 /** A thin bar in a person's colour, e.g. 3 of 5 steps done. */
 export function ProgressBar({ done, total, colour, thick = false }: { done: number; total: number; colour?: string | null; thick?: boolean }) {
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
@@ -326,5 +341,26 @@ export function Chips({
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * What a screen shows for the moment while it's being read: soft grey
+ * outlines where the header and cards will be, instead of the word
+ * "Loading…" on a blank screen.
+ */
+export function LoadingOutline() {
+  return (
+    <div className="flex min-h-0 flex-1 animate-pulse flex-col gap-5" role="status" aria-label="Loading">
+      <div className="flex h-18 shrink-0 items-center gap-5">
+        <span className="h-12 w-72 rounded-2xl bg-rail" />
+        <span className="h-12 w-56 rounded-2xl bg-rail" />
+        <span className="ml-auto h-12 w-44 rounded-2xl bg-rail" />
+      </div>
+      <div className="grid min-h-[20rem] flex-1 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
+        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
+        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
+      </div>
+    </div>
   );
 }

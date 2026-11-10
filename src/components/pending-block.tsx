@@ -113,7 +113,7 @@ export function ResizeHandle({ handlers }: { handlers: React.HTMLAttributes<HTML
       aria-hidden
       className="absolute inset-x-0 bottom-0 flex h-5 cursor-ns-resize touch-none items-end justify-center pb-1"
     >
-      <span className="h-1 w-8 rounded-full bg-ink/40" />
+      <span className="handle-mark h-1 w-8 rounded-full bg-ink/40" />
     </div>
   );
 }

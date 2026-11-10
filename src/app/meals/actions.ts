@@ -9,6 +9,7 @@ import { guessAisle, weekStartOf } from "@/lib/meals";
 import { parseRecipeHtml, parseRecipeText, type ImportedRecipe } from "@/lib/recipe-import";
 import { addDays, isLocalTime, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { isVisibility } from "../calendar/options";
+import type { MealSetupDraft } from "./setup/draft";
 import { applyPresets, findOrCreateItem, nextFreeDate, seededDatesFrom, syncHeadsUps } from "./shared";
 
 /*
@@ -492,82 +493,17 @@ export async function importRecipe(formData: FormData) {
 // Setup: meal times and presets
 // ---------------------------------------------------------------------------
 
-export async function addMealTime(formData: FormData) {
-  const household = await requireHousehold();
-  const name = text(formData, "name");
-  const usual = text(formData, "usualTime") || "12:00";
-  if (!name) back(formData, "error", "A meal time needs a name, like Breakfast.");
-  if (!isLocalTime(usual)) back(formData, "error", "Pick a time.");
-  const supabase = await createClient();
-  const { data: last } = await supabase.from("meal_times").select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
-  const { error } = await supabase
-    .from("meal_times")
-    .insert({ household_id: household.id, name: name.slice(0, 30), icon: readIcon(formData), usual_time: usual, sort_order: (last?.sort_order ?? 0) + 1 });
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Added ${name}.`);
-}
-
-export async function updateMealTime(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const usual = text(formData, "usualTime");
-  if (!name) back(formData, "error", "A meal time needs a name.");
-  if (!isLocalTime(usual)) back(formData, "error", "Pick a time.");
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("meal_times")
-    .update({ name: name.slice(0, 30), icon: readIcon(formData), usual_time: usual, show_on_planner: formData.get("showOnPlanner") === "on" })
-    .eq("id", id);
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Saved ${name}.`);
-}
-
-export async function moveMealTime(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const direction = text(formData, "direction") === "up" ? -1 : 1;
-  const supabase = await createClient();
-  const { data } = await supabase.from("meal_times").select("id, sort_order").order("sort_order").order("name");
-  const list = data ?? [];
-  const i = list.findIndex((t) => t.id === id);
-  const j = i + direction;
-  if (i < 0 || j < 0 || j >= list.length) backQuietly(formData);
-  const reordered = [...list];
-  [reordered[i], reordered[j]] = [reordered[j], reordered[i]];
-  for (const [n, t] of reordered.entries()) await supabase.from("meal_times").update({ sort_order: n + 1 }).eq("id", t.id);
-  refresh();
-  backQuietly(formData);
-}
-
-export async function removeMealTime(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const supabase = await createClient();
-  const { count } = await supabase.from("meal_times").select("id", { count: "exact", head: true });
-  if ((count ?? 0) <= 1) back(formData, "error", "Keep at least one meal time.");
-  const { error } = await supabase.from("meal_times").delete().eq("id", id);
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Removed ${text(formData, "name")} and its planned meals.`);
-}
-
-/** Saves the preset grid: one category (or none) per weekday and meal time. */
-export async function savePresets(formData: FormData) {
-  const household = await requireHousehold();
-  const supabase = await createClient();
-  const rows: { household_id: string; weekday: number; meal_time_id: string; category_id: string }[] = [];
-  for (const [key, value] of formData.entries()) {
-    const m = /^preset\|([0-6])\|([0-9a-f-]{36})$/.exec(key);
-    if (m && typeof value === "string" && value) rows.push({ household_id: household.id, weekday: Number(m[1]), meal_time_id: m[2], category_id: value });
-  }
+/** Writes the preset grid, and puts any new presets into weeks already filled in. */
+async function writePresets(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  household: Awaited<ReturnType<typeof requireHousehold>>,
+  rows: { household_id: string; weekday: number; meal_time_id: string; category_id: string }[],
+): Promise<string | null> {
   const { data: before } = await supabase.from("meal_presets").select("weekday, meal_time_id, category_id");
   await supabase.from("meal_presets").delete().eq("household_id", household.id);
   if (rows.length) {
     const { error } = await supabase.from("meal_presets").insert(rows);
-    if (error) back(formData, "error", error.message);
+    if (error) return error.message;
   }
   // New presets join weeks that were already filled in.
   const had = new Set((before ?? []).map((p) => `${p.weekday}|${p.meal_time_id}|${p.category_id}`));
@@ -582,8 +518,58 @@ export async function savePresets(formData: FormData) {
     await supabase.from("meal_presets").delete().eq("household_id", household.id);
     await supabase.from("meal_presets").insert(rows);
   }
+  return null;
+}
+
+/**
+ * The Meal times screen's one Save (2026-11-10): the meal times in their
+ * order (ones taken off go, with their planned meals) and the preset grid.
+ */
+export async function saveMealSetup(draft: MealSetupDraft): Promise<{ ok: true } | { ok: false; error: string }> {
+  const household = await requireHousehold();
+  if (draft.times.length === 0) return { ok: false, error: "Keep at least one meal time." };
+  for (const t of draft.times) {
+    if (!t.name.trim()) return { ok: false, error: "Every meal time needs a name, like Breakfast." };
+    if (!isLocalTime(t.usual)) return { ok: false, error: `Pick a time for ${t.name}.` };
+    if (t.icon && [...t.icon].length > 4) return { ok: false, error: "A picture should be one emoji, like 🌮." };
+  }
+  const supabase = await createClient();
+  const { data: now, error: readError } = await supabase.from("meal_times").select("id");
+  if (readError) return { ok: false, error: readError.message };
+
+  const keep = new Set(draft.times.map((t) => t.id));
+  const gone = (now ?? []).filter((r) => !keep.has(r.id)).map((r) => r.id);
+  if (gone.length) {
+    const { error } = await supabase.from("meal_times").delete().in("id", gone);
+    if (error) return { ok: false, error: error.message };
+  }
+  const ids = new Map<string, string>();
+  for (const [i, t] of draft.times.entries()) {
+    const row = { name: t.name.trim().slice(0, 30), icon: t.icon || null, usual_time: t.usual, show_on_planner: t.onPlanner, sort_order: i + 1 };
+    if (t.id.startsWith("new-")) {
+      const { data, error } = await supabase
+        .from("meal_times")
+        .insert({ ...row, household_id: household.id })
+        .select("id")
+        .single();
+      if (error) return { ok: false, error: error.message };
+      ids.set(t.id, data.id);
+    } else {
+      const { error } = await supabase.from("meal_times").update(row).eq("id", t.id);
+      if (error) return { ok: false, error: error.message };
+      ids.set(t.id, t.id);
+    }
+  }
+
+  const rows = Object.entries(draft.presets).flatMap(([key, categoryId]) => {
+    const [weekday, timeId] = key.split("|");
+    const mealTimeId = ids.get(timeId);
+    return mealTimeId && categoryId && /^[0-6]$/.test(weekday) ? [{ household_id: household.id, weekday: Number(weekday), meal_time_id: mealTimeId, category_id: categoryId }] : [];
+  });
+  const problem = await writePresets(supabase, household, rows);
+  if (problem) return { ok: false, error: problem };
   refresh();
-  back(formData, "message", "Presets saved.");
+  return { ok: true };
 }
 
 export async function setItemAisle(formData: FormData) {

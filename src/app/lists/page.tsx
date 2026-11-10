@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
+import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
@@ -26,7 +25,7 @@ import { GroceryView } from "../groceries/view";
 export default function ListsPage(props: PageProps<"/lists">) {
   return (
     <AppFrame section="lists">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Lists searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>
@@ -36,7 +35,7 @@ export default function ListsPage(props: PageProps<"/lists">) {
 async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["searchParams"] }) {
   const household = await requireHousehold();
   const params = await searchParams;
-  const { locale, timeZone } = household.settings;
+  const { timeZone } = household.settings;
   const today = localDateOf(new Date(), timeZone);
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
@@ -71,9 +70,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
   return (
     <>
-      <ScreenHeader title="Lists">
-        <HeaderClock locale={locale} timeZone={timeZone} />
-      </ScreenHeader>
+      <ScreenHeader title="List Manager" />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -90,7 +87,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                   <Link
                     href={`/lists?list=${l.id}`}
                     aria-current={active ? "page" : undefined}
-                    className={`flex min-h-16 items-center gap-3 rounded-2xl px-3 ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : "hover:bg-rail"}`}
+                    className={`flex min-h-16 items-center gap-3 rounded-2xl px-3 ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
                   >
                     <Emoji emoji={l.icon ?? "📝"} className="size-9" />
                     <span className="min-w-0 flex-1 truncate text-xl font-bold text-ink">{l.name}</span>
@@ -270,7 +267,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
             </div>
           </form>
           {list.is_groceries ? (
-            <p className="mt-6 text-lg text-ink-muted">This is the grocery list: saving the weekly review puts the menu on it. The list stays, but you can rename it.</p>
+            <p className="mt-6 text-lg text-ink-muted">The grocery list. The weekly review fills it from the menu.</p>
           ) : list.is_chores ? (
             <p className="mt-6 text-lg text-ink-muted">Everything on this list is a chore. The list stays, but you can rename it.</p>
           ) : (

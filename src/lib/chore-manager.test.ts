@@ -46,7 +46,7 @@ test("a good draft has no problem", () => {
 test("problems are said in plain words", () => {
   assert.match(draftProblem(draft({ regular: [{ ...draft().regular[0], name: " " }] })) ?? "", /needs a name/);
   assert.match(draftProblem(draft({ regular: [{ ...draft().regular[0], chore_day_id: "gone" }] })) ?? "", /needs a chore day/);
-  assert.match(draftProblem(draft({ regular: [{ ...draft().regular[0], due_time: "7pm" }] })) ?? "", /7:00 p.m./);
+  assert.match(draftProblem(draft({ regular: [{ ...draft().regular[0], due_time: "7pm" }] })) ?? "", /7 pm/);
   const noDays = draft();
   noDays.days[1] = { ...noDays.days[1], weekdays: [] };
   assert.match(draftProblem(noDays) ?? "", /Pick at least one day/);

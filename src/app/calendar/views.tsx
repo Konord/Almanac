@@ -70,6 +70,12 @@ export function eventColour(event: CalendarItem, memberById: Map<string, Member>
   return (id ? memberById.get(id)?.colour : undefined) ?? EVERYONE_COLOUR;
 }
 
+/** An event shared by two or more people: each one's colour, so it fades from one to the next. */
+function sharedColours(event: CalendarItem, memberById: Map<string, Member>): string[] | undefined {
+  const colours = event.member_ids.map((id) => memberById.get(id)?.colour).filter((c): c is string => Boolean(c));
+  return colours.length > 1 ? colours : undefined;
+}
+
 function dayBounds(day: LocalDate, timeZone: string) {
   return {
     start: zonedToUtc(day, "00:00", timeZone),
@@ -346,6 +352,7 @@ export function DayBlocks({
             key={block.id}
             event={event}
             colour={colourFor ? colourFor(event) : eventColour(event, memberById)}
+            colours={colourFor ? undefined : sharedColours(event, memberById)}
             household={household}
             href={linkFor(event)}
             big={big}
@@ -881,21 +888,22 @@ export function MonthView({
     const weekHref = href({ view: "week", date: day, edit: null, add: null, panel: null });
     // In the rolling view, the 1st of a month (and the first square) says which month.
     const label = mode === "weeks" && (day.endsWith("-01") || day === cells[0]) ? `${shortMonth(day)} ${Number(day.slice(8))}` : String(Number(day.slice(8)));
-    // A holiday's picture fills the square, faded when there are things on top of it.
+    // A holiday's picture fills an empty square. On a busy day it shrinks to a
+    // sticker beside the date, so it never sits on top of the events (2026-11-10).
     const holiday = specials?.get(day)?.find((x) => x.kind === "holiday");
     const birthdays = specials?.get(day)?.filter((x) => x.kind === "birthday") ?? [];
     const busy = dayEvents.length > 0 || breaksOn(breaks, day).length > 0;
     return (
       <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-hidden ${past ? "opacity-45" : ""}`}>
-        {holiday ? (
+        {holiday && !busy ? (
           <Link
             href={HOLIDAYS_HREF}
             title={specialLabel(holiday)}
             aria-label={`${specialLabel(holiday)}, a holiday`}
-            className={`absolute inset-0 flex flex-col items-center justify-center ${busy ? "opacity-20" : ""}`}
+            className="absolute inset-0 flex flex-col items-center justify-center"
           >
-            <Emoji emoji={holiday.icon} className={`aspect-square max-h-full min-h-0 flex-1 ${busy ? "" : "pt-9 pb-1"}`} />
-            {busy || half ? null : (
+            <Emoji emoji={holiday.icon} className="aspect-square max-h-full min-h-0 flex-1 pt-9 pb-1" />
+            {half ? null : (
               <span className="max-w-full shrink-0 truncate px-1 text-sm font-extrabold" style={{ color: strong(HOLIDAY_COLOUR) }}>
                 {holiday.name}
               </span>
@@ -907,11 +915,22 @@ export function MonthView({
             href={weekHref}
             className={`flex h-9 min-w-9 items-center justify-center rounded-full px-1.5 text-xl font-bold whitespace-nowrap ${
               day === today ? "bg-now text-white" : inMonth ? "text-ink" : "text-ink-muted"
-            } ${past ? "line-through decoration-2" : ""}`}
+            }`}
             title="Open this week"
           >
             {label}
           </Link>
+          {holiday && busy ? (
+            <Link
+              href={HOLIDAYS_HREF}
+              title={specialLabel(holiday)}
+              aria-label={`${specialLabel(holiday)}, a holiday`}
+              className="shrink-0 rounded-lg p-px"
+              style={{ background: soft(HOLIDAY_COLOUR), boxShadow: `inset 0 0 0 2px ${strong(HOLIDAY_COLOUR)}` }}
+            >
+              <Emoji emoji={holiday.icon} className="size-7" />
+            </Link>
+          ) : null}
           {breaksOn(breaks, day)
             .slice(0, 1)
             .map((b) => (
@@ -950,9 +969,9 @@ export function MonthView({
             href={editHref(e)}
             scroll={false}
             title={`${e.title}, ${timeRange(e, household)}`}
-            className="relative flex min-h-0 shrink items-center gap-1.5 overflow-hidden px-1 text-base font-bold"
+            className="relative flex min-h-0 shrink items-center gap-1 overflow-hidden px-0.5 text-base font-bold"
           >
-            <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
+            <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-5.5" />
             <span className="min-w-0 truncate" style={{ color: strong(eventColour(e, memberById)) }}>
               {e.title}
             </span>

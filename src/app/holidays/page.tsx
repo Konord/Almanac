@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
+import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { loadHolidays } from "./data";
@@ -14,7 +13,7 @@ import { HolidayManager } from "./manager";
 export default function HolidaysPage() {
   return (
     <AppFrame section="calendar">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Holidays />
       </Suspense>
     </AppFrame>
@@ -30,7 +29,6 @@ async function Holidays() {
       initial={initial}
       today={localDateOf(new Date(), timeZone)}
       locale={locale}
-      clock={<HeaderClock locale={locale} timeZone={timeZone} />}
     />
   );
 }

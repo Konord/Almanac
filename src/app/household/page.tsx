@@ -1,37 +1,27 @@
 import { Suspense } from "react";
-import { GearSix, HouseLine, SignOut, UsersThree } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Avatar, Button, Card, Field, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { allBoxes, panelBoxes } from "@/lib/panel-boxes";
 import { createClient } from "@/lib/supabase/server";
-import { signOut } from "@/app/login/actions";
-import { addMember, removeMember, saveSettings, setPin, updateMember } from "./actions";
-import { PERSON_COLOURS, strong } from "@/lib/colours";
-import { EmojiPicker } from "@/components/emoji-picker";
+import type { SettingsDraft } from "./draft";
+import { SettingsEditor } from "./editor";
 
-export default function HouseholdPage(props: PageProps<"/household">) {
+/**
+ * Settings: the people in the household and the household's settings.
+ * One Save for the whole screen; nothing scrolls (2026-11-10).
+ */
+export default function HouseholdPage() {
   return (
     <AppFrame section="settings">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
-        <HouseholdContent searchParams={props.searchParams} />
+      <Suspense fallback={<LoadingOutline />}>
+        <HouseholdContent />
       </Suspense>
     </AppFrame>
   );
 }
 
-type Member = {
-  id: string;
-  name: string;
-  role: string;
-  colour: string;
-  icon: string | null;
-  birth_year: number | null;
-  hasPin: boolean;
-};
-
-async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/household">["searchParams"] }) {
+async function HouseholdContent() {
   const household = await requireHousehold();
-  const params = await searchParams;
   const supabase = await createClient();
 
   const { data: rows, error } = await supabase
@@ -41,247 +31,38 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
     .order("sort_order")
     .order("name");
   if (error) throw error;
-
-  const members: Member[] = await Promise.all(
-    rows.map(async (row) => {
-      const { data: hasPin } = await supabase.rpc("member_has_pin", { member_id: row.id });
-      return { ...row, hasPin: Boolean(hasPin) };
-    }),
-  );
+  const pins = await Promise.all(rows.map((row) => supabase.rpc("member_has_pin", { member_id: row.id })));
 
   // The activity log is still kept, but no history shows for now (Connor, 2026-11-10).
   const { data: lists } = await supabase.from("task_lists").select("id, name, is_chores").order("sort_order").order("name");
-  const boxes = allBoxes(lists ?? []);
-  const shownBoxes = new Set(panelBoxes(household.settings.panelBoxes, lists ?? [], false).map((b) => b.id));
-
-  const error_ = firstParam(params.error);
-  const message = firstParam(params.message);
   const { settings } = household;
 
-  return (
-    <>
-      <ScreenHeader title="Settings">
-        <span className="min-w-0 truncate text-2xl text-ink-muted lg:text-4xl">{household.name}</span>
-        <SoftLink href="/households" className="lg:ml-auto">
-          <HouseLine size="1.5rem" aria-hidden />
-          Switch or add household
-        </SoftLink>
-        <form action={signOut}>
-          <Button variant="secondary">
-            <SignOut size="1.5rem" aria-hidden />
-            Sign out
-          </Button>
-        </form>
-      </ScreenHeader>
+  const initial: SettingsDraft = {
+    name: household.name,
+    timeZone: settings.timeZone,
+    currency: settings.currency,
+    weekStartsOn: settings.weekStartsOn,
+    monthStyle: settings.monthStyle,
+    units: settings.units,
+    temperatureUnit: settings.temperatureUnit,
+    measures: settings.measures,
+    handwriting: settings.handwriting,
+    reviewWeekday: settings.weeklyReview.weekday,
+    reviewTime: settings.weeklyReview.time,
+    panelBoxes: panelBoxes(settings.panelBoxes, lists ?? [], false).map((b) => b.id),
+    members: rows.map((row, i) => ({
+      id: row.id,
+      name: row.name,
+      role: row.role === "child" ? "child" : "parent",
+      colour: row.colour,
+      icon: row.icon,
+      birthYear: row.birth_year,
+      hasPin: Boolean(pins[i].data),
+      pin: "",
+      pinAgain: "",
+      removed: false,
+    })),
+  };
 
-      {error_ ? <Notice tone="error">{error_}</Notice> : null}
-      {message ? <Notice tone="success">{message}</Notice> : null}
-
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Card title="People" icon={UsersThree} tint="blue">
-        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
-        {members.length === 0 ? (
-          <p className="mb-4 text-lg text-ink-muted">No one yet. Add the first person below.</p>
-        ) : (
-          <ul className="mb-6 flex flex-col gap-4">
-            {members.map((member) => (
-              <li key={member.id} className="border-b border-frame py-3 last:border-0">
-                <MemberEditor member={member} />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <details className="rounded-[var(--radius-card)] bg-rail p-4">
-          <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">Add someone</summary>
-          <form action={addMember} className="mt-2 grid gap-4 sm:grid-cols-2">
-            <MemberFields />
-            <div className="sm:col-span-2">
-              <Button>Add</Button>
-            </div>
-          </form>
-        </details>
-        </div>
-      </Card>
-
-      <Card title="Household" icon={GearSix} tint="slate">
-        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
-        <form action={saveSettings} className="grid gap-4 sm:grid-cols-2">
-          <Field label="Household name">
-            <Input name="householdName" defaultValue={household.name} required maxLength={80} />
-          </Field>
-          <Field label="Time zone" hint="For example, America/Toronto.">
-            <Input name="timeZone" defaultValue={settings.timeZone} required />
-          </Field>
-          <Field label="Week starts on">
-            <Select name="weekStartsOn" defaultValue={String(settings.weekStartsOn)}>
-              <option value="0">Sunday</option>
-              <option value="1">Monday</option>
-            </Select>
-          </Field>
-          <Field label="The Month view shows">
-            <Select name="monthStyle" defaultValue={settings.monthStyle}>
-              <option value="rolling">5 weeks from this week</option>
-              <option value="calendar">The calendar month</option>
-            </Select>
-          </Field>
-          <Field label="Weekly review on" hint="A reminder shows on the Agenda from then until the next week is confirmed.">
-            <Select name="reviewWeekday" defaultValue={String(settings.weeklyReview.weekday)}>
-              {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
-                <option key={day} value={i}>
-                  {day}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Weekly review at">
-            <Input name="reviewTime" type="time" defaultValue={settings.weeklyReview.time} required />
-          </Field>
-          <Field label="Currency">
-            <Input name="currency" defaultValue={settings.currency} required maxLength={3} />
-          </Field>
-          <Field label="Units">
-            <Select name="units" defaultValue={settings.units}>
-              <option value="metric">Metric</option>
-              <option value="imperial">Imperial</option>
-            </Select>
-          </Field>
-          <Field label="Temperature">
-            <Select name="temperatureUnit" defaultValue={settings.temperatureUnit}>
-              <option value="celsius">Celsius</option>
-              <option value="fahrenheit">Fahrenheit</option>
-            </Select>
-          </Field>
-          <Field label="Kitchen measures">
-            <Select name="measures" defaultValue={settings.measures}>
-              <option value="canadian">Canadian (1 cup = 250 ml)</option>
-              <option value="us">US (1 cup = 237 ml)</option>
-            </Select>
-          </Field>
-          <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink sm:col-span-2">
-            <input type="checkbox" name="handwriting" defaultChecked={settings.handwriting} className="size-6 accent-accent" />
-            <span>
-              Show to-dos, meals and notes in <span className="font-hand text-xl font-bold">handwriting</span>
-            </span>
-          </label>
-          <fieldset className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2">
-            <legend className="px-2 text-lg font-bold text-ink">Today panel</legend>
-            <p className="text-base text-ink-muted">The boxes its arrows flip between. Up next shows on the Week and Month only.</p>
-            <input type="hidden" name="panelBoxesSent" value="1" />
-            <div className="flex flex-wrap gap-2">
-              {boxes.map((b) => (
-                <label
-                  key={b.id}
-                  className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold"
-                >
-                  <input type="checkbox" name="panelBoxes" value={b.id} defaultChecked={shownBoxes.has(b.id)} className="sr-only" />
-                  {b.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="sm:col-span-2">
-            <Button>Save settings</Button>
-          </div>
-        </form>
-
-        </div>
-      </Card>
-      </div>
-    </>
-  );
-}
-
-function MemberEditor({ member }: { member: Member }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <Avatar name={member.name} colour={member.colour} icon={member.icon} />
-        <span className="text-xl font-bold text-ink">{member.name}</span>
-        <span className="text-base text-ink-muted">
-          {member.role === "parent" ? "Parent" : "Child"}
-          {member.role === "parent" ? (member.hasPin ? " · PIN set" : " · no PIN yet") : ""}
-        </span>
-      </div>
-
-      <details>
-        <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-accent">Edit</summary>
-        <form action={updateMember} className="mt-4 grid gap-4 sm:grid-cols-2">
-          <input type="hidden" name="id" value={member.id} />
-          <MemberFields member={member} />
-          <div className="sm:col-span-2">
-            <Button>Save</Button>
-          </div>
-        </form>
-
-        {member.role === "parent" ? (
-          <form action={setPin} className="mt-6 grid gap-4 sm:grid-cols-2">
-            <input type="hidden" name="id" value={member.id} />
-            <Field label={member.hasPin ? "New PIN" : "PIN"} hint="4 to 8 digits. Used for parent mode later.">
-              <Input name="pin" type="password" inputMode="numeric" pattern="\d{4,8}" autoComplete="off" required />
-            </Field>
-            <Field label="Type it again">
-              <Input name="confirmPin" type="password" inputMode="numeric" pattern="\d{4,8}" autoComplete="off" required />
-            </Field>
-            <div className="sm:col-span-2">
-              <Button variant="secondary">{member.hasPin ? "Change PIN" : "Set PIN"}</Button>
-            </div>
-          </form>
-        ) : null}
-
-        <form action={removeMember} className="mt-6">
-          <input type="hidden" name="id" value={member.id} />
-          <input type="hidden" name="name" value={member.name} />
-          <Button variant="danger">Remove {member.name}</Button>
-        </form>
-      </details>
-    </div>
-  );
-}
-
-function MemberFields({ member }: { member?: Member }) {
-  return (
-    <>
-      <div className="flex gap-3">
-        <EmojiPicker initial={member?.icon ?? ""} nameField="name" letter fullScreen />
-        <div className="min-w-0 flex-1">
-          <Field label="Name" hint="Tap the circle to give them a picture instead of a letter.">
-            <Input name="name" defaultValue={member?.name} required maxLength={40} />
-          </Field>
-        </div>
-      </div>
-      <Field label="Role">
-        <Select name="role" defaultValue={member?.role ?? "parent"}>
-          <option value="parent">Parent</option>
-          <option value="child">Child</option>
-        </Select>
-      </Field>
-      <fieldset className="flex flex-col gap-1.5 sm:col-span-2">
-        <legend className="mb-1.5 text-base font-bold text-ink">Colour</legend>
-        <div className="flex flex-wrap gap-2">
-          {PERSON_COLOURS.map((c) => (
-            <label key={c.value} className="cursor-pointer" title={c.label}>
-              <input
-                type="radio"
-                name="colour"
-                value={c.value}
-                defaultChecked={(member?.colour ?? "blue") === c.value}
-                className="peer sr-only"
-                required
-              />
-              <span
-                className="flex size-[var(--touch-target)] items-center justify-center rounded-full ring-ink ring-offset-2 peer-checked:ring-4 peer-focus-visible:ring-4"
-                style={{ background: strong(c.value) }}
-              >
-                <span className="sr-only">{c.label}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <Field label="Birth year" hint="Optional.">
-        <Input name="birthYear" type="number" min={1900} max={2100} defaultValue={member?.birth_year ?? undefined} />
-      </Field>
-    </>
-  );
+  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} />;
 }

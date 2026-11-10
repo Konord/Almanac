@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame, Emoji, firstParam } from "@/components/ui";
+import { AppFrame, Emoji, firstParam, LoadingOutline } from "@/components/ui";
 import { CategoryForm } from "../category-form";
 import { loadMealBasics } from "../data";
 import { Modal } from "../parts";
@@ -15,7 +15,7 @@ import { MenuManager, type ManagerMeal } from "./manager";
 export default function MenuPage(props: PageProps<"/meals/menu">) {
   return (
     <AppFrame section="meals">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Menu searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

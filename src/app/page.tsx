@@ -10,6 +10,7 @@ import {
   ScreenHeader,
   Segmented,
   firstParam,
+  LoadingOutline,
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
@@ -69,7 +70,7 @@ const COLUMN_GAP = "0.625rem";
 export default function Home(props: PageProps<"/">) {
   return (
     <AppFrame section="today">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Today searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>
@@ -386,7 +387,7 @@ function PeopleTimeline({
   return (
     <section
       aria-label="Today's timeline"
-      className="flex min-h-[36rem] flex-col max-lg:overflow-x-auto lg:min-h-0 lg:w-[56.25rem] lg:shrink-0"
+      className="flex min-h-[36rem] flex-col max-lg:overflow-x-auto lg:min-h-0 lg:min-w-0 lg:flex-1"
     >
       <div className="flex flex-1 flex-col max-lg:min-w-[40rem] lg:min-h-0">
         <div className="flex shrink-0 gap-2.5 pl-16.5">

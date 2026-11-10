@@ -8,6 +8,7 @@ import { zonedToUtc, type LocalDate } from "@/lib/time";
 import { carriedOver } from "@/lib/todos";
 import { doToday, markChoreDone, skipChore, toggleTodo, undoRound } from "./actions";
 import type { ChoreMember, ChoreWithTiming, Round, Todo } from "./data";
+import { shortClockTime } from "@/lib/time-text";
 
 /** "Today", "Tomorrow", "Sat", or "Nov 14". */
 export function dayLabel(date: LocalDate, today: LocalDate, household: Household): string {
@@ -21,15 +22,13 @@ export function dayLabel(date: LocalDate, today: LocalDate, household: Household
   return new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" }).format(noon);
 }
 
-/** "by Fri", "Tue 9 a.m.", "from Tue" (still open after its day). */
+/** "by Fri", "Tue 9 am", "from Tue" (still open after its day). */
 export function todoWhen(todo: Pick<Todo, "due_date" | "date_kind" | "at_time" | "status">, today: LocalDate, household: Household): string {
   if (!todo.due_date) return "";
   const day = dayLabel(todo.due_date, today, household);
   if (carriedOver(todo, today)) return `from ${day}`;
   const time = todo.at_time
-    ? ` ${new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, hour: "numeric", minute: "2-digit" })
-        .format(zonedToUtc(todo.due_date, todo.at_time.slice(0, 5), household.settings.timeZone))
-        .replace(":00", "")}`
+    ? ` ${shortClockTime(zonedToUtc(todo.due_date, todo.at_time.slice(0, 5), household.settings.timeZone), household.settings.locale, household.settings.timeZone)}`
     : "";
   return todo.date_kind === "due" ? `by ${day}${time}` : `${day}${time}`;
 }

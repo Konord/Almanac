@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BookOpen, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { BATCHES, batchAmount } from "@/lib/meals";
 import { clampBatches, menuMealName } from "@/lib/menu";
 import { measureText, type Measures } from "@/lib/units";
@@ -22,7 +22,7 @@ import { DishEditor, type DishTab } from "../dish-editor";
 export default function LibraryPage(props: PageProps<"/meals/library">) {
   return (
     <AppFrame section="meals">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Library searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>
@@ -30,7 +30,7 @@ export default function LibraryPage(props: PageProps<"/meals/library">) {
 }
 
 const KIND_PAGE = 12;
-const DISH_PAGE = 6;
+const DISH_PAGE = 8;
 /** The pretend kinds: every dish, and dishes with no kind. */
 const ALL = "all";
 const NONE = "none";
@@ -78,7 +78,6 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
         <Card title="Kinds of dish" icon={BookOpen} tint="yellow">
-          <p className="mb-3 text-lg text-ink-muted">Every dish is just a dish. Its kinds say what it can be in a meal: a Main, a Starch, a Veggie…</p>
           <div className="grid min-h-0 flex-1 grid-cols-4 gap-2.5" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
             {tilePage.items.map((t) => (
               <Link
@@ -195,7 +194,7 @@ function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; ba
           </>
         ) : (
           <>
-            <p className="text-lg text-ink-muted">Most recipe sites include a tidy copy of the recipe. Paste the page&apos;s link and Almanac reads it.</p>
+            <p className="text-lg text-ink-muted">Paste a recipe page&apos;s link and Almanac reads it in.</p>
             <Field label="Link">
               <Input name="url" type="url" required placeholder="https://…" />
             </Field>
@@ -360,7 +359,7 @@ function RecipeView({
             ))}
           </nav>
         </div>
-        <p className="shrink-0 text-base text-ink-muted">Tap an amount to see it in other units. Recipes keep the units they were written in.</p>
+        <p className="shrink-0 text-base text-ink-muted">Tap an amount to see it in other units.</p>
         {ingredients.length ? (
           <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-6">
             {column(shown.slice(0, VIEW_INGREDIENTS))}

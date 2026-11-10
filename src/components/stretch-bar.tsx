@@ -49,7 +49,7 @@ export function StretchBar({
       else router.refresh();
     });
   return (
-    <div className={`relative flex min-w-0 px-1 ${saving ? "opacity-70" : ""}`} style={{ gridColumn: `${a + 1} / ${b + 2}`, gridRow: lane + 1 }}>
+    <div className={`quiet-handles relative flex min-w-0 px-1 ${preview ? "is-dragging" : ""} ${saving ? "opacity-70" : ""}`} style={{ gridColumn: `${a + 1} / ${b + 2}`, gridRow: lane + 1 }}>
       <Link href={href} scroll={false} title={title} draggable={false} className={`${className} ${preview ? "ring-2 ring-ink" : ""}`} style={style}>
         {children}
       </Link>

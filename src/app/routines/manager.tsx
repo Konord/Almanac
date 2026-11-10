@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
-import { Avatar, Emoji } from "@/components/ui";
+import { Avatar, EmptyState, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
@@ -14,6 +14,7 @@ import { SideHandles } from "@/components/side-handles";
 import { clock, useTimelineDrag } from "@/components/timeline-drag";
 import { spanBox } from "@/lib/calendar-layout";
 import { saveRoutineManager } from "./manager-actions";
+import { hourText, minutesText } from "@/lib/time-text";
 
 /*
  * The Routine Manager. Left: routine blocks on a time grid, one column per
@@ -160,9 +161,8 @@ export function RoutineManager({
   const firstHour = Math.max(0, Math.floor(Math.min(6 * 60, ...wakeTimes, ...allBlocks.map((b) => b.start)) / 60));
   const lastHour = Math.min(24, Math.ceil(Math.max(21 * 60, ...wakeTimes, ...allBlocks.map((b) => b.end)) / 60));
   const span = (lastHour - firstHour) * 60;
-  const hourLabel = (h: number) => new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 1, h % 24)));
-  const timeLabel = (min: number) =>
-    new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 1, Math.floor(min / 60) % 24, min % 60)));
+  const hourLabel = (h: number) => hourText(h, locale);
+  const timeLabel = (min: number) => minutesText(min, locale);
 
   // --- Changing the draft ------------------------------------------------------
   const routine = draft.routines.find((r) => r.id === selected) ?? null;
@@ -339,7 +339,7 @@ export function RoutineManager({
     const copy = copyRoutine(draft, routine.id, newId, true);
     if (!copy) return;
     update((d) => ({ ...d, routines: [...d.routines, copy.routine], steps: [...d.steps, ...copy.steps] }));
-    setNote({ text: "Saved as a template: start new routines from it with the + above a column. Press Save to keep it.", warn: false });
+    setNote({ text: "Saved as a template. Press Save to keep it.", warn: false });
   };
 
   // --- Saving ---------------------------------------------------------------------
@@ -582,7 +582,7 @@ export function RoutineManager({
                     {note.text}
                   </span>
                 ) : routine.is_template ? (
-                  <span className="rounded-full bg-panel px-2.5 py-1 text-ink">Template · start new routines from it with the + above a column</span>
+                  <span className="rounded-full bg-panel px-2.5 py-1 text-ink">Template</span>
                 ) : usedBy.length === 0 ? (
                   <span>Nobody has this routine yet. Tap + above a column to give it to someone.</span>
                 ) : (
@@ -753,7 +753,7 @@ export function RoutineManager({
                     partly={listState === "some"}
                     onClick={() => setWholeDailyList(listState !== "all")}
                     label={listState === "some" ? "Daily list: some steps" : "Whole routine on daily list"}
-                    hint="Shows as one row on the daily list; ticking it ticks every step. Or pick single steps with the list buttons."
+                    hint="Shows as one row on the daily list. Or put single steps on it."
                   />
                   <label className="ml-auto flex items-center gap-2 text-sm font-bold text-ink-muted">
                     Who sees it
@@ -769,11 +769,7 @@ export function RoutineManager({
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-              <Emoji emoji="📝" className="size-16" />
-              <p className="max-w-80 text-xl font-bold text-ink">Tap a routine to edit it</p>
-              <p className="max-w-96 text-base text-ink-muted">Or tap an empty spot in a column to add a new one there. The + above a column gives that person a routine you already have.</p>
-            </div>
+            <EmptyState emoji="📝" title="Tap a routine to edit it" hint="Or tap an empty spot to add one." />
           )}
 
         </section>
@@ -798,7 +794,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-base font-bold ${active ? "border-ink bg-ink text-board" : "border-frame bg-board text-ink hover:border-ink"}`}
+      className={`flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-base font-bold ${active ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink hover:border-ink"}`}
     >
       {children}
     </button>
