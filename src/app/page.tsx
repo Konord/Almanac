@@ -26,9 +26,8 @@ import { loadTodos, type Todo } from "./chores/data";
 import { onCalendar } from "@/lib/todos";
 import { loadSpecialDays } from "./holidays/data";
 import { loadRoutines, type RoutineData } from "./routines/data";
-import { energyModeOn, loadBackupParts, loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
-import { MealBlock, SurvivalButton, mealsForRoutines, placeTodayMeals, startCooking } from "./meals/today";
-import { SurvivalCard } from "./survival-card";
+import { loadMealBasics, loadMeals, type Meal, type MealBasics } from "./meals/data";
+import { MealBlock, mealsForRoutines, placeTodayMeals, startCooking } from "./meals/today";
 import { OpenPanelTab, TodayPanel } from "./today-panel/panel";
 import { readPanelPrefs } from "./today-panel/prefs";
 import { chainPositions, floatingDay, RoutineChain } from "./routines/floating";
@@ -91,13 +90,12 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   // The chore generator puts today's chores on the daily list before the tasks are read.
   await choreSchedule(household, today, timeZone);
-  const [{ layers, members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, energyMode, reviewNow] = await Promise.all([
+  const [{ layers, members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, today),
-    energyModeOn(today),
     reviewReminder(household, today, now),
   ]);
   const todaySpecials = (await loadSpecialDays(today, today)).get(today) ?? [];
@@ -116,17 +114,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/");
-  // The Survival card (?survival=1): meals still to cook, and chores due.
-  const survivalOpen = firstParam(params.survival) === "1" && !placing;
+  // The Survival button and its card are hidden for now (Connor, 2026-11-10);
+  // they come back with backup meals.
   const openRoutine = firstParam(params.routine) ?? "";
   const openMember = firstParam(params.member) ?? "";
   const routineOpen = Boolean(openRoutine && openMember) && !placing;
-  const survivalParts = survivalOpen ? await loadBackupParts() : [];
-  const mealsToCook = survivalOpen
-    ? placeTodayMeals(todayMeals, mealBasics, [])
-        .filter((m) => !m.cooked && !m.backup && m.endMin > minutesIntoDay(now, timeZone))
-        .sort((a, b) => a.startMin - b.startMin)
-    : [];
 
   // The Today panel on the left (no Up next here: the timeline already shows today).
   const panelPrefs = await readPanelPrefs();
@@ -197,7 +189,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             Weekly review
           </Link>
         ) : null}
-        <SurvivalButton used={energyMode === "survival"} href="/?survival=1" />
         <div className="lg:ml-auto">
           <Segmented
             label="How much to show"
@@ -256,9 +247,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
       </Link>
 
-      {survivalOpen ? (
-        <SurvivalCard meals={mealsToCook} basics={mealBasics} parts={survivalParts} chores={todoData.todos.filter((t) => t.template_id && t.status === "open" && t.due_date !== null && t.due_date <= today)} closeHref="/" />
-      ) : null}
 
       {pending ? (
         <QuickAddSheet pending={pending} layers={layers} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />

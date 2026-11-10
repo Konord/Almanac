@@ -843,7 +843,7 @@ function OccasionalEditor({
 
   const status = info
     ? [
-        info.lastDone ? `Last done ${dateLabel(info.lastDone)}` : "Not done yet",
+        // When it was last done is kept but not shown: no history on screen for now (Connor, 2026-11-10).
         `due ${dateLabel(info.dueOn)}`,
         info.placedOn ? `placed on ${dateLabel(info.placedOn)}` : null,
       ]

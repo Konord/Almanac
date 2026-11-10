@@ -255,20 +255,47 @@ export async function addRecipe(formData: FormData) {
   redirect(`/meals/library?${kindId ? `kind=${kindId}&` : ""}recipe=${data.id}&tab=basics`);
 }
 
-export async function saveRecipeBasics(formData: FormData) {
+export type DishSaveResult = { ok: true } | { ok: false; error: string };
+
+type IngredientRow = { amount?: unknown; unit?: unknown; name?: unknown; note?: unknown; putAway?: unknown };
+type HelperRow = { kind?: unknown; minutes?: unknown; temperature?: unknown; label?: unknown };
+type StepRow = { text?: unknown; helpers?: HelperRow[] };
+
+/**
+ * Saves a whole dish at once: its basics, ingredients, steps and notes
+ * (Connor, 2026-11-10: one Save for the dish, not one per tab). The dish
+ * editor sends everything; nothing is saved unless all of it checks out.
+ */
+export async function saveDish(formData: FormData): Promise<DishSaveResult> {
   const household = await requireHousehold();
   const id = text(formData, "id");
+  const fail = (error: string): DishSaveResult => ({ ok: false, error });
+
+  // Basics
   const name = text(formData, "name");
-  if (!name) back(formData, "error", "A dish needs a name.");
+  if (!name) return fail("A dish needs a name.");
   const serves = wholeNumber(text(formData, "serves") || "4", 1, 50);
   const handsOn = wholeNumber(text(formData, "handsOnMinutes"), 0, 1440);
   const total = wholeNumber(text(formData, "totalMinutes"), 0, 2880);
-  if (Number.isNaN(serves) || serves === null) back(formData, "error", "Serves should be 1 to 50.");
-  if (Number.isNaN(handsOn) || Number.isNaN(total)) back(formData, "error", "Minutes should be whole numbers, like 25.");
+  if (Number.isNaN(serves) || serves === null) return fail("Serves should be 1 to 50.");
+  if (Number.isNaN(handsOn) || Number.isNaN(total)) return fail("Minutes should be whole numbers, like 25.");
   const visibility = text(formData, "visibility") || "everyone";
-  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see it.");
+  if (!isVisibility(visibility)) return fail("Choose who can see it.");
   const kindIds = formData.getAll("kindIds").map(String).filter(Boolean);
   const tagIds = formData.getAll("tagIds").map(String).filter(Boolean);
+  // Notes
+  const source = text(formData, "sourceUrl");
+  if (source && !/^https?:\/\//i.test(source)) return fail("The recipe link should start with https://");
+  // Ingredients and steps (JSON from the editor)
+  let ingredients: IngredientRow[];
+  let stepRows: StepRow[];
+  try {
+    ingredients = JSON.parse(text(formData, "ingredients") || "[]") as IngredientRow[];
+    stepRows = JSON.parse(text(formData, "steps") || "[]") as StepRow[];
+  } catch {
+    return fail("Couldn't read the ingredients or steps. Try again.");
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("recipes")
@@ -278,118 +305,56 @@ export async function saveRecipeBasics(formData: FormData) {
       serves,
       hands_on_minutes: handsOn,
       total_minutes: total,
-      is_backup: formData.get("isBackup") === "on",
       visibility,
+      notes: text(formData, "notes").slice(0, 4000) || null,
+      source_url: source || null,
     })
     .eq("id", id);
-  if (error) back(formData, "error", error.message);
+  if (error) return fail(error.message);
   await supabase.from("recipe_kinds").delete().eq("recipe_id", id);
   if (kindIds.length) await supabase.from("recipe_kinds").insert(kindIds.map((kind_id) => ({ recipe_id: id, kind_id, household_id: household.id })));
   await supabase.from("recipe_tags").delete().eq("recipe_id", id);
   if (tagIds.length) await supabase.from("recipe_tags").insert(tagIds.map((tag_id) => ({ recipe_id: id, tag_id, household_id: household.id })));
-  refresh();
-  back(formData, "message", `Saved ${name}.`);
-}
 
-export async function saveRecipeNotes(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const source = text(formData, "sourceUrl");
-  if (source && !/^https?:\/\//i.test(source)) back(formData, "error", "The link should start with https://");
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("recipes")
-    .update({ notes: text(formData, "notes").slice(0, 4000) || null, source_url: source || null })
-    .eq("id", id);
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", "Notes saved.");
-}
-
-export async function removeRecipe(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const supabase = await createClient();
-  const { error } = await supabase.from("recipes").delete().eq("id", id);
-  if (error) back(formData, "error", error.message);
-  // Meals on the menu that were only this dish go too.
-  const [meals, spots] = await Promise.all([supabase.from("menu_meals").select("id"), supabase.from("menu_meal_spots").select("menu_meal_id")]);
-  const used = new Set((spots.data ?? []).map((sp) => sp.menu_meal_id));
-  const empty = (meals.data ?? []).map((m) => m.id).filter((m) => !used.has(m));
-  if (empty.length) await supabase.from("menu_meals").delete().in("id", empty);
-  await log(household.id, "recipe_removed", "recipe", id, { name });
-  refresh();
-  back(formData, "message", `Removed ${name}.`, { recipe: null, tab: null });
-}
-
-type IngredientRow = { amount?: unknown; unit?: unknown; name?: unknown; note?: unknown; putAway?: unknown };
-
-/** Saves the whole ingredient list (sent as JSON from the recipe card). */
-export async function saveIngredients(formData: FormData) {
-  const household = await requireHousehold();
-  const recipeId = text(formData, "recipeId");
-  let rows: IngredientRow[];
-  try {
-    rows = JSON.parse(text(formData, "rows") || "[]") as IngredientRow[];
-  } catch {
-    back(formData, "error", "Couldn't read the ingredients. Try again.");
-  }
-  const supabase = await createClient();
-  const clean = [];
-  for (const r of rows.slice(0, 80)) {
-    const name = String(r.name ?? "").trim();
-    if (!name) continue;
-    clean.push({
+  // Ingredients: the whole list is replaced.
+  const cleanIngredients = [];
+  for (const r of ingredients.slice(0, 80)) {
+    const itemName = String(r.name ?? "").trim();
+    if (!itemName) continue;
+    cleanIngredients.push({
       household_id: household.id,
-      recipe_id: recipeId,
-      item_id: await findOrCreateItem(supabase, household.id, name),
+      recipe_id: id,
+      item_id: await findOrCreateItem(supabase, household.id, itemName),
       amount: positive(r.amount),
       unit: String(r.unit ?? "").trim().slice(0, 20) || null,
       note: String(r.note ?? "").trim().slice(0, 80) || null,
       put_away_if_skipped: r.putAway === true,
-      position: clean.length,
+      position: cleanIngredients.length,
     });
   }
-  const { error: delError } = await supabase.from("recipe_ingredients").delete().eq("recipe_id", recipeId);
-  if (delError) back(formData, "error", delError.message);
-  if (clean.length) {
-    const { error } = await supabase.from("recipe_ingredients").insert(clean);
-    if (error) back(formData, "error", error.message);
+  const { error: ingredientsGone } = await supabase.from("recipe_ingredients").delete().eq("recipe_id", id);
+  if (ingredientsGone) return fail(ingredientsGone.message);
+  if (cleanIngredients.length) {
+    const { error: ingredientsError } = await supabase.from("recipe_ingredients").insert(cleanIngredients);
+    if (ingredientsError) return fail(ingredientsError.message);
   }
-  refresh();
-  back(formData, "message", `Saved ${clean.length} ingredient${clean.length === 1 ? "" : "s"}.`);
-}
 
-type HelperRow = { kind?: unknown; minutes?: unknown; temperature?: unknown; label?: unknown };
-type StepRow = { text?: unknown; helpers?: HelperRow[] };
-
-/** Saves the steps and the helpers you kept (sent as JSON from the recipe card). */
-export async function saveSteps(formData: FormData) {
-  const household = await requireHousehold();
-  const recipeId = text(formData, "recipeId");
-  let rows: StepRow[];
-  try {
-    rows = JSON.parse(text(formData, "steps") || "[]") as StepRow[];
-  } catch {
-    back(formData, "error", "Couldn't read the steps. Try again.");
-  }
-  const supabase = await createClient();
-  const { error: delError } = await supabase.from("recipe_steps").delete().eq("recipe_id", recipeId);
-  if (delError) back(formData, "error", delError.message);
-  const steps = rows
+  // Steps, with the helpers you kept: the whole list is replaced.
+  const { error: stepsGone } = await supabase.from("recipe_steps").delete().eq("recipe_id", id);
+  if (stepsGone) return fail(stepsGone.message);
+  const steps = stepRows
     .map((r) => ({ text: String(r.text ?? "").trim().slice(0, 400), helpers: r.helpers ?? [] }))
     .filter((r) => r.text)
     .slice(0, 60);
   if (steps.length) {
-    const { data, error } = await supabase
+    const { data, error: stepsError } = await supabase
       .from("recipe_steps")
-      .insert(steps.map((s, i) => ({ household_id: household.id, recipe_id: recipeId, position: i, text: s.text })))
+      .insert(steps.map((st, i) => ({ household_id: household.id, recipe_id: id, position: i, text: st.text })))
       .select("id, position");
-    if (error) back(formData, "error", error.message);
+    if (stepsError) return fail(stepsError.message);
     const idAt = new Map(data.map((d) => [d.position, d.id]));
-    const helperRows = steps.flatMap((s, i) =>
-      s.helpers.flatMap((h) => {
+    const helperRows = steps.flatMap((st, i) =>
+      st.helpers.flatMap((h) => {
         const kind = String(h.kind);
         if (!["timer", "heads_up", "oven", "doneness"].includes(kind)) return [];
         const minutes = positive(h.minutes, 4320);
@@ -411,15 +376,34 @@ export async function saveSteps(formData: FormData) {
     );
     if (helperRows.length) {
       const { error: helperError } = await supabase.from("step_helpers").insert(helperRows);
-      if (helperError) back(formData, "error", helperError.message);
+      if (helperError) return fail(helperError.message);
     }
   }
-  // Heads-ups for meals already planned with this recipe.
+
+  // Heads-ups for meals already planned with this dish.
   const today = localDateOf(new Date(), household.settings.timeZone);
-  const { data: planned } = await supabase.from("meals").select("id").eq("recipe_id", recipeId).eq("status", "planned").gte("date", addDays(today, -1));
+  const { data: planned } = await supabase.from("meals").select("id").eq("recipe_id", id).eq("status", "planned").gte("date", addDays(today, -1));
   for (const m of planned ?? []) await syncHeadsUps(household.id, m.id, household.settings.timeZone);
+  await log(household.id, "recipe_saved", "recipe", id, { name });
   refresh();
-  back(formData, "message", `Saved ${steps.length} step${steps.length === 1 ? "" : "s"}.`);
+  return { ok: true };
+}
+
+export async function removeRecipe(formData: FormData) {
+  const household = await requireHousehold();
+  const id = text(formData, "id");
+  const name = text(formData, "name");
+  const supabase = await createClient();
+  const { error } = await supabase.from("recipes").delete().eq("id", id);
+  if (error) back(formData, "error", error.message);
+  // Meals on the menu that were only this dish go too.
+  const [meals, spots] = await Promise.all([supabase.from("menu_meals").select("id"), supabase.from("menu_meal_spots").select("menu_meal_id")]);
+  const used = new Set((spots.data ?? []).map((sp) => sp.menu_meal_id));
+  const empty = (meals.data ?? []).map((m) => m.id).filter((m) => !used.has(m));
+  if (empty.length) await supabase.from("menu_meals").delete().in("id", empty);
+  await log(household.id, "recipe_removed", "recipe", id, { name });
+  refresh();
+  back(formData, "message", `Removed ${name}.`, { recipe: null, tab: null });
 }
 
 /** Brings a recipe in from pasted text or a web link, then opens it to check. */

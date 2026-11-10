@@ -225,12 +225,7 @@ export function MealBox({
       <div className={`flex min-h-0 flex-col ${mode.name === "meals" || mode.name === "plate" ? "h-[41rem]" : ""}`}>{body}</div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-frame pt-4.5">
-        {mode.name === "kinds" && backups.length > 0 ? (
-          <button type="button" onClick={() => go({ name: "backups" })} className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-meal px-5 text-lg font-bold text-meal-ink">
-            <Emoji emoji="🥫" className="size-7" />
-            Use a backup meal
-          </button>
-        ) : null}
+        {/* "Use a backup meal" is hidden for now (Connor, 2026-11-10); it returns with backup meals. */}
         {meal ? (
           <button type="button" onClick={onAddAnother} className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-5 text-lg font-bold text-ink hover:bg-panel">
             <Plus size="1.25rem" weight="bold" aria-hidden />

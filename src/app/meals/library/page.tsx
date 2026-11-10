@@ -1,19 +1,17 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BookOpen, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Chips, Emoji, Field, Input, Select, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam } from "@/components/ui";
 import { BATCHES, batchAmount } from "@/lib/meals";
 import { clampBatches, menuMealName } from "@/lib/menu";
 import { measureText, type Measures } from "@/lib/units";
 import { UnitPill } from "../unit-pill";
-import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
 import { minutesText } from "@/lib/meal-helpers";
-import { VISIBILITY_OPTIONS } from "../../calendar/options";
-import { addRecipe, importRecipe, removeRecipe, saveRecipeBasics, saveRecipeNotes } from "../actions";
+import { addRecipe, importRecipe, removeRecipe } from "../actions";
 import { loadMealBasics, loadRecipeDetail, type DishKind, type MealBasics, type Recipe } from "../data";
 import { MealsHeader, Modal, Pager, linker, pageOf } from "../parts";
-import { IngredientsEditor, StepsEditor } from "../recipe-editors";
+import { DishEditor, type DishTab } from "../dish-editor";
 
 /**
  * The Menu Manager's Dishes tab (Connor, 2026-11-10): every dish, by what
@@ -158,7 +156,6 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
           here={here}
           temperatureUnit={household.settings.temperatureUnit}
           measures={household.settings.measures}
-          returnTo={returnTo}
         />
       ) : null}
     </>
@@ -236,13 +233,7 @@ function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; ba
   );
 }
 
-const RECIPE_TABS = [
-  { tab: "recipe", label: "Recipe" },
-  { tab: "basics", label: "Basics" },
-  { tab: "ingredients", label: "Ingredients" },
-  { tab: "steps", label: "Steps" },
-  { tab: "notes", label: "Notes" },
-] as const;
+const DISH_TABS: readonly DishTab[] = ["recipe", "basics", "ingredients", "steps", "notes"];
 
 async function RecipeCard({
   recipe,
@@ -252,7 +243,6 @@ async function RecipeCard({
   here,
   temperatureUnit,
   measures,
-  returnTo,
 }: {
   recipe: Recipe;
   basics: MealBasics;
@@ -261,114 +251,49 @@ async function RecipeCard({
   here: ReturnType<typeof linker>;
   temperatureUnit: "celsius" | "fahrenheit";
   measures: Measures;
-  returnTo: string;
 }) {
-  const detail = tab === "ingredients" || tab === "steps" || tab === "recipe" ? await loadRecipeDetail(recipe.id) : null;
-  const tabs = (
-    <div className="flex gap-1 rounded-2xl bg-panel p-1">
-      {RECIPE_TABS.map((t) => (
-        <Link
-          key={t.tab}
-          href={here({ recipe: recipe.id, tab: t.tab })}
-          scroll={false}
-          className={`flex min-h-12 items-center rounded-xl px-5 text-base font-bold ${t.tab === tab ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
-        >
-          {t.label}
-        </Link>
-      ))}
-    </div>
-  );
+  const detail = await loadRecipeDetail(recipe.id);
+  const ingredients = detail.ingredients.map((i) => ({ amount: i.amount === null ? "" : String(i.amount), unit: i.unit ?? "", name: i.item.name, note: i.note ?? "", putAway: i.put_away_if_skipped }));
+  const steps = detail.steps.map((s) => ({ text: s.text, helpers: s.helpers.map((h) => ({ kind: h.kind, minutes: h.minutes, temperature: h.temperature, label: h.label })) }));
+  const dish = {
+    id: recipe.id,
+    name: recipe.name,
+    icon: recipe.icon,
+    serves: recipe.serves,
+    hands_on_minutes: recipe.hands_on_minutes,
+    total_minutes: recipe.total_minutes,
+    visibility: recipe.visibility,
+    kind_ids: recipe.kind_ids,
+    tag_ids: recipe.tag_ids,
+    notes: recipe.notes,
+    source_url: recipe.source_url,
+  };
   return (
-    <Modal title={recipe.name} icon={<Emoji emoji={recipe.icon} className="size-12" />} closeHref={here({})} wide aside={tabs}>
-      {tab === "recipe" && detail ? (
-        <RecipeView recipe={recipe} detail={detail} batches={batches} here={here} measures={measures} basics={basics} />
-      ) : tab === "ingredients" && detail ? (
-        <IngredientsEditor
-          recipeId={recipe.id}
-          returnTo={returnTo}
-          initial={detail.ingredients.map((i) => ({ amount: i.amount === null ? "" : String(i.amount), unit: i.unit ?? "", name: i.item.name, note: i.note ?? "", putAway: i.put_away_if_skipped }))}
-        />
-      ) : tab === "steps" && detail ? (
-        <StepsEditor
-          recipeId={recipe.id}
-          returnTo={returnTo}
-          temperatureUnit={temperatureUnit}
-          initial={detail.steps.map((s) => ({ text: s.text, helpers: s.helpers.map((h) => ({ kind: h.kind, minutes: h.minutes, temperature: h.temperature, label: h.label })) }))}
-        />
-      ) : tab === "notes" ? (
-        <form action={saveRecipeNotes} className="flex min-h-0 flex-1 flex-col gap-4">
-          <input type="hidden" name="returnTo" value={returnTo} />
+    <DishEditor
+      // A fresh start whenever the saved dish changes (after Save).
+      key={JSON.stringify([dish, ingredients, steps])}
+      dish={dish}
+      kinds={basics.kinds}
+      tags={basics.tags}
+      ingredients={ingredients}
+      steps={steps}
+      temperatureUnit={temperatureUnit}
+      initialTab={DISH_TABS.find((t) => t === tab) ?? "recipe"}
+      dishHref={here({ recipe: recipe.id })}
+      closeHref={here({})}
+      view={<RecipeView recipe={recipe} detail={detail} batches={batches} here={here} measures={measures} basics={basics} />}
+      remove={
+        <form action={removeRecipe}>
+          <input type="hidden" name="returnTo" value={here({})} />
           <input type="hidden" name="id" value={recipe.id} />
-          <label className="flex min-h-0 flex-1 flex-col gap-1.5">
-            <span className="text-base font-bold text-ink">Notes (swaps, what the kids think, where it came from)</span>
-            <textarea
-              name="notes"
-              defaultValue={recipe.notes ?? ""}
-              maxLength={4000}
-              className="font-hand min-h-0 flex-1 resize-none rounded-[var(--radius)] border-2 border-frame p-4 text-2xl text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <div className="flex items-end gap-4">
-            <Field label="Recipe link">
-              <Input name="sourceUrl" type="url" defaultValue={recipe.source_url ?? ""} placeholder="https://…" className="w-[40rem]" />
-            </Field>
-            <Button>Save notes</Button>
-          </div>
+          <input type="hidden" name="name" value={recipe.name} />
+          <Button variant="danger">
+            <Trash size="1.375rem" aria-hidden />
+            Remove dish
+          </Button>
         </form>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <form action={saveRecipeBasics} className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-10 gap-y-5">
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <input type="hidden" name="id" value={recipe.id} />
-            <div className="flex flex-col gap-5">
-              <div className="flex items-end gap-4">
-                <EmojiPicker initial={recipe.icon ?? ""} nameField="name" />
-                <Field label="Name">
-                  <Input name="name" defaultValue={recipe.name} required maxLength={80} className="w-[30rem]" />
-                </Field>
-              </div>
-              <div className="flex gap-4">
-                <Field label="Serves">
-                  <Input name="serves" type="number" min={1} max={50} defaultValue={recipe.serves} className="w-28" />
-                </Field>
-                <Field label="Hands-on minutes">
-                  <Input name="handsOnMinutes" type="number" min={0} max={1440} defaultValue={recipe.hands_on_minutes ?? ""} className="w-36" />
-                </Field>
-                <Field label="Total minutes">
-                  <Input name="totalMinutes" type="number" min={0} max={2880} defaultValue={recipe.total_minutes ?? ""} className="w-36" />
-                </Field>
-              </div>
-              <p className="-mt-3 text-base text-ink-muted">Hands-on time is how early the meal shows on Today, so you start in time.</p>
-              <Chips name="visibility" label="Who can see it" defaultValue={recipe.visibility} options={VISIBILITY_OPTIONS} />
-              <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-xl text-ink">
-                <input type="checkbox" name="isBackup" defaultChecked={recipe.is_backup} className="size-7 accent-[var(--color-ink)]" />
-                It&apos;s a backup meal (for survival days)
-              </label>
-            </div>
-            <div className="flex flex-col gap-5">
-              <Chips
-                name="kindIds"
-                label="What it can be in a meal"
-                multiple
-                defaultValue={recipe.kind_ids}
-                options={basics.kinds.slice(0, 14).map((k) => ({ value: k.id, label: k.name, leading: <Emoji emoji={k.icon} className="size-7" /> }))}
-              />
-              <Chips name="tagIds" label="Tags" multiple defaultValue={recipe.tag_ids} options={basics.tags.map((t) => ({ value: t.id, label: t.name, leading: <Emoji emoji={t.icon} className="size-7" /> }))} />
-              <Button className="self-start">Save</Button>
-            </div>
-          </form>
-          <form action={removeRecipe} className="flex shrink-0 justify-end border-t border-frame pt-4">
-            <input type="hidden" name="returnTo" value={here({})} />
-            <input type="hidden" name="id" value={recipe.id} />
-            <input type="hidden" name="name" value={recipe.name} />
-            <Button variant="danger">
-              <Trash size="1.375rem" aria-hidden />
-              Remove dish
-            </Button>
-          </form>
-        </div>
-      )}
-    </Modal>
+      }
+    />
   );
 }
 
