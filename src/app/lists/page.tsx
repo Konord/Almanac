@@ -9,6 +9,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf, type LocalDate } from "@/lib/time";
 import { onItsList } from "@/lib/todos";
+import { CHORE_TAGS } from "@/lib/chore-days";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
 import { loadTodos, type ChoreMember } from "../chores/data";
 import { choreSchedule } from "../chores/plan";
@@ -122,6 +123,32 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               </Link>
             }
           >
+            {list.is_chores ? (
+              // The Chores list: just the words and tags; the chore planner picks the day.
+              <form action={addTodo} className="mt-2 mb-2 flex flex-col gap-2">
+                <input type="hidden" name="listId" value={list.id} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <div className="flex items-center gap-2">
+                  <Input name="title" placeholder="Add a chore… the planner picks a day" required maxLength={120} aria-label="New chore" className="min-w-0 flex-1" />
+                  <Button>
+                    <Plus size="1.25rem" weight="bold" aria-hidden />
+                    Add
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Tags">
+                  {CHORE_TAGS.map((t) => (
+                    <label
+                      key={t.value}
+                      title={t.hint}
+                      className="flex min-h-11 cursor-pointer items-center rounded-full border-2 border-frame bg-board px-3.5 text-base text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold"
+                    >
+                      <input type="checkbox" name="tags" value={t.value} className="sr-only" />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
+              </form>
+            ) : (
             <form action={addTodo} className="mt-2 mb-2 flex flex-wrap items-center gap-2">
               <input type="hidden" name="listId" value={list.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -132,7 +159,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 <Select name="dateKind" aria-label="What the day means" defaultValue="due" className="w-full">
                   <option value="due">Done by</option>
                   <option value="start">On</option>
-                  <option value="chore">Chore</option>
                 </Select>
               </div>
               <div className="min-w-44 flex-1">
@@ -156,6 +182,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 Add
               </Button>
             </form>
+            )}
             <div className="flex flex-col lg:min-h-0 lg:flex-1">
               {showingDone ? (
                 <>
@@ -233,10 +260,10 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
       {editing ? (
         <Sheet title="Edit to-do" closeHref={returnTo}>
-          <form id="edit-todo" action={updateTodo} className="group grid gap-4 sm:grid-cols-2">
+          <form id="edit-todo" action={updateTodo} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={editing.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <TodoFields members={members} lists={lists} choreDays={choreDays} todo={editing} showList />
+            <TodoFields members={members} lists={lists.filter((l) => !l.is_chores)} choreDays={choreDays} todo={editing} showList chore={editing.is_chore} />
           </form>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button form="edit-todo">Save</Button>
@@ -259,12 +286,16 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <Button>Save list</Button>
             </div>
           </form>
-          <form action={removeList} className="mt-6">
-            <input type="hidden" name="id" value={list.id} />
-            <input type="hidden" name="name" value={list.name} />
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <Button variant="danger">Remove the list and its to-dos</Button>
-          </form>
+          {list.is_chores ? (
+            <p className="mt-6 text-lg text-ink-muted">Everything on this list is a chore. The list stays, but you can rename it.</p>
+          ) : (
+            <form action={removeList} className="mt-6">
+              <input type="hidden" name="id" value={list.id} />
+              <input type="hidden" name="name" value={list.name} />
+              <input type="hidden" name="returnTo" value={returnTo} />
+              <Button variant="danger">Remove the list and its to-dos</Button>
+            </form>
+          )}
         </Sheet>
       ) : null}
 

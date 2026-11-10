@@ -6,7 +6,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
 import { isFeatureLink } from "@/lib/todos";
-import { isChoreTag, type ChoreTag } from "@/lib/chore-days";
+import { isChoreTag } from "@/lib/chore-days";
 import { skipChoreNow } from "./skip";
 
 /*
@@ -147,60 +147,49 @@ function readTodo(formData: FormData) {
     link: link || null,
     assignee_id: text(formData, "assigneeId") || null,
     notes: text(formData, "notes") || null,
-    chore_day_id: null as string | null,
-    is_chore: false,
-    tags: [] as ChoreTag[],
   };
 }
 
 /**
- * A list task's fields, or a one-off chore's (Connor, 2026-11-09): a chore
- * has tags and maybe a chore day, and the chore planner picks its day, so
- * the day fields are left alone (`dated: false`) and only cleared when a
- * task first becomes a chore.
+ * A one-off chore's fields (Connor, 2026-11-10): anything on the Chores
+ * list. It has tags and maybe a chore day, and the chore planner picks its
+ * day, so it has no day fields of its own.
  */
-function readListTask(formData: FormData, wasChore: boolean) {
-  const todo = readTodo(formData);
-  // The Lists screen's quick add has "Chore" beside "Done by" and "On".
-  const kind = text(formData, "kind") || (text(formData, "dateKind") === "chore" ? "chore" : "task");
-  if (kind !== "chore") return { ...todo, ...(wasChore ? { must_do: false } : {}) };
+function readChore(formData: FormData) {
+  const title = text(formData, "title");
+  if (!title) back(formData, "error", "Write what needs doing.");
+  if (title.length > 120) back(formData, "error", "Keep it under 120 letters.");
+  const link = text(formData, "link");
+  if (link && !isFeatureLink(link)) back(formData, "error", "Choose a part of the app for it to open.");
   const tags = formData.getAll("tags").map(String).filter(isChoreTag);
   return {
-    title: todo.title,
-    icon: todo.icon,
-    link: todo.link,
-    assignee_id: todo.assignee_id,
-    notes: todo.notes,
-    ...(wasChore ? {} : { due_date: null, date_kind: "start" as const, at_time: null, lead_days: null }),
-    is_chore: true,
+    title,
+    icon: readIcon(formData),
+    link: link || null,
+    assignee_id: text(formData, "assigneeId") || null,
+    notes: text(formData, "notes") || null,
     tags,
     must_do: tags.includes("essential"),
     chore_day_id: text(formData, "choreDayId") || null,
   };
 }
 
+/** Whether a list is the household's Chores list. */
+async function isChoresList(listId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("task_lists").select("is_chores").eq("id", listId).maybeSingle();
+  return Boolean(data?.is_chores);
+}
+
 export async function addTodo(formData: FormData) {
   const household = await requireHousehold();
   const listId = text(formData, "listId");
   if (!listId) back(formData, "error", "Choose a list.");
-  const todo = readListTask(formData, false);
+  const todo = (await isChoresList(listId)) ? readChore(formData) : readTodo(formData);
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("task_instances")
-    .insert({ ...todo, list_id: listId, household_id: household.id })
-    .select("id")
-    .single();
+  const { error } = await supabase.from("task_instances").insert({ ...todo, list_id: listId, household_id: household.id });
   if (error) back(formData, "error", error.message);
   refresh();
-  // A new chore opens straight away, so its tags can be picked.
-  if (todo.is_chore) {
-    const [base, query = ""] = returnPath(formData).split("?");
-    const params = new URLSearchParams(query);
-    params.delete("error");
-    params.delete("message");
-    params.set("edit", data.id);
-    redirect(`${base}?${params.toString()}`);
-  }
   back(formData, "message", `Added "${todo.title}".`);
 }
 
@@ -208,12 +197,16 @@ export async function updateTodo(formData: FormData) {
   await requireHousehold();
   const id = text(formData, "id");
   const supabase = await createClient();
-  const { data: before } = await supabase.from("task_instances").select("is_chore").eq("id", id).maybeSingle();
-  const todo = readListTask(formData, Boolean(before?.is_chore));
+  const { data: before } = await supabase.from("task_instances").select("list_id").eq("id", id).maybeSingle();
+  if (!before?.list_id) back(formData, "error", "That to-do no longer exists.");
+  const chore = await isChoresList(before.list_id);
+  const todo = chore ? readChore(formData) : readTodo(formData);
+  // Tasks move between lists, but never on or off the Chores list (delete and remake instead).
   const listId = text(formData, "listId");
+  const move = listId && listId !== before.list_id && !chore && !(await isChoresList(listId));
   const { error } = await supabase
     .from("task_instances")
-    .update({ ...todo, ...(listId ? { list_id: listId } : {}) })
+    .update({ ...todo, ...(move ? { list_id: listId } : {}) })
     .eq("id", id)
     .not("list_id", "is", null);
   if (error) back(formData, "error", error.message);
@@ -352,6 +345,7 @@ export async function removeList(formData: FormData) {
   await requireHousehold();
   const id = text(formData, "id");
   const name = text(formData, "name");
+  if (await isChoresList(id)) back(formData, "error", "The Chores list stays. Rename it if you like.");
   const supabase = await createClient();
   // Keep the chores' history: done chore to-dos leave the list instead of
   // going with it. Open ones are made again on another list.

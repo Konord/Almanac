@@ -900,7 +900,7 @@ async function swapCore(household: Household, mealId: string, backupId: string, 
       .select("items(name)")
       .eq("recipe_id", meal.recipe_id)
       .eq("put_away_if_skipped", true);
-    const { data: list } = await supabase.from("task_lists").select("id").order("sort_order").limit(1).maybeSingle();
+    const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").limit(1).maybeSingle();
     if (list && fresh && fresh.length) {
       await supabase.from("task_instances").insert(
         fresh.map((f) => ({

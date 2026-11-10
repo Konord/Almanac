@@ -37,7 +37,8 @@ export type Round = {
   completed_by: string | null;
 };
 
-export type TaskList = { id: string; name: string; icon: string | null; visibility: string };
+/** `is_chores`: the household's Chores list, where every task is a one-off chore. */
+export type TaskList = { id: string; name: string; icon: string | null; visibility: string; is_chores: boolean };
 
 export type Todo = {
   id: string;
@@ -65,7 +66,7 @@ export type Todo = {
   minutes: number | null;
   /** A one-off chore: waits for the next one of this chore day with room. */
   chore_day_id: string | null;
-  /** A list task switched to a chore: the chore planner picks its day. */
+  /** On the Chores list (worked out when loaded): the chore planner picks its day. */
   is_chore: boolean;
   /** Its chore tags (Essential, Big, Outdoor, Errand). */
   tags: string[];
@@ -138,16 +139,23 @@ export async function loadChoreDays(): Promise<(ChoreDay & { sort_order: number 
 export async function loadTodos() {
   const supabase = await createClient();
   const [lists, todos] = await Promise.all([
-    supabase.from("task_lists").select("id, name, icon, visibility").order("sort_order").order("name"),
+    supabase.from("task_lists").select("id, name, icon, visibility, is_chores").order("sort_order").order("name"),
     supabase
       .from("task_instances")
-      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, heads_up_id, minutes, chore_day_id, is_chore, tags")
+      .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, heads_up_id, minutes, chore_day_id, tags")
       .not("list_id", "is", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at"),
   ]);
   for (const r of [lists, todos]) if (r.error) throw r.error;
-  return { lists: (lists.data ?? []) as TaskList[], todos: (todos.data ?? []) as Todo[] };
+  const choreLists = new Set((lists.data ?? []).filter((l) => l.is_chores).map((l) => l.id));
+  return {
+    lists: (lists.data ?? []) as TaskList[],
+    todos: (todos.data ?? []).map((t) => ({
+      ...t,
+      is_chore: choreLists.has(t.list_id as string) && t.template_id === null && t.heads_up_id === null,
+    })) as Todo[],
+  };
 }
 
 /** Open to-dos for the Today screen (see src/lib/todos.ts for when each shows). */

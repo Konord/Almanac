@@ -1,7 +1,7 @@
 -- Checks for chore days and chore tags. Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(13);
 
 insert into auth.users (id, email, aud, role) values
   ('96969696-9696-9696-9696-969696969696', 'days-a@test', 'authenticated', 'authenticated'),
@@ -39,19 +39,29 @@ select throws_ok(
   '23505', null, 'A chore has one open to-do at a time'
 );
 
-insert into public.task_instances (household_id, list_id, title, is_chore, tags)
-values (public.current_household_id(), (select id from public.task_lists limit 1), 'Repair eaves trough', true, '{big,outdoor}');
-select is((select tags from public.task_instances where title = 'Repair eaves trough'), '{big,outdoor}'::text[], 'A list task can be a chore with tags');
+select is((select count(*)::int from public.task_lists where is_chores), 1, 'Each household has one Chores list');
+insert into public.task_instances (household_id, list_id, title, tags)
+values (public.current_household_id(), (select id from public.task_lists where is_chores), 'Repair eaves trough', '{big,outdoor}');
+select is((select tags from public.task_instances where title = 'Repair eaves trough'), '{big,outdoor}'::text[], 'A chore on the Chores list has tags');
 select throws_ok(
-  $$insert into public.task_instances (household_id, list_id, title, is_chore, tags)
-    values (public.current_household_id(), (select id from public.task_lists limit 1), 'Mystery', true, '{shiny}')$$,
+  $$insert into public.task_instances (household_id, list_id, title, tags)
+    values (public.current_household_id(), (select id from public.task_lists where is_chores), 'Mystery', '{shiny}')$$,
   '23514', null, 'List task tags come from the preset list'
+);
+select throws_ok(
+  $$delete from public.task_lists where is_chores$$,
+  '23514', null, 'The Chores list cannot be removed'
 );
 
 select set_config('request.jwt.claims', '{"sub":"97979797-9797-9797-9797-979797979797","role":"authenticated"}', true);
 select public.create_household('Other House');
 select is((select count(*)::int from public.chore_days), 1, 'Other households only see their own Free day');
 select is((select count(*)::int from public.task_template_chore_days), 0, 'Other households cannot see chore day tags');
+
+select lives_ok(
+  $$select public.delete_household(public.current_household_id(), 'Other House')$$,
+  'A household goes, Chores list and all'
+);
 
 select * from finish();
 rollback;
