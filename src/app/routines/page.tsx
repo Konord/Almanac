@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame } from "@/components/ui";
+import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import type { ManagerDraft } from "@/lib/routine-manager";
 import { DEFAULT_MINUTES } from "@/lib/routine-placement";
@@ -16,7 +16,7 @@ import { RoutineManager } from "./manager";
 export default function RoutinesPage() {
   return (
     <AppFrame section="routines">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Manager />
       </Suspense>
     </AppFrame>

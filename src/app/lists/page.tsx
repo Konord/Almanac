@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
@@ -25,7 +25,7 @@ import { GroceryView } from "../groceries/view";
 export default function ListsPage(props: PageProps<"/lists">) {
   return (
     <AppFrame section="lists">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Lists searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

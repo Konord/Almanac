@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame } from "@/components/ui";
+import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { loadMealBasics, loadPresets } from "../data";
 import type { MealSetupDraft } from "./draft";
@@ -13,7 +13,7 @@ import { MealSetupEditor } from "./editor";
 export default function MealsSetupPage() {
   return (
     <AppFrame section="meals">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Setup />
       </Suspense>
     </AppFrame>

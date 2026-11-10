@@ -343,3 +343,24 @@ export function Chips({
     </fieldset>
   );
 }
+
+/**
+ * What a screen shows for the moment while it's being read: soft grey
+ * outlines where the header and cards will be, instead of the word
+ * "Loading…" on a blank screen.
+ */
+export function LoadingOutline() {
+  return (
+    <div className="flex min-h-0 flex-1 animate-pulse flex-col gap-5" role="status" aria-label="Loading">
+      <div className="flex h-18 shrink-0 items-center gap-5">
+        <span className="h-12 w-72 rounded-2xl bg-rail" />
+        <span className="h-12 w-56 rounded-2xl bg-rail" />
+        <span className="ml-auto h-12 w-44 rounded-2xl bg-rail" />
+      </div>
+      <div className="grid min-h-[20rem] flex-1 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
+        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
+        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
+      </div>
+    </div>
+  );
+}

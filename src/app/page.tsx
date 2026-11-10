@@ -10,6 +10,7 @@ import {
   ScreenHeader,
   Segmented,
   firstParam,
+  LoadingOutline,
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
@@ -69,7 +70,7 @@ const COLUMN_GAP = "0.625rem";
 export default function Home(props: PageProps<"/">) {
   return (
     <AppFrame section="today">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Today searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

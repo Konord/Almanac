@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame, firstParam } from "@/components/ui";
+import { AppFrame, firstParam, LoadingOutline } from "@/components/ui";
 import { placeable } from "@/lib/chore-days";
 import { snapOf, type Season } from "@/lib/chores";
 import type { ChoreManagerDraft, DraftOccasional, OnlyIn, Snap } from "@/lib/chore-manager";
@@ -21,7 +21,7 @@ import { choreSchedule } from "./plan";
 export default function ChoresPage(props: PageProps<"/chores">) {
   return (
     <AppFrame section="chores">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Chores searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

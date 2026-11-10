@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame } from "@/components/ui";
+import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { allBoxes, panelBoxes } from "@/lib/panel-boxes";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +13,7 @@ import { SettingsEditor } from "./editor";
 export default function HouseholdPage() {
   return (
     <AppFrame section="settings">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <HouseholdContent />
       </Suspense>
     </AppFrame>

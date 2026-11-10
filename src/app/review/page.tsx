@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AppFrame, firstParam } from "@/components/ui";
+import { AppFrame, firstParam, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { weekStartOf } from "@/lib/meals";
@@ -15,7 +15,7 @@ import { comingWeek, loadReview } from "./data";
 export default function ReviewPage(props: PageProps<"/review">) {
   return (
     <AppFrame section="review">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Review searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

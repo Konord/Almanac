@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BookOpen, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { BATCHES, batchAmount } from "@/lib/meals";
 import { clampBatches, menuMealName } from "@/lib/menu";
 import { measureText, type Measures } from "@/lib/units";
@@ -22,7 +22,7 @@ import { DishEditor, type DishTab } from "../dish-editor";
 export default function LibraryPage(props: PageProps<"/meals/library">) {
   return (
     <AppFrame section="meals">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Library searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

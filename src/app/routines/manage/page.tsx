@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { AppFrame, Notice, firstParam } from "@/components/ui";
+import { AppFrame, Notice, firstParam, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { groupKey, type DaysDraft } from "@/lib/set-days";
 import { addDays, localDateOf } from "@/lib/time";
@@ -16,7 +16,7 @@ import { SetDays, type Tab } from "./set-days";
 export default function SetDaysPage(props: PageProps<"/routines/manage">) {
   return (
     <AppFrame section="routines">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <Days searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>

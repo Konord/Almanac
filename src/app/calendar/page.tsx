@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, Copy, Plus, Trash, X } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
+import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
@@ -52,7 +52,7 @@ type View = "week" | "month";
 export default function CalendarPage(props: PageProps<"/calendar">) {
   return (
     <AppFrame section="calendar">
-      <Suspense fallback={<p className="text-lg text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<LoadingOutline />}>
         <CalendarContent searchParams={props.searchParams} />
       </Suspense>
     </AppFrame>
