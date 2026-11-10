@@ -6,35 +6,30 @@ import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
-import { strong } from "@/lib/colours";
 import { addMonths, dayOfWeek, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import {
-  addLayer,
   addView,
   removeView,
   updateView,
   moveOccurrence,
   removeEvent,
-  removeLayer,
   removeTag,
   removeTemplate,
   resetOccurrence,
   skipOccurrence,
   updateEvent,
-  updateLayer,
   updateTemplate,
 } from "./actions";
-import { EventCardFields, LayerFields, ViewFields } from "./forms";
+import { EventCardFields, OVERLAY_TAGS, ViewFields } from "./forms";
 import { LengthInput } from "./when-fields";
 import { Stickers } from "./stickers";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { ViewChooser } from "./view-chooser";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
-import { VISIBILITY_OPTIONS } from "./options";
 import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, profilesFor, rangeOf } from "./data";
 import type { CalendarEvent, CalendarItem, EventTemplate, Layer, Member, SavedView, Tag as TagType } from "./types";
 import { eventEmoji } from "@/lib/emoji";
@@ -42,10 +37,12 @@ import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
 import { loadSpecialDays } from "../holidays/data";
 import { PeopleRow } from "../routines/people-row";
+import { RoutineChecklist } from "../routines/routine-checklist";
 import { loadTodos } from "../chores/data";
 import { onCalendar } from "@/lib/todos";
-import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, shortTime, type Dinner } from "./views";
-import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
+import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime, type WeekMeal } from "./views";
+import { loadMealBasics, loadMeals } from "../meals/data";
+import { cookHref, placeTodayMeals } from "../meals/today";
 import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
 import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
@@ -80,7 +77,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const occParam = firstParam(params.occ);
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const panelParam = firstParam(params.panel);
-  const panel = panelParam === "layers" || panelParam === "tags" || panelParam === "template" ? panelParam : null;
+  const panel = panelParam === "overlays" || panelParam === "tags" || panelParam === "template" ? panelParam : null;
 
   const days =
     view === "week"
@@ -103,11 +100,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const savedView = await deviceView(views);
   const events: CalendarItem[] = itemsInView(items, savedView);
   // The week view shows each day's dinner under the date, and list tasks with a time as points.
-  const dinners = view === "week" ? await dinnersFor(days) : new Map<LocalDate, Dinner>();
+  const weekMeals = view === "week" ? await mealsFor(days, events, members, timeZone) : new Map<LocalDate, WeekMeal[]>();
   const weekTasks =
     view === "week" ? (await loadTodos()).todos.filter((t) => onCalendar(t) && t.due_date! >= days[0] && t.due_date! <= days[days.length - 1]) : [];
   const profiles = profilesFor(days, items, layers, household);
-  const layerById = new Map(layers.map((l) => [l.id, l]));
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
@@ -147,6 +143,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // The Today panel on the left: what's still to come today, soonest first.
   const panelPrefs = await readPanelPrefs();
   const panelReturn = `/calendar?${returnTo}`;
+  const openRoutine = firstParam(params.routine) ?? "";
+  const openMember = firstParam(params.member) ?? "";
+  const routineOpen = Boolean(openRoutine && openMember) && !placing;
   const now = new Date();
   // Up next is always about today, even when the calendar shows another month.
   let todayEvents = events;
@@ -170,8 +169,29 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       <RememberDisplay display={view} />
       <WallRefresh timeZone={timeZone} />
       <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
-      {panelPrefs.open ? (
-        <TodayPanel household={household} today={today} upNext={upNext} tab={panelPrefs.tab} returnTo={panelReturn} />
+      {panelPrefs.open || routineOpen ? (
+        <TodayPanel
+          household={household}
+          today={today}
+          upNext={upNext}
+          tab={panelPrefs.tab}
+          returnTo={panelReturn}
+          routine={
+            // A routine tapped in the Routines box takes over the panel until it's closed.
+            routineOpen ? (
+              <RoutineChecklist
+                data={routineData}
+                memberId={openMember}
+                templateId={openRoutine}
+                date={today}
+                today={today}
+                page={Number(firstParam(params.rpage) ?? 0) || 0}
+                closeHref={panelReturn}
+                hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
+              />
+            ) : undefined
+          }
+        />
       ) : (
         <OpenPanelTab returnTo={panelReturn} />
       )}
@@ -196,9 +216,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             <Tag size="1.5rem" aria-hidden />
             Tags
           </SoftLink>
-          <SoftLink href={href({ panel: "layers", edit: null, add: null })}>
+          <SoftLink href={href({ panel: "overlays", edit: null, add: null })}>
             <Stack size="1.5rem" aria-hidden />
-            {savedView ? savedView.name : "Layers"}
+            <span className="max-w-[9rem] truncate">{savedView ? savedView.name : "Overlays"}</span>
           </SoftLink>
           <Segmented
             label="How much to show"
@@ -231,7 +251,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           memberById={memberById}
           href={href}
           profiles={profiles}
-          dinners={dinners}
+          meals={weekMeals}
           tasks={weekTasks}
           adding={{ placing, pending, addHref }}
           breaks={breaks}
@@ -318,140 +338,109 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         </Sheet>
       ) : null}
 
-      {panel === "layers" ? (
-        <Sheet title="Layers and views" closeHref={closeHref}>
-          <LayersPanel
-            layers={layers}
-            views={views}
-            savedView={savedView}
-            members={members}
-            memberById={memberById}
-            layerById={layerById}
-            returnTo={returnTo}
-          />
+      {panel === "overlays" ? (
+        <Sheet title="Overlays" closeHref={closeHref} narrow>
+          <OverlaysPanel tags={tags} views={views} savedView={savedView} editing={firstParam(params.ov) ?? null} returnTo={returnTo} />
         </Sheet>
       ) : null}
     </>
   );
 }
 
-/** Which layers this screen shows, and adding or changing layers and views. */
-function LayersPanel({
-  layers,
+/** How many overlays the panel lists (nothing scrolls). */
+const OVERLAYS_SHOWN = 6;
+
+/**
+ * Tag overlays (they replace layers, Connor 2026-11-10): an overlay is a
+ * set of tags, like "Court and appointments". Picking one on a screen
+ * shows only the events with one of its tags; each screen remembers its
+ * own, so the wall can show everything while a phone shows a few tags.
+ */
+function OverlaysPanel({
+  tags,
   views,
   savedView,
-  members,
-  memberById,
-  layerById,
+  editing,
   returnTo,
 }: {
-  layers: Layer[];
+  tags: TagType[];
   views: SavedView[];
   savedView: SavedView | null;
-  members: Member[];
-  memberById: Map<string, Member>;
-  layerById: Map<string, Layer>;
+  /** The overlay being changed ("new" for a new one), or null for the list. */
+  editing: string | null;
   returnTo: string;
 }) {
+  const back = `${returnTo}&panel=overlays`;
+  const tagById = new Map(tags.map((t) => [t.id, t]));
+  const view = editing && editing !== "new" ? views.find((v) => v.id === editing) : undefined;
+  if (editing === "new" || view) {
+    return (
+      <form action={view ? updateView : addView} className="flex flex-col gap-5">
+        {view ? <input type="hidden" name="id" value={view.id} /> : null}
+        <input type="hidden" name="returnTo" value={`${back}&ov=${view?.id ?? "new"}`} />
+        <ViewFields tags={tags} view={view} />
+        {tags.length > OVERLAY_TAGS ? <p className="text-base text-ink-muted">Showing the first {OVERLAY_TAGS} tags.</p> : null}
+        <div className="flex gap-3">
+          <Button>{view ? "Save overlay" : "Add overlay"}</Button>
+          <Link
+            href={`/calendar?${back}`}
+            scroll={false}
+            className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
+          >
+            Cancel
+          </Link>
+        </div>
+      </form>
+    );
+  }
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-7">
       <ViewChooser views={views} current={savedView} returnTo={returnTo} returnPath="/calendar" />
-
-      <section>
-        <h3 className="mb-1 text-2xl font-bold text-ink">Layers</h3>
-        <p className="mb-4 text-lg text-ink-muted">
-          Every event belongs to a layer, like Court or Kids. Blocks on the calendar take the colour of the person
-          they&apos;re for.
+      <section className="flex flex-col gap-3">
+        <h3 className="text-2xl font-bold text-ink">Overlays</h3>
+        <p className="text-lg text-ink-muted">
+          An overlay shows only the events with some tags, like &ldquo;Court and appointments&rdquo;. Each screen remembers the one you picked.
         </p>
-        <ul className="mb-6 flex flex-col gap-3">
-          {layers.map((layer) => (
-            <li key={layer.id} className="rounded-[var(--radius-card)] border border-frame p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="size-5 rounded-full" style={{ background: strong(layer.colour) }} />
-                <span className="text-xl font-bold text-ink">{layer.name}</span>
-                <span className="text-lg text-ink-muted">
-                  {visibilityLabel(layer.visibility)}
-                  {layer.owner_member_id ? ` · ${memberById.get(layer.owner_member_id)?.name ?? ""}'s` : ""}
-                  {layer.counts_toward_busyness ? "" : " · doesn't count toward busy"}
+        {views.length === 0 ? <p className="text-lg text-ink-muted">No overlays yet.</p> : null}
+        <ul className="grid grid-cols-2 gap-2">
+          {views.slice(0, OVERLAYS_SHOWN).map((v) => (
+            <li key={v.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
+              <Link
+                href={`/calendar?${back}&ov=${v.id}`}
+                scroll={false}
+                title={`Change the ${v.name} overlay`}
+                className="flex min-h-[var(--touch-target)] min-w-0 flex-1 flex-col justify-center"
+              >
+                <span className="truncate text-lg font-bold text-ink">{v.name}</span>
+                <span className="flex items-center gap-1 truncate text-sm text-ink-muted">
+                  {v.tag_ids
+                    .map((id) => tagById.get(id))
+                    .filter((t): t is TagType => Boolean(t))
+                    .slice(0, 5)
+                    .map((t) => (
+                      <Emoji key={t.id} emoji={t.icon || eventEmoji(null, t.name)} className="size-5" />
+                    ))}
+                  {v.tag_ids.map((id) => tagById.get(id)?.name).filter(Boolean).join(", ") || "No tags"}
                 </span>
-              </div>
-              <details className="mt-2">
-                <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-accent">Edit</summary>
-                <form action={updateLayer} className="mt-2 grid gap-4 sm:grid-cols-2">
-                  <input type="hidden" name="id" value={layer.id} />
-                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
-                  <LayerFields layer={layer} members={members} />
-                  <div className="sm:col-span-2">
-                    <Button>Save layer</Button>
-                  </div>
-                </form>
-                <form action={removeLayer} className="mt-4">
-                  <input type="hidden" name="id" value={layer.id} />
-                  <input type="hidden" name="name" value={layer.name} />
-                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
-                  <Button variant="danger">Remove {layer.name} and its events</Button>
-                </form>
-              </details>
+              </Link>
+              <form action={removeView}>
+                <input type="hidden" name="id" value={v.id} />
+                <input type="hidden" name="name" value={v.name} />
+                <input type="hidden" name="returnTo" value={back} />
+                <RemoveButton label={`Remove the ${v.name} overlay`} />
+              </form>
             </li>
           ))}
         </ul>
-        <details className="rounded-[var(--radius-card)] bg-rail p-4">
-          <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">Add a layer</summary>
-          <form action={addLayer} className="mt-2 grid gap-4 sm:grid-cols-2">
-            <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
-            <LayerFields members={members} />
-            <div className="sm:col-span-2">
-              <Button>Add layer</Button>
-            </div>
-          </form>
-        </details>
-      </section>
-
-      <section>
-        <h3 className="mb-1 text-2xl font-bold text-ink">Views</h3>
-        <p className="mb-4 text-lg text-ink-muted">
-          A view is a set of layers, like &ldquo;Court and appointments&rdquo;. Each screen remembers the view you
-          picked on it, so the wall can show everything while a phone shows just a few layers.
-        </p>
-        <ul className="mb-6 flex flex-col gap-3">
-          {views.map((v) => (
-            <li key={v.id} className="rounded-[var(--radius-card)] border border-frame p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-xl font-bold text-ink">{v.name}</span>
-                <span className="text-lg text-ink-muted">
-                  {v.layer_ids.map((id) => layerById.get(id)?.name).filter(Boolean).join(", ") || "No layers"}
-                </span>
-              </div>
-              <details className="mt-2">
-                <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-lg font-bold text-accent">Edit</summary>
-                <form action={updateView} className="mt-2 grid gap-4">
-                  <input type="hidden" name="id" value={v.id} />
-                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
-                  <ViewFields layers={layers} view={v} />
-                  <div>
-                    <Button>Save view</Button>
-                  </div>
-                </form>
-                <form action={removeView} className="mt-4">
-                  <input type="hidden" name="id" value={v.id} />
-                  <input type="hidden" name="name" value={v.name} />
-                  <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
-                  <Button variant="danger">Remove the {v.name} view</Button>
-                </form>
-              </details>
-            </li>
-          ))}
-        </ul>
-        <details className="rounded-[var(--radius-card)] bg-rail p-4">
-          <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center text-xl font-bold text-ink">Add a view</summary>
-          <form action={addView} className="mt-2 grid gap-4">
-            <input type="hidden" name="returnTo" value={`${returnTo}&panel=layers`} />
-            <ViewFields layers={layers} />
-            <div>
-              <Button>Add view</Button>
-            </div>
-          </form>
-        </details>
+        {views.length > OVERLAYS_SHOWN ? <p className="text-base text-ink-muted">+ {views.length - OVERLAYS_SHOWN} more</p> : null}
+        <Link
+          href={`/calendar?${back}&ov=new`}
+          scroll={false}
+          className="inline-flex min-h-[var(--touch-target)] items-center gap-2 self-start rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
+        >
+          <Plus size="1.25rem" weight="bold" aria-hidden />
+          New overlay
+        </Link>
       </section>
     </div>
   );
@@ -692,21 +681,32 @@ function CloseLink({ href, label = "Cancel" }: { href: string; label?: string })
 }
 
 /**
- * Each day's dinner: the planned meals at the dinner meal time (the one
- * called Dinner or Supper, else the latest in the day).
+ * The week's meals as blocks: each planned meal at its eating time, moved
+ * out of the way of plans the same way the Agenda does it.
  */
-async function dinnersFor(days: LocalDate[]): Promise<Map<LocalDate, Dinner>> {
+async function mealsFor(days: LocalDate[], events: CalendarItem[], members: Member[], timeZone: string): Promise<Map<LocalDate, WeekMeal[]>> {
   const [basics, meals] = await Promise.all([loadMealBasics(), loadMeals(days[0], days[days.length - 1])]);
-  const times = basics.mealTimes.toSorted((x, y) => (x.usual_time ?? "").localeCompare(y.usual_time ?? ""));
-  const dinner = times.find((t) => /dinner|supper/i.test(t.name)) ?? times.at(-1);
-  const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
-  const categories = new Map(basics.categories.map((c) => [c.id, c]));
-  const result = new Map<LocalDate, Dinner>();
-  if (!dinner) return result;
+  const memberIds = new Set(members.map((m) => m.id));
+  const result = new Map<LocalDate, WeekMeal[]>();
   for (const day of days) {
-    const here = meals.filter((m) => m.date === day && m.meal_time_id === dinner.id && (m.status === "planned" || m.status === "cooked"));
-    if (here.length === 0) continue;
-    result.set(day, { name: mealName(here[0], recipes, categories), icon: mealIcon(here[0], recipes, categories), more: here.length - 1 });
+    const plans = eventsOnDay(events, day, timeZone)
+      .filter((e) => !isAllDayStyle(e, timeZone))
+      .map((e) => ({
+        startMin: minutesIntoDay(new Date(e.starts_at), timeZone),
+        endMin: minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60,
+        title: e.title,
+        memberIds: e.member_ids.filter((id) => memberIds.has(id)),
+      }));
+    const placed = placeTodayMeals(
+      meals.filter((m) => m.date === day),
+      basics,
+      plans,
+    );
+    if (placed.length === 0) continue;
+    result.set(
+      day,
+      placed.map((m) => ({ id: m.id, name: m.name, icon: m.icon, startMin: m.startMin, endMin: m.endMin, href: cookHref(m), cooked: m.cooked })),
+    );
   }
   return result;
 }
@@ -726,10 +726,6 @@ function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household:
   return sameMonth
     ? `${fmt.format(noon(first))} – ${Number(last.slice(8))}, ${year}`
     : `${fmt.format(noon(first))} – ${fmt.format(noon(last))}, ${year}`;
-}
-
-function visibilityLabel(value: string): string {
-  return VISIBILITY_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
 /**
@@ -755,18 +751,25 @@ function TagsPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="flex flex-col gap-3">
         <h3 className="text-2xl font-bold text-ink">Tags</h3>
-        {tags.length === 0 ? <p className="text-lg text-ink-muted">No tags yet. Tap &ldquo;New tag&rdquo; when adding an event.</p> : null}
+        <p className="text-base text-ink-muted">
+          One set of tags for events, chores and chore days. The chore planner&apos;s tags can&apos;t be removed: tag an event Errand (like an
+          office day) and errands go on that day.
+        </p>
         <ul className="grid grid-cols-2 gap-2">
           {tags.slice(0, 16).map((t) => (
-            <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
+            <li key={t.id} className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
               <Emoji emoji={t.icon || eventEmoji(null, t.name)} className="size-8" />
               <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{t.name}</span>
-              <form action={removeTag}>
-                <input type="hidden" name="id" value={t.id} />
-                <input type="hidden" name="name" value={t.name} />
-                <input type="hidden" name="returnTo" value={back} />
-                <RemoveButton label={`Remove the ${t.name} tag`} />
-              </form>
+              {t.role ? (
+                <span className="shrink-0 px-2 text-sm font-bold text-ink-muted">Chores</span>
+              ) : (
+                <form action={removeTag}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <input type="hidden" name="name" value={t.name} />
+                  <input type="hidden" name="returnTo" value={back} />
+                  <RemoveButton label={`Remove the ${t.name} tag`} />
+                </form>
+              )}
             </li>
           ))}
         </ul>

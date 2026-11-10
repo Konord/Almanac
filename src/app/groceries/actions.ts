@@ -6,7 +6,8 @@ import { weekStartOf } from "@/lib/meals";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
 import { findOrCreateItem } from "../meals/shared";
-import { loadGroceries, type GroceryLine } from "./data";
+import { isRepeatEvery } from "@/lib/grocery-repeats";
+import { loadGroceries, loadRepeats, type GroceryLine, type GroceryRepeat } from "./data";
 
 /*
  * Changing the grocery list. Every tap saves straight away: it's a live
@@ -18,7 +19,7 @@ export type GroceriesResult = { ok: true; lines: GroceryLine[] } | { ok: false; 
 async function lines(): Promise<GroceriesResult> {
   const household = await requireHousehold();
   try {
-    return { ok: true, lines: await loadGroceries(household.settings.measures) };
+    return { ok: true, lines: await loadGroceries(household) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Couldn't read the list." };
   }
@@ -84,10 +85,65 @@ export async function addGrocery(name: string): Promise<GroceriesResult> {
 export async function clearTickedGroceries(): Promise<GroceriesResult> {
   await requireHousehold();
   const supabase = await createClient();
-  const hide = await supabase.from("shopping_list").update({ hidden: true }).eq("checked", true).in("source", ["meal", "weekly"]);
+  const hide = await supabase.from("shopping_list").update({ hidden: true }).eq("checked", true).eq("source", "meal");
   if (hide.error) return { ok: false, error: hide.error.message };
-  const gone = await supabase.from("shopping_list").delete().eq("checked", true).not("source", "in", "(meal,weekly)");
+  const gone = await supabase.from("shopping_list").delete().eq("checked", true).neq("source", "meal");
   if (gone.error) return { ok: false, error: gone.error.message };
   refresh();
   return lines();
+}
+
+// ---------------------------------------------------------------------------
+// Repeating groceries: milk every week, coffee every 3 weeks
+// ---------------------------------------------------------------------------
+
+export type RepeatsResult = { ok: true; repeats: GroceryRepeat[]; lines: GroceryLine[] } | { ok: false; error: string };
+
+async function repeatsAndLines(): Promise<RepeatsResult> {
+  const household = await requireHousehold();
+  try {
+    // The list first: reading it moves on any repeats that have just gone on it.
+    const lines = await loadGroceries(household);
+    const repeats = await loadRepeats();
+    return { ok: true, repeats, lines };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't read the repeats." };
+  }
+}
+
+/** The repeating groceries (and the list, which may have just had some added). */
+export async function readRepeats(): Promise<RepeatsResult> {
+  return repeatsAndLines();
+}
+
+/**
+ * Makes something repeat ("Milk", every 1 week). It goes on the list now
+ * if it isn't there, then again each time it comes round. Already
+ * repeating: its timing changes.
+ */
+export async function addRepeat(input: { name: string; every: number; unit: string }): Promise<RepeatsResult> {
+  const household = await requireHousehold();
+  const clean = input.name.trim().replace(/\s+/g, " ").slice(0, 60);
+  if (!clean) return { ok: false, error: "What do you buy?" };
+  if (!Number.isInteger(input.every) || input.every < 1 || input.every > 365) return { ok: false, error: "Pick how often." };
+  if (!isRepeatEvery(input.unit)) return { ok: false, error: "Pick days, weeks or months." };
+  const supabase = await createClient();
+  const itemId = await findOrCreateItem(supabase, household.id, clean);
+  const today = localDateOf(new Date(), household.settings.timeZone);
+  const { error } = await supabase
+    .from("grocery_repeats")
+    .upsert({ household_id: household.id, item_id: itemId, every: input.every, every_unit: input.unit, next_on: today }, { onConflict: "household_id,item_id" });
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return repeatsAndLines();
+}
+
+/** Stops something repeating (what's on the list stays). */
+export async function removeRepeat(id: string): Promise<RepeatsResult> {
+  await requireHousehold();
+  const supabase = await createClient();
+  const { error } = await supabase.from("grocery_repeats").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return repeatsAndLines();
 }

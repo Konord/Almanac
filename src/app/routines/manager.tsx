@@ -31,6 +31,8 @@ type View = { by: "day"; name: string } | { by: "person"; memberId: string };
 type Column = { key: string; member: ManagerMember; dayType: ManagerDayType | null; title: string; icon: string | null; isPerson: boolean };
 
 const STEPS_PER_PAGE = 7;
+/** Habit tracking (Track) is hidden for now: no history on screen (Connor, 2026-11-10). Ticks are still recorded. */
+const SHOW_HABITS = false;
 const ANCHOR_LABEL: Record<Anchor, string> = {
   wake: "After wake-up",
   bed: "Ends by bedtime",
@@ -636,7 +638,7 @@ export function RoutineManager({
                       >
                         <ListChecks size="1.125rem" weight="bold" aria-hidden />
                       </SmallButton>
-                      {routine.habit_since ? (
+                      {SHOW_HABITS && routine.habit_since ? (
                         <SmallButton
                           label={step.habit ? `Stop tracking ${step.text}` : `Track ${step.text} as a habit`}
                           pressed={step.habit}
@@ -679,7 +681,7 @@ export function RoutineManager({
                     <ListChecks size="1rem" weight="bold" aria-hidden />
                     Blue = on the daily list
                   </span>
-                  {routine.habit_since ? (
+                  {SHOW_HABITS && routine.habit_since ? (
                     <span className="flex items-center gap-1.5 text-success">
                       <ChartLineUp size="1rem" weight="bold" aria-hidden />
                       Green = tracked
@@ -738,12 +740,14 @@ export function RoutineManager({
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" hint="Can move later in the day" />
-                  <Switch
-                    on={Boolean(routine.habit_since)}
-                    onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
-                    label="Track"
-                    hint="Keeps a habit history"
-                  />
+                  {SHOW_HABITS ? (
+                    <Switch
+                      on={Boolean(routine.habit_since)}
+                      onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
+                      label="Track"
+                      hint="Keeps a habit history"
+                    />
+                  ) : null}
                   <Switch
                     on={listState === "all"}
                     partly={listState === "some"}

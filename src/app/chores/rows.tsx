@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ArrowCounterClockwise, ArrowRight, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowCounterClockwise, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji } from "@/components/ui";
 import { CHORE_TAGS } from "@/lib/chore-days";
 import { daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
-import { carriedOver, linkLabel } from "@/lib/todos";
+import { carriedOver } from "@/lib/todos";
 import { doToday, markChoreDone, skipChore, toggleTodo, undoRound } from "./actions";
 import type { ChoreMember, ChoreWithTiming, Round, Todo } from "./data";
 
@@ -183,7 +183,6 @@ export function TodoRow({
   const who = todo.assignee_id ? members.get(todo.assignee_id) : undefined;
   const done = todo.status === "done";
   const late = !done && carriedOver(todo, today);
-  const opens = linkLabel(todo.link);
   // A one-off chore: its tags under the words, and the day the planner picked.
   const tagNames = todo.is_chore ? CHORE_TAGS.filter((t) => todo.tags.includes(t.value)).map((t) => t.label) : [];
   const planned = todo.is_chore && plannedOn ? (todo.due_date === today ? today : (plannedOn.get(todo.id) ?? null)) : undefined;
@@ -246,16 +245,6 @@ export function TodoRow({
             Do today
           </button>
         </form>
-      ) : null}
-      {opens && todo.link && !done ? (
-        <Link
-          href={todo.link}
-          className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-ink"
-          title={`Open ${opens}`}
-          aria-label={`Open ${opens}`}
-        >
-          <ArrowRight size="1.25rem" weight="bold" aria-hidden />
-        </Link>
       ) : null}
       {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
     </li>

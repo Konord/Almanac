@@ -31,6 +31,8 @@ export type HouseholdSettings = {
   routineFlexMinutes: number;
   /** When the weekly review is due: a weekday (0 = Sunday) and a time. */
   weeklyReview: { weekday: number; time: string };
+  /** Which boxes the Today panel flips between (see src/lib/panel-boxes.ts). Null: the usual ones. */
+  panelBoxes: string[] | null;
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -49,6 +51,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   defaultEventMinutes: 60,
   routineFlexMinutes: 60,
   weeklyReview: { weekday: 6, time: "09:00" },
+  panelBoxes: null,
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -79,6 +82,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
       const r = v as { weekday?: unknown; time?: unknown };
       return typeof r.weekday === "number" && Number.isInteger(r.weekday) && r.weekday >= 0 && r.weekday <= 6 && typeof r.time === "string" && isLocalTime(r.time);
     }),
+    panelBoxes: pick("panelBoxes", (v) => Array.isArray(v) && v.length <= 40 && v.every((x) => typeof x === "string" && /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(x))),
   };
 }
 

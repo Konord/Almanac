@@ -2,7 +2,7 @@
 
 # Almanac: notes for Claude
 
-The Almanac Design Doc is the source of truth. Key rules from it:
+"How Almanac works" (https://claude.ai/artifact/QjW3p9sognq4E7tiC3yFmB, replaced the old design doc on 2026-11-10) explains the features, rules and decisions; the migrations are the schema. Key rules:
 
 - Build one phase (and one step) at a time, then stop, summarise, and wait for approval.
 - The owner is new to coding: explain each new concept and choice in plain language.

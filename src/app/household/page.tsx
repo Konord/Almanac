@@ -1,7 +1,8 @@
 import { Suspense } from "react";
-import { GearSix, HouseLine, SignOut, UsersThree, ClockCounterClockwise } from "@phosphor-icons/react/dist/ssr";
+import { GearSix, HouseLine, SignOut, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Avatar, Button, Card, Field, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
+import { allBoxes, panelBoxes } from "@/lib/panel-boxes";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/app/login/actions";
 import { addMember, removeMember, saveSettings, setPin, updateMember } from "./actions";
@@ -48,11 +49,10 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
     }),
   );
 
-  const { data: activity } = await supabase
-    .from("activity_log")
-    .select("id, at, action, details")
-    .order("at", { ascending: false })
-    .limit(10);
+  // The activity log is still kept, but no history shows for now (Connor, 2026-11-10).
+  const { data: lists } = await supabase.from("task_lists").select("id, name, is_chores").order("sort_order").order("name");
+  const boxes = allBoxes(lists ?? []);
+  const shownBoxes = new Set(panelBoxes(household.settings.panelBoxes, lists ?? [], false).map((b) => b.id));
 
   const error_ = firstParam(params.error);
   const message = firstParam(params.message);
@@ -202,33 +202,27 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
               />
             </Field>
           </fieldset>
+          <fieldset className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2">
+            <legend className="px-2 text-lg font-bold text-ink">Today panel</legend>
+            <p className="text-base text-ink-muted">The boxes its arrows flip between. Up next shows on the Week and Month only.</p>
+            <input type="hidden" name="panelBoxesSent" value="1" />
+            <div className="flex flex-wrap gap-2">
+              {boxes.map((b) => (
+                <label
+                  key={b.id}
+                  className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold"
+                >
+                  <input type="checkbox" name="panelBoxes" value={b.id} defaultChecked={shownBoxes.has(b.id)} className="sr-only" />
+                  {b.name}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="sm:col-span-2">
             <Button>Save settings</Button>
           </div>
         </form>
 
-        <h3 className="mt-8 mb-2 flex items-center gap-2 text-2xl font-bold text-ink">
-          <ClockCounterClockwise size="1.75rem" aria-hidden className="text-ink-muted" />
-          Recent activity
-        </h3>
-        {activity && activity.length > 0 ? (
-          <ul className="flex flex-col gap-2 text-base text-ink">
-            {activity.map((entry) => (
-              <li key={entry.id} className="flex justify-between gap-4 border-b border-frame pb-2 last:border-0">
-                <span>{describeActivity(entry.action, entry.details)}</span>
-                <span className="shrink-0 text-ink-muted">
-                  {new Intl.DateTimeFormat(settings.locale, {
-                    timeZone: settings.timeZone,
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(entry.at))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-lg text-ink-muted">Nothing yet.</p>
-        )}
         </div>
       </Card>
       </div>
@@ -328,27 +322,4 @@ function MemberFields({ member }: { member?: Member }) {
       </Field>
     </>
   );
-}
-
-function describeActivity(action: string, details: unknown): string {
-  const name =
-    details && typeof details === "object" && "name" in details && typeof details.name === "string"
-      ? details.name
-      : "";
-  switch (action) {
-    case "household_created":
-      return "Household created";
-    case "member_added":
-      return `Added ${name}`;
-    case "member_updated":
-      return `Updated ${name}`;
-    case "member_removed":
-      return `Removed ${name}`;
-    case "member_pin_set":
-      return "A parent PIN was set";
-    case "settings_updated":
-      return "Settings changed";
-    default:
-      return action.replaceAll("_", " ");
-  }
 }

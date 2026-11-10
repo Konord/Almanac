@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowsClockwise, CheckCircle } from "@phosphor-icons/react/dist/ssr";
+import { ArrowsClockwise, Check, CheckCircle, X } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
@@ -11,6 +11,7 @@ import { loadMealBasics, loadMeals } from "../meals/data";
 import { mealsForRoutines, placeTodayMeals } from "../meals/today";
 import type { CalendarItem } from "../calendar/types";
 import { dayRoutinesFor, personDay, type DayRoutine, type RoutineData } from "./data";
+import { toggleStep } from "./actions";
 
 export type FloatingRoutine = DayRoutine & { placement: Placement };
 
@@ -111,14 +112,12 @@ export function clock(minutes: number, date: LocalDate, household: Household): s
  */
 export function RoutineChain({
   routine,
-  memberId,
   colour,
   date,
   top,
   household,
 }: {
   routine: FloatingRoutine;
-  memberId: string;
   colour: string;
   date: LocalDate;
   top: number;
@@ -137,7 +136,8 @@ export function RoutineChain({
   const ordered = steps.toSorted((x, y) => x.position - y.position);
   return (
     <Link
-      href={`/?routine=${template.id}&member=${memberId}`}
+      // Tapping a routine opens it up right there, in everyone's column who shares it (Connor, 2026-11-10).
+      href={`/?expand=${template.id}`}
       scroll={false}
       className={`absolute right-1 left-1 z-[1] flex h-8 -translate-y-1/2 items-center gap-1.5 overflow-hidden ${progress.complete ? "opacity-60" : ""}`}
       style={{ top: `${top}%` }}
@@ -168,6 +168,88 @@ export function RoutineChain({
         {when}
       </span>
     </Link>
+  );
+}
+
+/** How many steps an opened routine shows in a column; the rest open in the Today panel. */
+const EXPANDED_STEPS = 6;
+
+/**
+ * A routine opened up on the Agenda timeline: this person's steps with a
+ * tick for each, in their own column. A routine several people share opens
+ * in each of their columns at once, each with their own steps. It sits at
+ * the routine's time, moved up if it would run off the bottom.
+ */
+export function ExpandedRoutine({
+  routine,
+  memberId,
+  colour,
+  date,
+  top,
+}: {
+  routine: FloatingRoutine;
+  memberId: string;
+  colour: string;
+  date: LocalDate;
+  top: number;
+}) {
+  const { template, progress, steps, doneIds } = routine;
+  const ink = strong(colour);
+  const ordered = steps.toSorted((x, y) => x.position - y.position);
+  const shown = ordered.slice(0, EXPANDED_STEPS);
+  const more = ordered.length - shown.length;
+  const here = `/?expand=${template.id}`;
+  // Header, rows and the "more" line, in rem, so the card can be kept on screen.
+  const height = 4 + shown.length * 3.25 + (more > 0 ? 2.5 : 0);
+  return (
+    <div
+      className="absolute right-0 left-0 z-20 flex flex-col overflow-hidden rounded-2xl border-2 bg-board shadow-[0_0.5rem_1.5rem_rgba(30,35,45,0.18)]"
+      style={{ top: `max(0%, min(calc(${top}% - 1rem), calc(100% - ${height}rem)))`, height: `${height}rem`, borderColor: ink }}
+      role="group"
+      aria-label={`${template.name}: ${progress.done} of ${progress.total} done`}
+    >
+      <div className="flex h-14 shrink-0 items-center gap-2 px-3" style={{ background: `color-mix(in srgb, ${ink} 10%, white)` }}>
+        <span className="min-w-0 flex-1 truncate text-lg font-extrabold text-ink">{template.name}</span>
+        <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">
+          {progress.done}/{progress.total}
+        </span>
+        <Link href="/" scroll={false} aria-label={`Close ${template.name}`} className="flex size-11 shrink-0 items-center justify-center rounded-full bg-board text-ink">
+          <X size="1.25rem" weight="bold" aria-hidden />
+        </Link>
+      </div>
+      <ul className="flex min-h-0 flex-1 flex-col px-2">
+        {shown.map((step) => {
+          const done = doneIds.has(step.id);
+          return (
+            <li key={step.id} className="border-b border-panel last:border-0">
+              <form action={toggleStep}>
+                <input type="hidden" name="memberId" value={memberId} />
+                <input type="hidden" name="stepId" value={step.id} />
+                <input type="hidden" name="templateId" value={template.id} />
+                <input type="hidden" name="date" value={date} />
+                <input type="hidden" name="returnTo" value={here} />
+                <button aria-pressed={done} className="flex h-12 w-full items-center gap-2 text-left" title={done ? "Tap to untick" : "Tap when done"}>
+                  {step.icon ? <Emoji emoji={step.icon} className="size-7" faded={done} /> : <span className="size-7 shrink-0" aria-hidden />}
+                  <span className={`min-w-0 flex-1 truncate text-lg font-semibold ${done ? "text-ink-muted line-through" : "text-ink"}`}>{step.text}</span>
+                  <span
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-full text-white ${done ? "" : "border-[2.5px] border-check-border"}`}
+                    style={done ? { background: ink } : undefined}
+                    aria-hidden
+                  >
+                    {done ? <Check size="1rem" weight="bold" /> : null}
+                  </span>
+                </button>
+              </form>
+            </li>
+          );
+        })}
+      </ul>
+      {more > 0 ? (
+        <Link href={`/?routine=${template.id}&member=${memberId}`} scroll={false} className="flex h-10 shrink-0 items-center px-3 text-base font-bold text-accent">
+          +{more} more steps
+        </Link>
+      ) : null}
+    </div>
   );
 }
 

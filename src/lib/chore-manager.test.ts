@@ -31,8 +31,8 @@ const occasional = (extra: Partial<DraftOccasional> = {}): DraftOccasional => ({
 
 const draft = (extra: Partial<ChoreManagerDraft> = {}): ChoreManagerDraft => ({
   days: [
-    { id: "free", name: "Free day", icon: null, weekdays: [], span: false, restrictive: false, max_tasks: 2, max_big: 0, is_free: true },
-    { id: "laundry", name: "Laundry", icon: "🧺", weekdays: [1], span: false, restrictive: true, max_tasks: 2, max_big: 0, is_free: false },
+    { id: "free", name: "Free day", icon: null, weekdays: [], span: false, restrictive: false, max_tasks: 2, max_big: 0, is_free: true, errands: false },
+    { id: "laundry", name: "Laundry", icon: "🧺", weekdays: [1], span: false, restrictive: true, max_tasks: 2, max_big: 0, is_free: false, errands: false },
   ],
   regular: [{ id: "r1", chore_day_id: "laundry", name: "Wash the sheets", icon: null, assignee_id: null, due_time: "19:00", notes: null, active: true }],
   occasional: [occasional()],

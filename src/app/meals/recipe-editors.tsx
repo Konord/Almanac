@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { CaretLeft, CaretRight, Plus, Trash, X } from "@phosphor-icons/react";
 import { helperText, spotHelpers, type Helper } from "@/lib/meal-helpers";
-import { saveIngredients, saveSteps } from "./actions";
 
 /*
- * The recipe card's two editors. Both keep the whole list in the browser,
- * show it a page at a time (nothing scrolls), and send it all at once
- * when you tap Save.
+ * The dish editor's ingredient and step lists. Both show the list a page at
+ * a time (nothing scrolls). The dish editor holds the lists and sends them
+ * with everything else when you tap its one Save.
  */
 
 function PageArrows({ page, pages, setPage }: { page: number; pages: number; setPage: (n: number) => void }) {
@@ -38,8 +37,9 @@ export type IngredientDraft = { amount: string; unit: string; name: string; note
 const INGREDIENT_PAGE = 8;
 const cell = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent";
 
-export function IngredientsEditor({ recipeId, initial, returnTo }: { recipeId: string; initial: IngredientDraft[]; returnTo: string }) {
-  const [rows, setRows] = useState<IngredientDraft[]>(initial.length ? initial : [{ amount: "", unit: "", name: "", note: "", putAway: false }]);
+export const BLANK_INGREDIENT: IngredientDraft = { amount: "", unit: "", name: "", note: "", putAway: false };
+
+export function IngredientsEditor({ rows, setRows }: { rows: IngredientDraft[]; setRows: (change: (rows: IngredientDraft[]) => IngredientDraft[]) => void }) {
   const [page, setPage] = useState(0);
   const pages = Math.max(1, Math.ceil(rows.length / INGREDIENT_PAGE));
   const p = Math.min(page, pages - 1);
@@ -47,15 +47,12 @@ export function IngredientsEditor({ recipeId, initial, returnTo }: { recipeId: s
 
   const change = (i: number, patch: Partial<IngredientDraft>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
   const add = () => {
-    setRows((r) => [...r, { amount: "", unit: "", name: "", note: "", putAway: false }]);
+    setRows((r) => [...r, BLANK_INGREDIENT]);
     setPage(Math.floor(rows.length / INGREDIENT_PAGE));
   };
 
   return (
-    <form action={saveIngredients} className="flex min-h-0 flex-1 flex-col gap-3">
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <input type="hidden" name="recipeId" value={recipeId} />
-      <input type="hidden" name="rows" value={JSON.stringify(rows)} />
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="grid grid-cols-[7rem_8rem_minmax(0,1fr)_minmax(0,0.8fr)_10rem_3.5rem] gap-2 text-base font-bold text-ink-muted">
         <span>Amount</span>
         <span>Unit</span>
@@ -94,9 +91,8 @@ export function IngredientsEditor({ recipeId, initial, returnTo }: { recipeId: s
           Ingredient
         </button>
         <PageArrows page={p} pages={pages} setPage={setPage} />
-        <button className="ml-auto inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board">Save ingredients</button>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -105,6 +101,8 @@ export function IngredientsEditor({ recipeId, initial, returnTo }: { recipeId: s
 // ---------------------------------------------------------------------------
 
 export type StepDraft = { text: string; helpers: Helper[] };
+/** A step being edited: also the spotted helpers you said no to. */
+export type EditingStep = StepDraft & { dismissed: string[] };
 
 const STEP_PAGE = 3;
 const keyOf = (h: Helper) => `${h.kind}|${h.minutes ?? ""}|${h.temperature ?? ""}`;
@@ -112,31 +110,23 @@ const keyOf = (h: Helper) => `${h.kind}|${h.minutes ?? ""}|${h.temperature ?? ""
 const HELPER_EMOJI: Record<Helper["kind"], string> = { timer: "⏲️", heads_up: "🔔", oven: "🔥", doneness: "🌡️" };
 
 export function StepsEditor({
-  recipeId,
-  initial,
-  returnTo,
+  steps,
+  setSteps,
   temperatureUnit,
 }: {
-  recipeId: string;
-  initial: StepDraft[];
-  returnTo: string;
+  steps: EditingStep[];
+  setSteps: (change: (steps: EditingStep[]) => EditingStep[]) => void;
   temperatureUnit: "celsius" | "fahrenheit";
 }) {
-  const [steps, setSteps] = useState<(StepDraft & { dismissed: string[] })[]>(
-    (initial.length ? initial : [{ text: "", helpers: [] }]).map((s) => ({ ...s, dismissed: [] })),
-  );
   const [page, setPage] = useState(0);
   const pages = Math.max(1, Math.ceil(steps.length / STEP_PAGE));
   const p = Math.min(page, pages - 1);
   const from = p * STEP_PAGE;
 
-  const change = (i: number, patch: Partial<StepDraft & { dismissed: string[] }>) => setSteps((s) => s.map((step, j) => (j === i ? { ...step, ...patch } : step)));
+  const change = (i: number, patch: Partial<EditingStep>) => setSteps((s) => s.map((step, j) => (j === i ? { ...step, ...patch } : step)));
 
   return (
-    <form action={saveSteps} className="flex min-h-0 flex-1 flex-col gap-3">
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <input type="hidden" name="recipeId" value={recipeId} />
-      <input type="hidden" name="steps" value={JSON.stringify(steps.map(({ text, helpers }) => ({ text, helpers })))} />
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <p className="text-lg text-ink-muted">
         Almanac spots timers, heads-ups and temperatures in each step. Dotted ones are suggestions: tap to keep them for Cooking mode.
       </p>
@@ -211,8 +201,7 @@ export function StepsEditor({
           Step
         </button>
         <PageArrows page={p} pages={pages} setPage={setPage} />
-        <button className="ml-auto inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board">Save steps</button>
       </div>
-    </form>
+    </div>
   );
 }

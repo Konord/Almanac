@@ -77,7 +77,7 @@ export function placeTodayMeals(
       eatStart: placed.startMin,
       eatEnd: placed.endMin,
       cooked: m.status === "cooked",
-      canCook: Boolean(m.recipe_id),
+      canCook: Boolean(m.recipe_id) || m.dishes.some((d) => d.recipe_id),
       backup: recipe?.is_backup ?? false,
       movedFor: placed.movedFor,
     };
@@ -109,7 +109,7 @@ export function MealBlock({ meal, date, household, style }: { meal: TodayMeal; d
   const eat = clock(meal.eatStart, date, household);
   return (
     <Link
-      href={meal.canCook ? `/meals/cook/${meal.id}` : `/review?meal=${meal.id}`}
+      href={cookHref(meal)}
       title={`${meal.name}: eat ${eat}`}
       className={`absolute flex items-center gap-2 overflow-hidden rounded-xl bg-meal px-2.5 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`}
       style={style}
@@ -133,8 +133,13 @@ export function startCooking(meal: TodayMeal): { minute: number; title: string; 
   return {
     minute: Math.max(0, meal.eatStart - meal.cookMinutes),
     title: `Start ${meal.mealTimeName.toLowerCase()}: ${meal.name}`,
-    href: meal.canCook ? `/meals/cook/${meal.id}` : `/review?meal=${meal.id}`,
+    href: cookHref(meal),
   };
+}
+
+/** Where tapping a meal goes: Cooking Mode, or the review to choose its dishes when it has none yet. */
+export function cookHref(meal: Pick<TodayMeal, "id" | "canCook">): string {
+  return meal.canCook ? `/meals/cook/${meal.id}` : `/review?meal=${meal.id}`;
 }
 
 /**

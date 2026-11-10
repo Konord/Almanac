@@ -1,6 +1,5 @@
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Chips, Field, Input, Select } from "@/components/ui";
-import { FEATURE_LINKS } from "@/lib/todos";
 import { CHORE_TAGS, isChoreTag, type ChoreDay } from "@/lib/chore-days";
 import type { ChoreMember } from "./data";
 
@@ -71,16 +70,6 @@ export function TodoFields({
         </Field>
       </>
       )}
-      <Field label="Opens" hint="Optional: tapping it goes there.">
-        <Select name="link" defaultValue={todo?.link ?? ""}>
-          <option value="">Nothing</option>
-          {FEATURE_LINKS.map((l) => (
-            <option key={l.path} value={l.path}>
-              {l.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
       <Field label="For someone" hint="Optional.">
         <Select name="assigneeId" defaultValue={todo?.assignee_id ?? ""}>
           <option value="">Anyone</option>

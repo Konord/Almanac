@@ -48,7 +48,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const [{ lists, todos: allTodos }, { data: memberRows }, groceries] = await Promise.all([
     loadTodos(),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
-    loadGroceries(household.settings.measures),
+    loadGroceries(household),
   ]);
   // Chores and heads-ups live on the daily list (Today panel), not here.
   const todos = allTodos.filter(onItsList);
@@ -127,9 +127,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               // The grocery list: its own lines, with amounts and aisles (saving the weekly review fills it).
               <div className="mt-2 flex flex-col lg:min-h-0 lg:flex-1">
                 <GroceryView initial={groceries} rows={10} columns={4} />
-                <p className="mt-2 shrink-0 text-base text-ink-muted">
-                  Things you buy every week are set in the <Link href="/meals/setup" className="font-bold text-accent">Menu Manager</Link>.
-                </p>
               </div>
             ) : list.is_chores ? (
               // The Chores list: just the words and tags; the chore planner picks the day.

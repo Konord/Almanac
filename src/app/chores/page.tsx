@@ -58,6 +58,7 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
       span: d.span,
       restrictive: d.restrictive,
       max_tasks: d.max_tasks,
+      errands: Boolean(d.errands),
       max_big: d.max_big,
       is_free: d.is_free,
     })),
