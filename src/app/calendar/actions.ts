@@ -168,22 +168,17 @@ async function saveStickers(formData: FormData, householdId: string, eventId: st
   if (error) back(formData, "error", error);
 }
 
-export async function addEvent(formData: FormData) {
-  const household = await requireHousehold();
-  const event = readEvent(formData, household.settings);
+/** Saves what's on an event card as a template, to start new events from. */
+async function insertTemplate(
+  formData: FormData,
+  household: Awaited<ReturnType<typeof requireHousehold>>,
+  event: ReturnType<typeof readEvent>,
+): Promise<string | null> {
   const supabase = await createClient();
+  const startTime = text(formData, "startTime");
   const { data, error } = await supabase
-    .from("events")
-    .insert({ ...event, household_id: household.id })
-    .select("id")
-    .single();
-  if (error) back(formData, "error", error.message);
-  await saveStickers(formData, household.id, data.id);
-  await log(household.id, "event_added", "event", data.id, event.title);
-  // "Save as a template" next to the Add button.
-  if (formData.get("saveTemplate") === "on") {
-    const startTime = text(formData, "startTime");
-    const { error: templateError } = await supabase.from("event_templates").insert({
+    .from("event_templates")
+    .insert({
       household_id: household.id,
       title: event.title,
       icon: event.icon,
@@ -197,13 +192,35 @@ export async function addEvent(formData: FormData) {
       notes: event.notes,
       day_kind: event.day_kind,
       sort_order: 100,
-    });
-    if (templateError) back(formData, "error", `Added ${event.title}, but the template didn't save: ${templateError.message}`);
-    await log(household.id, "template_added", "event_template", data.id, event.title);
+    })
+    .select("id")
+    .single();
+  if (error) return error.message;
+  await log(household.id, "template_added", "event_template", data.id, event.title);
+  return null;
+}
+
+export async function addEvent(formData: FormData) {
+  const household = await requireHousehold();
+  const event = readEvent(formData, household.settings);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("events")
+    .insert({ ...event, household_id: household.id })
+    .select("id")
+    .single();
+  if (error) back(formData, "error", error.message);
+  await saveStickers(formData, household.id, data.id);
+  await log(household.id, "event_added", "event", data.id, event.title);
+  // "Add and save as a template" on the add card.
+  const asTemplate = formData.get("saveTemplate") === "on";
+  if (asTemplate) {
+    const templateError = await insertTemplate(formData, household, event);
+    if (templateError) back(formData, "error", `Added ${event.title}, but the template didn't save: ${templateError}`);
   }
   revalidatePath("/calendar");
   revalidatePath("/");
-  back(formData, "message", formData.get("saveTemplate") === "on" ? `Added ${event.title} and saved it as a template.` : `Added ${event.title}.`);
+  back(formData, "message", asTemplate ? `Added ${event.title} and saved it as a template.` : `Added ${event.title}.`);
 }
 
 export async function updateEvent(formData: FormData) {
@@ -218,6 +235,19 @@ export async function updateEvent(formData: FormData) {
   // It may change someone's kind of day, which shows everywhere.
   revalidatePath("/", "layout");
   back(formData, "message", `Saved ${event.title}.`);
+}
+
+/**
+ * "Save as a template" on an existing event's card: the card as it is now
+ * (changes included, but the event itself isn't changed) becomes a template.
+ */
+export async function saveEventAsTemplate(formData: FormData) {
+  const household = await requireHousehold();
+  const event = readEvent(formData, household.settings);
+  const templateError = await insertTemplate(formData, household, event);
+  if (templateError) back(formData, "error", `The template didn't save: ${templateError}`);
+  revalidatePath("/calendar");
+  back(formData, "message", `Saved ${event.title} as a template. Pick it from "Start from" when you add an event.`);
 }
 
 export async function removeEvent(formData: FormData) {

@@ -201,7 +201,7 @@ export function EventCardFields({
 /**
  * Ready-made events across the top of the add card. Tapping one fills in
  * the card (it reloads the card with ?template=). Templates are saved with
- * "Save as a template too" when adding; "Edit templates" opens the list
+ * "Add and save as a template" when adding, or "Save as a template" on an event; "Edit templates" opens the list
  * where each can be changed or deleted.
  */
 function TemplateRow({
@@ -220,7 +220,7 @@ function TemplateRow({
     <div className="flex min-w-0 items-center gap-2">
       <span className="shrink-0 text-base font-bold text-ink">Start from</span>
       {list.length === 0 ? (
-        <span className="text-base text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding one.</span>
+        <span className="text-base text-ink-muted">No templates yet. Open an event and press &ldquo;Save as a template&rdquo;.</span>
       ) : (
         <div className="flex min-w-0 flex-wrap gap-2">
           {list.slice(0, 6).map((t) => (
