@@ -276,7 +276,7 @@ export function ChoreManager({
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-lg font-bold text-ink">{d.name || "Unnamed"}</span>
                     <span className="truncate text-sm font-semibold text-ink-muted">
-                      {d.is_free ? "Any other day" : d.weekdays.length ? weekdaysLabel(d.weekdays) : "No days yet"} · {count} regular
+                      {d.is_free ? "Any other day" : d.weekdays.length ? weekdaysLabel(d.weekdays) : "No days yet"} · {count === 1 ? "1 chore" : `${count} chores`}
                     </span>
                   </span>
                 </button>
@@ -909,7 +909,7 @@ function OccasionalEditor({
                 </Chip>
               ))}
             </Group>
-            <Group label="Chore days it can go on (none picked: any day that takes all chores)">
+            <Group label="Chore days it can go on (none picked: any day)">
               {draft.days.map((d) => (
                 <Chip key={d.id} on={c.chore_day_ids.includes(d.id)} onClick={() => set({ chore_day_ids: toggle(c.chore_day_ids, d.id) })}>
                   {d.icon ? <Emoji emoji={d.icon} className="size-6" /> : null}

@@ -267,7 +267,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
             </div>
           </form>
           {list.is_groceries ? (
-            <p className="mt-6 text-lg text-ink-muted">This is the grocery list: saving the weekly review puts the menu on it. The list stays, but you can rename it.</p>
+            <p className="mt-6 text-lg text-ink-muted">The grocery list. The weekly review fills it from the menu.</p>
           ) : list.is_chores ? (
             <p className="mt-6 text-lg text-ink-muted">Everything on this list is a chore. The list stays, but you can rename it.</p>
           ) : (

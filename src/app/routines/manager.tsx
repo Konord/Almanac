@@ -339,7 +339,7 @@ export function RoutineManager({
     const copy = copyRoutine(draft, routine.id, newId, true);
     if (!copy) return;
     update((d) => ({ ...d, routines: [...d.routines, copy.routine], steps: [...d.steps, ...copy.steps] }));
-    setNote({ text: "Saved as a template: start new routines from it with the + above a column. Press Save to keep it.", warn: false });
+    setNote({ text: "Saved as a template. Press Save to keep it.", warn: false });
   };
 
   // --- Saving ---------------------------------------------------------------------
@@ -582,7 +582,7 @@ export function RoutineManager({
                     {note.text}
                   </span>
                 ) : routine.is_template ? (
-                  <span className="rounded-full bg-panel px-2.5 py-1 text-ink">Template · start new routines from it with the + above a column</span>
+                  <span className="rounded-full bg-panel px-2.5 py-1 text-ink">Template</span>
                 ) : usedBy.length === 0 ? (
                   <span>Nobody has this routine yet. Tap + above a column to give it to someone.</span>
                 ) : (
@@ -753,7 +753,7 @@ export function RoutineManager({
                     partly={listState === "some"}
                     onClick={() => setWholeDailyList(listState !== "all")}
                     label={listState === "some" ? "Daily list: some steps" : "Whole routine on daily list"}
-                    hint="Shows as one row on the daily list; ticking it ticks every step. Or pick single steps with the list buttons."
+                    hint="Shows as one row on the daily list. Or put single steps on it."
                   />
                   <label className="ml-auto flex items-center gap-2 text-sm font-bold text-ink-muted">
                     Who sees it

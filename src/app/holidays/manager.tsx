@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
 import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
 import { EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
@@ -117,9 +116,6 @@ export function HolidayManager({
   return (
     <>
       <ScreenHeader title="Holidays and birthdays">
-        <Link href="/calendar?view=month" className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-rail px-4 text-base font-bold text-ink">
-          Back to the calendar
-        </Link>
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
 
@@ -392,7 +388,7 @@ function HolidayEditor({ holiday, next, onChange, onRemove }: { holiday: Holiday
           {rule.kind === "before" || rule.kind === "easter" ? <p className="text-lg text-ink-soft">{describeHolidayRule(rule)}</p> : null}
         </>
       )}
-      <p className="mt-auto text-base text-ink-muted">Holidays show on the calendar as a special day. They don&rsquo;t change anyone&rsquo;s days or chores; do that in the Weekly Review if you need to.</p>
+      <p className="mt-auto text-base text-ink-muted">Holidays don&rsquo;t change anyone&rsquo;s days or chores. Do that in the Weekly review.</p>
     </>
   );
 }

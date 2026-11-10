@@ -427,7 +427,7 @@ export async function TodayPanel({
           </p>
         ) : (
           <PanelPages
-            link={showing === "today" ? { href: "/lists", label: "Open the lists" } : { href: `/lists?list=${showing}`, label: "Open the list" }}
+            link={showing === "today" ? { href: "/lists", label: "See all lists" } : { href: `/lists?list=${showing}`, label: "Open the list" }}
             pages={pagesOf(open, ROWS).map((rows, p) => (
               <ul key={p} className="flex flex-col">
             {rows.map((row) => {
@@ -520,7 +520,7 @@ export async function TodayPanel({
                 : showing === "upnext"
                   ? "Open the agenda"
                   : showing === "today"
-                    ? "Open the lists"
+                    ? "See all lists"
                     : "Open the list"}
             </Link>
           );

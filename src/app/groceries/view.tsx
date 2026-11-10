@@ -131,12 +131,12 @@ export function GroceryView({
           <Plus size="1.25rem" weight="bold" aria-hidden />
           Add
         </button>
-        {compact ? null : (
+        {compact || !all.some((l) => l.parts.length > 1) ? null : (
           <>
             <div className="flex-1" />
             <span className="inline-flex items-center gap-2 text-base text-ink-soft">
               <CombinedMark count={2} />
-              added together from more than one meal
+              from more than one meal
             </span>
           </>
         )}

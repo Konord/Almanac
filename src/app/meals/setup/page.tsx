@@ -71,7 +71,7 @@ function MealTimes({ basics, page, here, returnTo }: { basics: Awaited<ReturnTyp
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5">
       <Card title="Meal times">
-        <p className="mb-3 text-lg text-ink-muted">Each meal time is a row on the planner. The usual time is when it shows on Today.</p>
+        <p className="mb-3 text-lg text-ink-muted">Each meal time is a row in the weekly review.</p>
         <ul className="flex min-h-0 flex-1 flex-col gap-2.5">
           {shown.items.map((t, k) => {
             const i = shown.page * 5 + k;

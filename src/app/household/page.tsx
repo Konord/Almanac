@@ -166,7 +166,7 @@ async function HouseholdContent({ searchParams }: { searchParams: PageProps<"/ho
           </label>
           <fieldset className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-frame p-4 sm:col-span-2">
             <legend className="px-2 text-lg font-bold text-ink">Today panel</legend>
-            <p className="text-base text-ink-muted">The boxes its arrows flip between. Up next shows on the Week and Month only.</p>
+            <p className="text-base text-ink-muted">The boxes you can flip through on the Today panel.</p>
             <input type="hidden" name="panelBoxesSent" value="1" />
             <div className="flex flex-wrap gap-2">
               {boxes.map((b) => (

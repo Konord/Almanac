@@ -198,7 +198,7 @@ export function MenuManager({
             ))}
           </ul>
           <Arrows page={kindList.page} pages={kindList.pages} setPage={setKindPage} />
-          <p className="shrink-0 text-base text-ink-muted">A kind is what the review shows first (Tacos). Tap one to see its meals.</p>
+          <p className="shrink-0 text-base text-ink-muted">Tap a kind to see its meals.</p>
         </section>
 
         {/* That kind's meals */}
