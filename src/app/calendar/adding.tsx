@@ -6,7 +6,7 @@ import type { HouseholdSettings } from "@/lib/household";
 import { isLocalDate, isLocalTime } from "@/lib/time";
 import { addEvent } from "./actions";
 import { EventCardFields, type CardDefaults } from "./forms";
-import type { EventTemplate, Member, Tag } from "./types";
+import type { DayKind, EventTemplate, Member, Tag } from "./types";
 
 /*
  * Adding by placing. Pressing + puts a screen into "adding" mode
@@ -72,6 +72,7 @@ export function readAdding(
         title: template.title,
         icon: template.icon ?? "",
         notes: template.notes ?? "",
+        dayKind: template.day_kind ?? undefined,
         startTime,
         minutes: template.minutes,
         allDay: template.all_day || !startTime,
@@ -117,6 +118,7 @@ export function QuickAddSheet({
   pending,
   members,
   tags,
+  dayKinds,
   templates,
   templateHref,
   closeHref,
@@ -128,6 +130,7 @@ export function QuickAddSheet({
   pending: Pending;
   members: Member[];
   tags: Tag[];
+  dayKinds: DayKind[];
   templates: EventTemplate[];
   templateHref: (id: string) => string;
   closeHref: string;
@@ -144,6 +147,7 @@ export function QuickAddSheet({
         <EventCardFields
           members={members}
           tags={tags}
+          dayKinds={dayKinds}
           defaults={pending}
           adding
           templates={{

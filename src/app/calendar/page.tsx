@@ -24,14 +24,14 @@ import {
   updateEvent,
   updateTemplate,
 } from "./actions";
-import { EventCardFields, OVERLAY_TAGS, ViewFields } from "./forms";
+import { DayKindChips, EventCardFields, OVERLAY_TAGS, ViewFields } from "./forms";
 import { LengthInput } from "./when-fields";
 import { Stickers } from "./stickers";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { ViewChooser } from "./view-chooser";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
 import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, rangeOf } from "./data";
-import type { CalendarEvent, CalendarItem, EventTemplate, Member, SavedView, Tag as TagType } from "./types";
+import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member, SavedView, Tag as TagType } from "./types";
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
@@ -91,7 +91,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Month never gets them).
   await syncEventAndChoreHeadsUps(household);
   await choreSchedule(household, today, timeZone);
-  const [{ members, views, tags, templates, items, exceptions }, routineData, breaks, specials] = await Promise.all([
+  const [{ members, views, tags, templates, dayKinds, items, exceptions }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadBreaks(days[0], days[days.length - 1]),
@@ -295,6 +295,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             household={household}
             members={members}
             tags={tags}
+            dayKinds={dayKinds}
             returnTo={returnTo}
             closeHref={closeHref}
             occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
@@ -313,7 +314,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         <QuickAddSheet
           // A day late in the week opens the card on the left, so the day stays in view.
           side={(dayOfWeek(pending.date) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right"}
-          pending={pending} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
+          pending={pending} members={members} tags={tags} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
       ) : null}
 
       {panel === "tags" ? (
@@ -328,6 +329,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             template={templates.find((t) => t.id === firstParam(params.tpl))!}
             members={members}
             tags={tags}
+            dayKinds={dayKinds}
             returnTo={returnTo}
             backHref={href({ panel: "tags", tpl: null })}
           />
@@ -447,6 +449,7 @@ function EditEventPanel({
   household,
   members,
   tags,
+  dayKinds,
   returnTo,
   closeHref,
   memberName,
@@ -471,6 +474,7 @@ function EditEventPanel({
   household: Household;
   members: Member[];
   tags: TagType[];
+  dayKinds: DayKind[];
   returnTo: string;
   closeHref: string;
   memberName: string | undefined;
@@ -527,6 +531,7 @@ function EditEventPanel({
         <EventCardFields
           members={members}
           tags={tags}
+          dayKinds={dayKinds}
           defaults={{
             title: event.title,
             date: startDate,
@@ -538,6 +543,7 @@ function EditEventPanel({
             tagIds: event.tag_ids,
             visibility: event.visibility,
             notes: event.notes ?? "",
+            dayKind: event.day_kind ?? undefined,
             icon: event.icon ?? "",
             repeat: parseRule(event.recurrence_rule),
           }}
@@ -825,12 +831,14 @@ function TemplateCard({
   template,
   members,
   tags,
+  dayKinds,
   returnTo,
   backHref,
 }: {
   template: EventTemplate;
   members: Member[];
   tags: TagType[];
+  dayKinds: DayKind[];
   returnTo: string;
   backHref: string;
 }) {
@@ -863,6 +871,7 @@ function TemplateCard({
           <LengthInput initial={template.minutes} />
         </div>
         <Stickers members={members} tags={tags} memberIds={template.member_ids} tagIds={template.tag_ids} />
+        <DayKindChips kinds={dayKinds} value={template.day_kind} />
         <Field label="Notes">
           <Input name="notes" maxLength={2000} defaultValue={template.notes ?? ""} />
         </Field>

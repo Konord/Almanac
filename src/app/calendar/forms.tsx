@@ -9,7 +9,7 @@ import { WhenFields } from "./when-fields";
 import { PendingSync } from "./pending-sync";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Stickers } from "./stickers";
-import type { EventTemplate, Member, SavedView, Tag } from "./types";
+import type { DayKind, EventTemplate, Member, SavedView, Tag } from "./types";
 
 /** The form fields for events and overlays. */
 
@@ -53,6 +53,31 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
       <p id="repeat-every-hint" className="text-sm text-ink-muted">Every 2 weekly = every other week.</p>
     </fieldset>
   )
+}
+
+/** How many kinds of day the card offers (nothing scrolls). */
+const DAY_KIND_CHIPS = 6;
+
+/**
+ * "Makes it a … day": the event turns its dates into this kind of day for
+ * the people on it (their wake-up, bedtime and routines follow).
+ */
+export function DayKindChips({ kinds, value }: { kinds: DayKind[]; value?: string | null }) {
+  const shown = kinds.slice(0, DAY_KIND_CHIPS);
+  // A kind that's been renamed or removed still shows, so saving keeps it.
+  if (value && !shown.some((k) => k.name.toLowerCase() === value.toLowerCase())) shown.push({ name: value, icon: null });
+  const chosen = shown.find((k) => value && k.name.toLowerCase() === value.toLowerCase())?.name ?? "";
+  return (
+    <Chips
+      name="dayKind"
+      label="Makes it a … day"
+      defaultValue={chosen}
+      options={[
+        { value: "", label: "No change" },
+        ...shown.map((k) => ({ value: k.name, label: k.name, leading: k.icon ? <Emoji emoji={k.icon} className="size-6" /> : undefined })),
+      ]}
+    />
+  );
 }
 
 /** How many tags the overlay card offers (nothing scrolls). */
@@ -99,6 +124,8 @@ export type CardDefaults = QuickDefaults & {
   title?: string;
   icon?: string;
   notes?: string;
+  /** The kind of day it makes its dates, if any. */
+  dayKind?: string;
   visibility?: string;
   repeat?: RepeatOptions;
   /** Last day, for all-day events over several days. */
@@ -113,6 +140,7 @@ export type CardDefaults = QuickDefaults & {
 export function EventCardFields({
   members,
   tags,
+  dayKinds,
   defaults,
   adding = false,
   templates,
@@ -121,6 +149,7 @@ export function EventCardFields({
 }: {
   members: Member[];
   tags: Tag[];
+  dayKinds: DayKind[];
   defaults: CardDefaults;
   /** Editing only: the event's heads-ups, on their own tab. */
   headsUps?: ReactNode;
@@ -159,6 +188,7 @@ export function EventCardFields({
                   adding={adding}
                 />
                 <Stickers members={members} tags={tags} memberIds={defaults.memberIds} tagIds={defaults.tagIds} />
+                <DayKindChips kinds={dayKinds} value={defaults.dayKind} />
               </>
             ),
           },

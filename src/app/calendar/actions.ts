@@ -99,7 +99,14 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     visibility,
     notes: notes || null,
     icon: icon || null,
+    day_kind: readDayKind(formData),
   };
+}
+
+/** "Makes it a … day" on the card: a kind of day's name, or null for no change. */
+function readDayKind(formData: FormData): string | null {
+  const name = text(formData, "dayKind");
+  return name ? name.slice(0, 40) : null;
 }
 
 /** A length in minutes from the quick-add card, if it sent a sensible one. 0 is a point (no length). */
@@ -201,6 +208,7 @@ export async function addEvent(formData: FormData) {
       member_ids: readIds(formData, "memberIds"),
       tag_ids: readIds(formData, "tagIds"),
       notes: event.notes,
+      day_kind: event.day_kind,
       sort_order: 100,
     });
     if (templateError) back(formData, "error", `Added ${event.title}, but the template didn't save: ${templateError.message}`);
@@ -220,7 +228,8 @@ export async function updateEvent(formData: FormData) {
   if (error) back(formData, "error", error.message);
   await saveStickers(formData, household.id, id);
   await log(household.id, "event_updated", "event", id, event.title);
-  revalidatePath("/calendar");
+  // It may change someone's kind of day, which shows everywhere.
+  revalidatePath("/", "layout");
   back(formData, "message", `Saved ${event.title}.`);
 }
 
@@ -232,7 +241,7 @@ export async function removeEvent(formData: FormData) {
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_removed", "event", id, title);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `Removed ${title}.`);
 }
 
@@ -639,6 +648,7 @@ export async function updateTemplate(formData: FormData) {
       member_ids: readIds(formData, "memberIds"),
       tag_ids: readIds(formData, "tagIds"),
       notes: notes || null,
+      day_kind: readDayKind(formData),
     })
     .eq("id", id);
   if (error) back(formData, "error", error.message);

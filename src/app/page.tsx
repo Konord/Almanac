@@ -87,7 +87,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   // The chore generator puts today's chores on the daily list before the tasks are read.
   await choreSchedule(household, today, timeZone);
-  const [{ members, views, tags, templates, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
+  const [{ members, views, tags, templates, dayKinds, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadTodos(),
@@ -244,7 +244,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
 
       {pending ? (
-        <QuickAddSheet pending={pending} members={members} tags={tags} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
+        <QuickAddSheet pending={pending} members={members} tags={tags} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
       ) : null}
 
     </>

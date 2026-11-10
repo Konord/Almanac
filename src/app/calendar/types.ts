@@ -1,3 +1,6 @@
+/** A kind of day anyone has (each person has their own, matched by name). */
+export type DayKind = { name: string; icon: string | null };
+
 export type Member = { id: string; name: string; colour: string; icon: string | null };
 
 /**
@@ -18,6 +21,8 @@ export type EventTemplate = {
   member_ids: string[];
   tag_ids: string[];
   notes: string | null;
+  /** Events made from it make their dates this kind of day. */
+  day_kind: string | null;
 };
 
 export type CalendarEvent = {
@@ -35,6 +40,8 @@ export type CalendarEvent = {
   /** One emoji, or null to guess one from the title. */
   icon: string | null;
   tag_ids: string[];
+  /** Makes its dates this kind of day ("Office day") for the people on it. */
+  day_kind: string | null;
 };
 
 /** One occurrence on the calendar: a one-off event, or one date of a series. */
