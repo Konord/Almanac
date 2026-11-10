@@ -2,13 +2,15 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarCheck, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
+import { ArrowLeft, Bell, CalendarCheck, Car, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
+import { LEAD_UNITS, leadLabel, leadMinutes, type LeadUnit } from "@/lib/heads-ups";
 import {
+  MAX_KIND_HEADS_UPS,
   NEW_PREFIX,
   addWeekPlan,
   daysProblem,
@@ -23,6 +25,7 @@ import {
   type DraftBreak,
   type DraftBreakPerson,
   type DraftDayType,
+  type DraftHeadsUp,
 } from "@/lib/set-days";
 import { saveSetDays } from "./actions";
 
@@ -395,6 +398,9 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
   const groups = groupsOf(draft.dayTypes);
   const perPage = members.length <= 4 ? 6 : 3;
   const [page, setPage] = useState(0);
+  // The kind of day whose heads-ups are open, if any.
+  const [bells, setBells] = useState<string | null>(null);
+  const bellGroup = groups.find((g) => g.group === bells);
   // The "+" card takes one spot on the last page.
   const pages = Math.max(1, Math.ceil((groups.length + 1) / perPage));
   const at = Math.min(page, pages - 1);
@@ -431,7 +437,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
     const group = `${NEW_PREFIX}${groupKey(String((counter += 1)))}`;
     update((d) => ({
       ...d,
-      dayTypes: [...d.dayTypes, ...members.map((m) => ({ id: newId(), member_id: m.id, group, name: "", icon: null, wake: "07:00", bed: "21:30" }))],
+      dayTypes: [...d.dayTypes, ...members.map((m) => ({ id: newId(), member_id: m.id, group, name: "", icon: null, wake: "07:00", bed: "21:30", errands: false }))],
     }));
     setPage(Math.floor(groups.length / perPage));
   };
@@ -463,6 +469,30 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 aria-label="Kind of day"
                 className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
               />
+              <button
+                type="button"
+                aria-pressed={g.types[0]?.errands ?? false}
+                onClick={() => setGroup(g.group, { errands: !(g.types[0]?.errands ?? false) })}
+                title="Good for errands: the chore planner puts errands on these days first"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-frame px-3 text-sm font-bold text-ink-muted aria-pressed:border-solid aria-pressed:border-ink aria-pressed:bg-rail aria-pressed:text-ink"
+              >
+                <Car size="1.25rem" aria-hidden />
+                Errands
+              </button>
+              <button
+                type="button"
+                onClick={() => setBells(g.group)}
+                aria-label={`Heads-ups for ${g.name || "this kind of day"}`}
+                title="Heads-ups: a to-do before each of these days, like “Pack a lunch” the night before"
+                className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-ink"
+              >
+                <Bell size="1.25rem" aria-hidden />
+                {draft.headsUps.some((h) => h.group === g.group) ? (
+                  <span className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-ink text-xs font-bold text-board">
+                    {draft.headsUps.filter((h) => h.group === g.group).length}
+                  </span>
+                ) : null}
+              </button>
               <button
                 type="button"
                 onClick={() => removeGroup(g.group)}
@@ -518,6 +548,146 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
         ) : null}
       </div>
       {pages > 1 ? <Pager page={at} pages={pages} setPage={setPage} /> : null}
+      {bellGroup ? (
+        <KindHeadsUps
+          name={bellGroup.name || "this kind of day"}
+          headsUps={draft.headsUps.filter((h) => h.group === bellGroup.group)}
+          onAdd={(h) => update((d) => ({ ...d, headsUps: [...d.headsUps, { ...h, id: newId(), group: bellGroup.group }] }))}
+          onRemove={(id) => update((d) => ({ ...d, headsUps: d.headsUps.filter((h) => h.id !== id) }))}
+          onClose={() => setBells(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Heads-ups on a kind of day: each makes a to-do (or a grocery line) a set
+ * time before wake-up on every one of those days. Changes wait for Save.
+ */
+function KindHeadsUps({
+  name,
+  headsUps,
+  onAdd,
+  onRemove,
+  onClose,
+}: {
+  name: string;
+  headsUps: DraftHeadsUp[];
+  onAdd: (h: Omit<DraftHeadsUp, "id" | "group">) => void;
+  onRemove: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [amount, setAmount] = useState("12");
+  const [unit, setUnit] = useState<LeadUnit>("hours");
+  const [makes, setMakes] = useState<"todo" | "grocery">("todo");
+  const minutes = leadMinutes(Number(amount), unit);
+  const add = () => {
+    if (!label.trim() || minutes === null) return;
+    onAdd({ label: label.trim().slice(0, 80), minutes_before: minutes, makes });
+    setLabel("");
+  };
+  const chip = (on: boolean) =>
+    `flex min-h-11 items-center rounded-full border-2 px-4 text-base ${on ? "border-ink bg-rail font-bold text-ink" : "border-frame bg-board text-ink"}`;
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(30,35,45,0.35)] p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label={`Heads-ups for ${name}`}
+        onClick={(e) => e.stopPropagation()}
+        className="flex w-full max-w-[40rem] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-6 shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)]"
+      >
+        <div className="flex items-center gap-3">
+          <h2 className="flex-1 text-2xl font-extrabold text-ink">Heads-ups for {name}</h2>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
+            <X size="1.25rem" weight="bold" aria-hidden />
+          </button>
+        </div>
+        <p className="text-base text-ink-muted">
+          A to-do before each {name}, counted back from wake-up. Like &ldquo;Pack a lunch&rdquo; 12 hours before. However it became {name}: the week, a break or an event.
+        </p>
+        {headsUps.length > 0 ? (
+          <ul className="flex flex-col">
+            {headsUps.map((h) => (
+              <li key={h.id} className="flex min-h-12 items-center gap-3 border-b border-panel last:border-0">
+                <Emoji emoji={h.makes === "grocery" ? "🛒" : "🔔"} className="size-7" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-lg font-semibold text-ink">{h.label}</span>
+                  <span className="text-sm font-semibold text-ink-muted">
+                    {leadLabel(h.minutes_before).replace("At the start", "At wake-up").replace(" before", " before wake-up")}
+                    {h.makes === "grocery" ? " · on the grocery list" : ""}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(h.id)}
+                  aria-label={`Remove the heads-up ${h.label}`}
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-ink"
+                >
+                  <X size="1.25rem" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {headsUps.length < MAX_KIND_HEADS_UPS ? (
+          <div className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-rail p-4">
+            <div className="flex items-end gap-3">
+              <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="text-base font-bold text-ink">New heads-up</span>
+                <input
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  maxLength={80}
+                  placeholder="Pack a lunch"
+                  className="min-h-11 rounded-xl border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
+                />
+              </label>
+              <label className="flex w-24 shrink-0 flex-col gap-1.5">
+                <span className="text-base font-bold text-ink">How long</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={999}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="min-h-11 rounded-xl border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {LEAD_UNITS.map((u) => (
+                <button key={u.unit} type="button" aria-pressed={unit === u.unit} onClick={() => setUnit(u.unit)} className={chip(unit === u.unit)}>
+                  {u.label}
+                </button>
+              ))}
+              <span className="px-1 text-base text-ink-muted">before wake-up, makes a</span>
+              <button type="button" aria-pressed={makes === "todo"} onClick={() => setMakes("todo")} className={chip(makes === "todo")}>
+                To-do
+              </button>
+              <button type="button" aria-pressed={makes === "grocery"} onClick={() => setMakes("grocery")} className={chip(makes === "grocery")}>
+                Grocery
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={add}
+                disabled={!label.trim() || minutes === null}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-ink px-5 text-base font-bold text-board disabled:opacity-40"
+              >
+                <Plus size="1.25rem" weight="bold" aria-hidden />
+                Add heads-up
+              </button>
+              {minutes === null ? <span className="text-sm font-bold text-danger">Up to 60 days.</span> : null}
+            </div>
+          </div>
+        ) : (
+          <p className="text-base text-ink-muted">That&rsquo;s the most for one kind of day.</p>
+        )}
+        <p className="text-sm text-ink-muted">Changes are kept when you press Save.</p>
+      </div>
     </div>
   );
 }

@@ -265,6 +265,7 @@ async function RecipeCard({
     visibility: recipe.visibility,
     kind_ids: recipe.kind_ids,
     tag_ids: recipe.tag_ids,
+    category_ids: recipe.category_ids,
     notes: recipe.notes,
     source_url: recipe.source_url,
   };
@@ -275,6 +276,7 @@ async function RecipeCard({
       dish={dish}
       kinds={basics.kinds}
       tags={basics.tags}
+      categories={basics.categories.filter((c) => c.active)}
       ingredients={ingredients}
       steps={steps}
       temperatureUnit={temperatureUnit}

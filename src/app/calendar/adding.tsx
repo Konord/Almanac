@@ -6,7 +6,7 @@ import type { HouseholdSettings } from "@/lib/household";
 import { isLocalDate, isLocalTime } from "@/lib/time";
 import { addEvent } from "./actions";
 import { EventCardFields, type CardDefaults } from "./forms";
-import type { EventTemplate, Layer, Member, Tag } from "./types";
+import type { DayKind, EventTemplate, Member } from "./types";
 
 /*
  * Adding by placing. Pressing + puts a screen into "adding" mode
@@ -30,7 +30,6 @@ export function readAdding(
   settings: HouseholdSettings,
   members: Member[],
   templates: EventTemplate[],
-  tags: Tag[],
   path: "/" | "/calendar",
 ): { placing: boolean; pending: Pending | null; templateHref: (id: string) => string } {
   // The same address with a template picked (everything else kept).
@@ -60,7 +59,6 @@ export function readAdding(
   const template = templates.find((t) => t.id === firstParam(params.template));
   if (template) {
     const memberIds = new Set(members.map((m) => m.id));
-    const tagIds = new Set(tags.map((t) => t.id));
     // A timed template placed on a day (Month) takes its own start time.
     const startTime = tapped.startTime ?? template.start_time ?? undefined;
     return {
@@ -72,11 +70,11 @@ export function readAdding(
         title: template.title,
         icon: template.icon ?? "",
         notes: template.notes ?? "",
+        dayKind: template.day_kind ?? undefined,
         startTime,
         minutes: template.minutes,
         allDay: template.all_day || !startTime,
         memberIds: tapped.memberIds.length > 0 || tapped.wholeRow ? tapped.memberIds : template.member_ids.filter((id) => memberIds.has(id)),
-        tagIds: template.tag_ids.filter((id) => tagIds.has(id)),
       },
     };
   }
@@ -115,9 +113,8 @@ export function PlacingBar({ hint, cancelHref }: { hint: string; cancelHref: str
 /** The quick-add card, sliding in from the right. */
 export function QuickAddSheet({
   pending,
-  layers,
   members,
-  tags,
+  dayKinds,
   templates,
   templateHref,
   closeHref,
@@ -127,9 +124,8 @@ export function QuickAddSheet({
 }: {
   side?: "left" | "right";
   pending: Pending;
-  layers: Layer[];
   members: Member[];
-  tags: Tag[];
+  dayKinds: DayKind[];
   templates: EventTemplate[];
   templateHref: (id: string) => string;
   closeHref: string;
@@ -139,44 +135,39 @@ export function QuickAddSheet({
 }) {
   return (
     <Sheet title="Add an event" closeHref={closeHref} narrow side={side}>
-      {layers.length === 0 ? (
-        <p className="text-lg text-ink-muted">Add a layer first (under Layers on the calendar).</p>
-      ) : (
-        // A new template remounts the form so its fields start from the template.
-        <form key={pending.templateId ?? "blank"} action={addEvent} className="group flex h-full flex-col gap-5">
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <input type="hidden" name="returnPath" value={returnPath} />
-          <EventCardFields
-            layers={layers}
-            members={members}
-            tags={tags}
-            defaults={pending}
-            adding
-            templates={{
-              list: templates,
-              href: templateHref,
-              chosen: pending.templateId,
-              editHref: `/calendar?${returnTo ? `${returnTo}&` : ""}panel=tags`,
-            }}
-          />
-          <div className="mt-auto flex shrink-0 items-center gap-3">
-            <Button>Add event</Button>
-            <Link
-              href={closeHref}
-              scroll={false}
-              className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
-            >
-              Cancel
-            </Link>
-            {pending.templateId ? null : (
-              <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
-                <input type="checkbox" name="saveTemplate" className="size-5 accent-ink" />
-                Save as a template too
-              </label>
-            )}
-          </div>
-        </form>
-      )}
+      {/* A new template remounts the form so its fields start from the template. */}
+      <form key={pending.templateId ?? "blank"} action={addEvent} className="group flex h-full flex-col gap-5">
+        <input type="hidden" name="returnTo" value={returnTo} />
+        <input type="hidden" name="returnPath" value={returnPath} />
+        <EventCardFields
+          members={members}
+          dayKinds={dayKinds}
+          defaults={pending}
+          adding
+          templates={{
+            list: templates,
+            href: templateHref,
+            chosen: pending.templateId,
+            editHref: `/calendar?${returnTo ? `${returnTo}&` : ""}panel=templates`,
+          }}
+        />
+        <div className="mt-auto flex shrink-0 items-center gap-3">
+          <Button>Add event</Button>
+          <Link
+            href={closeHref}
+            scroll={false}
+            className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
+          >
+            Cancel
+          </Link>
+          {pending.templateId ? null : (
+            <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent">
+              <input type="checkbox" name="saveTemplate" className="size-5 accent-ink" />
+              Save as a template too
+            </label>
+          )}
+        </div>
+      </form>
     </Sheet>
   );
 }

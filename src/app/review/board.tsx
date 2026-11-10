@@ -235,7 +235,7 @@ export function ReviewBoard({
                 <h2 className="truncate text-[1.75rem] text-ink">
                   <span className="font-extrabold">{col.label.split(" ")[0]}</span> <span className="font-medium text-ink-soft">{col.label.split(" ").slice(1).join(" ")}</span>
                 </h2>
-                {col.away ? <Badge away /> : col.busy ? <Badge /> : null}
+                {col.away ? <Badge /> : null}
               </div>
 
               {/* Meal tiles, one row per meal time. */}
@@ -562,15 +562,12 @@ function WeekButton({ label, onClick, icon }: { label: string; onClick: () => vo
   );
 }
 
-function Badge({ away = false }: { away?: boolean }) {
+/** "Away" on a day of a break marked away. */
+function Badge() {
   return (
-    <span
-      className={`ml-auto flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-bold ${
-        away ? "bg-panel text-ink-soft" : "bg-[color-mix(in_srgb,var(--color-now)_14%,white)] text-now"
-      }`}
-    >
-      {away ? <Suitcase size="0.875rem" aria-hidden /> : null}
-      {away ? "Away" : "Busy"}
+    <span className="ml-auto flex shrink-0 items-center gap-1 rounded-lg bg-panel px-1.5 py-0.5 text-xs font-bold text-ink-soft">
+      <Suitcase size="0.875rem" aria-hidden />
+      Away
     </span>
   );
 }

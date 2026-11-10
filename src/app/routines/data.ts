@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { dayFor, type Break, type DayTypeData } from "@/lib/day-types";
+import { dayFor, eventDates, type Break, type DayTypeData, type EventDay, type WeekSettings } from "@/lib/day-types";
+import { requireHousehold } from "@/lib/household";
+import { expandEvents } from "@/lib/recurrence";
 import type { Anchor } from "@/lib/routine-placement";
 import { assignmentsForDay, isRoutineKind, routineProgress, stepsForMember, type Progress, type RoutineKind } from "@/lib/routines";
-import { addDays, type LocalDate } from "@/lib/time";
+import { addDays, zonedToUtc, type LocalDate } from "@/lib/time";
 
 export type RoutineMember = {
   id: string;
@@ -70,7 +72,7 @@ export type RoutineData = DayTypeData & {
 /** Everything about routines, plus the ticks for one date. */
 export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
   const supabase = await createClient();
-  const [members, templates, steps, assignments, checks, dayTypes, weekPlans, weekPlanDays, overrides, ends, breaks] = await Promise.all([
+  const [members, templates, steps, assignments, checks, dayTypes, weekPlans, weekPlanDays, overrides, ends, breaks, eventDays] = await Promise.all([
     supabase
       .from("members")
       .select("id, name, role, colour, icon, current_week_plan_id, week_plans_rotate, rotation_start")
@@ -87,12 +89,13 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       .order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, day_type_id, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),
-    supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order").order("sort_order").order("name"),
+    supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order, errands").order("sort_order").order("name"),
     supabase.from("week_plans").select("id, member_id, name, sort_order").order("sort_order").order("name"),
     supabase.from("week_plan_days").select("week_plan_id, weekday, day_type_id"),
     supabase.from("day_overrides").select("member_id, date, day_type_id, wake_time, bed_time").gte("date", addDays(date, -1)).lte("date", addDays(date, 7)),
     supabase.from("routine_ends").select("member_id, template_id").eq("end_date", date),
     loadBreaks(addDays(date, -1), addDays(date, 7)),
+    loadEventDays(addDays(date, -1), addDays(date, 7)),
   ]);
   for (const r of [members, templates, steps, assignments, checks, dayTypes, weekPlans, weekPlanDays, overrides, ends]) if (r.error) throw r.error;
 
@@ -115,7 +118,64 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
     weekPlanDays: weekPlanDays.data ?? [],
     overrides: overrides.data ?? [],
     breaks,
+    eventDays,
   };
+}
+
+/**
+ * Who has which kind of day on each date from `from` to `to`, for screens
+ * that need more than the week loadRoutines() covers (the chore planner).
+ */
+export async function loadDaysBetween(from: LocalDate, to: LocalDate): Promise<{ members: WeekSettings[]; data: DayTypeData }> {
+  const supabase = await createClient();
+  const [members, dayTypes, weekPlans, weekPlanDays, overrides, breaks, eventDays] = await Promise.all([
+    supabase.from("members").select("id, current_week_plan_id, week_plans_rotate, rotation_start"),
+    supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order, errands"),
+    supabase.from("week_plans").select("id, member_id, name, sort_order"),
+    supabase.from("week_plan_days").select("week_plan_id, weekday, day_type_id"),
+    supabase.from("day_overrides").select("member_id, date, day_type_id, wake_time, bed_time").gte("date", from).lte("date", to),
+    loadBreaks(from, to),
+    loadEventDays(from, to),
+  ]);
+  for (const r of [members, dayTypes, weekPlans, weekPlanDays, overrides]) if (r.error) throw r.error;
+  return {
+    members: members.data ?? [],
+    data: { dayTypes: dayTypes.data ?? [], weekPlans: weekPlans.data ?? [], weekPlanDays: weekPlanDays.data ?? [], overrides: overrides.data ?? [], breaks, eventDays },
+  };
+}
+
+/** Events that make some of the dates from `from` to `to` a kind of day ("Office day"). */
+export async function loadEventDays(from: LocalDate, to: LocalDate): Promise<EventDay[]> {
+  const { settings } = await requireHousehold();
+  const supabase = await createClient();
+  const rangeStart = zonedToUtc(from, "00:00", settings.timeZone);
+  const rangeEnd = zonedToUtc(addDays(to, 1), "00:00", settings.timeZone);
+  const columns = "id, title, starts_at, ends_at, all_day, timezone, recurrence_rule, day_kind, event_members(member_id)";
+  const [oneOffs, series] = await Promise.all([
+    supabase
+      .from("events")
+      .select(columns)
+      .not("day_kind", "is", null)
+      .is("recurrence_rule", null)
+      .lt("starts_at", rangeEnd.toISOString())
+      .gte("ends_at", rangeStart.toISOString()),
+    supabase.from("events").select(columns).not("day_kind", "is", null).not("recurrence_rule", "is", null).lt("starts_at", rangeEnd.toISOString()),
+  ]);
+  if (oneOffs.error) throw oneOffs.error;
+  if (series.error) throw series.error;
+  const seriesIds = series.data.map((e) => e.id);
+  const exceptions =
+    seriesIds.length === 0
+      ? []
+      : ((await supabase.from("event_exceptions").select("event_id, original_date, skipped, new_starts_at, new_ends_at").in("event_id", seriesIds)).data ?? []);
+  return expandEvents([...oneOffs.data, ...series.data], exceptions, rangeStart, rangeEnd)
+    .toSorted((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0))
+    .map((e) => ({
+      title: e.title,
+      name: e.day_kind ?? "",
+      member_ids: e.event_members.map((m) => m.member_id),
+      dates: eventDates(e.starts_at, e.ends_at, e.all_day, settings.timeZone),
+    }));
 }
 
 /** Breaks that touch the dates from `from` to `to`, with who's on each. */
@@ -144,7 +204,7 @@ export type DayRoutine = {
 /** A person's day type on a date, with their wake-up and bedtime ("07:00"). */
 export function personDay(data: RoutineData, memberId: string, date: LocalDate): ReturnType<typeof dayFor> {
   const member = data.members.find((m) => m.id === memberId);
-  if (!member) return { dayType: null, wake: "07:00", bed: "21:30", switched: false, onBreak: null };
+  if (!member) return { dayType: null, wake: "07:00", bed: "21:30", switched: false, onBreak: null, fromEvent: null };
   return dayFor(member, data, date);
 }
 

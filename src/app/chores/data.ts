@@ -129,27 +129,13 @@ export async function loadChores(today: LocalDate, timeZone: string) {
 /** The household's chore days, Free day last. */
 export async function loadChoreDays(): Promise<(ChoreDay & { sort_order: number; errands: boolean })[]> {
   const supabase = await createClient();
-  const [days, tagged] = await Promise.all([
-    supabase
-      .from("chore_days")
-      .select("id, name, icon, weekdays, span, restrictive, max_tasks, max_big, is_free, sort_order")
-      .order("sort_order")
-      .order("name"),
-    supabase.from("chore_day_tags").select("chore_day_id, tag_id"),
-  ]);
-  if (days.error) throw days.error;
-  if (tagged.error) throw tagged.error;
-  const errand = await errandTagId();
-  const errandDays = new Set(tagged.data.filter((t) => t.tag_id === errand).map((t) => t.chore_day_id));
-  return days.data.map((d) => ({ ...d, errands: errandDays.has(d.id) }));
-}
-
-/** The id of the household's Errand tag (in the shared tag pool), if there is one. */
-export async function errandTagId(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("tags").select("id").eq("role", "errand").maybeSingle();
+  const { data, error } = await supabase
+    .from("chore_days")
+    .select("id, name, icon, weekdays, span, restrictive, max_tasks, max_big, is_free, sort_order, errands")
+    .order("sort_order")
+    .order("name");
   if (error) throw error;
-  return data?.id ?? null;
+  return data;
 }
 
 /** The to-do lists and their to-dos (open ones, plus the last few done). */

@@ -3,7 +3,7 @@ import { dayFor } from "@/lib/day-types";
 import { combineDays, datesBetween, habitDay, habitStats, type HabitDay, type HabitStats } from "@/lib/habits";
 import { assignmentsForDay, stepsForMember } from "@/lib/routines";
 import { addDays, type LocalDate } from "@/lib/time";
-import { loadBreaks, type RoutineData, type RoutineStep, type RoutineTemplate } from "./data";
+import { loadBreaks, loadEventDays, type RoutineData, type RoutineStep, type RoutineTemplate } from "./data";
 
 /*
  * Habit history for one person: for each tracked routine, and each of its
@@ -49,7 +49,7 @@ export async function loadHabitHistory(data: RoutineData, memberId: string, from
   if (!member || tracked.length === 0) return { dates, routines: [] };
 
   const supabase = await createClient();
-  const [checks, overrides, days, breaks] = await Promise.all([
+  const [checks, overrides, days, breaks, eventDays] = await Promise.all([
     supabase.from("routine_checks").select("step_id, check_date").eq("member_id", memberId).gte("check_date", from).lte("check_date", to),
     supabase
       .from("day_overrides")
@@ -59,12 +59,13 @@ export async function loadHabitHistory(data: RoutineData, memberId: string, from
       .lte("date", to),
     supabase.from("days").select("date, energy_mode").gte("date", from).lte("date", to),
     loadBreaks(from, to),
+    loadEventDays(from, to),
   ]);
   for (const r of [checks, overrides, days]) if (r.error) throw r.error;
 
   const ticked = new Set((checks.data ?? []).map((c) => `${c.step_id}:${c.check_date}`));
   const survival = new Set((days.data ?? []).filter((d) => d.energy_mode === "survival").map((d) => d.date));
-  const rangeData = { ...data, overrides: overrides.data ?? [], breaks };
+  const rangeData = { ...data, overrides: overrides.data ?? [], breaks, eventDays };
   const kindOf = (id: string) => data.templates.find((t) => t.id === id)?.kind;
 
   // Which routines were on for this person, each day.

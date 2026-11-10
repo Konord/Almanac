@@ -199,7 +199,7 @@ test("errands are grouped onto a day that already has one", () => {
   assert.equal(where(plan, "library"), TUE);
 });
 
-test("errands go on a chore day tagged Errand", () => {
+test("errands go on a chore day good for errands", () => {
   const marketing = day("marketing", { weekdays: [3], errands: true });
   const plan = planChoreDays({
     choreDays: [free, marketing],
@@ -212,7 +212,7 @@ test("errands go on a chore day tagged Errand", () => {
   assert.equal(where(plan, "dust"), "2026-11-12");
 });
 
-test("a day with an event tagged Errand (an office day) takes errands", () => {
+test("a kind of day good for errands (an office day) takes errands", () => {
   const plan = planChoreDays({
     choreDays: [free],
     chores: [chore("post", { tags: ["errand"], dueOn: "2026-11-12" })],

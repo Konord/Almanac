@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/database.types";
-import { DEFAULT_DAY_PROFILE, type DayProfileSettings } from "@/lib/day-profile";
 import { isLocalTime } from "@/lib/time";
 
 /**
@@ -23,8 +22,6 @@ export type HouseholdSettings = {
   activeTheme: string;
   /** Show family-written things (to-dos, meals, notes) in handwriting. */
   handwriting: boolean;
-  /** What counts as a free or busy day (see src/lib/day-profile.ts). */
-  dayProfile: DayProfileSettings;
   /** How long a new event lasts when only a start time is given. */
   defaultEventMinutes: number;
   /** How far a routine may move to get around an event (unless it's loose). */
@@ -47,7 +44,6 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   monthStyle: "rolling",
   activeTheme: "bright",
   handwriting: true,
-  dayProfile: DEFAULT_DAY_PROFILE,
   defaultEventMinutes: 60,
   routineFlexMinutes: 60,
   weeklyReview: { weekday: 6, time: "09:00" },
@@ -74,7 +70,6 @@ export function parseSettings(raw: Json): HouseholdSettings {
     monthStyle: pick("monthStyle", (v) => v === "rolling" || v === "calendar"),
     activeTheme: pick("activeTheme", (v) => typeof v === "string" && v.length > 0),
     handwriting: pick("handwriting", (v) => typeof v === "boolean"),
-    dayProfile: parseDayProfile(value.dayProfile),
     defaultEventMinutes: pick("defaultEventMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 5 && v <= 24 * 60),
     routineFlexMinutes: pick("routineFlexMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 6 * 60),
     weeklyReview: pick("weeklyReview", (v) => {
@@ -84,31 +79,6 @@ export function parseSettings(raw: Json): HouseholdSettings {
     }),
     panelBoxes: pick("panelBoxes", (v) => Array.isArray(v) && v.length <= 40 && v.every((x) => typeof x === "string" && /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(x))),
   };
-}
-
-/** Day-profile thresholds, filling any missing or odd values with defaults. */
-export function parseDayProfile(raw: Json | undefined): DayProfileSettings {
-  const value = raw !== null && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  const time = (key: "dayStarts" | "dayEnds" | "eveningStarts") => {
-    const v = value[key];
-    return typeof v === "string" && isLocalTime(v) ? v : DEFAULT_DAY_PROFILE[key];
-  };
-  const minutes = (key: "busyDayMinutes" | "busyEveningMinutes") => {
-    const v = value[key];
-    return typeof v === "number" && Number.isInteger(v) && v > 0 && v <= 24 * 60 ? v : DEFAULT_DAY_PROFILE[key];
-  };
-  const result = {
-    dayStarts: time("dayStarts"),
-    dayEnds: time("dayEnds"),
-    eveningStarts: time("eveningStarts"),
-    busyDayMinutes: minutes("busyDayMinutes"),
-    busyEveningMinutes: minutes("busyEveningMinutes"),
-  };
-  // The day has to end after it starts, with the evening in between.
-  if (!(result.dayStarts < result.eveningStarts && result.eveningStarts < result.dayEnds)) {
-    return { ...result, dayStarts: DEFAULT_DAY_PROFILE.dayStarts, eveningStarts: DEFAULT_DAY_PROFILE.eveningStarts, dayEnds: DEFAULT_DAY_PROFILE.dayEnds };
-  }
-  return result;
 }
 
 export function isTimeZone(value: unknown): boolean {

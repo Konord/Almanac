@@ -37,7 +37,7 @@ export type DraftChoreDay = {
   max_tasks: number;
   max_big: number;
   is_free: boolean;
-  /** Tagged Errand: errands go on this day first. */
+  /** Good for errands: errands go on this day first. */
   errands: boolean;
 };
 

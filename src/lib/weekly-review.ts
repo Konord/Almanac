@@ -59,10 +59,6 @@ export type ReviewDay = {
   past: boolean;
   /** On a break marked away. */
   away: boolean;
-  /** Packed with plans (a busy day by the household's day-profile setting). */
-  busy: boolean;
-  /** Minutes of plans in the day (to pick the lightest day). */
-  busyMinutes: number;
   meals: ReviewMeal[];
 };
 
@@ -228,15 +224,15 @@ export function reviewProblems(input: {
   const open = days.filter((d) => !d.past);
   const out: Problem[] = [];
 
-  /** The best other day this week for a chore day: not away, not packed, not already one; nearest, later first. */
+  /** The best other day this week for a chore day: not away, not already one; nearest, later first. */
   const betterDay = (from: ReviewDay, id: string): ReviewDay | undefined => {
     const index = days.indexOf(from);
     return open
-      .filter((d) => d !== from && !d.away && !d.busy && !(draft.choreDays[d.date] ?? []).includes(id))
+      .filter((d) => d !== from && !d.away && !(draft.choreDays[d.date] ?? []).includes(id))
       .toSorted((a, b) => {
         const da = Math.abs(days.indexOf(a) - index);
         const db = Math.abs(days.indexOf(b) - index);
-        return da - db || days.indexOf(b) - days.indexOf(a) || a.busyMinutes - b.busyMinutes;
+        return da - db || days.indexOf(b) - days.indexOf(a);
       })
       .at(0);
   };
@@ -244,11 +240,11 @@ export function reviewProblems(input: {
   for (const day of open) {
     for (const id of draft.choreDays[day.date] ?? []) {
       const cd = byId.get(id);
-      if (!cd || !(day.away || day.busy)) continue;
+      if (!cd || !day.away) continue;
       const to = betterDay(day, id);
-      const why = day.away ? `You're away on ${day.name}, a ${cd.name} day.` : `${day.name} is packed with plans, and it's a ${cd.name} day.`;
+      const why = `You're away on ${day.name}, a ${cd.name} day.`;
       out.push({
-        id: `${day.away ? "away" : "busy"}|${day.date}|${id}`,
+        id: `away|${day.date}|${id}`,
         date: day.date,
         text: to ? `${why} Move ${cd.name} to ${to.name}?` : `${why} There's no better day this week.`,
         fix: to ? { label: `Move to ${to.name}`, apply: { kind: "move", choreDayId: id, from: day.date, to: to.date } } : undefined,

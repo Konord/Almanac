@@ -9,9 +9,9 @@ import { WhenFields } from "./when-fields";
 import { PendingSync } from "./pending-sync";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Stickers } from "./stickers";
-import type { EventTemplate, Layer, Member, SavedView, Tag } from "./types";
+import type { DayKind, EventTemplate, Member } from "./types";
 
-/** The form fields for events and overlays. */
+/** The form fields for events. */
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -55,32 +55,28 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
   )
 }
 
-/** How many tags the overlay card offers (nothing scrolls). */
-export const OVERLAY_TAGS = 24;
+/** How many kinds of day the card offers (nothing scrolls). */
+const DAY_KIND_CHIPS = 6;
 
-/** Name and tags for an overlay. */
-export function ViewFields({ tags, view }: { tags: Tag[]; view?: SavedView }) {
+/**
+ * "Makes it a … day": the event turns its dates into this kind of day for
+ * the people on it (their wake-up, bedtime and routines follow).
+ */
+export function DayKindChips({ kinds, value }: { kinds: DayKind[]; value?: string | null }) {
+  const shown = kinds.slice(0, DAY_KIND_CHIPS);
+  // A kind that's been renamed or removed still shows, so saving keeps it.
+  if (value && !shown.some((k) => k.name.toLowerCase() === value.toLowerCase())) shown.push({ name: value, icon: null });
+  const chosen = shown.find((k) => value && k.name.toLowerCase() === value.toLowerCase())?.name ?? "";
   return (
-    <>
-      <Field label="Name">
-        <Input name="name" defaultValue={view?.name} required maxLength={40} placeholder="e.g. Court and appointments" />
-      </Field>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-base font-medium text-ink">Shows events tagged</legend>
-        <div className="grid grid-cols-3 gap-2">
-          {tags.slice(0, OVERLAY_TAGS).map((tag) => (
-            <label
-              key={tag.id}
-              className="flex min-h-[var(--touch-target)] min-w-0 items-center gap-2 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-base font-semibold text-ink has-[:checked]:border-accent has-[:checked]:bg-rail"
-            >
-              <input type="checkbox" name="tagIds" value={tag.id} defaultChecked={view?.tag_ids.includes(tag.id)} className="size-5 shrink-0 accent-accent" />
-              <Emoji emoji={tag.icon || eventEmoji(null, tag.name)} className="size-6" />
-              <span className="truncate">{tag.name}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-    </>
+    <Chips
+      name="dayKind"
+      label="Makes it a … day"
+      defaultValue={chosen}
+      options={[
+        { value: "", label: "No change" },
+        ...shown.map((k) => ({ value: k.name, label: k.name, leading: k.icon ? <Emoji emoji={k.icon} className="size-6" /> : undefined })),
+      ]}
+    />
   );
 }
 
@@ -91,7 +87,6 @@ export type QuickDefaults = {
   minutes: number;
   allDay: boolean;
   memberIds?: string[];
-  tagIds?: string[];
 };
 
 /** Everything the card can start with when it's editing an existing event. */
@@ -99,7 +94,8 @@ export type CardDefaults = QuickDefaults & {
   title?: string;
   icon?: string;
   notes?: string;
-  layerId?: string;
+  /** The kind of day it makes its dates, if any. */
+  dayKind?: string;
   visibility?: string;
   repeat?: RepeatOptions;
   /** Last day, for all-day events over several days. */
@@ -112,18 +108,16 @@ export type CardDefaults = QuickDefaults & {
  * buttons and an All day switch. Repeats and the rest are behind tabs. Put it inside a <form className="group ...">.
  */
 export function EventCardFields({
-  layers,
   members,
-  tags,
+  dayKinds,
   defaults,
   adding = false,
   templates,
   headsUps,
   initialTab,
 }: {
-  layers: Layer[];
   members: Member[];
-  tags: Tag[];
+  dayKinds: DayKind[];
   defaults: CardDefaults;
   /** Editing only: the event's heads-ups, on their own tab. */
   headsUps?: ReactNode;
@@ -137,8 +131,6 @@ export function EventCardFields({
   return (
     <>
       {adding ? <PendingSync defaults={defaults} /> : null}
-      {/* Tags replace layers on the card; events still quietly belong to one (Connor, 2026-11-05). */}
-      <input type="hidden" name="layerId" value={defaults.layerId ?? layers[0]?.id ?? ""} />
       <CardTabs
         initial={initialTab === "heads-ups" ? 3 : 0}
         tabs={[
@@ -163,7 +155,8 @@ export function EventCardFields({
                   endDate={defaults.endDate}
                   adding={adding}
                 />
-                <Stickers members={members} tags={tags} memberIds={defaults.memberIds} tagIds={defaults.tagIds} />
+                <Stickers members={members} memberIds={defaults.memberIds} />
+                <DayKindChips kinds={dayKinds} value={defaults.dayKind} />
               </>
             ),
           },

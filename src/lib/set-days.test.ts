@@ -4,9 +4,9 @@ import { addWeekPlan, daysProblem, groupsOf, pickWeek, removeDayType, removeWeek
 
 const draft: DaysDraft = {
   dayTypes: [
-    { id: "mia-school", member_id: "mia", group: "school day", name: "School day", icon: "🎒", wake: "07:00", bed: "20:00" },
-    { id: "mia-home", member_id: "mia", group: "home day", name: "Home day", icon: null, wake: "07:30", bed: "20:30" },
-    { id: "leo-school", member_id: "leo", group: "school day", name: "School day", icon: "🎒", wake: "06:45", bed: "19:30" },
+    { id: "mia-school", member_id: "mia", group: "school day", name: "School day", icon: "🎒", wake: "07:00", bed: "20:00", errands: false },
+    { id: "mia-home", member_id: "mia", group: "home day", name: "Home day", icon: null, wake: "07:30", bed: "20:30", errands: false },
+    { id: "leo-school", member_id: "leo", group: "school day", name: "School day", icon: "🎒", wake: "06:45", bed: "19:30", errands: false },
   ],
   weekPlans: [
     { id: "mia-week", member_id: "mia", name: "Usual week" },
@@ -23,10 +23,18 @@ const draft: DaysDraft = {
   breaks: [
     { id: "b1", name: "Winter break", icon: "⛄", start: "2026-12-21", end: "2027-01-01", people: [{ member_id: "mia", day_type_id: "mia-home", week_plan_id: null }] },
   ],
+  headsUps: [{ id: "h1", group: "school day", label: "Pack a lunch", minutes_before: 720, makes: "todo" }],
 };
 
 test("a good draft has no problem", () => {
   assert.equal(daysProblem(draft), null);
+});
+
+test("a heads-up on a kind of day needs words and a lead of up to 60 days", () => {
+  assert.match(daysProblem({ ...draft, headsUps: [{ ...draft.headsUps[0], label: " " }] }) ?? "", /needs words/);
+  assert.match(daysProblem({ ...draft, headsUps: [{ ...draft.headsUps[0], minutes_before: 90000 }] }) ?? "", /how long before/);
+  // One left behind by a kind of day that's gone doesn't count.
+  assert.equal(daysProblem({ ...draft, headsUps: [{ ...draft.headsUps[0], group: "gone", label: "" }] }), null);
 });
 
 test("kinds of day with the same name show as one group", () => {

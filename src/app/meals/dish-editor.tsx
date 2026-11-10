@@ -38,6 +38,8 @@ export type EditableDish = {
   visibility: string;
   kind_ids: string[];
   tag_ids: string[];
+  /** Kinds of meal it goes with: offered first in their side spots. */
+  category_ids: string[];
   notes: string | null;
   source_url: string | null;
 };
@@ -52,6 +54,7 @@ export function DishEditor({
   dish,
   kinds,
   tags,
+  categories,
   ingredients,
   steps,
   temperatureUnit,
@@ -64,6 +67,8 @@ export function DishEditor({
   dish: EditableDish;
   kinds: Option[];
   tags: Option[];
+  /** Kinds of meal (Pasta, Tacos…), for "Goes with". */
+  categories: Option[];
   ingredients: IngredientDraft[];
   steps: StepDraft[];
   temperatureUnit: "celsius" | "fahrenheit";
@@ -238,6 +243,13 @@ export function DishEditor({
                     multiple
                     defaultValue={dish.kind_ids}
                     options={kinds.slice(0, 14).map((k) => ({ value: k.id, label: k.name, leading: <Emoji emoji={k.icon} className="size-7" /> }))}
+                  />
+                  <Chips
+                    name="goesWith"
+                    label="Goes with (offered first in these meals)"
+                    multiple
+                    defaultValue={dish.category_ids}
+                    options={categories.slice(0, 12).map((c) => ({ value: c.id, label: c.name, leading: <Emoji emoji={c.icon} className="size-7" /> }))}
                   />
                   <Chips
                     name="tagIds"

@@ -25,6 +25,8 @@ export type DraftDayType = {
   /** "07:00" */
   wake: string;
   bed: string;
+  /** Good for errands (the same for the whole group). */
+  errands: boolean;
 };
 
 export type DraftWeekPlan = { id: string; member_id: string; name: string };
@@ -52,6 +54,22 @@ export type DraftBreak = {
   people: DraftBreakPerson[];
 };
 
+/**
+ * A heads-up on a kind of day ("Pack a lunch" the night before each Office
+ * day). It belongs to the group, so everyone with that kind of day gets it.
+ */
+export type DraftHeadsUp = {
+  id: string;
+  group: string;
+  label: string;
+  /** How long before wake-up that day. */
+  minutes_before: number;
+  makes: "todo" | "grocery";
+};
+
+/** Room for this many on one kind of day without scrolling. */
+export const MAX_KIND_HEADS_UPS = 4;
+
 /** Everything on Set days. Kinds of day and week plans are in order. */
 export type DaysDraft = {
   dayTypes: DraftDayType[];
@@ -59,6 +77,7 @@ export type DaysDraft = {
   planDays: DraftPlanDay[];
   members: DraftMemberWeek[];
   breaks: DraftBreak[];
+  headsUps: DraftHeadsUp[];
 };
 
 /** The group key for a kind of day's name. */
@@ -178,6 +197,13 @@ export function daysProblem(draft: DaysDraft, names: Record<string, string> = {}
   for (const m of draft.members) {
     if (m.current_week_plan_id && planOwner.get(m.current_week_plan_id) !== m.member_id) return `Choose which week ${who(m.member_id)} is on.`;
     if (m.rotate && !(m.rotation_start && DATE.test(m.rotation_start))) return `Choose when ${who(m.member_id)}'s weeks start taking turns.`;
+  }
+  const groups = new Set(draft.dayTypes.map((t) => t.group));
+  for (const h of draft.headsUps) {
+    if (!groups.has(h.group)) continue;
+    if (!h.label.trim()) return "Every heads-up needs words, like “Pack a lunch”.";
+    if (h.label.trim().length > 80) return `"${h.label.slice(0, 20)}…" is too long for a heads-up (80 letters at most).`;
+    if (!Number.isInteger(h.minutes_before) || h.minutes_before < 0 || h.minutes_before > 86400) return `Pick how long before for “${h.label.trim()}”, up to 60 days.`;
   }
   for (const b of draft.breaks) {
     const name = b.name.trim();

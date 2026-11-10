@@ -13,7 +13,7 @@ select public.create_household('Bright House');
 select is((select settings ->> 'activeTheme' from public.households), 'bright', 'A new household uses the bright theme');
 select is((select settings -> 'handwriting' from public.households), 'true'::jsonb, 'Handwriting is on by default');
 select is((select tokens -> 'colors' ->> 'personBlueSoft' from public.themes where slug = 'bright'), '#CFE3F8', 'The bright theme has the person colours');
-select is((select colour from public.layers where name = 'Family'), 'orange', 'Starter layers use the person colours');
+select is((select settings -> 'dayProfile' from public.households), null, 'No busy-day settings any more');
 
 insert into public.members (household_id, name, role) values (public.current_household_id(), 'Ava', 'child');
 select is((select colour from public.members where name = 'Ava'), 'blue', 'People start out blue');

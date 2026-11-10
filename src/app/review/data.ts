@@ -6,7 +6,7 @@ import { EATING_MINUTES, weekDates, weekStartOf } from "@/lib/meals";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { lastPicksFrom, menuMealIcon, menuMealName, spotSummary } from "@/lib/menu";
 import { reviewDue, type DraftMeal, type ReviewDay, type ReviewDraft } from "@/lib/weekly-review";
-import { loadCalendar, profilesFor, rangeOf } from "../calendar/data";
+import { loadCalendar, rangeOf } from "../calendar/data";
 import { eventsOnDay, isAllDayStyle } from "../calendar/views";
 import { choreSchedule, loadChoreDayMoves } from "../chores/plan";
 import { loadChoreDays } from "../chores/data";
@@ -23,7 +23,16 @@ export type ReviewColumn = ReviewDay & {
 };
 
 /** A dish (recipe) the review's meals can use. */
-export type ReviewDish = { id: string; name: string; icon: string | null; kind_ids: string[]; is_backup: boolean; serves: number };
+export type ReviewDish = {
+  id: string;
+  name: string;
+  icon: string | null;
+  kind_ids: string[];
+  is_backup: boolean;
+  serves: number;
+  /** Kinds of meal it goes with (Caesar salad: Pasta, Pizza…): offered first there. */
+  goes_with?: string[];
+};
 
 /** A meal on the menu, ready to pick: its spots are set dishes or kinds to pick from. */
 export type ReviewMenuMeal = {
@@ -112,7 +121,6 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     loadWeekReview(week),
     loadPickHistory(addDays(week, 7)),
   ]);
-  const profiles = profilesFor(dates, calendar.items, calendar.layers, household);
   const dishById = new Map(basics.recipes.map((r) => [r.id, r]));
   const plannerTimes = basics.mealTimes.filter((t) => t.show_on_planner);
   const memberIds = routines.members.map((m) => m.id);
@@ -140,15 +148,12 @@ export async function loadReview(household: Household, week: LocalDate, today: L
           return { meal: m, time: t, everyoneOut: eaters.length > 0 && eaters.every(out) };
         }),
     );
-    const profile = profiles.get(date);
     return {
       date,
       name: new Intl.DateTimeFormat(locale, { timeZone, weekday: "long" }).format(noon),
       label: new Intl.DateTimeFormat(locale, { timeZone, weekday: "short", day: "numeric" }).format(noon),
       past: date < today,
       away: routines.breaks.some((b) => b.away && b.start_date <= date && date <= b.end_date),
-      busy: profile?.kind === "busy",
-      busyMinutes: profile?.busyMinutes ?? 0,
       meals: dayMeals.map(({ meal, time, everyoneOut }) => ({ id: meal.id, mealTimeName: time.name, categoryId: meal.category_id, everyoneOut })),
       events: shown.map((e) => ({
         id: `${e.id}-${e.starts_at}`,
@@ -191,6 +196,7 @@ export async function loadReview(household: Household, week: LocalDate, today: L
       kind_ids: r.kind_ids,
       is_backup: r.is_backup,
       serves: r.serves,
+      goes_with: r.category_ids,
     })),
     kinds: basics.kinds.map((k) => ({ id: k.id, name: k.name, icon: k.icon })),
     menuMeals: basics.menuMeals.map((m) => ({
