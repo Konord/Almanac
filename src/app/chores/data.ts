@@ -37,8 +37,11 @@ export type Round = {
   completed_by: string | null;
 };
 
-/** `is_chores`: the household's Chores list, where every task is a one-off chore. */
-export type TaskList = { id: string; name: string; icon: string | null; visibility: string; is_chores: boolean };
+/**
+ * `is_chores`: the household's Chores list, where every task is a one-off chore.
+ * `is_groceries`: the grocery list, whose lines live in shopping_list (amounts, aisles).
+ */
+export type TaskList = { id: string; name: string; icon: string | null; visibility: string; is_chores: boolean; is_groceries: boolean };
 
 export type Todo = {
   id: string;
@@ -139,7 +142,7 @@ export async function loadChoreDays(): Promise<(ChoreDay & { sort_order: number 
 export async function loadTodos() {
   const supabase = await createClient();
   const [lists, todos] = await Promise.all([
-    supabase.from("task_lists").select("id, name, icon, visibility, is_chores").order("sort_order").order("name"),
+    supabase.from("task_lists").select("id, name, icon, visibility, is_chores, is_groceries").order("sort_order").order("name"),
     supabase
       .from("task_instances")
       .select("id, list_id, title, icon, due_date, assignee_id, status, completed_on, notes, must_do, date_kind, at_time, lead_days, link, template_id, heads_up_id, minutes, chore_day_id, tags")

@@ -1,20 +1,25 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { BookOpen, DownloadSimple, PencilSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
+import { BookOpen, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Chips, Emoji, Field, Input, Select, SoftLink, firstParam } from "@/components/ui";
+import { BATCHES, batchAmount } from "@/lib/meals";
+import { clampBatches, menuMealName } from "@/lib/menu";
+import { measureText, type Measures } from "@/lib/units";
+import { UnitPill } from "../unit-pill";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
 import { minutesText } from "@/lib/meal-helpers";
 import { VISIBILITY_OPTIONS } from "../../calendar/options";
-import { addCategory, addRecipe, importRecipe, removeCategory, removeRecipe, saveRecipeBasics, saveRecipeNotes, updateCategory } from "../actions";
-import { loadMealBasics, loadRecipeDetail, type MealBasics, type MealCategory, type Recipe } from "../data";
+import { addRecipe, importRecipe, removeRecipe, saveRecipeBasics, saveRecipeNotes } from "../actions";
+import { loadMealBasics, loadRecipeDetail, type DishKind, type MealBasics, type Recipe } from "../data";
 import { MealsHeader, Modal, Pager, linker, pageOf } from "../parts";
 import { IngredientsEditor, StepsEditor } from "../recipe-editors";
 
 /**
- * The recipe library: categories (Tacos, Pasta…) on the left, the chosen
- * category's variants (Beef tacos, Chicken tacos…) on the right. Tapping a
- * variant opens its recipe card, with tabs so nothing has to scroll.
+ * The Menu Manager's Dishes tab (Connor, 2026-11-10): every dish, by what
+ * it can be in a meal (Main, Starch, Veggie…). Tapping a dish opens its
+ * recipe: ×1/×2/×3 batches, amounts whose units you can tap to see in other
+ * units, and tabs for editing so nothing has to scroll.
  */
 export default function LibraryPage(props: PageProps<"/meals/library">) {
   return (
@@ -26,9 +31,10 @@ export default function LibraryPage(props: PageProps<"/meals/library">) {
   );
 }
 
-const CATEGORY_PAGE = 12;
-const VARIANT_PAGE = 6;
-/** Recipes with no category show under this pretend category. */
+const KIND_PAGE = 12;
+const DISH_PAGE = 6;
+/** The pretend kinds: every dish, and dishes with no kind. */
+const ALL = "all";
 const NONE = "none";
 
 async function Library({ searchParams }: { searchParams: PageProps<"/meals/library">["searchParams"] }) {
@@ -37,141 +43,121 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   const basics = await loadMealBasics();
   const p = (k: string) => firstParam(params[k]);
 
-  const loose = basics.recipes.filter((r) => r.category_ids.length === 0 && !r.is_backup);
-  const categoryParam = p("category");
-  const category: MealCategory | null =
-    categoryParam === NONE
-      ? null
-      : (basics.categories.find((c) => c.id === categoryParam) ?? (categoryParam ? null : (basics.categories[0] ?? null)));
-  const showingLoose = categoryParam === NONE;
+  const dishes = basics.recipes.filter((r) => !r.is_backup);
+  const loose = dishes.filter((r) => r.kind_ids.length === 0);
+  const kindParam = p("kind") ?? ALL;
+  const kind: DishKind | undefined = basics.kinds.find((k) => k.id === kindParam);
+  const picked = kind ? kind.id : kindParam === NONE ? NONE : ALL;
 
-  const current = {
-    category: categoryParam ?? null,
-    cpage: p("cpage") ?? null,
-    vpage: p("vpage") ?? null,
-  };
+  const current = { kind: p("kind") ?? null, kpage: p("kpage") ?? null, dpage: p("dpage") ?? null };
   const here = linker("/meals/library", current);
-  const returnTo = here({ recipe: p("recipe") ?? null, tab: p("tab") ?? null });
+  const returnTo = here({ recipe: p("recipe") ?? null, tab: p("tab") ?? null, batches: p("batches") ?? null });
 
   const tiles = [
-    ...basics.categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, count: basics.recipes.filter((r) => r.category_ids.includes(c.id)).length, active: c.active })),
-    ...(loose.length ? [{ id: NONE, name: "No category", icon: "📒", count: loose.length, active: true }] : []),
+    { id: ALL, name: "All dishes", icon: "📖", count: dishes.length },
+    ...basics.kinds.map((k) => ({ id: k.id, name: k.name, icon: k.icon, count: dishes.filter((r) => r.kind_ids.includes(k.id)).length })),
+    ...(loose.length ? [{ id: NONE, name: "No kind", icon: "📒", count: loose.length }] : []),
   ];
-  const tilePage = pageOf(tiles, Number(p("cpage") ?? 0), CATEGORY_PAGE);
-  const selectedId = showingLoose ? NONE : category?.id;
-  const variants = showingLoose ? loose : category ? basics.recipes.filter((r) => r.category_ids.includes(category.id)) : [];
-  const variantPage = pageOf(variants, Number(p("vpage") ?? 0), VARIANT_PAGE);
+  const tilePage = pageOf(tiles, Number(p("kpage") ?? 0), KIND_PAGE);
+  const list = picked === ALL ? dishes : picked === NONE ? loose : dishes.filter((r) => r.kind_ids.includes(picked));
+  const dishPage = pageOf(list, Number(p("dpage") ?? 0), DISH_PAGE);
   const tagById = new Map(basics.tags.map((t) => [t.id, t]));
+  const kindById = new Map(basics.kinds.map((k) => [k.id, k]));
+  const pickedName = picked === ALL ? "All dishes" : picked === NONE ? "No kind" : (kind?.name ?? "");
 
   const recipeId = p("recipe");
   const openRecipe = recipeId ? basics.recipes.find((r) => r.id === recipeId) : undefined;
+  const mainKind = basics.kinds.find((k) => k.name === "Main");
 
   return (
     <>
-      <MealsHeader title="Recipes" tab="library" error={p("error")} message={p("message")}>
-        <SoftLink href={here({ newCategory: "1" })}>
-          <Plus size="1.5rem" weight="bold" aria-hidden />
-          Category
-        </SoftLink>
+      <MealsHeader title="Menu Manager" tab="library" error={p("error")} message={p("message")}>
         <SoftLink href={here({ import: "paste" })}>
           <DownloadSimple size="1.5rem" aria-hidden />
           Bring a recipe in
         </SoftLink>
       </MealsHeader>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-5">
-        <Card title="Categories" icon={BookOpen} tint="yellow">
-          <p className="mb-3 text-lg text-ink-muted">A category is what you plan (Tacos). Its variants are the recipes you choose between (Beef, Chicken, Bean).</p>
-          <div className="grid min-h-0 flex-1 auto-rows-[minmax(0,1fr)] grid-cols-4 gap-2.5" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
+        <Card title="Kinds of dish" icon={BookOpen} tint="yellow">
+          <p className="mb-3 text-lg text-ink-muted">Every dish is just a dish. Its kinds say what it can be in a meal: a Main, a Starch, a Veggie…</p>
+          <div className="grid min-h-0 flex-1 grid-cols-4 gap-2.5" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
             {tilePage.items.map((t) => (
               <Link
                 key={t.id}
-                href={here({ category: t.id, vpage: null })}
+                href={here({ kind: t.id === ALL ? null : t.id, dpage: null })}
                 scroll={false}
-                className={`flex min-h-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 text-center ${
-                  t.id === selectedId ? "border-meal-ink bg-meal" : "border-frame hover:bg-rail"
-                } ${t.active ? "" : "opacity-55"}`}
+                className={`flex min-h-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 text-center ${t.id === picked ? "border-meal-ink bg-meal" : "border-frame hover:bg-rail"}`}
               >
-                <Emoji emoji={t.icon} className="size-16" />
+                <Emoji emoji={t.icon} className="size-14" />
                 <span className="line-clamp-1 text-xl font-bold text-ink">{t.name}</span>
                 <span className="text-base text-ink-muted">
-                  {t.count} variant{t.count === 1 ? "" : "s"}
+                  {t.count} dish{t.count === 1 ? "" : "es"}
                 </span>
               </Link>
             ))}
           </div>
           <div className="mt-3">
-            <Pager page={tilePage.page} pages={tilePage.pages} href={(n) => here({ cpage: n || null })} />
+            <Pager page={tilePage.page} pages={tilePage.pages} href={(n) => here({ kpage: n || null })} />
           </div>
         </Card>
 
-        <Card
-          title={showingLoose ? "No category" : (category?.name ?? "No categories yet")}
-          aside={
-            category ? (
-              <SoftLink href={here({ editCategory: "1" })}>
-                <PencilSimple size="1.375rem" aria-hidden />
-                Edit
-              </SoftLink>
-            ) : null
-          }
-        >
-          {category || showingLoose ? (
-            <>
-              <ul className="mt-2 flex min-h-0 flex-1 flex-col gap-2">
-                {variantPage.items.map((r) => (
-                  <li key={r.id}>
-                    <Link href={here({ recipe: r.id, tab: "basics" })} scroll={false} className="flex min-h-18 items-center gap-3 rounded-2xl bg-rail px-4 hover:bg-panel">
-                      <Emoji emoji={r.icon ?? category?.icon} className="size-12" />
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-xl font-bold text-ink">{r.name}</span>
-                        <span className="truncate text-base text-ink-muted">
-                          {[r.total_minutes ? minutesText(r.total_minutes) : null, `Serves ${r.serves}`, ...r.tag_ids.map((id) => tagById.get(id)?.name)].filter(Boolean).join(" · ")}
-                        </span>
-                      </span>
-                      {r.is_backup ? <Emoji emoji="🛟" className="size-8" /> : null}
-                    </Link>
-                  </li>
-                ))}
-                {variants.length === 0 ? <li className="text-lg text-ink-muted">No variants yet. Add the first one below.</li> : null}
-              </ul>
-              <Pager page={variantPage.page} pages={variantPage.pages} href={(n) => here({ vpage: n || null })} />
-              {category ? (
-                <form action={addRecipe} className="mt-3 flex shrink-0 gap-2">
-                  <input type="hidden" name="returnTo" value={returnTo} />
-                  <input type="hidden" name="categoryId" value={category.id} />
-                  <Input name="name" placeholder={`New ${category.name.toLowerCase()} variant`} className="min-w-0 flex-1" maxLength={80} />
-                  <Button>
-                    <Plus size="1.25rem" weight="bold" aria-hidden />
-                    Add
-                  </Button>
-                </form>
-              ) : null}
-            </>
-          ) : (
-            <p className="text-lg text-ink-muted">Make a category to get started.</p>
-          )}
+        <Card title={pickedName}>
+          <ul className="mt-2 flex min-h-0 flex-1 flex-col gap-2">
+            {dishPage.items.map((r) => (
+              <li key={r.id}>
+                <Link href={here({ recipe: r.id, tab: "recipe" })} scroll={false} className="flex min-h-18 items-center gap-3 rounded-2xl bg-rail px-4 hover:bg-panel">
+                  <Emoji emoji={r.icon ?? kindById.get(r.kind_ids[0] ?? "")?.icon} className="size-12" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-xl font-bold text-ink">{r.name}</span>
+                    <span className="truncate text-base text-ink-muted">
+                      {[
+                        r.kind_ids.map((id) => kindById.get(id)?.name).filter(Boolean).join(", ") || null,
+                        r.total_minutes ? minutesText(r.total_minutes) : null,
+                        `Serves ${r.serves}`,
+                        ...r.tag_ids.map((id) => tagById.get(id)?.name),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {list.length === 0 ? <li className="text-lg text-ink-muted">No dishes here yet. Add the first one below.</li> : null}
+          </ul>
+          <Pager page={dishPage.page} pages={dishPage.pages} href={(n) => here({ dpage: n || null })} />
+          <form action={addRecipe} className="mt-3 flex shrink-0 items-end gap-2">
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <input type="hidden" name="kindId" value={kind?.id ?? ""} />
+            <Input name="name" placeholder={kind ? `New ${kind.name.toLowerCase()} dish` : "New dish"} aria-label="New dish" className="min-w-0 flex-1" maxLength={80} required />
+            <Select name="meal" aria-label="Also a meal on the menu" defaultValue={kind && kind.id === mainKind?.id ? NONE : ""} className="w-[17rem]">
+              <option value="">Just a dish</option>
+              <option value={NONE}>Also a meal on the menu</option>
+              {basics.categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Also a meal under {c.name}
+                </option>
+              ))}
+            </Select>
+            <Button>
+              <Plus size="1.25rem" weight="bold" aria-hidden />
+              Add
+            </Button>
+          </form>
         </Card>
       </div>
 
-      {p("newCategory") ? (
-        <Modal title="New category" closeHref={here({})}>
-          <CategoryForm basics={basics} returnTo={here({ newCategory: "1" })} />
-        </Modal>
-      ) : null}
-      {p("editCategory") && category ? (
-        <Modal title={`Edit ${category.name}`} icon={<Emoji emoji={category.icon} className="size-12" />} closeHref={here({})}>
-          <CategoryForm basics={basics} category={category} returnTo={here({ editCategory: "1" })} />
-        </Modal>
-      ) : null}
-      {p("import") ? <ImportCard mode={p("import") === "link" ? "link" : "paste"} basics={basics} categoryId={category?.id ?? ""} here={here} /> : null}
+      {p("import") ? <ImportCard mode={p("import") === "link" ? "link" : "paste"} basics={basics} kindId={kind?.id ?? mainKind?.id ?? ""} here={here} /> : null}
       {openRecipe ? (
         <RecipeCard
           recipe={openRecipe}
           basics={basics}
-          tab={p("tab") ?? "basics"}
+          tab={p("tab") ?? "recipe"}
+          batches={clampBatches(p("batches") ?? 1)}
           here={here}
           temperatureUnit={household.settings.temperatureUnit}
+          measures={household.settings.measures}
           returnTo={returnTo}
         />
       ) : null}
@@ -179,44 +165,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   );
 }
 
-function CategoryForm({ basics, category, returnTo }: { basics: MealBasics; category?: MealCategory; returnTo: string }) {
-  return (
-    <div className="flex flex-col gap-5">
-      <form action={category ? updateCategory : addCategory} className="flex flex-col gap-5">
-        <input type="hidden" name="returnTo" value={returnTo} />
-        {category ? <input type="hidden" name="id" value={category.id} /> : null}
-        <div className="flex items-end gap-4">
-          <EmojiPicker initial={category?.icon ?? ""} nameField="name" />
-          <Field label="Name">
-            <Input name="name" defaultValue={category?.name} placeholder="Tacos" maxLength={40} required className="w-[28rem]" />
-          </Field>
-        </div>
-        <Chips
-          name="mealTimeIds"
-          label="Which meal times? (none ticked means any)"
-          multiple
-          defaultValue={category?.meal_time_ids ?? []}
-          options={basics.mealTimes.map((t) => ({ value: t.id, label: t.name, leading: <Emoji emoji={t.icon} className="size-7" /> }))}
-        />
-        <Chips name="visibility" label="Who can see it" defaultValue={category?.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
-        <Button className="self-start">{category ? "Save" : "Make category"}</Button>
-      </form>
-      {category ? (
-        <form action={removeCategory} className="border-t border-frame pt-4">
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <input type="hidden" name="id" value={category.id} />
-          <input type="hidden" name="name" value={category.name} />
-          <Button variant="danger">
-            <Trash size="1.375rem" aria-hidden />
-            Remove {category.name} (keeps its recipes)
-          </Button>
-        </form>
-      ) : null}
-    </div>
-  );
-}
-
-function ImportCard({ mode, basics, categoryId, here }: { mode: "paste" | "link"; basics: MealBasics; categoryId: string; here: ReturnType<typeof linker> }) {
+function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; basics: MealBasics; kindId: string; here: ReturnType<typeof linker> }) {
   const tabs = (
     <div className="flex gap-1 rounded-2xl bg-panel p-1">
       {(["paste", "link"] as const).map((m) => (
@@ -257,14 +206,25 @@ function ImportCard({ mode, basics, categoryId, here }: { mode: "paste" | "link"
         )}
         <div className="flex items-end gap-4">
           <Field label="Name (optional)">
-            <Input name="name" maxLength={80} placeholder="Use the recipe's own" className="w-[24rem]" />
+            <Input name="name" maxLength={80} placeholder="Use the recipe's own" className="w-[20rem]" />
           </Field>
-          <Field label="Category">
-            <Select name="categoryId" defaultValue={categoryId}>
+          <Field label="Kind of dish">
+            <Select name="kindId" defaultValue={kindId}>
               <option value="">None</option>
+              {basics.kinds.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="On the menu">
+            <Select name="meal" defaultValue="none">
+              <option value="">Just a dish</option>
+              <option value="none">Also a meal</option>
               {basics.categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  A meal under {c.name}
                 </option>
               ))}
             </Select>
@@ -277,6 +237,7 @@ function ImportCard({ mode, basics, categoryId, here }: { mode: "paste" | "link"
 }
 
 const RECIPE_TABS = [
+  { tab: "recipe", label: "Recipe" },
   { tab: "basics", label: "Basics" },
   { tab: "ingredients", label: "Ingredients" },
   { tab: "steps", label: "Steps" },
@@ -287,18 +248,22 @@ async function RecipeCard({
   recipe,
   basics,
   tab,
+  batches,
   here,
   temperatureUnit,
+  measures,
   returnTo,
 }: {
   recipe: Recipe;
   basics: MealBasics;
   tab: string;
+  batches: number;
   here: ReturnType<typeof linker>;
   temperatureUnit: "celsius" | "fahrenheit";
+  measures: Measures;
   returnTo: string;
 }) {
-  const detail = tab === "ingredients" || tab === "steps" ? await loadRecipeDetail(recipe.id) : null;
+  const detail = tab === "ingredients" || tab === "steps" || tab === "recipe" ? await loadRecipeDetail(recipe.id) : null;
   const tabs = (
     <div className="flex gap-1 rounded-2xl bg-panel p-1">
       {RECIPE_TABS.map((t) => (
@@ -315,7 +280,9 @@ async function RecipeCard({
   );
   return (
     <Modal title={recipe.name} icon={<Emoji emoji={recipe.icon} className="size-12" />} closeHref={here({})} wide aside={tabs}>
-      {tab === "ingredients" && detail ? (
+      {tab === "recipe" && detail ? (
+        <RecipeView recipe={recipe} detail={detail} batches={batches} here={here} measures={measures} basics={basics} />
+      ) : tab === "ingredients" && detail ? (
         <IngredientsEditor
           recipeId={recipe.id}
           returnTo={returnTo}
@@ -380,11 +347,11 @@ async function RecipeCard({
             </div>
             <div className="flex flex-col gap-5">
               <Chips
-                name="categoryIds"
-                label="Categories"
+                name="kindIds"
+                label="What it can be in a meal"
                 multiple
-                defaultValue={recipe.category_ids}
-                options={basics.categories.slice(0, 14).map((c) => ({ value: c.id, label: c.name, leading: <Emoji emoji={c.icon} className="size-7" /> }))}
+                defaultValue={recipe.kind_ids}
+                options={basics.kinds.slice(0, 14).map((k) => ({ value: k.id, label: k.name, leading: <Emoji emoji={k.icon} className="size-7" /> }))}
               />
               <Chips name="tagIds" label="Tags" multiple defaultValue={recipe.tag_ids} options={basics.tags.map((t) => ({ value: t.id, label: t.name, leading: <Emoji emoji={t.icon} className="size-7" /> }))} />
               <Button className="self-start">Save</Button>
@@ -396,11 +363,111 @@ async function RecipeCard({
             <input type="hidden" name="name" value={recipe.name} />
             <Button variant="danger">
               <Trash size="1.375rem" aria-hidden />
-              Remove recipe
+              Remove dish
             </Button>
           </form>
         </div>
       )}
     </Modal>
+  );
+}
+
+const VIEW_INGREDIENTS = 12;
+const VIEW_STEPS = 6;
+
+/** The recipe to read: ingredients times the batches, units you can tap, and the steps. */
+function RecipeView({
+  recipe,
+  detail,
+  batches,
+  here,
+  measures,
+  basics,
+}: {
+  recipe: Recipe;
+  detail: Awaited<ReturnType<typeof loadRecipeDetail>>;
+  batches: number;
+  here: ReturnType<typeof linker>;
+  measures: Measures;
+  basics: MealBasics;
+}) {
+  const ingredients = detail.ingredients;
+  const dishes = new Map(basics.recipes.map((r) => [r.id, r]));
+  const inMeals = basics.menuMeals.filter((m) => m.spots.some((s) => s.recipe_id === recipe.id)).map((m) => menuMealName(m, dishes));
+  const column = (list: typeof ingredients) => (
+    <ul className="flex min-w-0 flex-col gap-1">
+      {list.map((i) => {
+        const amount = batchAmount(i.amount === null ? null : Number(i.amount), batches);
+        const text = measureText(amount, i.unit);
+        return (
+          <li key={i.id} className="flex min-h-12 items-center gap-2.5">
+            <Emoji emoji={i.item.icon} className="size-8" />
+            {text ? <UnitPill amount={amount} unit={i.unit} text={text} measures={measures} size="md" /> : null}
+            <span className="min-w-0 flex-1 truncate leading-tight">
+              <span className="text-lg text-ink">{i.item.name}</span>
+              {i.note ? <span className="text-base text-ink-muted">, {i.note}</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+  const shown = ingredients.slice(0, VIEW_INGREDIENTS * 2);
+  return (
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-8">
+      <section className="flex min-h-0 flex-col gap-3">
+        <div className="flex shrink-0 items-center gap-3">
+          <h3 className="flex-1 text-2xl font-bold text-ink">Ingredients</h3>
+          <span className="text-base text-ink-muted">Makes {recipe.serves * batches} servings</span>
+          <nav aria-label="Batches" className="flex gap-1 rounded-2xl bg-meal p-1.5">
+            {BATCHES.map((b) => (
+              <Link
+                key={b}
+                href={here({ recipe: recipe.id, tab: "recipe", batches: b === 1 ? null : b })}
+                scroll={false}
+                aria-current={b === batches ? "true" : undefined}
+                className={`flex h-12 min-w-14 items-center justify-center rounded-xl px-3 text-lg font-bold ${b === batches ? "bg-board text-ink" : "text-meal-ink"}`}
+              >
+                ×{b}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <p className="shrink-0 text-base text-ink-muted">Tap an amount to see it in other units. Recipes keep the units they were written in.</p>
+        {ingredients.length ? (
+          <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-6">
+            {column(shown.slice(0, VIEW_INGREDIENTS))}
+            {column(shown.slice(VIEW_INGREDIENTS))}
+          </div>
+        ) : (
+          <p className="text-lg text-ink-muted">No ingredients yet. Add them in the Ingredients tab.</p>
+        )}
+        {ingredients.length > shown.length ? (
+          <Link href={here({ recipe: recipe.id, tab: "ingredients" })} scroll={false} className="text-base font-bold text-accent">
+            + {ingredients.length - shown.length} more
+          </Link>
+        ) : null}
+      </section>
+      <section className="flex min-h-0 flex-col gap-3">
+        <h3 className="shrink-0 text-2xl font-bold text-ink">Steps</h3>
+        <ol className="flex min-h-0 flex-1 flex-col gap-2.5">
+          {detail.steps.slice(0, VIEW_STEPS).map((s, i) => (
+            <li key={s.id} className="flex gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rail text-base font-extrabold text-ink">{i + 1}</span>
+              <span className="line-clamp-3 text-lg leading-snug text-ink">{s.text}</span>
+            </li>
+          ))}
+          {detail.steps.length === 0 ? <li className="text-lg text-ink-muted">No steps yet. Add them in the Steps tab.</li> : null}
+        </ol>
+        {detail.steps.length > VIEW_STEPS ? (
+          <Link href={here({ recipe: recipe.id, tab: "steps" })} scroll={false} className="shrink-0 text-base font-bold text-accent">
+            + {detail.steps.length - VIEW_STEPS} more steps
+          </Link>
+        ) : null}
+        <p className="shrink-0 border-t border-frame pt-3 text-base text-ink-muted">
+          {inMeals.length ? `On the menu in ${inMeals.slice(0, 3).join(", ")}${inMeals.length > 3 ? ` and ${inMeals.length - 3} more` : ""}.` : "Not in a meal on the menu yet."} Cooking mode opens from a planned meal on Today.
+        </p>
+      </section>
+    </div>
   );
 }

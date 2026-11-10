@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CaretLeft, CaretRight, Check, Minus, Plus, X } from "@phosphor-icons/react";
+import { ArrowLeft, CaretLeft, CaretRight, Check, X } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
 import { DONENESS, helperText, minutesText, type Helper } from "@/lib/meal-helpers";
-import { amountText, scaleAmount } from "@/lib/meals";
+import { BATCHES, batchAmount } from "@/lib/meals";
+import { measureText, type Measures } from "@/lib/units";
+import { UnitPill } from "../unit-pill";
 import { addMinute, startTimer, stopTimer, timeLeft, useAlarm, useNow, useTimers } from "@/components/timer-store";
 import { markCooked } from "../actions";
 
 /*
  * Cooking mode: the current step big at the top, the next steps smaller
- * below so you can get ready, the ingredients (scaled to the servings) on
+ * below so you can get ready, the ingredients (times the batches) on
  * the left and little kitchen helpers on the right: timers taken from the
  * step, the oven temperature, and safe inside temperatures.
  */
@@ -50,35 +52,38 @@ function useWakeLock() {
   }, []);
 }
 
+export type CookDish = { recipeId: string; name: string; icon: string | null; batches: number; notes: string | null; ingredients: CookIngredient[]; steps: CookStep[] };
+
 export function CookingMode({
   mealId,
-  name,
-  icon,
-  serves,
-  servings: initialServings,
-  notes,
+  title,
   temperatureUnit,
   canPlanLeftovers,
-  ingredients,
-  steps,
+  dishes,
+  measures,
 }: {
   mealId: string;
-  name: string;
-  icon: string | null;
-  serves: number;
-  servings: number;
-  notes: string | null;
+  /** The meal's name, shown when it has more than one dish. */
+  title: string;
   temperatureUnit: "celsius" | "fahrenheit";
   canPlanLeftovers: boolean;
-  ingredients: CookIngredient[];
-  steps: CookStep[];
+  /** The meal's dishes, each with its own steps; tabs switch between them. */
+  dishes: CookDish[];
+  measures: Measures;
 }) {
   useWakeLock();
-  const [step, setStep] = useState(0);
-  const [servings, setServings] = useState(initialServings);
+  const [active, setActive] = useState(0);
+  const [stepOf, setStepOf] = useState<number[]>(() => dishes.map(() => 0));
+  const [batchesOf, setBatchesOf] = useState<number[]>(() => dishes.map((d) => d.batches));
   const [ticked, setTicked] = useState<string[]>([]);
   const [ingredientPage, setIngredientPage] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  const dish = dishes[active];
+  const { name, icon, notes, ingredients, steps } = dish;
+  const step = stepOf[active] ?? 0;
+  const setStep = (n: number) => setStepOf((all) => all.map((v, i) => (i === active ? n : v)));
+  const batches = batchesOf[active] ?? 1;
+  const setBatches = (n: number) => setBatchesOf((all) => all.map((v, i) => (i === active ? n : v)));
   const timers = useTimers();
   const now = useNow(timers.length > 0);
   useAlarm(timers, now);
@@ -102,17 +107,40 @@ export function CookingMode({
           <ArrowLeft size="1.75rem" weight="bold" aria-hidden />
         </Link>
         <Picture emoji={icon} className="size-16" />
-        <h1 className="min-w-0 flex-1 truncate text-5xl font-extrabold tracking-tight text-ink">{name}</h1>
-        <div className="flex items-center gap-2 rounded-2xl bg-meal px-2 py-1.5 text-meal-ink">
-          <button type="button" aria-label="Fewer servings" onClick={() => setServings(Math.max(1, servings - 1))} className="flex size-12 items-center justify-center rounded-full bg-board/60">
-            <Minus size="1.5rem" weight="bold" aria-hidden />
-          </button>
-          <span className="min-w-32 text-center text-xl font-bold">
-            Serves {servings}
-          </span>
-          <button type="button" aria-label="More servings" onClick={() => setServings(Math.min(50, servings + 1))} className="flex size-12 items-center justify-center rounded-full bg-board/60">
-            <Plus size="1.5rem" weight="bold" aria-hidden />
-          </button>
+        <h1 className="min-w-0 truncate text-5xl font-extrabold tracking-tight text-ink">{dishes.length > 1 ? title : name}</h1>
+        {dishes.length > 1 ? (
+          <nav aria-label="Dishes" className="flex min-w-0 flex-1 gap-1.5 overflow-hidden">
+            {dishes.slice(0, 6).map((d, i) => (
+              <button
+                key={d.recipeId + i}
+                type="button"
+                aria-pressed={i === active}
+                onClick={() => {
+                  setActive(i);
+                  setIngredientPage(0);
+                }}
+                className={`flex min-h-[var(--touch-target)] min-w-0 items-center gap-2 rounded-2xl px-3.5 text-lg font-bold ${i === active ? "bg-ink text-board" : "bg-rail text-ink-soft"}`}
+              >
+                <Picture emoji={d.icon} className="size-8 shrink-0" />
+                <span className="truncate">{d.name}</span>
+              </button>
+            ))}
+          </nav>
+        ) : (
+          <div className="flex-1" />
+        )}
+        <div className="flex items-center gap-1 rounded-2xl bg-meal p-1.5 text-meal-ink" role="group" aria-label="Batches">
+          {BATCHES.map((b) => (
+            <button
+              key={b}
+              type="button"
+              aria-pressed={batches === b}
+              onClick={() => setBatches(b)}
+              className={`flex h-12 min-w-16 items-center justify-center rounded-xl px-3 text-xl font-bold ${batches === b ? "bg-board text-ink" : ""}`}
+            >
+              ×{b}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -120,11 +148,12 @@ export function CookingMode({
         {/* Ingredients */}
         <section className="flex min-h-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame p-4">
           <h2 className="text-2xl font-bold text-ink">Ingredients</h2>
-          {servings !== serves ? <p className="text-base text-ink-muted">Changed from {serves} servings to {servings}.</p> : null}
+          {batches > 1 ? <p className="text-base text-ink-muted">Everything ×{batches}, for {batches} batches.</p> : null}
           <ul className="flex min-h-0 flex-1 flex-col gap-1.5">
             {ingredients.slice(iPage * INGREDIENT_PAGE, (iPage + 1) * INGREDIENT_PAGE).map((ing) => {
               const done = ticked.includes(ing.id);
-              const amount = amountText(scaleAmount(ing.amount, servings, serves), ing.unit);
+              const scaled = batchAmount(ing.amount, batches);
+              const amount = measureText(scaled, ing.unit);
               return (
                 <li key={ing.id}>
                   <button
@@ -136,7 +165,7 @@ export function CookingMode({
                       {done ? <Check size="1.25rem" weight="bold" aria-hidden /> : null}
                     </span>
                     <span className="min-w-0 flex-1 leading-tight">
-                      {amount ? <span className="text-xl font-extrabold text-ink">{amount} </span> : null}
+                      {amount ? <UnitPill amount={scaled} unit={ing.unit} text={amount} measures={measures} /> : null}
                       <span className={`text-xl text-ink ${done ? "line-through" : ""}`}>{ing.name}</span>
                       {ing.note ? <span className="block truncate text-base text-ink-muted">{ing.note}</span> : null}
                     </span>

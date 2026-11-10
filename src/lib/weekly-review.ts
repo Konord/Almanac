@@ -1,5 +1,6 @@
 import { dayOfWeek } from "./calendar-layout.ts";
 import type { ChoreDay, ChoreDayMove } from "./chore-days.ts";
+import type { DraftDish } from "./menu.ts";
 import { addDays, type LocalDate } from "./time.ts";
 
 /*
@@ -36,11 +37,12 @@ export type DraftMeal = {
   mealTimeId: string;
   /** The kind of meal ("Tacos"). */
   categoryId: string | null;
-  /** Which one ("Beef tacos"); null while it's still to pick. */
-  recipeId: string | null;
+  /** The meal on the menu it came from; null for a custom meal (or one still to pick). */
+  menuMealId: string | null;
+  /** Its dishes, each with its batches; any of them can be swapped for this day. */
+  dishes: DraftDish[];
   /** Who it's for; empty means everyone. */
   memberIds: string[];
-  servings: number | null;
 };
 
 /** A meal added on the review, not yet saved. */

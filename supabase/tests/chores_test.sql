@@ -12,7 +12,7 @@ select set_config('request.jwt.claims', '{"sub":"66666666-6666-6666-6666-6666666
 select public.create_household('Chore House');
 
 select is((select count(*)::int from public.task_templates), 0, 'A new household starts with no chores');
-select is((select count(*)::int from public.task_lists), 3, 'But it gets two to-do lists and the Chores list');
+select is((select count(*)::int from public.task_lists), 4, 'But it gets two to-do lists, the Chores list and the grocery list');
 insert into public.task_templates (household_id, name, repeat_every, repeat_unit)
 values (public.current_household_id(), 'Clean out the fridge', 1, 'month');
 

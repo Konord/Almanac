@@ -140,7 +140,7 @@ async function syncTodos(household: Household, today: LocalDate, wanted: Wanted[
   }
   if (wanted.length === 0) return;
 
-  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").order("name").limit(1).maybeSingle();
+  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").order("name").limit(1).maybeSingle();
   if (!list) return;
   const rows = wanted.map((w) => ({
     household_id: household.id,

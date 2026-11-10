@@ -14,10 +14,10 @@ test("weeks start on Sunday or Monday", () => {
 });
 
 test("amounts read like a recipe", () => {
-  assert.equal(formatAmount(1.5), "1 1/2");
-  assert.equal(formatAmount(0.25), "1/4");
+  assert.equal(formatAmount(1.5), "1½");
+  assert.equal(formatAmount(0.25), "¼");
   assert.equal(formatAmount(2), "2");
-  assert.equal(formatAmount(0.333), "1/3");
+  assert.equal(formatAmount(0.333), "⅓");
   assert.equal(formatAmount(null), "");
   assert.equal(amountText(2, "cup"), "2 cups");
   assert.equal(amountText(1, "cup"), "1 cup");

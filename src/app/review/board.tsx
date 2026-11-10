@@ -7,6 +7,7 @@ import { Emoji } from "@/components/ui";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { eventEmoji } from "@/lib/emoji";
 import { strong } from "@/lib/colours";
+import { hasOpenDish, mainDish } from "@/lib/menu";
 import {
   addChoreDay,
   applyFix,
@@ -73,7 +74,8 @@ export function ReviewBoard({
   const freeDay = data.choreDays.find((d) => d.is_free);
   const dayType = new Map(data.dayTypes.map((t) => [t.id, t]));
   const category = new Map(data.categories.map((c) => [c.id, c]));
-  const recipe = new Map(data.recipes.map((r) => [r.id, r]));
+  const dish = new Map(data.dishes.map((r) => [r.id, r]));
+  const menuMeal = new Map(data.menuMeals.map((m) => [m.id, m]));
   const open = data.columns.filter((c) => !c.past);
 
   /** Every kind of day by name, with each person's own version of it. */
@@ -118,10 +120,21 @@ export function ReviewBoard({
   // --- How things look ------------------------------------------------------
 
   const mealLook = (m: DraftMeal) => {
-    const r = m.recipeId ? recipe.get(m.recipeId) : undefined;
+    const mm = m.menuMealId ? menuMeal.get(m.menuMealId) : undefined;
+    const main = mainDish(m.dishes);
+    const r = main ? dish.get(main) : undefined;
     const c = m.categoryId ? category.get(m.categoryId) : undefined;
-    const variants = c ? data.recipes.filter((x) => !x.isBackup && x.categoryIds.includes(c.id)).length : 0;
-    return { title: r?.name ?? c?.name ?? "Meal", icon: r?.icon ?? c?.icon ?? "🍽️", kind: r && c ? c.name : null, pick: !r && variants > 1 };
+    const options = c ? data.menuMeals.filter((x) => x.category_ids.includes(c.id)).length : 0;
+    // A saved meal with sides keeps its own name; a custom one is called after its main dish.
+    const title = mm?.name ?? r?.name ?? c?.name ?? "Meal";
+    const sides = m.dishes.filter((d) => d.recipeId && d.recipeId !== main).length;
+    return {
+      title,
+      icon: mm?.icon ?? r?.icon ?? c?.icon ?? "🍽️",
+      kind: (mm || r) && c ? c.name : null,
+      pick: (!mm && !r && options > 1) || hasOpenDish(m.dishes),
+      sides,
+    };
   };
   const mealChanged = (id: string) => id in draft.meals;
   const groupsOn = (date: string): KindGroup[] => kindGroups(draft.dayTypes[date] ?? {}, memberOrder, dayType);
@@ -267,7 +280,13 @@ export function ReviewBoard({
                             <span className="flex min-w-0 flex-col">
                               <span className="truncate text-xs font-bold tracking-wide uppercase opacity-70">{time.name}</span>
                               <span className={`line-clamp-2 leading-tight font-extrabold ${big ? "text-xl" : "text-lg"}`}>{look.title}</span>
-                              {look.pick ? <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">Pick which one</span> : null}
+                              {look.pick ? (
+                                <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">Pick which one</span>
+                              ) : look.sides > 0 ? (
+                                <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">
+                                  + {look.sides} {look.sides === 1 ? "side" : "sides"}
+                                </span>
+                              ) : null}
                             </span>
                           </button>
                         );
@@ -421,7 +440,7 @@ export function ReviewBoard({
           onClose={() => setChecks(false)}
         />
       ) : null}
-      {groceries ? <GrocerySheet week={data.week} dirty={dirty} onClose={() => setGroceries(false)} /> : null}
+      {groceries ? <GrocerySheet dirty={dirty} onClose={() => setGroceries(false)} /> : null}
       {guard.leaving || goTo ? (
         <LeaveDialog
           what="this week"

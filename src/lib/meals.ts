@@ -32,24 +32,34 @@ export function weekDates(start: LocalDate): LocalDate[] {
 // ---------------------------------------------------------------------------
 
 const FRACTIONS: [number, string][] = [
-  [1 / 8, "1/8"],
-  [1 / 4, "1/4"],
-  [1 / 3, "1/3"],
-  [1 / 2, "1/2"],
-  [2 / 3, "2/3"],
-  [3 / 4, "3/4"],
+  [1 / 8, "⅛"],
+  [1 / 4, "¼"],
+  [1 / 3, "⅓"],
+  [1 / 2, "½"],
+  [2 / 3, "⅔"],
+  [3 / 4, "¾"],
 ];
 
-/** 1.5 → "1 1/2", 0.25 → "1/4", 2 → "2", 0.4 → "0.4". */
+/** 1.5 → "1½", 0.25 → "¼", 2 → "2", 0.4 → "0.4". */
 export function formatAmount(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) return "";
   const whole = Math.floor(value + 1e-9);
   const part = value - whole;
   if (part < 0.02) return String(whole);
   const near = FRACTIONS.find(([f]) => Math.abs(part - f) < 0.02);
-  if (near) return whole > 0 ? `${whole} ${near[1]}` : near[1];
+  if (near) return whole > 0 ? `${whole}${near[1]}` : near[1];
   return String(Math.round(value * 100) / 100);
 }
+
+/** An amount for a whole number of batches (×1, ×2, ×3: never halved). */
+export function batchAmount(amount: number | null, batches: number | null | undefined): number | null {
+  if (amount === null) return null;
+  const n = Math.min(3, Math.max(1, Math.round(batches ?? 1)));
+  return Math.round(amount * n * 1000) / 1000;
+}
+
+/** The batch choices a dish offers. */
+export const BATCHES = [1, 2, 3] as const;
 
 /** An amount for more or fewer people than the recipe makes. */
 export function scaleAmount(amount: number | null, servings: number | null | undefined, serves: number): number | null {

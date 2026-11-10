@@ -123,6 +123,7 @@ export async function saveSettings(formData: FormData) {
   const monthStyle = text(formData, "monthStyle") === "calendar" ? "calendar" : "rolling";
   const units = text(formData, "units") === "imperial" ? "imperial" : "metric";
   const temperatureUnit = text(formData, "temperatureUnit") === "fahrenheit" ? "fahrenheit" : "celsius";
+  const measures = text(formData, "measures") === "us" ? "us" : "canadian";
 
   if (!name) back("error", "The household needs a name.");
   if (!isTimeZone(timeZone)) back("error", `"${timeZone}" isn't a time zone I recognise.`);
@@ -163,6 +164,7 @@ export async function saveSettings(formData: FormData) {
     monthStyle,
     units,
     temperatureUnit,
+    measures,
     handwriting: formData.get("handwriting") === "on",
     dayProfile,
     weeklyReview: { weekday: reviewWeekday, time: reviewTime },

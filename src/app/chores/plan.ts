@@ -173,7 +173,7 @@ async function makeToday(
   const have = new Set(openChores.filter((t) => !stale.includes(t.id)).map((t) => t.template_id));
   const missing = [...wanted].filter(([id]) => !have.has(id));
   if (missing.length > 0) {
-    const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).order("sort_order").order("name").limit(1).maybeSingle();
+    const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").order("name").limit(1).maybeSingle();
     if (list) {
       for (const [id, date] of missing) {
         const c = byId.get(id) as ChoreWithTiming;
