@@ -4,7 +4,6 @@ import {
   CaretLeft,
   CaretRight,
   Check,
-  CloudSun,
 } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
@@ -307,10 +306,9 @@ export async function TodayPanel({
           </span>
         </span>
       </div>
+      {/* Weather goes here once it's set up (it needs a weather service). */}
       <div className="mt-5 flex items-center gap-3 text-xl font-semibold text-ink-muted">
-        <CloudSun size="2.5rem" aria-hidden />
-        <span>Weather soon</span>
-        <span className="ml-auto text-3xl font-bold">
+        <span className="text-3xl font-bold">
           <HeaderClock locale={locale} timeZone={timeZone} />
         </span>
       </div>
@@ -557,9 +555,11 @@ export async function TodayPanel({
             </span>
           </>
         ) : (
-          <span className="text-xl font-bold">
-            No meal planned yet. Plan meals
-          </span>
+          <>
+            <Emoji emoji="🍽️" className="size-12" />
+            <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals yet</span>
+            <span className="shrink-0 rounded-full bg-board/70 px-4 py-2 text-base font-extrabold">Plan meals</span>
+          </>
         )}
       </Link>
 

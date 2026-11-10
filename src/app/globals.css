@@ -79,3 +79,20 @@ body {
 .font-hand {
   font-family: var(--font-hand);
 }
+
+/*
+ * Calendar events keep their grab strips (drag the bottom to change the
+ * length, the sides to stretch), but the little grey marks only show while
+ * a finger or pointer is on the event, so they don't draw lines through the
+ * times on the wall (Connor, 2026-11-10).
+ */
+.quiet-handles .handle-mark {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.quiet-handles:hover .handle-mark,
+.quiet-handles:focus-visible .handle-mark,
+.quiet-handles:active .handle-mark,
+.quiet-handles.is-dragging .handle-mark {
+  opacity: 1;
+}

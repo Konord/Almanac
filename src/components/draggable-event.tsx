@@ -115,7 +115,7 @@ export function DraggableEvent({
       onKeyDown={(e) => {
         if (e.key === "Enter") router.push(href, { scroll: false });
       }}
-      className={`${className} cursor-grab touch-none select-none active:cursor-grabbing ${drag.dragging ? "z-30 shadow-lg ring-2 ring-ink" : ""} ${saving ? "opacity-70" : ""}`}
+      className={`${className} quiet-handles cursor-grab touch-none select-none active:cursor-grabbing ${drag.dragging || widening || stretching ? "is-dragging" : ""} ${drag.dragging ? "z-30 shadow-lg ring-2 ring-ink" : ""} ${saving ? "opacity-70" : ""}`}
       style={{ ...style, ...drag.position, ...wide, ...stretched }}
     >
       {children}

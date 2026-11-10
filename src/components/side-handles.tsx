@@ -70,10 +70,10 @@ export function SideHandles({
   return (
     <>
       <div {...handlers("left")} aria-hidden className={`${strip} left-0`}>
-        <span className="h-4 w-1 rounded-full bg-ink/40" />
+        <span className="handle-mark h-4 w-1 rounded-full bg-ink/40" />
       </div>
       <div {...handlers("right")} aria-hidden className={`${strip} right-0`}>
-        <span className="h-4 w-1 rounded-full bg-ink/40" />
+        <span className="handle-mark h-4 w-1 rounded-full bg-ink/40" />
       </div>
     </>
   );
