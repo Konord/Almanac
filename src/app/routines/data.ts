@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { dayFor, eventDates, type Break, type DayTypeData, type EventDay } from "@/lib/day-types";
+import { dayFor, eventDates, type Break, type DayTypeData, type EventDay, type WeekSettings } from "@/lib/day-types";
 import { requireHousehold } from "@/lib/household";
 import { expandEvents } from "@/lib/recurrence";
 import type { Anchor } from "@/lib/routine-placement";
@@ -89,7 +89,7 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       .order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, day_type_id, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),
-    supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order").order("sort_order").order("name"),
+    supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order, errands").order("sort_order").order("name"),
     supabase.from("week_plans").select("id, member_id, name, sort_order").order("sort_order").order("name"),
     supabase.from("week_plan_days").select("week_plan_id, weekday, day_type_id"),
     supabase.from("day_overrides").select("member_id, date, day_type_id, wake_time, bed_time").gte("date", addDays(date, -1)).lte("date", addDays(date, 7)),
@@ -119,6 +119,28 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
     overrides: overrides.data ?? [],
     breaks,
     eventDays,
+  };
+}
+
+/**
+ * Who has which kind of day on each date from `from` to `to`, for screens
+ * that need more than the week loadRoutines() covers (the chore planner).
+ */
+export async function loadDaysBetween(from: LocalDate, to: LocalDate): Promise<{ members: WeekSettings[]; data: DayTypeData }> {
+  const supabase = await createClient();
+  const [members, dayTypes, weekPlans, weekPlanDays, overrides, breaks, eventDays] = await Promise.all([
+    supabase.from("members").select("id, current_week_plan_id, week_plans_rotate, rotation_start"),
+    supabase.from("day_types").select("id, member_id, name, icon, wake_time, bed_time, sort_order, errands"),
+    supabase.from("week_plans").select("id, member_id, name, sort_order"),
+    supabase.from("week_plan_days").select("week_plan_id, weekday, day_type_id"),
+    supabase.from("day_overrides").select("member_id, date, day_type_id, wake_time, bed_time").gte("date", from).lte("date", to),
+    loadBreaks(from, to),
+    loadEventDays(from, to),
+  ]);
+  for (const r of [members, dayTypes, weekPlans, weekPlanDays, overrides]) if (r.error) throw r.error;
+  return {
+    members: members.data ?? [],
+    data: { dayTypes: dayTypes.data ?? [], weekPlans: weekPlans.data ?? [], weekPlanDays: weekPlanDays.data ?? [], overrides: overrides.data ?? [], breaks, eventDays },
   };
 }
 

@@ -4,9 +4,9 @@ import { addWeekPlan, daysProblem, groupsOf, pickWeek, removeDayType, removeWeek
 
 const draft: DaysDraft = {
   dayTypes: [
-    { id: "mia-school", member_id: "mia", group: "school day", name: "School day", icon: "🎒", wake: "07:00", bed: "20:00" },
-    { id: "mia-home", member_id: "mia", group: "home day", name: "Home day", icon: null, wake: "07:30", bed: "20:30" },
-    { id: "leo-school", member_id: "leo", group: "school day", name: "School day", icon: "🎒", wake: "06:45", bed: "19:30" },
+    { id: "mia-school", member_id: "mia", group: "school day", name: "School day", icon: "🎒", wake: "07:00", bed: "20:00", errands: false },
+    { id: "mia-home", member_id: "mia", group: "home day", name: "Home day", icon: null, wake: "07:30", bed: "20:30", errands: false },
+    { id: "leo-school", member_id: "leo", group: "school day", name: "School day", icon: "🎒", wake: "06:45", bed: "19:30", errands: false },
   ],
   weekPlans: [
     { id: "mia-week", member_id: "mia", name: "Usual week" },

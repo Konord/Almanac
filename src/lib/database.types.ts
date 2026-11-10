@@ -277,14 +277,14 @@ isOneToOne: false
                   ]
                 },"day_types": {
                   Row: {
-                    "bed_time": string,"created_at": string,"household_id": string,"icon": string | null,"id": string,"member_id": string,"name": string,"sort_order": number,"updated_at": string,"wake_time": string
+                    "bed_time": string,"created_at": string,"errands": boolean,"household_id": string,"icon": string | null,"id": string,"member_id": string,"name": string,"sort_order": number,"updated_at": string,"wake_time": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "bed_time"?: string,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"member_id": string,"name": string,"sort_order"?: number,"updated_at"?: string,"wake_time"?: string
+                    "bed_time"?: string,"created_at"?: string,"errands"?: boolean,"household_id": string,"icon"?: string | null,"id"?: string,"member_id": string,"name": string,"sort_order"?: number,"updated_at"?: string,"wake_time"?: string
                   }
                   Update: {
-                    "bed_time"?: string,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"member_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string,"wake_time"?: string
+                    "bed_time"?: string,"created_at"?: string,"errands"?: boolean,"household_id"?: string,"icon"?: string | null,"id"?: string,"member_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string,"wake_time"?: string
                   }
                   Relationships: [
                     {

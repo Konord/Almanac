@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 import { isChoreTag, placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
 import { spreadSlack } from "@/lib/chores";
 import type { Household } from "@/lib/household";
-import { addDays, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { loadCalendar } from "../calendar/data";
-import { errandTagId, loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
+import { addDays, type LocalDate } from "@/lib/time";
+import { dayFor } from "@/lib/day-types";
+import { loadDaysBetween } from "../routines/data";
+import { loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
 
 /*
  * The chore generator on the server (tasks rework, step 2). Each time a
@@ -49,21 +50,16 @@ async function loadAway(today: LocalDate, last: LocalDate): Promise<Set<LocalDat
 }
 
 /**
- * Dates with an event tagged Errand between two dates (an office day, a
- * trip into town): good days for errands.
+ * Dates when someone's kind of day is good for errands (an office day, a
+ * day in town) between two dates. The kind of day may come from the week
+ * plan, a break, an event ("Makes it an Office day") or a change by hand.
  */
-async function loadErrandDates(today: LocalDate, last: LocalDate, timeZone: string): Promise<Set<LocalDate>> {
-  const errand = await errandTagId();
+async function loadErrandDates(today: LocalDate, last: LocalDate): Promise<Set<LocalDate>> {
+  const { members, data } = await loadDaysBetween(today, last);
   const dates = new Set<LocalDate>();
-  if (!errand) return dates;
-  const { items } = await loadCalendar(zonedToUtc(today, "00:00", timeZone), zonedToUtc(addDays(last, 1), "00:00", timeZone));
-  for (const item of items) {
-    if (!item.tag_ids.includes(errand)) continue;
-    const start = localDateOf(new Date(item.starts_at), timeZone);
-    // An all-day event ends at midnight after its last day.
-    const before = localDateOf(new Date(new Date(item.ends_at).getTime() - 1), timeZone);
-    const end = before < start ? start : before;
-    for (let d = start; d <= end && d <= last; d = addDays(d, 1)) if (d >= today) dates.add(d);
+  if (!data.dayTypes.some((t) => t.errands)) return dates;
+  for (let d = today; d <= last; d = addDays(d, 1)) {
+    if (members.some((m) => dayFor(m, data, d).dayType?.errands)) dates.add(d);
   }
   return dates;
 }
@@ -86,7 +82,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     loadAway(today, last),
     loadChoreDayMoves(addDays(today, -6), last),
     choreTasks(supabase, today),
-    loadErrandDates(today, last, timeZone),
+    loadErrandDates(today, last),
   ]);
   if (tasks.error) throw tasks.error;
 

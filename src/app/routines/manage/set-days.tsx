@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarCheck, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
+import { ArrowLeft, CalendarCheck, Car, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -431,7 +431,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
     const group = `${NEW_PREFIX}${groupKey(String((counter += 1)))}`;
     update((d) => ({
       ...d,
-      dayTypes: [...d.dayTypes, ...members.map((m) => ({ id: newId(), member_id: m.id, group, name: "", icon: null, wake: "07:00", bed: "21:30" }))],
+      dayTypes: [...d.dayTypes, ...members.map((m) => ({ id: newId(), member_id: m.id, group, name: "", icon: null, wake: "07:00", bed: "21:30", errands: false }))],
     }));
     setPage(Math.floor(groups.length / perPage));
   };
@@ -463,6 +463,16 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 aria-label="Kind of day"
                 className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
               />
+              <button
+                type="button"
+                aria-pressed={g.types[0]?.errands ?? false}
+                onClick={() => setGroup(g.group, { errands: !(g.types[0]?.errands ?? false) })}
+                title="Good for errands: the chore planner puts errands on these days first"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-frame px-3 text-sm font-bold text-ink-muted aria-pressed:border-solid aria-pressed:border-ink aria-pressed:bg-rail aria-pressed:text-ink"
+              >
+                <Car size="1.25rem" aria-hidden />
+                Errands
+              </button>
               <button
                 type="button"
                 onClick={() => removeGroup(g.group)}

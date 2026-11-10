@@ -25,6 +25,8 @@ export type DraftDayType = {
   /** "07:00" */
   wake: string;
   bed: string;
+  /** Good for errands (the same for the whole group). */
+  errands: boolean;
 };
 
 export type DraftWeekPlan = { id: string; member_id: string; name: string };

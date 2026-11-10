@@ -14,7 +14,17 @@ import { addDays, localDateOf, type LocalDate } from "./time.ts";
  * review), a break, an event, then the week plan.
  */
 
-export type DayType = { id: string; member_id: string; name: string; icon: string | null; wake_time: string; bed_time: string; sort_order: number };
+export type DayType = {
+  id: string;
+  member_id: string;
+  name: string;
+  icon: string | null;
+  wake_time: string;
+  bed_time: string;
+  sort_order: number;
+  /** Good for errands: the chore planner puts errands on these days first. */
+  errands?: boolean;
+};
 export type WeekPlan = { id: string; member_id: string; name: string; sort_order: number };
 export type WeekPlanDay = { week_plan_id: string; weekday: number; day_type_id: string };
 export type DayOverride = { member_id: string; date: string; day_type_id: string | null; wake_time: string | null; bed_time: string | null };

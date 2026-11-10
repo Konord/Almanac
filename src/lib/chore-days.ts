@@ -21,7 +21,7 @@ import { addDays, type LocalDate } from "./time.ts";
  *     day and tags) waits for the next day that takes it and has room.
  *     With no chore day it goes on any day that isn't restrictive. Big
  *     ones count against the Big limit, errands go on a day good for
- *     errands (a chore day or an event tagged Errand) or join one that has one,
+ *     errands (a chore day, or a kind of day like an office day) or join one that has one,
  *     and essential ones go on today when today takes them.
  *
  * A day "accepts" a chore when the chore is tagged for one of its chore
@@ -103,7 +103,7 @@ export type PlanDay = {
   date: LocalDate;
   away: boolean;
   choreDays: ChoreDay[];
-  /** Good for errands: a chore day tagged Errand, or an event tagged Errand (an office day). */
+  /** Good for errands: a chore day marked so, or a kind of day that is (an office day). */
   errands: boolean;
   /** Preset chores whose stretch starts on this day. */
   presets: string[];
@@ -173,7 +173,7 @@ export function planChoreDays(input: {
   keptToday?: Set<string>;
   /** Chore days moved on single dates (the weekly review). */
   moves?: ChoreDayMove[];
-  /** Dates with an event tagged Errand (an office day): good for errands. */
+  /** Dates when someone has a kind of day good for errands (an office day). */
   errandDates?: Set<LocalDate>;
 }): ChorePlan {
   const { choreDays, chores, today } = input;

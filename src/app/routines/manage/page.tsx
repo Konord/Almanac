@@ -45,7 +45,7 @@ async function Days({ searchParams }: { searchParams: PageProps<"/routines/manag
     dayTypes: data.members.flatMap((m) =>
       data.dayTypes
         .filter((t) => t.member_id === m.id)
-        .map((t) => ({ id: t.id, member_id: m.id, group: groupKey(t.name), name: t.name, icon: t.icon, wake: t.wake_time.slice(0, 5), bed: t.bed_time.slice(0, 5) })),
+        .map((t) => ({ id: t.id, member_id: m.id, group: groupKey(t.name), name: t.name, icon: t.icon, wake: t.wake_time.slice(0, 5), bed: t.bed_time.slice(0, 5), errands: t.errands ?? false })),
     ),
     weekPlans: data.members.flatMap((m) => data.weekPlans.filter((p) => p.member_id === m.id).map((p) => ({ id: p.id, member_id: m.id, name: p.name }))),
     planDays: data.weekPlanDays

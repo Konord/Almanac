@@ -37,7 +37,7 @@ export async function saveSetDays(draft: DaysDraft, knownBreakIds: string[]): Pr
   for (const t of draft.dayTypes) {
     const at = order.get(t.member_id) ?? 0;
     order.set(t.member_id, at + 1);
-    const row = { name: t.name.trim(), icon: t.icon || null, wake_time: t.wake, bed_time: t.bed, sort_order: at };
+    const row = { name: t.name.trim(), icon: t.icon || null, wake_time: t.wake, bed_time: t.bed, errands: t.errands, sort_order: at };
     if (isNewId(t.id)) {
       const { data, error } = await supabase.from("day_types").insert({ ...row, household_id: household.id, member_id: t.member_id }).select("id").single();
       if (error) return { ok: false, error: error.message };
