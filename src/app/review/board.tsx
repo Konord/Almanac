@@ -278,7 +278,7 @@ export function ReviewBoard({
                             ) : null}
                             <Emoji emoji={look.icon} className={big ? "size-[4.75rem]" : "size-10"} />
                             <span className="flex min-w-0 flex-col">
-                              <span className="truncate text-xs font-bold tracking-wide uppercase opacity-70">{time.name}</span>
+                              <span className="truncate text-sm font-bold tracking-wide uppercase opacity-70">{time.name}</span>
                               <span className={`line-clamp-2 leading-tight font-extrabold ${big ? "text-xl" : "text-lg"}`}>{look.title}</span>
                               {look.pick ? (
                                 <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">Pick which one</span>
@@ -329,7 +329,7 @@ export function ReviewBoard({
                     ))
                   )}
                 </span>
-                <span className="flex min-h-6 flex-wrap items-center gap-1.5 text-[0.9375rem] font-bold text-ink-soft">
+                <span className="flex min-h-6 flex-wrap items-center gap-1.5 text-sm font-bold text-ink-soft">
                   {col.events.length === 0 ? (
                     <span className="font-normal text-ink-muted">Nothing on</span>
                   ) : (
@@ -509,7 +509,7 @@ function OpenDay({
                 key={m.id}
                 type="button"
                 onClick={() => onMeal(m.id, time.id)}
-                className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl border-2 bg-meal px-2 text-left text-[0.9375rem] font-extrabold text-meal-ink ${m.changed ? "border-dashed border-accent" : "border-transparent"}`}
+                className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl border-2 bg-meal px-2 text-left text-sm font-extrabold text-meal-ink ${m.changed ? "border-dashed border-accent" : "border-transparent"}`}
               >
                 <Emoji emoji={m.icon} className="size-7" />
                 <span className="min-w-0 truncate">{m.title}</span>

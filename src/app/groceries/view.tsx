@@ -204,7 +204,7 @@ export function GroceryView({
                       <span className="flex min-w-0 flex-col">
                         <span className={`truncate font-hand text-[1.375rem] leading-tight ${l.checked ? "text-ink-muted line-through" : "text-ink"}`}>{l.name}</span>
                         {l.need || l.detail ? (
-                          <span className="truncate text-[0.875rem] font-bold text-ink-muted">{l.need || (l.source === "repeat" ? l.detail : "")}</span>
+                          <span className="truncate text-sm font-bold text-ink-muted">{l.need || (l.source === "repeat" ? l.detail : "")}</span>
                         ) : null}
                       </span>
                     </button>

@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
@@ -36,7 +35,7 @@ export default function ListsPage(props: PageProps<"/lists">) {
 async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["searchParams"] }) {
   const household = await requireHousehold();
   const params = await searchParams;
-  const { locale, timeZone } = household.settings;
+  const { timeZone } = household.settings;
   const today = localDateOf(new Date(), timeZone);
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
@@ -71,9 +70,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
   return (
     <>
-      <ScreenHeader title="Lists">
-        <HeaderClock locale={locale} timeZone={timeZone} />
-      </ScreenHeader>
+      <ScreenHeader title="List Manager" />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -90,7 +87,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                   <Link
                     href={`/lists?list=${l.id}`}
                     aria-current={active ? "page" : undefined}
-                    className={`flex min-h-16 items-center gap-3 rounded-2xl px-3 ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : "hover:bg-rail"}`}
+                    className={`flex min-h-16 items-center gap-3 rounded-2xl px-3 ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
                   >
                     <Emoji emoji={l.icon ?? "📝"} className="size-9" />
                     <span className="min-w-0 flex-1 truncate text-xl font-bold text-ink">{l.name}</span>

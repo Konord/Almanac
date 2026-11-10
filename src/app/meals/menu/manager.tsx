@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowsLeftRight, CaretLeft, CaretRight, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
-import { Emoji, Notice, ScreenHeader, Segmented } from "@/components/ui";
+import { EmptyState, Emoji, Notice, ScreenHeader, Segmented } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { BATCHES } from "@/lib/meals";
@@ -252,12 +252,7 @@ export function MenuManager({
               }}
             />
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-              <Emoji emoji="🍽️" className="size-20" />
-              <p className="max-w-[30rem] text-xl text-ink-muted">
-                Pick a meal to change its dishes. A dish can be set (Mashed potatoes), or picked on the day (any Veggie). The weekly review starts open dishes on last time&rsquo;s pick.
-              </p>
-            </div>
+            <EmptyState emoji="🍽️" title="Pick a meal to change its dishes" />
           )}
         </section>
       </div>

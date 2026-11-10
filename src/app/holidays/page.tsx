@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { AppFrame } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
 import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { loadHolidays } from "./data";
@@ -30,7 +29,6 @@ async function Holidays() {
       initial={initial}
       today={localDateOf(new Date(), timeZone)}
       locale={locale}
-      clock={<HeaderClock locale={locale} timeZone={timeZone} />}
     />
   );
 }

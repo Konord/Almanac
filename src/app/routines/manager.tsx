@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
-import { Avatar, Emoji } from "@/components/ui";
+import { Avatar, EmptyState, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
@@ -769,11 +769,7 @@ export function RoutineManager({
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-              <Emoji emoji="📝" className="size-16" />
-              <p className="max-w-80 text-xl font-bold text-ink">Tap a routine to edit it</p>
-              <p className="max-w-96 text-base text-ink-muted">Or tap an empty spot in a column to add a new one there. The + above a column gives that person a routine you already have.</p>
-            </div>
+            <EmptyState emoji="📝" title="Tap a routine to edit it" hint="Or tap an empty spot to add one." />
           )}
 
         </section>
@@ -798,7 +794,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-base font-bold ${active ? "border-ink bg-ink text-board" : "border-frame bg-board text-ink hover:border-ink"}`}
+      className={`flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-base font-bold ${active ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink hover:border-ink"}`}
     >
       {children}
     </button>

@@ -190,6 +190,21 @@ export function Emoji({ emoji, className = "size-10", faded = false }: { emoji: 
   );
 }
 
+/**
+ * What an editor panel shows before anything is picked: one big picture, a
+ * short line saying what to tap, and at most one line of help. Every manager
+ * uses this, so empty panels look the same everywhere.
+ */
+export function EmptyState({ emoji, title, hint }: { emoji: string; title: ReactNode; hint?: ReactNode }) {
+  return (
+    <div className="m-auto flex max-w-[30rem] flex-col items-center gap-3 p-6 text-center">
+      <Emoji emoji={emoji} className="size-20" />
+      <p className="text-2xl font-bold text-balance text-ink">{title}</p>
+      {hint ? <p className="text-lg text-balance text-ink-muted">{hint}</p> : null}
+    </div>
+  );
+}
+
 /** A thin bar in a person's colour, e.g. 3 of 5 steps done. */
 export function ProgressBar({ done, total, colour, thick = false }: { done: number; total: number; colour?: string | null; thick?: boolean }) {
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);

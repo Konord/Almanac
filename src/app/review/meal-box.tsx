@@ -392,7 +392,7 @@ function Plate({
             >
               <Emoji emoji={r?.icon ?? kind.get(d.kindId ?? "")?.icon ?? "🍽️"} className="size-12" />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className={`text-xs font-extrabold tracking-wide uppercase ${active ? "text-accent" : "text-ink-muted"}`}>{active ? `${kindName} · picking` : kindName}</span>
+                <span className={`text-sm font-extrabold tracking-wide uppercase ${active ? "text-accent" : "text-ink-muted"}`}>{active ? `${kindName} · picking` : kindName}</span>
                 <span className="truncate text-xl font-extrabold text-ink">{r?.name ?? `Pick a ${kindName.toLowerCase()}`}</span>
               </span>
               <div className="flex rounded-2xl bg-panel p-1" role="group" aria-label={`Batches of ${r?.name ?? kindName}`}>
@@ -684,7 +684,7 @@ function SaveAsMeal({
                 type="button"
                 aria-pressed={on}
                 onClick={() => setCats(on ? cats.filter((x) => x !== c.id) : [...cats, c.id])}
-                className={`flex min-h-12 items-center gap-2 rounded-xl border-2 px-3 text-base font-bold ${on ? "border-ink bg-ink text-board" : "border-frame bg-board text-ink"}`}
+                className={`flex min-h-12 items-center gap-2 rounded-xl border-2 px-3 text-base font-bold ${on ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink"}`}
               >
                 <Emoji emoji={c.icon} className="size-6" />
                 {c.name}

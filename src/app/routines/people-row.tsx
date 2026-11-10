@@ -52,7 +52,7 @@ export function PeopleRow({
             key={m.id}
             href={hrefFor(m.id)}
             aria-current={activeId === m.id ? "page" : undefined}
-            className={`${base} min-h-[var(--touch-target)] rounded-2xl px-3 ${activeId === m.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : "hover:bg-rail"}`}
+            className={`${base} min-h-[var(--touch-target)] rounded-2xl px-3 ${activeId === m.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
           >
             {inner}
           </Link>

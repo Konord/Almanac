@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { AppFrame, firstParam } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
 import { placeable } from "@/lib/chore-days";
 import { snapOf, type Season } from "@/lib/chores";
 import type { ChoreManagerDraft, DraftOccasional, OnlyIn, Snap } from "@/lib/chore-manager";
@@ -164,7 +163,6 @@ async function Chores({ searchParams }: { searchParams: PageProps<"/chores">["se
         timeZone={timeZone}
         weekStartsOn={weekStartsOn}
       startWith={{ chore: firstParam(params.edit), day: firstParam(params.day) }}
-      clock={<HeaderClock locale={locale} timeZone={timeZone} />}
     />
   );
 }

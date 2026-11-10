@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
-import { Emoji, ScreenHeader } from "@/components/ui";
+import { EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { describeHolidayRule, nextDate, PUBLIC_HOLIDAYS, type Birthday, type Holiday, type HolidayRule } from "@/lib/holidays";
@@ -31,12 +31,10 @@ export function HolidayManager({
   initial,
   today,
   locale,
-  clock,
 }: {
   initial: HolidayDraft;
   today: string;
   locale: string;
-  clock: ReactNode;
 }) {
   const [draft, setDraft] = useState<HolidayDraft>(initial);
   const [tab, setTab] = useState<Tab>("holidays");
@@ -119,7 +117,6 @@ export function HolidayManager({
   return (
     <>
       <ScreenHeader title="Holidays and birthdays">
-        {clock}
         <Link href="/calendar?view=month" className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-rail px-4 text-base font-bold text-ink">
           Back to the calendar
         </Link>
@@ -223,15 +220,10 @@ export function HolidayManager({
                 setSelection(null);
               }}
             />
+          ) : tab === "holidays" ? (
+            <EmptyState emoji="🎉" title="Tap a holiday to change it" />
           ) : (
-            <div className="m-auto flex max-w-[32rem] flex-col items-center gap-3 text-center">
-              <Emoji emoji={tab === "holidays" ? "🎉" : "🎂"} className="size-20" />
-              <p className="text-xl text-ink-soft">
-                {tab === "holidays"
-                  ? "Tap a holiday to rename it, change its picture or take it away. They show on the calendar as special all-day days."
-                  : "Tap a birthday to change it, or add one. With a birth year, the calendar says how old they turn."}
-              </p>
-            </div>
+            <EmptyState emoji="🎂" title="Tap a birthday to change it" hint="Add a birth year and the calendar shows how old they turn." />
           )}
         </section>
       </div>
@@ -250,7 +242,7 @@ function Row({ emoji, name, detail, active, onClick }: { emoji: string; name: st
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-frame)]" : "hover:bg-rail"}`}
+        className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
       >
         <Emoji emoji={emoji} className="size-10" />
         <span className="flex min-w-0 flex-1 flex-col">
