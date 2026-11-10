@@ -471,6 +471,7 @@ function Plate({
             key={`${picking.index}|${picking.kindId}`}
             current={meal.dishes[picking.index]?.recipeId ?? null}
             startKind={picking.kindId}
+            goesWith={meal.categoryId ? (categories.find((c) => c.id === meal.categoryId) ?? null) : null}
             dishes={dishes}
             kinds={kinds}
             onDish={onDish}
@@ -508,6 +509,7 @@ function Plate({
 function DishPicker({
   current,
   startKind,
+  goesWith,
   dishes,
   kinds,
   onPick,
@@ -515,6 +517,8 @@ function DishPicker({
 }: {
   current: string | null;
   startKind: string | null;
+  /** The meal's kind (Pasta night): dishes that go with it come first. */
+  goesWith: { id: string; name: string } | null;
   dishes: ReviewDish[];
   kinds: ReviewData["kinds"];
   onPick: (recipeId: string, kindId: string | null) => void;
@@ -530,7 +534,11 @@ function DishPicker({
   const [pending, start] = useTransition();
   const tabs = startKind ? [startKind] : sides.map((k) => k.id);
   const kindName = (id: string | null) => kinds.find((k) => k.id === id)?.name ?? "Dish";
-  const list = dishesOfKind(dishes, tab).toSorted((a, b) => (a.id === current ? -1 : b.id === current ? 1 : a.name.localeCompare(b.name)));
+  const pairs = (d: ReviewDish) => Boolean(goesWith && d.goes_with?.includes(goesWith.id));
+  // The dish on the plate first, then the ones that go with this kind of meal, then the rest.
+  const list = dishesOfKind(dishes, tab).toSorted(
+    (a, b) => (a.id === current ? -1 : b.id === current ? 1 : Number(pairs(b)) - Number(pairs(a)) || a.name.localeCompare(b.name)),
+  );
   const pages = Math.max(1, Math.ceil((list.length + 1) / (PICKS_PER_PAGE + 1)));
   const p = Math.min(page, pages - 1);
   const shown = list.slice(p * PICKS_PER_PAGE, (p + 1) * PICKS_PER_PAGE);
@@ -600,7 +608,11 @@ function DishPicker({
             >
               <Emoji emoji={d.icon ?? "🍽️"} className="size-14" />
               <span className="line-clamp-2 text-lg leading-tight font-extrabold text-ink">{d.name}</span>
-              {d.id === current ? <span className="text-sm font-bold text-accent">On the plate</span> : null}
+              {d.id === current ? (
+                <span className="text-sm font-bold text-accent">On the plate</span>
+              ) : pairs(d) && goesWith ? (
+                <span className="truncate text-sm font-bold text-ink-muted">Goes with {goesWith.name}</span>
+              ) : null}
             </button>
           ))}
           {p === pages - 1 ? (

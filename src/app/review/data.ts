@@ -23,7 +23,16 @@ export type ReviewColumn = ReviewDay & {
 };
 
 /** A dish (recipe) the review's meals can use. */
-export type ReviewDish = { id: string; name: string; icon: string | null; kind_ids: string[]; is_backup: boolean; serves: number };
+export type ReviewDish = {
+  id: string;
+  name: string;
+  icon: string | null;
+  kind_ids: string[];
+  is_backup: boolean;
+  serves: number;
+  /** Kinds of meal it goes with (Caesar salad: Pasta, Pizza…): offered first there. */
+  goes_with?: string[];
+};
 
 /** A meal on the menu, ready to pick: its spots are set dishes or kinds to pick from. */
 export type ReviewMenuMeal = {
@@ -187,6 +196,7 @@ export async function loadReview(household: Household, week: LocalDate, today: L
       kind_ids: r.kind_ids,
       is_backup: r.is_backup,
       serves: r.serves,
+      goes_with: r.category_ids,
     })),
     kinds: basics.kinds.map((k) => ({ id: k.id, name: k.name, icon: k.icon })),
     menuMeals: basics.menuMeals.map((m) => ({

@@ -283,6 +283,7 @@ export async function saveDish(formData: FormData): Promise<DishSaveResult> {
   if (!isVisibility(visibility)) return fail("Choose who can see it.");
   const kindIds = formData.getAll("kindIds").map(String).filter(Boolean);
   const tagIds = formData.getAll("tagIds").map(String).filter(Boolean);
+  const goesWith = formData.getAll("goesWith").map(String).filter(Boolean);
   // Notes
   const source = text(formData, "sourceUrl");
   if (source && !/^https?:\/\//i.test(source)) return fail("The recipe link should start with https://");
@@ -315,6 +316,9 @@ export async function saveDish(formData: FormData): Promise<DishSaveResult> {
   if (kindIds.length) await supabase.from("recipe_kinds").insert(kindIds.map((kind_id) => ({ recipe_id: id, kind_id, household_id: household.id })));
   await supabase.from("recipe_tags").delete().eq("recipe_id", id);
   if (tagIds.length) await supabase.from("recipe_tags").insert(tagIds.map((tag_id) => ({ recipe_id: id, tag_id, household_id: household.id })));
+  // Goes with: the kinds of meal this dish is offered first in (Caesar salad with Pasta).
+  await supabase.from("recipe_categories").delete().eq("recipe_id", id);
+  if (goesWith.length) await supabase.from("recipe_categories").insert(goesWith.map((category_id) => ({ recipe_id: id, category_id, household_id: household.id })));
 
   // Ingredients: the whole list is replaced.
   const cleanIngredients = [];
