@@ -13,6 +13,7 @@ import {
 } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
+import { WallRefresh } from "@/components/wall-refresh";
 import { EVERYONE_COLOUR, soft } from "@/lib/colours";
 import { formatMinutes, profileLabel, type DayProfile } from "@/lib/day-profile";
 import { eventEmoji } from "@/lib/emoji";
@@ -133,6 +134,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   return (
     <>
       <RememberDisplay display="agenda" />
+      <WallRefresh timeZone={timeZone} />
       <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
       {panelPrefs.open || routineOpen ? (
         <TodayPanel

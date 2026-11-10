@@ -24,6 +24,7 @@ import { floatingRoutines } from "../routines/floating";
 import { pickPanelTab, setPanelOpen } from "./actions";
 import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
+import { PanelPages } from "@/components/panel-pages";
 
 /**
  * The Today panel: a column on the left of the calendar with three parts.
@@ -357,8 +358,11 @@ export async function TodayPanel({
             {showing === "today" ? "Nothing on today's list." : "Nothing on this list."}
           </p>
         ) : (
-          <ul className="flex flex-col">
-            {open.slice(0, ROWS).map((row) => {
+          <PanelPages
+            link={showing === "today" ? { href: "/lists", label: "Open the lists" } : { href: `/lists?list=${showing}`, label: "Open the list" }}
+            pages={pagesOf(open, ROWS).map((rows, p) => (
+              <ul key={p} className="flex flex-col">
+            {rows.map((row) => {
               const colour =
                 row.kind === "todo"
                   ? row.todo.assignee_id
@@ -429,9 +433,12 @@ export async function TodayPanel({
                 </li>
               );
             })}
-          </ul>
+              </ul>
+            ))}
+          />
         )}
-        {(() => {
+        {/* Paged lists have their own bottom row; Up next, groceries and empty lists get a link. */}
+        {showing !== "upnext" && !groceries && open.length > 0 ? null : (() => {
           const extra =
             showing === "upnext" ? upNext.length - ROWS : open.length - ROWS;
           const href = showing === "upnext" ? "/" : showing === "today" ? "/lists" : `/lists?list=${showing}`;
@@ -517,4 +524,11 @@ export function OpenPanelTab({ returnTo }: { returnTo: string }) {
       </button>
     </form>
   );
+}
+
+/** Splits rows into pages of a set size (at least one page). */
+function pagesOf<T>(items: T[], size: number): T[][] {
+  const pages: T[][] = [];
+  for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size));
+  return pages.length ? pages : [[]];
 }

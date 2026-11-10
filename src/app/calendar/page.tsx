@@ -4,6 +4,7 @@ import { CaretLeft, CaretRight, Plus, Stack, Tag, Trash, X } from "@phosphor-ico
 import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
+import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
 import { strong } from "@/lib/colours";
 import { addMonths, dayOfWeek, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
@@ -48,6 +49,8 @@ import { loadMealBasics, loadMeals, mealIcon, mealName } from "../meals/data";
 import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
 import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
+import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
+import { choreSchedule } from "../chores/plan";
 
 /** Week or Month. What Month shows (rolling 5 weeks or the calendar month) is a setting. */
 type View = "week" | "month";
@@ -86,6 +89,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         ? rollingWeekDays(anchor, weekStartsOn)
         : monthGridDays(anchor, weekStartsOn);
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
+  // The Today panel's daily list needs today's heads-ups and chores made into
+  // tasks first, the same as on the Agenda (otherwise a wall left on Week or
+  // Month never gets them).
+  await syncEventAndChoreHeadsUps(household);
+  await choreSchedule(household, today, timeZone);
   const [{ layers, members, views, tags, templates, items, exceptions }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
@@ -160,6 +168,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   return (
     <>
       <RememberDisplay display={view} />
+      <WallRefresh timeZone={timeZone} />
       <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
       {panelPrefs.open ? (
         <TodayPanel household={household} today={today} upNext={upNext} tab={panelPrefs.tab} returnTo={panelReturn} />
