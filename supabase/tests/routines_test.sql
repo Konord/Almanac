@@ -1,7 +1,7 @@
 -- Checks for routines. Run with: npx supabase test db
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(14);
 
 insert into auth.users (id, email, aud, role) values
   ('11111111-1111-1111-1111-111111111111', 'a@test', 'authenticated', 'authenticated'),
@@ -64,6 +64,15 @@ select is(
   (select daily_list from public.routine_steps where id = current_setting('test.step')::uuid),
   false,
   'Steps stay off the daily list unless switched on'
+);
+
+insert into public.routine_templates (household_id, name, anchor, is_template)
+values (public.current_household_id(), 'Kids morning template', 'wake', true);
+select throws_ok(
+  $$ insert into public.routine_assignments (household_id, template_id, member_id, day_type_id)
+     values (public.current_household_id(), (select id from public.routine_templates where name = 'Kids morning template'),
+       current_setting('test.ava')::uuid, (select id from public.day_types where member_id = current_setting('test.ava')::uuid and name = 'Weekday')) $$,
+  '23514', null, 'A routine template can''t be put on someone''s day'
 );
 
 delete from public.routine_templates where name = 'Bedtime';

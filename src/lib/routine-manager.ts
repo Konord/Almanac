@@ -28,6 +28,8 @@ export type DraftRoutine = {
   /** When habit tracking was switched on; null when off. */
   habit_since: string | null;
   visibility: string;
+  /** A starting point for new routines (Start from), never on anyone's day. */
+  is_template: boolean;
 };
 
 export type DraftStep = {
@@ -90,7 +92,10 @@ export function draftProblem(draft: ManagerDraft): string | null {
     if (!text) return "A step is empty. Type what to do, or delete it.";
     if (text.length > 80) return `"${text.slice(0, 20)}…" is too long for a step (80 letters at most).`;
   }
-  for (const u of draft.uses) if (!ids.has(u.routine_id)) return "A routine is given to someone but isn't there any more.";
+  for (const u of draft.uses) {
+    if (!ids.has(u.routine_id)) return "A routine is given to someone but isn't there any more.";
+    if (draft.routines.find((r) => r.id === u.routine_id)?.is_template) return "A template can't be on someone's day. Start a routine from it instead.";
+  }
   for (const s of draft.steps) {
     if (s.member_ids.length === 0) continue;
     if (stepPeople(draft, s).length === 0) {
@@ -127,4 +132,59 @@ export function dailyListState(steps: Pick<DraftStep, "daily_list">[]): "all" | 
 /** True when two drafts would save the same thing. */
 export function sameDraft(a: ManagerDraft, b: ManagerDraft): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * A copy of a routine and its steps with new ids: "Save as template"
+ * (asTemplate) or "Start from" a template. Who does each step isn't copied,
+ * because the copy may go to other people.
+ */
+export function copyRoutine(
+  draft: ManagerDraft,
+  routineId: string,
+  newId: () => string,
+  asTemplate: boolean,
+): { routine: DraftRoutine; steps: DraftStep[] } | null {
+  const from = draft.routines.find((r) => r.id === routineId);
+  if (!from) return null;
+  const id = newId();
+  return {
+    routine: { ...from, id, is_template: asTemplate, habit_since: asTemplate ? null : from.habit_since },
+    steps: draft.steps.filter((s) => s.routine_id === routineId).map((s) => ({ ...s, id: newId(), routine_id: id, member_ids: [] })),
+  };
+}
+
+/** A routine block in one column of the manager's grid. */
+export type GridBlock = { routineId: string; start: number; end: number };
+
+/** Neighbouring columns showing the same routine at the same time, drawn as one bubble. */
+export type GridRun<B extends GridBlock> = { routineId: string; start: number; end: number; c0: number; c1: number; blocks: B[] };
+
+/**
+ * Joins a routine's blocks in neighbouring columns into one bubble when
+ * they start and end at the same time (like an event for several people).
+ * Where the times differ, each column keeps its own block.
+ */
+export function joinRuns<B extends GridBlock>(columns: B[][]): GridRun<B>[] {
+  const runs: GridRun<B>[] = [];
+  const open = new Map<string, GridRun<B>>();
+  columns.forEach((blocks, c) => {
+    const next = new Map<string, GridRun<B>>();
+    for (const b of blocks) {
+      const key = `${b.routineId}|${b.start}|${b.end}`;
+      const run = open.get(key);
+      if (run && run.c1 === c - 1) {
+        run.c1 = c;
+        run.blocks.push(b);
+        next.set(key, run);
+      } else {
+        const fresh: GridRun<B> = { routineId: b.routineId, start: b.start, end: b.end, c0: c, c1: c, blocks: [b] };
+        runs.push(fresh);
+        next.set(key, fresh);
+      }
+    }
+    open.clear();
+    for (const [k, v] of next) open.set(k, v);
+  });
+  return runs;
 }

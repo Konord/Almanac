@@ -45,6 +45,7 @@ async function Manager() {
       loose: t.loose,
       habit_since: t.habit_since,
       visibility: t.visibility,
+      is_template: t.is_template,
     })),
     steps: data.steps.map((s) => ({
       id: s.id,

@@ -51,6 +51,7 @@ export async function saveRoutineManager(draft: ManagerDraft): Promise<SaveResul
       loose: r.loose,
       habit_since: r.habit_since,
       visibility: r.visibility,
+      is_template: r.is_template,
       sort_order: i,
     };
     if (isNewId(r.id)) {

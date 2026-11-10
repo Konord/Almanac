@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dailyListState, draftProblem, kindFor, stepPeople, type ManagerDraft } from "./routine-manager.ts";
+import { copyRoutine, dailyListState, draftProblem, joinRuns, kindFor, stepPeople, type ManagerDraft } from "./routine-manager.ts";
 
 test("kind comes from when the routine happens", () => {
   assert.equal(kindFor({ anchor: "wake", usual_start: null }, null), "morning");
@@ -22,6 +22,7 @@ const routine = {
   loose: false,
   habit_since: null,
   visibility: "everyone",
+  is_template: false,
 };
 const draft = (changes: Partial<ManagerDraft> = {}): ManagerDraft => ({
   routines: [routine],
@@ -55,4 +56,45 @@ test("the routine's daily list switch is all, some or none of its steps", () => 
   assert.equal(dailyListState([{ daily_list: true }, { daily_list: false }]), "some");
   assert.equal(dailyListState([{ daily_list: false }]), "none");
   assert.equal(dailyListState([]), "none");
+});
+
+test("neighbouring columns at the same time share one bubble", () => {
+  const b = (routineId: string, start: number, end: number) => ({ routineId, start, end });
+  const runs = joinRuns([
+    [b("tidy", 1110, 1125), b("bed", 1200, 1230)],
+    [b("tidy", 1110, 1125), b("bed", 1230, 1260)],
+    [b("tidy", 1110, 1125)],
+    [],
+    [b("tidy", 1110, 1125)],
+  ]);
+  const tidy = runs.filter((r) => r.routineId === "tidy").map((r) => [r.c0, r.c1]);
+  assert.deepEqual(tidy, [
+    [0, 2],
+    [4, 4],
+  ]);
+  // Different bedtimes: separate blocks.
+  assert.deepEqual(
+    runs.filter((r) => r.routineId === "bed").map((r) => [r.c0, r.c1]),
+    [
+      [0, 0],
+      [1, 1],
+    ],
+  );
+});
+
+test("templates are copies, and never on anyone's day", () => {
+  let n = 0;
+  const id = () => `new-c${(n += 1)}`;
+  const shared = { ...draft({ uses: [{ id: "u0", routine_id: "new-1", member_id: "ava", day_type_id: "d" }] }), steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit: true, member_ids: ["ava"], daily_list: true }] };
+  const copy = copyRoutine(shared, "new-1", id, true);
+  assert.ok(copy);
+  assert.equal(copy.routine.is_template, true);
+  assert.notEqual(copy.routine.id, "new-1");
+  assert.deepEqual(copy.steps.map((s) => [s.routine_id, s.text, s.member_ids.length, s.daily_list]), [[copy.routine.id, "Brush teeth", 0, true]]);
+  const withTemplate = { ...shared, routines: [...shared.routines, copy.routine], steps: [...shared.steps, ...copy.steps] };
+  assert.equal(draftProblem(withTemplate), null);
+  assert.match(
+    draftProblem({ ...withTemplate, uses: [...withTemplate.uses, { id: "u", routine_id: copy.routine.id, member_id: "ava", day_type_id: "d" }] }) ?? "",
+    /template can't be on someone's day/,
+  );
 });
