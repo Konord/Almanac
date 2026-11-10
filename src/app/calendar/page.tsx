@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Plus, Stack, Tag, Trash, X } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, Copy, Plus, Trash, X } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
@@ -12,26 +12,22 @@ import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import {
-  addView,
-  removeView,
-  updateView,
   moveOccurrence,
   removeEvent,
-  removeTag,
   removeTemplate,
   resetOccurrence,
   skipOccurrence,
   updateEvent,
   updateTemplate,
 } from "./actions";
-import { DayKindChips, EventCardFields, OVERLAY_TAGS, ViewFields } from "./forms";
+import { DayKindChips, EventCardFields } from "./forms";
 import { LengthInput } from "./when-fields";
 import { Stickers } from "./stickers";
 import { EmojiPicker } from "@/components/emoji-picker";
-import { ViewChooser } from "./view-chooser";
+import { PeopleButton, PeopleChooser } from "./people-filter";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
-import { deviceView, EVENT_COLUMNS, itemsInView, toEvent, loadCalendar, rangeOf } from "./data";
-import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member, SavedView, Tag as TagType } from "./types";
+import { devicePeople, EVENT_COLUMNS, itemsForPeople, toEvent, loadCalendar, rangeOf } from "./data";
+import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member } from "./types";
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
@@ -77,7 +73,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const occParam = firstParam(params.occ);
   const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const panelParam = firstParam(params.panel);
-  const panel = panelParam === "overlays" || panelParam === "tags" || panelParam === "template" ? panelParam : null;
+  const panel = panelParam === "people" || panelParam === "templates" || panelParam === "template" ? panelParam : null;
 
   const days =
     view === "week"
@@ -91,19 +87,19 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Month never gets them).
   await syncEventAndChoreHeadsUps(household);
   await choreSchedule(household, today, timeZone);
-  const [{ members, views, tags, templates, dayKinds, items, exceptions }, routineData, breaks, specials] = await Promise.all([
+  const [{ members, templates, dayKinds, items, exceptions }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadBreaks(days[0], days[days.length - 1]),
     loadSpecialDays(days[0], days[days.length - 1]),
   ]);
-  const savedView = await deviceView(views);
-  const events: CalendarItem[] = itemsInView(items, savedView);
+  const people = await devicePeople(members);
+  const events: CalendarItem[] = itemsForPeople(items, people);
   // The week view shows each day's dinner under the date, and list tasks with a time as points.
   const weekMeals = view === "week" ? await mealsFor(days, events, members, timeZone) : new Map<LocalDate, WeekMeal[]>();
   const weekTasks =
     view === "week" ? (await loadTodos()).todos.filter((t) => onCalendar(t) && t.due_date! >= days[0] && t.due_date! <= days[days.length - 1]) : [];
-  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/calendar");
+  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
   // The event being edited might be outside the visible range, so fetch it on its own.
@@ -150,7 +146,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   let todayEvents = events;
   if (!days.includes(today)) {
     const todayRange = rangeOf([today], timeZone);
-    todayEvents = panelPrefs.open ? itemsInView((await loadCalendar(todayRange.rangeStart, todayRange.rangeEnd)).items, savedView) : [];
+    todayEvents = panelPrefs.open ? itemsForPeople((await loadCalendar(todayRange.rangeStart, todayRange.rangeEnd)).items, people) : [];
   }
   const upNext: UpNextItem[] = eventsOnDay(todayEvents, today, timeZone)
     .filter((e) => !isAllDayStyle(e, timeZone) && new Date(e.ends_at) > now)
@@ -211,14 +207,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           >
             <Emoji emoji="🎉" className="size-7" />
           </Link>
-          <SoftLink href={href({ panel: "tags", edit: null, add: null })}>
-            <Tag size="1.5rem" aria-hidden />
-            Tags
-          </SoftLink>
-          <SoftLink href={href({ panel: "overlays", edit: null, add: null })}>
-            <Stack size="1.5rem" aria-hidden />
-            <span className="max-w-[9rem] truncate">{savedView ? savedView.name : "Overlays"}</span>
-          </SoftLink>
+          <IconLink href={href({ panel: "templates", edit: null, add: null })} label="Event templates" icon={Copy} />
+          <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
           <Segmented
             label="How much to show"
             options={[
@@ -294,7 +284,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             event={editing}
             household={household}
             members={members}
-            tags={tags}
             dayKinds={dayKinds}
             returnTo={returnTo}
             closeHref={closeHref}
@@ -314,133 +303,33 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         <QuickAddSheet
           // A day late in the week opens the card on the left, so the day stays in view.
           side={(dayOfWeek(pending.date) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right"}
-          pending={pending} members={members} tags={tags} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
+          pending={pending} members={members} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref={closeHref} returnTo={returnTo} returnPath="/calendar" />
       ) : null}
 
-      {panel === "tags" ? (
-        <Sheet title="Tags and templates" closeHref={closeHref} narrow>
-          <TagsPanel tags={tags} templates={templates} memberById={memberById} tagById={new Map(tags.map((t) => [t.id, t]))} returnTo={returnTo} />
+      {panel === "templates" ? (
+        <Sheet title="Templates" closeHref={closeHref} narrow>
+          <TemplatesPanel templates={templates} memberById={memberById} returnTo={returnTo} />
         </Sheet>
       ) : null}
 
       {panel === "template" && templates.some((t) => t.id === firstParam(params.tpl)) ? (
-        <Sheet title="Edit template" closeHref={href({ panel: "tags", tpl: null })} narrow>
+        <Sheet title="Edit template" closeHref={href({ panel: "templates", tpl: null })} narrow>
           <TemplateCard
             template={templates.find((t) => t.id === firstParam(params.tpl))!}
             members={members}
-            tags={tags}
             dayKinds={dayKinds}
             returnTo={returnTo}
-            backHref={href({ panel: "tags", tpl: null })}
+            backHref={href({ panel: "templates", tpl: null })}
           />
         </Sheet>
       ) : null}
 
-      {panel === "overlays" ? (
-        <Sheet title="Overlays" closeHref={closeHref} narrow>
-          <OverlaysPanel tags={tags} views={views} savedView={savedView} editing={firstParam(params.ov) ?? null} returnTo={returnTo} />
+      {panel === "people" ? (
+        <Sheet title="Showing" closeHref={closeHref} narrow>
+          <PeopleChooser members={members} shown={people} returnTo={`${returnTo}&panel=people`} returnPath="/calendar" />
         </Sheet>
       ) : null}
     </>
-  );
-}
-
-/** How many overlays the panel lists (nothing scrolls). */
-const OVERLAYS_SHOWN = 6;
-
-/**
- * Tag overlays (they replace layers, Connor 2026-11-10): an overlay is a
- * set of tags, like "Court and appointments". Picking one on a screen
- * shows only the events with one of its tags; each screen remembers its
- * own, so the wall can show everything while a phone shows a few tags.
- */
-function OverlaysPanel({
-  tags,
-  views,
-  savedView,
-  editing,
-  returnTo,
-}: {
-  tags: TagType[];
-  views: SavedView[];
-  savedView: SavedView | null;
-  /** The overlay being changed ("new" for a new one), or null for the list. */
-  editing: string | null;
-  returnTo: string;
-}) {
-  const back = `${returnTo}&panel=overlays`;
-  const tagById = new Map(tags.map((t) => [t.id, t]));
-  const view = editing && editing !== "new" ? views.find((v) => v.id === editing) : undefined;
-  if (editing === "new" || view) {
-    return (
-      <form action={view ? updateView : addView} className="flex flex-col gap-5">
-        {view ? <input type="hidden" name="id" value={view.id} /> : null}
-        <input type="hidden" name="returnTo" value={`${back}&ov=${view?.id ?? "new"}`} />
-        <ViewFields tags={tags} view={view} />
-        {tags.length > OVERLAY_TAGS ? <p className="text-base text-ink-muted">Showing the first {OVERLAY_TAGS} tags.</p> : null}
-        <div className="flex gap-3">
-          <Button>{view ? "Save overlay" : "Add overlay"}</Button>
-          <Link
-            href={`/calendar?${back}`}
-            scroll={false}
-            className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
-          >
-            Cancel
-          </Link>
-        </div>
-      </form>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-7">
-      <ViewChooser views={views} current={savedView} returnTo={returnTo} returnPath="/calendar" />
-      <section className="flex flex-col gap-3">
-        <h3 className="text-2xl font-bold text-ink">Overlays</h3>
-        <p className="text-lg text-ink-muted">
-          An overlay shows only the events with some tags, like &ldquo;Court and appointments&rdquo;. Each screen remembers the one you picked.
-        </p>
-        {views.length === 0 ? <p className="text-lg text-ink-muted">No overlays yet.</p> : null}
-        <ul className="grid grid-cols-2 gap-2">
-          {views.slice(0, OVERLAYS_SHOWN).map((v) => (
-            <li key={v.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
-              <Link
-                href={`/calendar?${back}&ov=${v.id}`}
-                scroll={false}
-                title={`Change the ${v.name} overlay`}
-                className="flex min-h-[var(--touch-target)] min-w-0 flex-1 flex-col justify-center"
-              >
-                <span className="truncate text-lg font-bold text-ink">{v.name}</span>
-                <span className="flex items-center gap-1 truncate text-sm text-ink-muted">
-                  {v.tag_ids
-                    .map((id) => tagById.get(id))
-                    .filter((t): t is TagType => Boolean(t))
-                    .slice(0, 5)
-                    .map((t) => (
-                      <Emoji key={t.id} emoji={t.icon || eventEmoji(null, t.name)} className="size-5" />
-                    ))}
-                  {v.tag_ids.map((id) => tagById.get(id)?.name).filter(Boolean).join(", ") || "No tags"}
-                </span>
-              </Link>
-              <form action={removeView}>
-                <input type="hidden" name="id" value={v.id} />
-                <input type="hidden" name="name" value={v.name} />
-                <input type="hidden" name="returnTo" value={back} />
-                <RemoveButton label={`Remove the ${v.name} overlay`} />
-              </form>
-            </li>
-          ))}
-        </ul>
-        {views.length > OVERLAYS_SHOWN ? <p className="text-base text-ink-muted">+ {views.length - OVERLAYS_SHOWN} more</p> : null}
-        <Link
-          href={`/calendar?${back}&ov=new`}
-          scroll={false}
-          className="inline-flex min-h-[var(--touch-target)] items-center gap-2 self-start rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
-        >
-          <Plus size="1.25rem" weight="bold" aria-hidden />
-          New overlay
-        </Link>
-      </section>
-    </div>
   );
 }
 
@@ -448,7 +337,6 @@ function EditEventPanel({
   event,
   household,
   members,
-  tags,
   dayKinds,
   returnTo,
   closeHref,
@@ -473,7 +361,6 @@ function EditEventPanel({
   event: CalendarEvent;
   household: Household;
   members: Member[];
-  tags: TagType[];
   dayKinds: DayKind[];
   returnTo: string;
   closeHref: string;
@@ -530,7 +417,6 @@ function EditEventPanel({
         <input type="hidden" name="returnTo" value={returnTo} />
         <EventCardFields
           members={members}
-          tags={tags}
           dayKinds={dayKinds}
           defaults={{
             title: event.title,
@@ -540,7 +426,6 @@ function EditEventPanel({
             startTime: event.all_day ? undefined : localTimeOf(start, timeZone),
             minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
             memberIds: event.member_ids,
-            tagIds: event.tag_ids,
             visibility: event.visibility,
             notes: event.notes ?? "",
             dayKind: event.day_kind ?? undefined,
@@ -727,63 +612,33 @@ function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household:
 }
 
 /**
- * The tags and templates you've made, with a way to remove each; tap a
- * template to change it. New ones are made on the add card ("New tag",
- * and "Save as a template too").
+ * The templates you've made, with a way to remove each; tap one to change
+ * it. New ones are made on the add card ("Save as a template too").
  */
-function TagsPanel({
-  tags,
+/** How many templates the panel lists (nothing scrolls). */
+const TEMPLATES_SHOWN = 16;
+
+function TemplatesPanel({
   templates,
   memberById,
-  tagById,
   returnTo,
 }: {
-  tags: TagType[];
   templates: EventTemplate[];
   memberById: Map<string, Member>;
-  tagById: Map<string, TagType>;
   returnTo: string;
 }) {
-  const back = `${returnTo}&panel=tags`;
+  const back = `${returnTo}&panel=templates`;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="flex flex-col gap-3">
-        <h3 className="text-2xl font-bold text-ink">Tags</h3>
-        <p className="text-base text-ink-muted">
-          One set of tags for events, chores and chore days. The chore planner&apos;s tags can&apos;t be removed: tag an event Errand (like an
-          office day) and errands go on that day.
-        </p>
-        <ul className="grid grid-cols-2 gap-2">
-          {tags.slice(0, 16).map((t) => (
-            <li key={t.id} className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
-              <Emoji emoji={t.icon || eventEmoji(null, t.name)} className="size-8" />
-              <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{t.name}</span>
-              {t.role ? (
-                <span className="shrink-0 px-2 text-sm font-bold text-ink-muted">Chores</span>
-              ) : (
-                <form action={removeTag}>
-                  <input type="hidden" name="id" value={t.id} />
-                  <input type="hidden" name="name" value={t.name} />
-                  <input type="hidden" name="returnTo" value={back} />
-                  <RemoveButton label={`Remove the ${t.name} tag`} />
-                </form>
-              )}
-            </li>
-          ))}
-        </ul>
-        {tags.length > 16 ? <p className="text-base text-ink-muted">+ {tags.length - 16} more</p> : null}
-      </section>
-      <section className="flex flex-col gap-3">
-        <h3 className="text-2xl font-bold text-ink">Templates</h3>
         {templates.length === 0 ? (
           <p className="text-lg text-ink-muted">No templates yet. Tick &ldquo;Save as a template too&rdquo; when adding an event.</p>
         ) : (
           <p className="text-base text-ink-muted">Tap a template to change it.</p>
         )}
         <ul className="grid grid-cols-2 gap-2">
-          {templates.slice(0, 8).map((t) => {
+          {templates.slice(0, TEMPLATES_SHOWN).map((t) => {
             const who = t.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(", ");
-            const tagNames = t.tag_ids.map((id) => tagById.get(id)?.name).filter(Boolean).join(", ");
             const when = t.all_day ? "All day" : `${t.start_time ? `${t.start_time}, ` : ""}${lengthLabel(t.minutes)}`;
             return (
               <li key={t.id} className="flex items-center gap-2 rounded-[var(--radius)] border border-frame py-1 pr-1 pl-3">
@@ -795,7 +650,7 @@ function TagsPanel({
                   className="flex min-h-[var(--touch-target)] min-w-0 flex-1 flex-col justify-center"
                 >
                   <span className="truncate text-lg font-bold text-ink">{t.title}</span>
-                  <span className="truncate text-sm text-ink-muted">{[when, who, tagNames].filter(Boolean).join(" · ")}</span>
+                  <span className="truncate text-sm text-ink-muted">{[when, who, t.day_kind ? `Makes it a ${t.day_kind}` : ""].filter(Boolean).join(" · ")}</span>
                 </Link>
                 <form action={removeTemplate}>
                   <input type="hidden" name="id" value={t.id} />
@@ -807,7 +662,7 @@ function TagsPanel({
             );
           })}
         </ul>
-        {templates.length > 8 ? <p className="text-base text-ink-muted">+ {templates.length - 8} more</p> : null}
+        {templates.length > TEMPLATES_SHOWN ? <p className="text-base text-ink-muted">+ {templates.length - TEMPLATES_SHOWN} more</p> : null}
       </section>
     </div>
   );
@@ -830,14 +685,12 @@ function RemoveButton({ label }: { label: string }) {
 function TemplateCard({
   template,
   members,
-  tags,
   dayKinds,
   returnTo,
   backHref,
 }: {
   template: EventTemplate;
   members: Member[];
-  tags: TagType[];
   dayKinds: DayKind[];
   returnTo: string;
   backHref: string;
@@ -870,7 +723,7 @@ function TemplateCard({
         <div className="group-has-[input[name=allDay]:checked]:hidden">
           <LengthInput initial={template.minutes} />
         </div>
-        <Stickers members={members} tags={tags} memberIds={template.member_ids} tagIds={template.tag_ids} />
+        <Stickers members={members} memberIds={template.member_ids} />
         <DayKindChips kinds={dayKinds} value={template.day_kind} />
         <Field label="Notes">
           <Input name="notes" maxLength={2000} defaultValue={template.notes ?? ""} />
@@ -882,7 +735,7 @@ function TemplateCard({
         <form action={removeTemplate} className="ml-auto">
           <input type="hidden" name="id" value={template.id} />
           <input type="hidden" name="name" value={template.title} />
-          <input type="hidden" name="returnTo" value={`${returnTo}&panel=tags`} />
+          <input type="hidden" name="returnTo" value={`${returnTo}&panel=templates`} />
           <Button variant="danger">Delete template</Button>
         </form>
       </div>

@@ -2,32 +2,29 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { expandEvents, type ExceptionLike } from "@/lib/recurrence";
 import { addDays, zonedToUtc, type LocalDate } from "@/lib/time";
-import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member, SavedView, Tag } from "./types";
+import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member } from "./types";
 
 /*
  * Loading calendar data, shared by the Calendar and Today screens.
  */
 
 export const EVENT_COLUMNS =
-  "id, title, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, day_kind, event_members(member_id), event_tags(tag_id)";
+  "id, title, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, day_kind, event_members(member_id)";
 
-type EventRow = Omit<CalendarEvent, "member_ids" | "tag_ids"> & {
+type EventRow = Omit<CalendarEvent, "member_ids"> & {
   event_members: { member_id: string }[];
-  event_tags: { tag_id: string }[];
 };
 
-/** Turns a loaded row (with its people and tags alongside) into an event. */
-export function toEvent({ event_members, event_tags, ...rest }: EventRow): CalendarEvent {
-  return { ...rest, member_ids: event_members.map((m) => m.member_id), tag_ids: event_tags.map((t) => t.tag_id) };
+/** Turns a loaded row (with its people alongside) into an event. */
+export function toEvent({ event_members, ...rest }: EventRow): CalendarEvent {
+  return { ...rest, member_ids: event_members.map((m) => m.member_id) };
 }
 
-/** The cookie that remembers which saved view this screen (browser) shows. */
-export const VIEW_COOKIE = "almanac-view";
+/** The cookie that remembers whose things this screen (browser) shows. */
+export const PEOPLE_COOKIE = "almanac-people";
 
 export type CalendarData = {
   members: Member[];
-  views: SavedView[];
-  tags: Tag[];
   templates: EventTemplate[];
   /** The kinds of day an event can make its dates, by name. */
   dayKinds: DayKind[];
@@ -39,9 +36,8 @@ export type CalendarData = {
 /** Everything on the calendar between two instants, with repeats worked out. */
 export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<CalendarData> {
   const supabase = await createClient();
-  const [membersResult, viewsResult, eventsResult, seriesResult, tagsResult, templatesResult, kindsResult] = await Promise.all([
+  const [membersResult, eventsResult, seriesResult, templatesResult, kindsResult] = await Promise.all([
     supabase.from("members").select("id, name, colour, icon").order("role", { ascending: false }).order("name"),
-    supabase.from("views").select("id, name, tag_ids").order("sort_order").order("name"),
     supabase
       .from("events")
       .select(EVENT_COLUMNS)
@@ -52,19 +48,16 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
     // Repeating events that have started by the end of the range; their
     // individual dates are worked out below.
     supabase.from("events").select(EVENT_COLUMNS).not("recurrence_rule", "is", null).lt("starts_at", rangeEnd.toISOString()),
-    supabase.from("tags").select("id, name, icon, role").order("sort_order").order("name"),
     supabase
       .from("event_templates")
-      .select("id, title, icon, start_time, minutes, all_day, member_ids, tag_ids, notes, day_kind")
+      .select("id, title, icon, start_time, minutes, all_day, member_ids, notes, day_kind")
       .order("sort_order")
       .order("title"),
     supabase.from("day_types").select("name, icon").order("sort_order").order("name"),
   ]);
   if (membersResult.error) throw membersResult.error;
-  if (viewsResult.error) throw viewsResult.error;
   if (eventsResult.error) throw eventsResult.error;
   if (seriesResult.error) throw seriesResult.error;
-  if (tagsResult.error) throw tagsResult.error;
   if (templatesResult.error) throw templatesResult.error;
   if (kindsResult.error) throw kindsResult.error;
 
@@ -90,8 +83,6 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
   const templates = templatesResult.data.map((t) => ({ ...t, start_time: t.start_time?.slice(0, 5) ?? null }));
   return {
     members: membersResult.data,
-    views: viewsResult.data,
-    tags: tagsResult.data,
     templates,
     dayKinds: kindsOfDay(kindsResult.data),
     items,
@@ -117,15 +108,18 @@ export function rangeOf(days: LocalDate[], timeZone: string): { rangeStart: Date
   };
 }
 
-/** The overlay this screen shows, or null for everything. */
-export async function deviceView(views: SavedView[]): Promise<SavedView | null> {
-  const id = (await cookies()).get(VIEW_COOKIE)?.value;
-  return views.find((v) => v.id === id) ?? null;
+/**
+ * The people this screen shows (each screen remembers its own), or an
+ * empty list for everyone. Someone removed from the household drops out.
+ */
+export async function devicePeople(members: Member[]): Promise<string[]> {
+  const raw = (await cookies()).get(PEOPLE_COOKIE)?.value ?? "";
+  const ids = raw.split(",").filter((id) => members.some((m) => m.id === id));
+  return ids.length === members.length ? [] : ids;
 }
 
-/** Only the events with one of the overlay's tags (or all of them, with no overlay). */
-export function itemsInView(items: CalendarItem[], view: SavedView | null): CalendarItem[] {
-  if (!view) return items;
-  const shown = new Set(view.tag_ids);
-  return items.filter((item) => item.tag_ids.some((id) => shown.has(id)));
+/** Only the events for one of these people, or for everyone (all of them, with no one picked). */
+export function itemsForPeople(items: CalendarItem[], people: string[]): CalendarItem[] {
+  if (people.length === 0) return items;
+  return items.filter((item) => item.member_ids.length === 0 || item.member_ids.some((id) => people.includes(id)));
 }

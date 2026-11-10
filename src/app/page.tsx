@@ -18,7 +18,9 @@ import { EVERYONE_COLOUR, soft } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold, type Household } from "@/lib/household";
 import { localDateOf, type LocalDate } from "@/lib/time";
-import { deviceView, itemsInView, loadCalendar, rangeOf } from "./calendar/data";
+import { devicePeople, itemsForPeople, loadCalendar, rangeOf } from "./calendar/data";
+import { PeopleButton, PeopleChooser } from "./calendar/people-filter";
+import { Sheet } from "@/components/sheet";
 import type { CalendarItem, Member } from "./calendar/types";
 import { loadTodos, type Todo } from "./chores/data";
 import { onCalendar } from "@/lib/todos";
@@ -87,7 +89,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { rangeStart, rangeEnd } = rangeOf(days, timeZone);
   // The chore generator puts today's chores on the daily list before the tasks are read.
   await choreSchedule(household, today, timeZone);
-  const [{ members, views, tags, templates, dayKinds, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
+  const [{ members, templates, dayKinds, items }, routineData, todoData, mealBasics, todayMeals, reviewNow] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadTodos(),
@@ -96,8 +98,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     reviewReminder(household, today, now),
   ]);
   const todaySpecials = (await loadSpecialDays(today, today)).get(today) ?? [];
-  const savedView = await deviceView(views);
-  const shown = itemsInView(items, savedView);
+  // The person filter: just some people's columns (and things for everyone).
+  const people = await devicePeople(members);
+  const shown = itemsForPeople(items, people);
+  const shownMembers = people.length === 0 ? members : members.filter((m) => people.includes(m.id));
 
   const longDate = new Intl.DateTimeFormat(locale, {
     timeZone,
@@ -108,7 +112,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
-  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, tags, "/");
+  const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, "/");
   // The Survival button and its card are hidden for now (Connor, 2026-11-10);
   // they come back with backup meals.
   const openRoutine = firstParam(params.routine) ?? "";
@@ -183,7 +187,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             Weekly review
           </Link>
         ) : null}
-        <div className="lg:ml-auto">
+        <div className="flex items-center gap-3 lg:ml-auto">
+          <PeopleButton members={members} shown={people} href="/?panel=people" />
           <Segmented
             label="How much to show"
             options={[
@@ -211,7 +216,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         <PeopleTimeline
           allDay={todayItems.filter((e) => isAllDayStyle(e, timeZone))}
           items={todayItems}
-          members={members}
+          members={shownMembers}
           routineData={routineData}
           today={today}
           now={now}
@@ -243,8 +248,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       </Link>
 
 
+      {firstParam(params.panel) === "people" ? (
+        <Sheet title="Showing" closeHref="/" narrow>
+          <PeopleChooser members={members} shown={people} returnTo="panel=people" returnPath="/" />
+        </Sheet>
+      ) : null}
+
       {pending ? (
-        <QuickAddSheet pending={pending} members={members} tags={tags} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
+        <QuickAddSheet pending={pending} members={members} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
       ) : null}
 
     </>

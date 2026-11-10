@@ -199,7 +199,7 @@ test("errands are grouped onto a day that already has one", () => {
   assert.equal(where(plan, "library"), TUE);
 });
 
-test("errands go on a chore day tagged Errand", () => {
+test("errands go on a chore day good for errands", () => {
   const marketing = day("marketing", { weekdays: [3], errands: true });
   const plan = planChoreDays({
     choreDays: [free, marketing],
