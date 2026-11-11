@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { FitList } from "@/components/fit-list";
 import Link from "next/link";
-import { BookOpen, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
+import { BookOpen, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { BATCHES, batchAmount } from "@/lib/meals";
 import { clampBatches, menuMealName } from "@/lib/menu";
@@ -9,7 +9,7 @@ import { measureText, type Measures } from "@/lib/units";
 import { UnitPill } from "../unit-pill";
 import { requireHousehold } from "@/lib/household";
 import { minutesText } from "@/lib/meal-helpers";
-import { addRecipe, importRecipe, removeRecipe } from "../actions";
+import { importRecipe, removeRecipe } from "../actions";
 import { loadMealBasics, loadRecipeDetail, type DishKind, type MealBasics, type Recipe } from "../data";
 import { MealsHeader, Modal, Pager, linker, pageOf } from "../parts";
 import { DishEditor, type DishTab } from "../dish-editor";
@@ -50,7 +50,6 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
 
   const current = { kind: p("kind") ?? null, kpage: p("kpage") ?? null };
   const here = linker("/meals/library", current);
-  const returnTo = here({ recipe: p("recipe") ?? null, tab: p("tab") ?? null, batches: p("batches") ?? null });
 
   const tiles = [
     { id: ALL, name: "All dishes", icon: "📖", count: dishes.length },
@@ -70,9 +69,9 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   return (
     <>
       <MealsHeader title="Menu Manager" tab="library" error={p("error")} message={p("message")}>
-        <SoftLink href={here({ import: "paste" })}>
-          <DownloadSimple size="1.5rem" aria-hidden />
-          Bring a recipe in
+        <SoftLink href={here({ add: "type" })}>
+          <Plus size="1.5rem" weight="bold" aria-hidden />
+          Add a dish
         </SoftLink>
       </MealsHeader>
 
@@ -99,12 +98,13 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
           </div>
         </Card>
 
-        <Card title={pickedName}>
+        <Card>
           <FitList
             key={picked}
+            heading={pickedName}
             fallback={DISH_PAGE}
             className="mt-2 gap-2"
-            empty={<li className="text-lg text-ink-muted">No dishes here yet. Add the first one below.</li>}
+            empty={<li className="text-lg text-ink-muted">No dishes here yet. Tap Add a dish at the top.</li>}
             rows={list.map((r) => (
               <li key={r.id}>
                 <Link href={here({ recipe: r.id, tab: "recipe" })} scroll={false} className="flex min-h-18 items-center gap-3 rounded-2xl bg-rail px-4 hover:bg-panel">
@@ -126,28 +126,10 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
               </li>
             ))}
           />
-          <form action={addRecipe} className="mt-3 flex shrink-0 items-end gap-2">
-            <input type="hidden" name="returnTo" value={returnTo} />
-            <input type="hidden" name="kindId" value={kind?.id ?? ""} />
-            <Input name="name" placeholder={kind ? `New ${kind.name.toLowerCase()} dish` : "New dish"} aria-label="New dish" className="min-w-0 flex-1" maxLength={80} required />
-            <Select name="meal" aria-label="Also a meal on the menu" defaultValue={kind && kind.id === mainKind?.id ? NONE : ""} className="w-[17rem]">
-              <option value="">Just a dish</option>
-              <option value={NONE}>Also a meal on the menu</option>
-              {basics.categories.filter((c) => !c.is_leftovers).map((c) => (
-                <option key={c.id} value={c.id}>
-                  Also a meal under {c.name}
-                </option>
-              ))}
-            </Select>
-            <Button>
-              <Plus size="1.25rem" weight="bold" aria-hidden />
-              Add
-            </Button>
-          </form>
         </Card>
       </div>
 
-      {p("import") ? <ImportCard mode={p("import") === "link" ? "link" : "paste"} basics={basics} kindId={kind?.id ?? mainKind?.id ?? ""} here={here} /> : null}
+      {p("add") ? <AddCard mode={ADD_MODES.find((m) => m === p("add")) ?? "type"} basics={basics} kindId={kind?.id ?? mainKind?.id ?? ""} here={here} /> : null}
       {openRecipe ? (
         <RecipeCard
           recipe={openRecipe}
@@ -163,27 +145,43 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   );
 }
 
-function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; basics: MealBasics; kindId: string; here: ReturnType<typeof linker> }) {
+const ADD_MODES = ["type", "paste", "link"] as const;
+type AddMode = (typeof ADD_MODES)[number];
+const ADD_MODE_NAMES: Record<AddMode, string> = { type: "Type it in", paste: "Paste it", link: "From a web page" };
+
+/**
+ * Adding a dish (Connor, 2026-11-11): one way in for every dish. Type it
+ * in, paste a recipe, or read one from a web page; all three make the dish
+ * and open it in the dish editor to fill in or check over.
+ */
+function AddCard({ mode, basics, kindId, here }: { mode: AddMode; basics: MealBasics; kindId: string; here: ReturnType<typeof linker> }) {
   const tabs = (
     <div className="flex gap-1 rounded-2xl bg-panel p-1">
-      {(["paste", "link"] as const).map((m) => (
+      {ADD_MODES.map((m) => (
         <Link
           key={m}
-          href={here({ import: m })}
+          href={here({ add: m })}
           scroll={false}
           className={`flex min-h-12 items-center rounded-xl px-5 text-base font-bold ${m === mode ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
         >
-          {m === "paste" ? "Paste it" : "From a web page"}
+          {ADD_MODE_NAMES[m]}
         </Link>
       ))}
     </div>
   );
   return (
-    <Modal title="Bring a recipe in" icon={<Emoji emoji="📥" className="size-12" />} closeHref={here({})} aside={tabs}>
+    <Modal title="Add a dish" icon={<Emoji emoji="🍽️" className="size-12" />} closeHref={here({})} aside={tabs}>
       <form action={importRecipe} className="flex min-h-0 flex-1 flex-col gap-4">
-        <input type="hidden" name="returnTo" value={here({ import: mode })} />
+        <input type="hidden" name="returnTo" value={here({ add: mode })} />
         <input type="hidden" name="mode" value={mode} />
-        {mode === "paste" ? (
+        {mode === "type" ? (
+          <>
+            <p className="text-lg text-ink-muted">Give it a name to start. The dish then opens so you can add its ingredients, steps and notes, the same as a recipe you paste in.</p>
+            <Field label="Name">
+              <Input name="name" maxLength={80} required autoFocus placeholder="Grandma's chili" className="text-2xl" />
+            </Field>
+          </>
+        ) : mode === "paste" ? (
           <>
             <p className="text-lg text-ink-muted">Paste the whole recipe. Almanac looks for &quot;Ingredients&quot; and &quot;Directions&quot;, then you check it over.</p>
             <textarea
@@ -202,10 +200,12 @@ function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; ba
             </Field>
           </>
         )}
-        <div className="flex items-end gap-4">
-          <Field label="Name (optional)">
-            <Input name="name" maxLength={80} placeholder="Use the recipe's own" className="w-[20rem]" />
-          </Field>
+        <div className="mt-auto flex items-end gap-4">
+          {mode === "type" ? null : (
+            <Field label="Name (optional)">
+              <Input name="name" maxLength={80} placeholder="Use the recipe's own" className="w-[20rem]" />
+            </Field>
+          )}
           <Field label="Kind of dish">
             <Select name="kindId" defaultValue={kindId}>
               <option value="">None</option>
@@ -227,7 +227,7 @@ function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; ba
               ))}
             </Select>
           </Field>
-          <Button className="ml-auto">Bring it in</Button>
+          <Button className="ml-auto">{mode === "type" ? "Add dish" : "Bring it in"}</Button>
         </div>
       </form>
     </Modal>

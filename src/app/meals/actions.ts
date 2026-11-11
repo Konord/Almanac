@@ -372,14 +372,21 @@ export async function removeRecipe(formData: FormData) {
   back(formData, "message", `Removed ${name}.`, { recipe: null, tab: null });
 }
 
-/** Brings a recipe in from pasted text or a web link, then opens it to check. */
+/**
+ * Adds a dish: typed in (just a name), pasted, or read from a web link.
+ * Every way makes the dish and opens it in the dish editor to fill in or
+ * check over (Connor, 2026-11-11: one way in for every dish).
+ */
 export async function importRecipe(formData: FormData) {
   const household = await requireHousehold();
   const mode = text(formData, "mode");
   const kindId = text(formData, "kindId") || null;
   const mealUnder = text(formData, "meal") || null;
   let recipe: ImportedRecipe | null = null;
-  if (mode === "link") {
+  if (mode === "type") {
+    if (!text(formData, "name")) back(formData, "error", "A dish needs a name.");
+    recipe = { name: "", serves: null, handsOnMinutes: null, totalMinutes: null, ingredients: [], steps: [], sourceUrl: null };
+  } else if (mode === "link") {
     const url = text(formData, "url");
     if (!/^https?:\/\/[^\s]+$/i.test(url)) back(formData, "error", "Paste the whole link, starting with https://");
     try {
@@ -441,8 +448,9 @@ export async function importRecipe(formData: FormData) {
   if (recipe.steps.length) {
     await supabase.from("recipe_steps").insert(recipe.steps.slice(0, 60).map((s, i) => ({ household_id: household.id, recipe_id: data.id, position: i, text: s })));
   }
-  await log(household.id, "recipe_imported", "recipe", data.id, { name, from: mode });
+  await log(household.id, mode === "type" ? "recipe_added" : "recipe_imported", "recipe", data.id, { name, from: mode });
   refresh();
+  if (mode === "type") redirect(`/meals/library?${kindId ? `kind=${kindId}&` : ""}recipe=${data.id}&tab=basics`);
   redirect(
     `/meals/library?${kindId ? `kind=${kindId}&` : ""}recipe=${data.id}&tab=steps&message=${encodeURIComponent(
       `Brought in ${recipe.ingredients.length} ingredients and ${recipe.steps.length} steps. Check them, and keep the helpers you want.`,
