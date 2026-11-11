@@ -7,14 +7,17 @@ import { addDays, type LocalDate } from "@/lib/time";
 
 export type EnergyMode = "normal" | "survival";
 
-export type MealTime = { id: string; name: string; icon: string | null; usual_time: string; show_on_planner: boolean; sort_order: number };
+/** A meal block (Lunch, Dinner): set in the Routine Manager. */
+export type MealTime = { id: string; name: string; icon: string | null; usual_time: string; minutes: number; sort_order: number };
+/** A meal block given to someone's kind of day. */
+export type MealTimeUse = { id: string; meal_time_id: string; member_id: string; day_type_id: string };
 export type MealCategory = {
   id: string;
   name: string;
   icon: string | null;
-  meal_time_ids: string[];
   active: boolean;
-  visibility: string;
+  /** The blank: no dishes, no cooking, no groceries (one per household). */
+  is_leftovers: boolean;
   sort_order: number;
 };
 export type MealTag = { id: string; name: string; icon: string | null };
@@ -29,7 +32,6 @@ export type Recipe = {
   notes: string | null;
   source_url: string | null;
   last_cooked_on: LocalDate | null;
-  visibility: string;
   category_ids: string[];
   tag_ids: string[];
   /** What it can fill in a meal: Main, Starch, Veggie… */
@@ -44,7 +46,6 @@ export type MenuMeal = {
   /** Blank: called after its first dish. */
   name: string | null;
   icon: string | null;
-  visibility: string;
   sort_order: number;
   category_ids: string[];
   spots: MenuSpot[];
@@ -71,8 +72,11 @@ export type Meal = {
   menu_name: string | null;
   menu_icon: string | null;
   dishes: MealDish[];
+  /** Moved on the calendar for this day only ("18:30"); null: the block's usual time. */
+  eat_at: string | null;
 };
-export type Preset = { id: string; weekday: number; meal_time_id: string; category_id: string };
+/** "Tuesday dinner is Tacos": a kind of meal, or one meal, on a weekday of a meal block. */
+export type Preset = { id: string; weekday: number; meal_time_id: string; category_id: string | null; menu_meal_id: string | null };
 export type MealMember = { id: string; name: string; colour: string; icon: string | null };
 
 export type Item = { id: string; name: string; icon: string | null; aisle: string };
@@ -105,14 +109,14 @@ export type BackupPart = {
   position: number;
 };
 
-const RECIPE_COLUMNS = "id, name, icon, serves, hands_on_minutes, total_minutes, is_backup, notes, source_url, last_cooked_on, visibility";
+const RECIPE_COLUMNS = "id, name, icon, serves, hands_on_minutes, total_minutes, is_backup, notes, source_url, last_cooked_on";
 
 /** Meal times, categories, variants, tags and the family: what every Meals screen needs. */
 export async function loadMealBasics() {
   const supabase = await createClient();
-  const [times, categories, recipes, links, tags, recipeTags, members, kinds, recipeKinds, menuMeals, spots, menuLinks] = await Promise.all([
-    supabase.from("meal_times").select("id, name, icon, usual_time, show_on_planner, sort_order").order("sort_order").order("name"),
-    supabase.from("meal_categories").select("id, name, icon, meal_time_ids, active, visibility, sort_order").order("sort_order").order("name"),
+  const [times, categories, recipes, links, tags, recipeTags, members, kinds, recipeKinds, menuMeals, spots, menuLinks, uses] = await Promise.all([
+    supabase.from("meal_times").select("id, name, icon, usual_time, minutes, sort_order").order("sort_order").order("name"),
+    supabase.from("meal_categories").select("id, name, icon, active, is_leftovers, sort_order").order("is_leftovers").order("sort_order").order("name"),
     supabase.from("recipes").select(RECIPE_COLUMNS).order("name"),
     supabase.from("recipe_categories").select("recipe_id, category_id"),
     supabase.from("meal_tags").select("id, name, icon").order("sort_order").order("name"),
@@ -120,11 +124,12 @@ export async function loadMealBasics() {
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
     supabase.from("dish_kinds").select("id, name, icon, sort_order").order("sort_order").order("name"),
     supabase.from("recipe_kinds").select("recipe_id, kind_id"),
-    supabase.from("menu_meals").select("id, name, icon, visibility, sort_order").order("sort_order").order("created_at"),
+    supabase.from("menu_meals").select("id, name, icon, sort_order").order("sort_order").order("created_at"),
     supabase.from("menu_meal_spots").select("id, menu_meal_id, position, kind_id, recipe_id, batches").order("position"),
     supabase.from("menu_meal_categories").select("menu_meal_id, category_id"),
+    supabase.from("meal_time_uses").select("id, meal_time_id, member_id, day_type_id"),
   ]);
-  for (const r of [times, categories, recipes, links, tags, recipeTags, members, kinds, recipeKinds, menuMeals, spots, menuLinks]) if (r.error) throw r.error;
+  for (const r of [times, categories, recipes, links, tags, recipeTags, members, kinds, recipeKinds, menuMeals, spots, menuLinks, uses]) if (r.error) throw r.error;
 
   const catsOf = new Map<string, string[]>();
   for (const l of links.data ?? []) catsOf.set(l.recipe_id, [...(catsOf.get(l.recipe_id) ?? []), l.category_id]);
@@ -139,6 +144,8 @@ export async function loadMealBasics() {
 
   return {
     mealTimes: (times.data ?? []).map((t) => ({ ...t, usual_time: t.usual_time.slice(0, 5) })) as MealTime[],
+    /** Which kinds of day have each meal block. */
+    mealTimeUses: (uses.data ?? []) as MealTimeUse[],
     categories: (categories.data ?? []) as MealCategory[],
     recipes: (recipes.data ?? []).map((r) => ({
       ...r,
@@ -163,7 +170,7 @@ export async function loadMeals(from: LocalDate, to: LocalDate): Promise<Meal[]>
   const { data, error } = await supabase
     .from("meals")
     .select(
-      "id, date, meal_time_id, category_id, recipe_id, servings, status, swapped_for_id, from_preset, sort_order, cook_id, menu_meal_id, meal_members(member_id), menu_meals(name, icon), meal_dishes(id, position, kind_id, recipe_id, batches, spot_position)",
+      "id, date, meal_time_id, category_id, recipe_id, servings, status, swapped_for_id, from_preset, sort_order, cook_id, menu_meal_id, eat_at, meal_members(member_id), menu_meals(name, icon), meal_dishes(id, position, kind_id, recipe_id, batches, spot_position)",
     )
     .gte("date", from)
     .lte("date", to)
@@ -186,12 +193,13 @@ export async function loadMeals(from: LocalDate, to: LocalDate): Promise<Meal[]>
     menu_name: (m.menu_meals as { name: string | null } | null)?.name ?? null,
     menu_icon: (m.menu_meals as { icon: string | null } | null)?.icon ?? null,
     dishes: (m.meal_dishes ?? []).toSorted((a, b) => a.position - b.position),
+    eat_at: m.eat_at ? m.eat_at.slice(0, 5) : null,
   }));
 }
 
 export async function loadPresets(): Promise<Preset[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("meal_presets").select("id, weekday, meal_time_id, category_id");
+  const { data, error } = await supabase.from("meal_presets").select("id, weekday, meal_time_id, category_id, menu_meal_id");
   if (error) throw error;
   return data ?? [];
 }

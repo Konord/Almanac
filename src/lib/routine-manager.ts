@@ -52,12 +52,48 @@ export type DraftUse = {
   day_type_id: string;
 };
 
-/** Everything on the Routine Manager. Steps are in order within each routine. */
+/**
+ * A meal block (Lunch, Dinner; Connor, 2026-11-11): when a meal is eaten
+ * and for how long. The weekly review shows it on the days someone has it.
+ */
+export type DraftMealBlock = {
+  id: string;
+  name: string;
+  icon: string | null;
+  /** "18:00" */
+  usual_time: string;
+  /** How long eating takes. */
+  minutes: number;
+  /**
+   * What goes on it each weekday (0 = Sunday … 6 = Saturday): "c:<id>" for a
+   * kind of meal (Tacos), "m:<id>" for one meal (Spaghetti), null for nothing.
+   */
+  presets: (string | null)[];
+};
+
+/** A meal block given to one person's kind of day. */
+export type DraftMealUse = {
+  id: string;
+  meal_id: string;
+  member_id: string;
+  day_type_id: string;
+};
+
+/** Everything on the Routine Manager. Steps are in order within each routine; meal blocks in their order. */
 export type ManagerDraft = {
   routines: DraftRoutine[];
   steps: DraftStep[];
   uses: DraftUse[];
+  meals: DraftMealBlock[];
+  mealUses: DraftMealUse[];
 };
+
+export const MEAL_MINUTES = { min: 10, max: 240 };
+
+/** No presets on any day. */
+export function noPresets(): (string | null)[] {
+  return [null, null, null, null, null, null, null];
+}
 
 export const ANCHORS: Anchor[] = ["wake", "bed", "meal", "clock"];
 
@@ -76,12 +112,22 @@ export function kindFor(routine: Pick<DraftRoutine, "anchor" | "usual_start">, m
 /** The first problem with a draft, in plain words, or null when it can be saved. */
 export function draftProblem(draft: ManagerDraft): string | null {
   const ids = new Set(draft.routines.map((r) => r.id));
+  const mealIds = new Set(draft.meals.map((m) => m.id));
+  for (const m of draft.meals) {
+    const name = m.name.trim();
+    if (!name) return "Every meal needs a name, like Dinner.";
+    if (name.length > 30) return `"${name.slice(0, 20)}…" is too long a name for a meal (30 letters at most).`;
+    if (!/^\d{2}:\d{2}$/.test(m.usual_time)) return `Choose a time for ${name}.`;
+    if (!(Number.isInteger(m.minutes) && m.minutes >= MEAL_MINUTES.min && m.minutes <= MEAL_MINUTES.max)) return `${name} should take between ${MEAL_MINUTES.min} and ${MEAL_MINUTES.max} minutes.`;
+    if (m.presets.length !== 7 || m.presets.some((p) => p !== null && !/^[cm]:/.test(p))) return `Something's wrong with ${name}'s presets. Undo and try again.`;
+  }
+  for (const u of draft.mealUses) if (!mealIds.has(u.meal_id)) return "A meal is given to someone but isn't there any more.";
   for (const r of draft.routines) {
     const name = r.name.trim();
     if (!name) return "Every routine needs a name.";
     if (name.length > 60) return `"${name.slice(0, 20)}…" is too long a name (60 letters at most).`;
     if (!ANCHORS.includes(r.anchor)) return `Choose when ${name} happens.`;
-    if (r.anchor === "meal" && !r.anchor_meal_time_id) return `Choose which meal ${name} comes after.`;
+    if (r.anchor === "meal" && !(r.anchor_meal_time_id && mealIds.has(r.anchor_meal_time_id))) return `Choose which meal ${name} comes after.`;
     if (r.anchor === "clock" && !(r.usual_start && /^\d{2}:\d{2}$/.test(r.usual_start))) return `Choose a time for ${name}.`;
     if (!(Number.isInteger(r.anchor_offset) && r.anchor_offset >= 0 && r.anchor_offset <= 240)) return `The gap for ${name} should be 0 to 240 minutes.`;
     if (!(Number.isInteger(r.usual_minutes) && r.usual_minutes >= 5 && r.usual_minutes <= 240)) return `${name} should take between 5 and 240 minutes.`;

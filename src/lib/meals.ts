@@ -137,7 +137,11 @@ export const EATING_MINUTES = 30;
  * no prep block: the cook gets a "Start dinner" task instead, `cookMinutes`
  * (the recipe's hands-on time, or a sensible default) before eating.
  */
-export function mealSlot(usualTime: string, recipe: { hands_on_minutes: number | null; total_minutes: number | null } | null): {
+export function mealSlot(
+  usualTime: string,
+  recipe: { hands_on_minutes: number | null; total_minutes: number | null } | null,
+  eatingMinutes: number = EATING_MINUTES,
+): {
   start: number;
   minutes: number;
   cookMinutes: number;
@@ -145,5 +149,5 @@ export function mealSlot(usualTime: string, recipe: { hands_on_minutes: number |
   const [h, m] = usualTime.split(":").map(Number);
   const eat = h * 60 + m;
   const cookMinutes = recipe?.hands_on_minutes ?? (recipe?.total_minutes ? Math.min(recipe.total_minutes, 60) : 30);
-  return { start: eat, minutes: EATING_MINUTES, cookMinutes: Math.min(cookMinutes, eat) };
+  return { start: eat, minutes: eatingMinutes, cookMinutes: Math.min(cookMinutes, eat) };
 }

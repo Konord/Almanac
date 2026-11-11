@@ -1,5 +1,6 @@
 "use client";
 
+import { blocksOn, storedEaters } from "@/lib/meal-blocks";
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CaretDown, CaretLeft, CaretRight, ShoppingCart, Sparkle, Suitcase } from "@phosphor-icons/react";
@@ -169,13 +170,32 @@ export function ReviewBoard({
         .map((cd) => ({ key: cd.id, label: cd.name, icon: cd.icon, pick: () => change((d) => addChoreDay(d, col.date, cd.id)) })),
     });
 
+  /**
+   * A day's meal tiles: each meal block someone has that day (from their
+   * kind of day, as changed in this review), plus any block that already
+   * has meals planned.
+   */
+  const slotsOn = (date: string) => {
+    const on = blocksOn(data.mealTimeUses, draft.dayTypes[date] ?? {});
+    return data.mealTimes
+      .map((t) => ({ time: t, meals: mealsIn(data.meals, draft, date, t.id) }))
+      .filter((slot) => on.has(slot.time.id) || slot.meals.length > 0);
+  };
+
   // The meal picker follows the draft, so it shows each change as it's made.
   const mealTarget: MealTarget | null = (() => {
     if (!mealAt) return null;
     const col = data.columns.find((c) => c.date === mealAt.date);
     const time = data.mealTimes.find((t) => t.id === mealAt.mealTimeId);
     const meal = mealAt.mealId ? (mealsIn(data.meals, draft, mealAt.date, mealAt.mealTimeId).find((m) => m.id === mealAt.mealId) ?? null) : null;
-    return { meal, date: mealAt.date, mealTimeId: mealAt.mealTimeId, where: `${time?.name ?? "Meal"} · ${col?.label ?? ""}` };
+    const eaters = blocksOn(data.mealTimeUses, draft.dayTypes[mealAt.date] ?? {}).get(mealAt.mealTimeId) ?? [];
+    return {
+      meal,
+      date: mealAt.date,
+      mealTimeId: mealAt.mealTimeId,
+      where: `${time?.name ?? "Meal"} · ${col?.label ?? ""}`,
+      eaters: storedEaters(eaters, data.members.map((m) => m.id)),
+    };
   })();
 
   // --- The screen ------------------------------------------------------------
@@ -226,7 +246,7 @@ export function ReviewBoard({
           const isOpen = openDay === col.date && !col.past;
           const groups = groupsOn(col.date);
           const chores = choresOn(col.date);
-          const slots = data.mealTimes.map((t) => ({ time: t, meals: mealsIn(data.meals, draft, col.date, t.id) }));
+          const slots = slotsOn(col.date);
           const roomy = slots.length <= 2;
           return (
             <section

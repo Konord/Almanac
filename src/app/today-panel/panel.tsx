@@ -230,7 +230,7 @@ export async function TodayPanel({
     .filter((m) => m.status === "planned")
     .map((m) => ({
       meal: m,
-      at: times.get(m.meal_time_id)?.usual_time ?? "18:00",
+      at: m.eat_at ?? times.get(m.meal_time_id)?.usual_time ?? "18:00",
       timeName: times.get(m.meal_time_id)?.name ?? "Meal",
     }))
     .filter((m) => m.meal.date > today || m.at >= hourAgo)

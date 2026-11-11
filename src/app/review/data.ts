@@ -51,10 +51,12 @@ export type ReviewData = {
   members: { id: string; name: string; colour: string; icon: string | null }[];
   dayTypes: { id: string; member_id: string; name: string; icon: string | null }[];
   choreDays: ChoreDay[];
-  /** The meal times shown as tiles on each day, in order. */
-  mealTimes: { id: string; name: string; icon: string | null }[];
-  /** Kinds of meal, and which meal times each suits (empty: any). */
-  categories: { id: string; name: string; icon: string | null; meal_time_ids: string[] }[];
+  /** The meal blocks (Lunch, Dinner), in order. A day shows the ones someone has that day. */
+  mealTimes: { id: string; name: string; icon: string | null; usual_time: string }[];
+  /** Which people's kinds of day have each meal block (from the Routine Manager). */
+  mealTimeUses: { meal_time_id: string; member_id: string; day_type_id: string }[];
+  /** Kinds of meal. Leftovers is the blank: no dishes, no cooking, no groceries. */
+  categories: { id: string; name: string; icon: string | null; is_leftovers: boolean }[];
   dishes: ReviewDish[];
   kinds: { id: string; name: string; icon: string | null }[];
   menuMeals: ReviewMenuMeal[];
@@ -122,7 +124,7 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     loadPickHistory(addDays(week, 7)),
   ]);
   const dishById = new Map(basics.recipes.map((r) => [r.id, r]));
-  const plannerTimes = basics.mealTimes.filter((t) => t.show_on_planner);
+  const plannerTimes = basics.mealTimes;
   const memberIds = routines.members.map((m) => m.id);
 
   const columns: ReviewColumn[] = dates.map((date) => {
@@ -135,8 +137,8 @@ export async function loadReview(household: Household, week: LocalDate, today: L
       meals
         .filter((m) => m.date === date && m.meal_time_id === t.id && m.status !== "skipped" && m.status !== "swapped")
         .map((m) => {
-          const start = zonedToUtc(date, t.usual_time, timeZone).getTime();
-          const end = start + EATING_MINUTES * 60_000;
+          const start = zonedToUtc(date, m.eat_at ?? t.usual_time, timeZone).getTime();
+          const end = start + (t.minutes || EATING_MINUTES) * 60_000;
           const eaters = m.member_ids.length > 0 ? m.member_ids : memberIds;
           const out = (id: string) =>
             timed.some(
@@ -187,8 +189,9 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     members: routines.members.map((m) => ({ id: m.id, name: m.name, colour: m.colour, icon: m.icon })),
     dayTypes: routines.dayTypes.map((t) => ({ id: t.id, member_id: t.member_id, name: t.name, icon: t.icon })),
     choreDays,
-    mealTimes: plannerTimes.map((t) => ({ id: t.id, name: t.name, icon: t.icon })),
-    categories: basics.categories.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, icon: c.icon, meal_time_ids: c.meal_time_ids })),
+    mealTimes: plannerTimes.map((t) => ({ id: t.id, name: t.name, icon: t.icon, usual_time: t.usual_time })),
+    mealTimeUses: basics.mealTimeUses.map((u) => ({ meal_time_id: u.meal_time_id, member_id: u.member_id, day_type_id: u.day_type_id })),
+    categories: basics.categories.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, icon: c.icon, is_leftovers: c.is_leftovers })),
     dishes: basics.recipes.map((r) => ({
       id: r.id,
       name: r.name,

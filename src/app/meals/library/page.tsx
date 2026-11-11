@@ -133,7 +133,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
             <Select name="meal" aria-label="Also a meal on the menu" defaultValue={kind && kind.id === mainKind?.id ? NONE : ""} className="w-[17rem]">
               <option value="">Just a dish</option>
               <option value={NONE}>Also a meal on the menu</option>
-              {basics.categories.map((c) => (
+              {basics.categories.filter((c) => !c.is_leftovers).map((c) => (
                 <option key={c.id} value={c.id}>
                   Also a meal under {c.name}
                 </option>
@@ -220,7 +220,7 @@ function ImportCard({ mode, basics, kindId, here }: { mode: "paste" | "link"; ba
             <Select name="meal" defaultValue="none">
               <option value="">Just a dish</option>
               <option value="none">Also a meal</option>
-              {basics.categories.map((c) => (
+              {basics.categories.filter((c) => !c.is_leftovers).map((c) => (
                 <option key={c.id} value={c.id}>
                   A meal under {c.name}
                 </option>
@@ -263,7 +263,6 @@ async function RecipeCard({
     serves: recipe.serves,
     hands_on_minutes: recipe.hands_on_minutes,
     total_minutes: recipe.total_minutes,
-    visibility: recipe.visibility,
     kind_ids: recipe.kind_ids,
     tag_ids: recipe.tag_ids,
     category_ids: recipe.category_ids,
@@ -277,7 +276,7 @@ async function RecipeCard({
       dish={dish}
       kinds={basics.kinds}
       tags={basics.tags}
-      categories={basics.categories.filter((c) => c.active)}
+      categories={basics.categories.filter((c) => c.active && !c.is_leftovers)}
       ingredients={ingredients}
       steps={steps}
       temperatureUnit={temperatureUnit}

@@ -11,6 +11,7 @@ import type { CalendarItem, Member } from "./types";
 import type { QuickDefaults } from "./forms";
 import { PlaceOnTimeline } from "@/components/place-on-timeline";
 import { DraggableEvent } from "@/components/draggable-event";
+import { DraggableMeal } from "@/components/draggable-meal";
 import { StretchBar } from "@/components/stretch-bar";
 import { PendingBlock } from "@/components/pending-block";
 
@@ -818,16 +819,36 @@ function WeekMealBlock({ meal, first, last, household, day }: { meal: WeekMeal; 
   const hh = String(Math.floor(meal.startMin / 60) % 24).padStart(2, "0");
   const mm = String(meal.startMin % 60).padStart(2, "0");
   const time = shortTime(zonedToUtc(day, `${hh}:${mm}`, household.settings.timeZone), household);
-  return (
-    <Link
-      href={meal.href}
-      title={`${meal.name}, ${time}${meal.cooked ? " (cooked)" : ""}. Tap to start cooking.`}
-      className={`absolute flex min-h-0 items-center gap-1.5 overflow-hidden rounded-xl bg-meal px-2 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`}
-      style={{ top: `${top}%`, height: `${height}%`, left: "4px", width: "calc(100% - 8px)" }}
-    >
+  const look = `absolute flex min-h-0 items-center gap-1.5 overflow-hidden rounded-xl bg-meal px-2 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`;
+  const body = (
+    <>
       <Emoji emoji={meal.icon} className="size-6.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate font-hand text-lg leading-none">{meal.name}</span>
-    </Link>
+    </>
+  );
+  if (meal.cooked) {
+    return (
+      <Link href={meal.href} title={`${meal.name}, ${time} (cooked)`} className={look} style={{ top: `${top}%`, height: `${height}%`, left: "4px", width: "calc(100% - 8px)" }}>
+        {body}
+      </Link>
+    );
+  }
+  // Dragging moves just this day's meal: to another time, or another day.
+  return (
+    <DraggableMeal
+      mealId={meal.id}
+      href={meal.href}
+      day={day}
+      start={meal.startMin}
+      minutes={Math.max(20, meal.endMin - meal.startMin)}
+      first={first}
+      last={last}
+      title={`${meal.name}, ${time}. Tap to start cooking, or drag to move this day's meal.`}
+      className={look}
+      style={{ left: "4px", width: "calc(100% - 8px)" }}
+    >
+      {body}
+    </DraggableMeal>
   );
 }
 

@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { AppFrame, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
-import type { ManagerDraft } from "@/lib/routine-manager";
+import { menuMealIcon, menuMealName } from "@/lib/menu";
+import { noPresets, type ManagerDraft } from "@/lib/routine-manager";
 import { DEFAULT_MINUTES } from "@/lib/routine-placement";
-import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
+import { loadMealBasics, loadPresets } from "../meals/data";
 import { loadRoutines } from "./data";
 import { RoutineManager } from "./manager";
 
@@ -26,12 +27,8 @@ export default function RoutinesPage() {
 async function Manager() {
   const household = await requireHousehold();
   const today = localDateOf(new Date(), household.settings.timeZone);
-  const supabase = await createClient();
-  const [data, mealTimes] = await Promise.all([
-    loadRoutines(today),
-    supabase.from("meal_times").select("id, name, usual_time").order("sort_order").order("name"),
-  ]);
-  if (mealTimes.error) throw mealTimes.error;
+  const [data, basics, presets] = await Promise.all([loadRoutines(today), loadMealBasics(), loadPresets()]);
+  const dishById = new Map(basics.recipes.map((r) => [r.id, r]));
 
   const initial: ManagerDraft = {
     routines: data.templates.map((t) => ({
@@ -59,6 +56,15 @@ async function Manager() {
     uses: data.assignments.flatMap((a) =>
       a.day_type_id ? [{ id: a.id, routine_id: a.template_id, member_id: a.member_id, day_type_id: a.day_type_id }] : [],
     ),
+    // Meal blocks (Lunch, Dinner) live here too (Connor, 2026-11-11).
+    meals: basics.mealTimes.map((t) => {
+      const days = noPresets();
+      for (const p of presets.filter((x) => x.meal_time_id === t.id)) {
+        days[p.weekday] = p.menu_meal_id ? `m:${p.menu_meal_id}` : p.category_id ? `c:${p.category_id}` : null;
+      }
+      return { id: t.id, name: t.name, icon: t.icon, usual_time: t.usual_time, minutes: t.minutes, presets: days };
+    }),
+    mealUses: basics.mealTimeUses.map((u) => ({ id: u.id, meal_id: u.meal_time_id, member_id: u.member_id, day_type_id: u.day_type_id })),
   };
 
   return (
@@ -68,7 +74,11 @@ async function Manager() {
       initial={initial}
       members={data.members.map((m) => ({ id: m.id, name: m.name, colour: m.colour, icon: m.icon }))}
       dayTypes={data.dayTypes}
-      mealTimes={(mealTimes.data ?? []).map((m) => ({ id: m.id, name: m.name, usual_time: m.usual_time.slice(0, 5) }))}
+      mealChoices={{
+        kinds: basics.categories.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
+        meals: basics.menuMeals.map((m) => ({ id: m.id, name: menuMealName(m, dishById), icon: menuMealIcon(m, dishById), categoryIds: m.category_ids })),
+      }}
+      weekStartsOn={household.settings.weekStartsOn}
       today={today}
       locale={household.settings.locale}
       flexMinutes={household.settings.routineFlexMinutes}

@@ -34,6 +34,8 @@ export type MealTarget = {
   mealTimeId: string;
   /** "Dinner · Tuesday 17" */
   where: string;
+  /** Who a new meal is for: the people with this meal block that day (empty: everyone). */
+  eaters: string[];
 };
 
 type Mode = { name: "kinds" } | { name: "meals"; categoryId: string } | { name: "plate" } | { name: "backups" };
@@ -75,7 +77,9 @@ export function MealBox({
   const known = new Set(dishes.map((d) => d.id));
   const lastPicks = new Map(Object.entries(data.lastPicks));
 
-  const startMode: Mode = !meal ? { name: "kinds" } : meal.dishes.length > 0 ? { name: "plate" } : meal.categoryId ? { name: "meals", categoryId: meal.categoryId } : { name: "kinds" };
+  const blankId = data.categories.find((c) => c.is_leftovers)?.id ?? null;
+  const startMode: Mode =
+    !meal ? { name: "kinds" } : meal.dishes.length > 0 ? { name: "plate" } : meal.categoryId && meal.categoryId !== blankId ? { name: "meals", categoryId: meal.categoryId } : { name: "kinds" };
   const [mode, setMode] = useState<Mode>(startMode);
   const [page, setPage] = useState(0);
   const go = (m: Mode) => {
@@ -83,12 +87,21 @@ export function MealBox({
     setPage(0);
   };
 
-  const categories = data.categories.filter((c) => c.meal_time_ids.length === 0 || c.meal_time_ids.includes(target.mealTimeId));
+  // Leftovers isn't a kind with meals in it: it has its own tile, last.
+  const categories = data.categories.filter((c) => !c.is_leftovers);
+  const blank = blankId ? data.categories.find((c) => c.id === blankId) : undefined;
   const category = new Map(data.categories.map((c) => [c.id, c]));
   const backups = dishes.filter((r) => r.is_backup);
 
   const base = (): DraftMeal =>
-    meal ?? { id: `new-${newId()}`, date: target.date, mealTimeId: target.mealTimeId, categoryId: null, menuMealId: null, dishes: [], memberIds: [] };
+    meal ?? { id: `new-${newId()}`, date: target.date, mealTimeId: target.mealTimeId, categoryId: null, menuMealId: null, dishes: [], memberIds: target.eaters };
+
+  /** Leftovers: a blank on the plan. No dishes, so no cooking, heads-ups or groceries. */
+  const pickBlank = () => {
+    if (!blankId) return;
+    onChange({ ...base(), categoryId: blankId, menuMealId: null, dishes: [] });
+    onClose();
+  };
 
   const pickMeal = (m: ReviewMenuMeal, categoryId: string | null) => {
     const next = { ...base(), categoryId, menuMealId: m.id, dishes: startDishes(m, lastPicks, known) };
@@ -122,14 +135,17 @@ export function MealBox({
   let body: React.ReactNode = null;
   let pages = 1;
   if (mode.name === "kinds") {
-    pages = Math.max(1, Math.ceil(categories.length / KINDS_PER_PAGE));
-    const shown = categories.slice(page * KINDS_PER_PAGE, (page + 1) * KINDS_PER_PAGE);
+    // Leftovers and Custom meal take the last two spots on every page.
+    const per = blank ? KINDS_PER_PAGE - 1 : KINDS_PER_PAGE;
+    pages = Math.max(1, Math.ceil(categories.length / per));
+    const shown = categories.slice(page * per, (page + 1) * per);
     body = (
       <div className="grid grid-cols-3 gap-3.5 sm:grid-cols-6">
         {shown.map((c) => {
           const n = mealsUnder(menuMeals, c.id).length;
           return <Tile key={c.id} icon={c.icon} label={c.name} note={n > 1 ? `${n} meals` : undefined} on={meal?.categoryId === c.id} onClick={() => pickCategory(c.id)} />;
         })}
+        {blank ? <Tile icon={blank.icon} label={blank.name} note="No cooking" on={meal?.categoryId === blank.id} onClick={pickBlank} /> : null}
         <CustomTile onClick={() => startCustom(null)} />
       </div>
     );
@@ -185,7 +201,7 @@ export function MealBox({
         dishes={dishes}
         dish={dish}
         kinds={data.kinds}
-        categories={data.categories}
+        categories={categories}
         members={members}
         onChange={onChange}
         onDish={(d) => setNewDishes((x) => [...x, d])}

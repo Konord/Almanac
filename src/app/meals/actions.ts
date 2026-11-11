@@ -7,10 +7,8 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { guessAisle, weekStartOf } from "@/lib/meals";
 import { parseRecipeHtml, parseRecipeText, type ImportedRecipe } from "@/lib/recipe-import";
-import { addDays, isLocalTime, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import { isVisibility } from "../calendar/options";
-import type { MealSetupDraft } from "./setup/draft";
-import { applyPresets, findOrCreateItem, nextFreeDate, seededDatesFrom, syncHeadsUps } from "./shared";
+import { addDays, isLocalDate, isLocalTime, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { findOrCreateItem, nextFreeDate, syncHeadsUps } from "./shared";
 
 /*
  * Every Meals change. Like the other screens: each action re-checks the
@@ -118,6 +116,23 @@ export async function removeMealForm(formData: FormData) {
   back(formData, "message", "Taken off the plan.", { meal: null });
 }
 
+/**
+ * A meal dragged on the calendar: this one meal moves to another time (or
+ * day). Its meal block's usual time stays the same (Connor, 2026-11-11).
+ */
+export async function moveMealThisDay(input: { mealId: string; date: string; time: string }): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if (!isLocalDate(input.date) || !isLocalTime(input.time)) return { error: "That time didn't work. Try again." };
+  const supabase = await createClient();
+  const { data: meal, error } = await supabase.from("meals").update({ date: input.date, eat_at: input.time }).eq("id", input.mealId).select("id, status").maybeSingle();
+  if (error) return { error: error.message };
+  if (!meal) return { error: "That meal isn't on the plan any more." };
+  await syncHeadsUps(household.id, meal.id, household.settings.timeZone);
+  await log(household.id, "meal_moved", "meal", meal.id, { date: input.date, time: input.time });
+  revalidatePath("/", "layout");
+  return {};
+}
+
 /** Finished cooking: remember it, and plan any leftovers for tomorrow's lunch. */
 export async function markCooked(formData: FormData) {
   const household = await requireHousehold();
@@ -131,15 +146,14 @@ export async function markCooked(formData: FormData) {
   if (cooked.length) await supabase.from("recipes").update({ last_cooked_on: meal.date }).in("id", cooked);
   if (leftovers && meal.recipe_id) {
     const { data: lunch } = await supabase.from("meal_times").select("id").ilike("name", "lunch").limit(1).maybeSingle();
-    const { data: cat } = await supabase.from("meal_categories").select("id").ilike("name", "leftovers").limit(1).maybeSingle();
-    if (lunch) {
-      // No dishes of its own, so the grocery list doesn't shop for leftovers.
+    const { data: cat } = await supabase.from("meal_categories").select("id").eq("is_leftovers", true).maybeSingle();
+    if (lunch && cat) {
+      // Leftovers are a blank: no dishes, so no cooking and nothing to shop for.
       await supabase.from("meals").insert({
         household_id: household.id,
         date: addDays(meal.date, 1),
         meal_time_id: lunch.id,
-        recipe_id: meal.recipe_id,
-        category_id: cat?.id ?? null,
+        category_id: cat.id,
         sort_order: 99,
       });
     }
@@ -153,56 +167,6 @@ export async function markCooked(formData: FormData) {
 // ---------------------------------------------------------------------------
 // Categories and variants
 // ---------------------------------------------------------------------------
-
-function readCategory(formData: FormData) {
-  const name = text(formData, "name");
-  if (!name) back(formData, "error", "A category needs a name.");
-  const visibility = text(formData, "visibility") || "everyone";
-  if (!isVisibility(visibility)) back(formData, "error", "Choose who can see it.");
-  return {
-    name: name.slice(0, 40),
-    icon: readIcon(formData),
-    meal_time_ids: formData.getAll("mealTimeIds").map(String).filter(Boolean),
-    visibility,
-  };
-}
-
-export async function addCategory(formData: FormData) {
-  const household = await requireHousehold();
-  const category = readCategory(formData);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("meal_categories")
-    .insert({ ...category, household_id: household.id, sort_order: 100 })
-    .select("id")
-    .single();
-  if (error) back(formData, "error", error.message);
-  refresh();
-  redirect(`/meals/menu?category=${data.id}&message=${encodeURIComponent(`Added ${category.name}.`)}`);
-}
-
-export async function updateCategory(formData: FormData) {
-  await requireHousehold();
-  const id = text(formData, "id");
-  const category = readCategory(formData);
-  const supabase = await createClient();
-  const { error } = await supabase.from("meal_categories").update(category).eq("id", id);
-  if (error) back(formData, "error", error.message);
-  refresh();
-  back(formData, "message", `Saved ${category.name}.`, { editCategory: null });
-}
-
-export async function removeCategory(formData: FormData) {
-  const household = await requireHousehold();
-  const id = text(formData, "id");
-  const name = text(formData, "name");
-  const supabase = await createClient();
-  const { error } = await supabase.from("meal_categories").delete().eq("id", id);
-  if (error) back(formData, "error", error.message);
-  await log(household.id, "meal_category_removed", "meal_category", id, { name });
-  refresh();
-  redirect(`/meals/menu?message=${encodeURIComponent(`Removed ${name}. Its meals are still on the menu.`)}`);
-}
 
 /**
  * A one-dish meal on the menu for a new dish ("Beef tacos" under Tacos), so
@@ -280,8 +244,6 @@ export async function saveDish(formData: FormData): Promise<DishSaveResult> {
   const total = wholeNumber(text(formData, "totalMinutes"), 0, 2880);
   if (Number.isNaN(serves) || serves === null) return fail("Serves should be 1 to 50.");
   if (Number.isNaN(handsOn) || Number.isNaN(total)) return fail("Minutes should be whole numbers, like 25.");
-  const visibility = text(formData, "visibility") || "everyone";
-  if (!isVisibility(visibility)) return fail("Choose who can see it.");
   const kindIds = formData.getAll("kindIds").map(String).filter(Boolean);
   const tagIds = formData.getAll("tagIds").map(String).filter(Boolean);
   const goesWith = formData.getAll("goesWith").map(String).filter(Boolean);
@@ -307,7 +269,6 @@ export async function saveDish(formData: FormData): Promise<DishSaveResult> {
       serves,
       hands_on_minutes: handsOn,
       total_minutes: total,
-      visibility,
       notes: text(formData, "notes").slice(0, 4000) || null,
       source_url: source || null,
     })
@@ -487,89 +448,6 @@ export async function importRecipe(formData: FormData) {
       `Brought in ${recipe.ingredients.length} ingredients and ${recipe.steps.length} steps. Check them, and keep the helpers you want.`,
     )}`,
   );
-}
-
-// ---------------------------------------------------------------------------
-// Setup: meal times and presets
-// ---------------------------------------------------------------------------
-
-/** Writes the preset grid, and puts any new presets into weeks already filled in. */
-async function writePresets(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  household: Awaited<ReturnType<typeof requireHousehold>>,
-  rows: { household_id: string; weekday: number; meal_time_id: string; category_id: string }[],
-): Promise<string | null> {
-  const { data: before } = await supabase.from("meal_presets").select("weekday, meal_time_id, category_id");
-  await supabase.from("meal_presets").delete().eq("household_id", household.id);
-  if (rows.length) {
-    const { error } = await supabase.from("meal_presets").insert(rows);
-    if (error) return error.message;
-  }
-  // New presets join weeks that were already filled in.
-  const had = new Set((before ?? []).map((p) => `${p.weekday}|${p.meal_time_id}|${p.category_id}`));
-  if (rows.some((r) => !had.has(`${r.weekday}|${r.meal_time_id}|${r.category_id}`))) {
-    const today = localDateOf(new Date(), household.settings.timeZone);
-    const dates = await seededDatesFrom(supabase, today);
-    // Only the new presets: a removed one shouldn't come back either.
-    await supabase.from("meal_presets").delete().eq("household_id", household.id);
-    const fresh = rows.filter((r) => !had.has(`${r.weekday}|${r.meal_time_id}|${r.category_id}`));
-    await supabase.from("meal_presets").insert(fresh);
-    await applyPresets(supabase, household.id, dates);
-    await supabase.from("meal_presets").delete().eq("household_id", household.id);
-    await supabase.from("meal_presets").insert(rows);
-  }
-  return null;
-}
-
-/**
- * The Meal times screen's one Save (2026-11-10): the meal times in their
- * order (ones taken off go, with their planned meals) and the preset grid.
- */
-export async function saveMealSetup(draft: MealSetupDraft): Promise<{ ok: true } | { ok: false; error: string }> {
-  const household = await requireHousehold();
-  if (draft.times.length === 0) return { ok: false, error: "Keep at least one meal time." };
-  for (const t of draft.times) {
-    if (!t.name.trim()) return { ok: false, error: "Every meal time needs a name, like Breakfast." };
-    if (!isLocalTime(t.usual)) return { ok: false, error: `Pick a time for ${t.name}.` };
-    if (t.icon && [...t.icon].length > 4) return { ok: false, error: "A picture should be one emoji, like 🌮." };
-  }
-  const supabase = await createClient();
-  const { data: now, error: readError } = await supabase.from("meal_times").select("id");
-  if (readError) return { ok: false, error: readError.message };
-
-  const keep = new Set(draft.times.map((t) => t.id));
-  const gone = (now ?? []).filter((r) => !keep.has(r.id)).map((r) => r.id);
-  if (gone.length) {
-    const { error } = await supabase.from("meal_times").delete().in("id", gone);
-    if (error) return { ok: false, error: error.message };
-  }
-  const ids = new Map<string, string>();
-  for (const [i, t] of draft.times.entries()) {
-    const row = { name: t.name.trim().slice(0, 30), icon: t.icon || null, usual_time: t.usual, show_on_planner: t.onPlanner, sort_order: i + 1 };
-    if (t.id.startsWith("new-")) {
-      const { data, error } = await supabase
-        .from("meal_times")
-        .insert({ ...row, household_id: household.id })
-        .select("id")
-        .single();
-      if (error) return { ok: false, error: error.message };
-      ids.set(t.id, data.id);
-    } else {
-      const { error } = await supabase.from("meal_times").update(row).eq("id", t.id);
-      if (error) return { ok: false, error: error.message };
-      ids.set(t.id, t.id);
-    }
-  }
-
-  const rows = Object.entries(draft.presets).flatMap(([key, categoryId]) => {
-    const [weekday, timeId] = key.split("|");
-    const mealTimeId = ids.get(timeId);
-    return mealTimeId && categoryId && /^[0-6]$/.test(weekday) ? [{ household_id: household.id, weekday: Number(weekday), meal_time_id: mealTimeId, category_id: categoryId }] : [];
-  });
-  const problem = await writePresets(supabase, household, rows);
-  if (problem) return { ok: false, error: problem };
-  refresh();
-  return { ok: true };
 }
 
 export async function setItemAisle(formData: FormData) {

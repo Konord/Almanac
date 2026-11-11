@@ -7,7 +7,6 @@ import { X } from "@phosphor-icons/react";
 import { Chips, Emoji, Field, Input } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton } from "@/components/unsaved-changes";
-import { VISIBILITY_OPTIONS } from "../calendar/options";
 import { saveDish } from "./actions";
 import { BLANK_INGREDIENT, IngredientsEditor, StepsEditor, type EditingStep, type IngredientDraft, type StepDraft } from "./recipe-editors";
 
@@ -35,7 +34,6 @@ export type EditableDish = {
   serves: number;
   hands_on_minutes: number | null;
   total_minutes: number | null;
-  visibility: string;
   kind_ids: string[];
   tag_ids: string[];
   /** Kinds of meal it goes with: offered first in their side spots. */
@@ -234,7 +232,6 @@ export function DishEditor({
                     </Field>
                   </div>
                   <p className="-mt-3 text-base text-ink-muted">Hands-on time is how early the meal shows on Today, so you start in time.</p>
-                  <Chips name="visibility" label="Who can see it" defaultValue={dish.visibility} options={VISIBILITY_OPTIONS} />
                 </div>
                 <div className="flex flex-col gap-5">
                   <Chips

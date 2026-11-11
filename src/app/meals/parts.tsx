@@ -27,11 +27,10 @@ export function MealsHeader({
 }) {
   return (
     <>
+      {/* The tabs sit straight after the title on every Menu Manager screen, so they never move. */}
       <ScreenHeader title={title}>
-        {children}
-        <div className="lg:ml-auto">
-          <Segmented label="Menu Manager" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
-        </div>
+        <Segmented label="Menu Manager" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
+        {children ? <div className="flex items-center gap-4 lg:ml-auto">{children}</div> : null}
       </ScreenHeader>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}

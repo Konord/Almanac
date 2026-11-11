@@ -472,11 +472,9 @@ function PeopleTimeline({
                       meal={meal}
                       date={today}
                       household={household}
-                      style={{
-                        top: `calc(${top}% + 3px)`,
-                        height: `calc(${height}% - 6px)`,
-                        ...spanBox(block.c0, block.c1, columns.length, COLUMN_GAP, block.lane, block.lanes),
-                      }}
+                      first={first}
+                      last={last}
+                      style={spanBox(block.c0, block.c1, columns.length, COLUMN_GAP, block.lane, block.lanes)}
                     />
                   </div>
                 );
