@@ -7,6 +7,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { HeaderClock } from "@/components/header-clock";
+import { AppAlerts } from "@/components/app-alerts";
 import { strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
@@ -311,6 +312,8 @@ export async function TodayPanel({
         <span className="text-3xl font-bold">
           <HeaderClock locale={locale} timeZone={timeZone} />
         </span>
+        {/* A server app that stopped answering (kitchen screen only). */}
+        <AppAlerts />
       </div>
 
       {/* 2. The working part: the daily list, Up next or a list. */}
