@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Bell, CalendarCheck, Car, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
@@ -182,11 +183,12 @@ type TabProps = {
 function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekdays: { value: number; short: string; long: string }[]; today: string }) {
   const rows = members.flatMap((m) => draft.weekPlans.filter((p) => p.member_id === m.id).map((plan) => ({ member: m, plan })));
   const [page, setPage] = useState(0);
+  const [rowsRef, rowsPerPage] = useFitRows<HTMLDivElement>(ROWS_PER_PAGE);
   const [picking, setPicking] = useState<{ plan: string; weekday: number } | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
-  const pages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
   const at = Math.min(page, pages - 1);
-  const shown = rows.slice(at * ROWS_PER_PAGE, at * ROWS_PER_PAGE + ROWS_PER_PAGE);
+  const shown = rows.slice(at * rowsPerPage, at * rowsPerPage + rowsPerPage);
   const selected = rows.find((r) => r.plan.id === chosen) ?? null;
 
   const setDay = (planId: string, weekday: number, dayTypeId: string) =>
@@ -203,7 +205,7 @@ function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekd
             </span>
           ))}
         </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+        <div ref={rowsRef} className="flex min-h-0 flex-1 flex-col gap-1.5">
           {shown.map(({ member, plan }, rowIndex) => {
             const plans = draft.weekPlans.filter((p) => p.member_id === member.id);
             const settings = draft.members.find((x) => x.member_id === member.id);

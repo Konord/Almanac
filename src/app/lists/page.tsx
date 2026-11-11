@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { FitList } from "@/components/fit-list";
 import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
@@ -66,7 +67,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const showingDone = firstParam(params.done) === "1";
-  const page = Math.max(0, Number(firstParam(params.page) ?? 0) || 0);
 
   return (
     <>
@@ -189,26 +189,31 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
             <div className="flex flex-col lg:min-h-0 lg:flex-1">
               {showingDone ? (
                 <>
-                  <ul className="flex flex-col">
-                    {pageOf(done, page, LIST_PAGE).map((t) => (
+                  <FitList
+                    key={`${list.id}-done`}
+                    fallback={LIST_PAGE}
+                    rows={done.map((t) => (
                       <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo={returnTo} />
                     ))}
-                  </ul>
-                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
-                    <SoftLink href={here()}>Back to the list</SoftLink>
-                    <Pager count={done.length} page={page} perPage={LIST_PAGE} href={(p) => here(`&done=1&page=${p}`)} />
-                    <form action={clearDone} className="ml-auto">
-                      <input type="hidden" name="listId" value={list.id} />
-                      <input type="hidden" name="returnTo" value={returnTo} />
-                      <Button variant="secondary">Clear the done ones</Button>
-                    </form>
-                  </div>
+                    footer={
+                      <>
+                        <SoftLink href={here()}>Back to the list</SoftLink>
+                        <form action={clearDone} className="ml-auto">
+                          <input type="hidden" name="listId" value={list.id} />
+                          <input type="hidden" name="returnTo" value={returnTo} />
+                          <Button variant="secondary">Clear the done ones</Button>
+                        </form>
+                      </>
+                    }
+                  />
                 </>
               ) : (
                 <>
                   {open.length === 0 ? <p className="py-4 text-xl text-ink-muted">Nothing on this list. Add something above.</p> : null}
-                  <ul className="flex flex-col">
-                    {pageOf(open, page, LIST_PAGE).map((t) => (
+                  <FitList
+                    key={list.id}
+                    fallback={LIST_PAGE}
+                    rows={open.map((t) => (
                       <TodoRow
                         key={t.id}
                         todo={t}
@@ -220,11 +225,8 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                         plannedOn={plannedOn}
                       />
                     ))}
-                  </ul>
-                  <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
-                    <Pager count={open.length} page={page} perPage={LIST_PAGE} href={(p) => here(`&page=${p}`)} />
-                    {done.length > 0 ? <SoftLink href={here("&done=1")}>Done ({done.length})</SoftLink> : null}
-                  </div>
+                    footer={done.length > 0 ? <SoftLink href={here("&done=1")}>Done ({done.length})</SoftLink> : undefined}
+                  />
                 </>
               )}
             </div>
@@ -312,34 +314,6 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
   );
 }
 
-/* Long lists turn into pages, so nothing scrolls on the wall screen. */
+/* Long lists turn into pages, so nothing scrolls on the wall screen. Before the list is measured: */
 const LIST_PAGE = 8;
 
-function pageOf<T>(items: T[], page: number, perPage: number): T[] {
-  const last = Math.max(0, Math.ceil(items.length / perPage) - 1);
-  const p = Math.min(page, last);
-  return items.slice(p * perPage, p * perPage + perPage);
-}
-
-function Pager({ count, page, perPage, href }: { count: number; page: number; perPage: number; href: (page: number) => string }) {
-  const pages = Math.ceil(count / perPage);
-  if (pages <= 1) return null;
-  const p = Math.min(page, pages - 1);
-  return (
-    <span className="flex items-center gap-2 text-base font-bold">
-      {p > 0 ? (
-        <Link href={href(p - 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
-          ‹
-        </Link>
-      ) : null}
-      <span className="text-ink-muted">
-        {p * perPage + 1}–{Math.min(count, (p + 1) * perPage)} of {count}
-      </span>
-      {p < pages - 1 ? (
-        <Link href={href(p + 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
-          More ›
-        </Link>
-      ) : null}
-    </span>
-  );
-}

@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, CalendarCheck, CaretLeft, CaretRight, Minus, Plus, Trash, X } from "@phosphor-icons/react";
 import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
@@ -153,6 +154,7 @@ export function ChoreManager({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dayPage, setDayPage] = useState(0);
+  const [daysRef, daysPerPage] = useFitRows<HTMLUListElement>(DAYS_PER_PAGE);
   const dirty = !sameDraft(draft, initial);
   const guard = useUnsavedChanges(dirty);
 
@@ -169,8 +171,8 @@ export function ChoreManager({
   const timeLabel = (t: string) => wallTime(t, locale);
 
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
-  const dayPages = Math.max(1, Math.ceil(days.length / DAYS_PER_PAGE));
-  const shownDays = days.slice(Math.min(dayPage, dayPages - 1) * DAYS_PER_PAGE, (Math.min(dayPage, dayPages - 1) + 1) * DAYS_PER_PAGE);
+  const dayPages = Math.max(1, Math.ceil(days.length / daysPerPage));
+  const shownDays = days.slice(Math.min(dayPage, dayPages - 1) * daysPerPage, (Math.min(dayPage, dayPages - 1) + 1) * daysPerPage);
   const hardCount = draft.occasional.filter((c) => info[c.id]?.hard && c.active).length;
   const nextUp = draft.occasional
     .filter((c) => c.active && info[c.id] && !info[c.id].hard && !info[c.id].onToday)
@@ -217,7 +219,7 @@ export function ChoreManager({
     const day: DraftChoreDay = { id, name: "New chore day", icon: null, weekdays: free === undefined ? [] : [free], span: false, restrictive: false, max_tasks: 3, max_big: 1, is_free: false, errands: false };
     update((d) => ({ ...d, days: [...d.days.filter((x) => !x.is_free), day, ...d.days.filter((x) => x.is_free)] }));
     setSelection({ kind: "day", id });
-    setDayPage(Math.floor(days.filter((x) => !x.is_free).length / DAYS_PER_PAGE));
+    setDayPage(Math.floor(days.filter((x) => !x.is_free).length / daysPerPage));
   };
 
   return (
@@ -260,7 +262,7 @@ export function ChoreManager({
           <span className="flex-1">Chore days</span>
           <span className="text-lg text-ink-muted">{days.length}</span>
         </h2>
-        <ul className="flex flex-col gap-1">
+        <ul ref={daysRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
           {shownDays.map((d) => {
             const count = draft.regular.filter((c) => c.chore_day_id === d.id).length;
             const active = selection.kind === "day" && selection.id === d.id;
@@ -369,6 +371,7 @@ function DayPanel({
   const day = draft.days.find((d) => d.id === dayId);
   const [open, setOpen] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [regularRef, fitRegular] = useFitRows<HTMLUListElement>(REGULAR_PER_PAGE);
   const [name, setName] = useState("");
   const [who, setWho] = useState("");
   const [time, setTime] = useState("");
@@ -379,7 +382,7 @@ function DayPanel({
 
   const regular = draft.regular.filter((c) => c.chore_day_id === day.id);
   // An open row takes the room of two.
-  const perPage = open ? REGULAR_PER_PAGE - 2 : REGULAR_PER_PAGE;
+  const perPage = open ? Math.max(1, fitRegular - 2) : fitRegular;
   const pages = Math.max(1, Math.ceil(regular.length / perPage));
   const p = Math.min(page, pages - 1);
   const shown = regular.slice(p * perPage, (p + 1) * perPage);
@@ -477,7 +480,7 @@ function DayPanel({
               Nothing yet. Add the chores that happen every time this day comes round, like &ldquo;Wash the bed sheets&rdquo;. A due time is optional.
             </p>
           ) : null}
-          <ul className="flex flex-col">
+          <ul ref={regularRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {shown.map((c) => {
               const person = c.assignee_id ? memberById.get(c.assignee_id) : undefined;
               if (open === c.id)
@@ -654,10 +657,11 @@ function OccasionalPanel({
     return at > 0 ? Math.floor(at / OCCASIONAL_PER_PAGE) : 0;
   });
   const [busy, setBusy] = useState<string | null>(null);
+  const [occasionalRef, occasionalPerPage] = useFitRows<HTMLUListElement>(OCCASIONAL_PER_PAGE);
   const tab = tabs.find((t) => t.season === season) ?? tabs[0];
-  const pages = Math.max(1, Math.ceil(tab.chores.length / OCCASIONAL_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(tab.chores.length / occasionalPerPage));
   const p = Math.min(page, pages - 1);
-  const shown = tab.chores.slice(p * OCCASIONAL_PER_PAGE, (p + 1) * OCCASIONAL_PER_PAGE);
+  const shown = tab.chores.slice(p * occasionalPerPage, (p + 1) * occasionalPerPage);
   const dayById = new Map(draft.days.map((d) => [d.id, d]));
 
   const ruleText = (c: DraftOccasional) => {
@@ -698,7 +702,7 @@ function OccasionalPanel({
     update((d) => ({ ...d, occasional: [...d.occasional, chore] }));
     setChoreId(id);
     setSeason(tabs[0].season);
-    setPage(Math.floor(tabs[0].chores.length / OCCASIONAL_PER_PAGE));
+    setPage(Math.floor(tabs[0].chores.length / occasionalPerPage));
   };
 
   const plus = async (id: string) => {
@@ -730,7 +734,7 @@ function OccasionalPanel({
           ))}
         </div>
         {tab.chores.length === 0 ? <p className="py-3 text-lg text-ink-muted">Nothing comes due in {tab.label.toLowerCase()}.</p> : null}
-        <ul className="flex flex-col">
+        <ul ref={occasionalRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {shown.map(({ chore: c }) => {
             const i = info[c.id];
             const isNew = c.id.startsWith(NEW_PREFIX);

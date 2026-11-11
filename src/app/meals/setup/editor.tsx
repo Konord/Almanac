@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
 import { Card, Emoji, ScreenHeader, Segmented } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { saveMealSetup } from "../actions";
 import { MENU_TABS } from "../menu-tabs";
@@ -29,6 +30,7 @@ export function MealSetupEditor({ initial, categories, weekStartsOn }: { initial
   const [draft, setDraft] = useState<MealSetupDraft>(initial);
   const [tab, setTab] = useState<Tab>("times");
   const [page, setPage] = useState(0);
+  const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -52,7 +54,7 @@ export function MealSetupEditor({ initial, categories, weekStartsOn }: { initial
     }));
   const add = () => {
     update((d) => ({ ...d, times: [...d.times, { id: newId(), name: "", icon: null, usual: "12:00", onPlanner: true }] }));
-    setPage(Math.floor(draft.times.length / PER_PAGE));
+    setPage(Math.floor(draft.times.length / perPage));
   };
 
   const save = async (then?: string | null) => {
@@ -71,9 +73,9 @@ export function MealSetupEditor({ initial, categories, weekStartsOn }: { initial
     setError(null);
   };
 
-  const pages = Math.max(1, Math.ceil(draft.times.length / PER_PAGE));
+  const pages = Math.max(1, Math.ceil(draft.times.length / perPage));
   const p = Math.min(page, pages - 1);
-  const shown = draft.times.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
+  const shown = draft.times.slice(p * perPage, (p + 1) * perPage);
   const presetTimes = draft.times.filter((t) => t.onPlanner).slice(0, 5);
   const days = Array.from({ length: 7 }, (_, i) => (i + weekStartsOn) % 7);
 
@@ -125,9 +127,9 @@ export function MealSetupEditor({ initial, categories, weekStartsOn }: { initial
           }
         >
           <p className="mb-3 text-lg text-ink-muted">Each meal time is a row in the weekly review. Taking one away also takes away the meals planned in it.</p>
-          <ul className="flex flex-col gap-2.5">
+          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden">
             {shown.map((t, k) => {
-              const i = p * PER_PAGE + k;
+              const i = p * perPage + k;
               return (
                 <li key={t.id} className="flex items-center gap-3 rounded-2xl bg-rail p-2.5">
                   <EmojiPicker initial={t.icon ?? ""} fieldName="" nameText={t.name} onChange={(icon) => setTime(t.id, { icon: icon || null })} label={`Picture for ${t.name || "this meal time"}`} fullScreen />

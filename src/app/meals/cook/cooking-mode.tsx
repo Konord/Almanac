@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useFitRows } from "@/components/use-fit-rows";
 import Link from "next/link";
 import { ArrowLeft, CaretLeft, CaretRight, Check, X } from "@phosphor-icons/react";
 import { emojiImage } from "@/lib/emoji";
@@ -77,6 +78,7 @@ export function CookingMode({
   const [batchesOf, setBatchesOf] = useState<number[]>(() => dishes.map((d) => d.batches));
   const [ticked, setTicked] = useState<string[]>([]);
   const [ingredientPage, setIngredientPage] = useState(0);
+  const [ingredientsRef, ingredientsPerPage] = useFitRows<HTMLUListElement>(INGREDIENT_PAGE);
   const [finishing, setFinishing] = useState(false);
   const dish = dishes[active];
   const { name, icon, notes, ingredients, steps } = dish;
@@ -96,7 +98,7 @@ export function CookingMode({
   const doneness = steps.flatMap((s) => s.helpers.filter((h) => h.kind === "doneness"));
   const stepTimers = current?.helpers.filter((h) => h.kind === "timer") ?? [];
 
-  const pages = Math.max(1, Math.ceil(ingredients.length / INGREDIENT_PAGE));
+  const pages = Math.max(1, Math.ceil(ingredients.length / ingredientsPerPage));
   const iPage = Math.min(ingredientPage, pages - 1);
 
   return (
@@ -149,8 +151,8 @@ export function CookingMode({
         <section className="flex min-h-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame p-4">
           <h2 className="text-2xl font-bold text-ink">Ingredients</h2>
           {batches > 1 ? <p className="text-base text-ink-muted">Everything ×{batches}, for {batches} batches.</p> : null}
-          <ul className="flex min-h-0 flex-1 flex-col gap-1.5">
-            {ingredients.slice(iPage * INGREDIENT_PAGE, (iPage + 1) * INGREDIENT_PAGE).map((ing) => {
+          <ul ref={ingredientsRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
+            {ingredients.slice(iPage * ingredientsPerPage, (iPage + 1) * ingredientsPerPage).map((ing) => {
               const done = ticked.includes(ing.id);
               const scaled = batchAmount(ing.amount, batches);
               const amount = measureText(scaled, ing.unit);

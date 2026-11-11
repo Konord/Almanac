@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FitList } from "@/components/fit-list";
 import Link from "next/link";
 import { BookOpen, DownloadSimple, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
 import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
@@ -47,7 +48,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   const kind: DishKind | undefined = basics.kinds.find((k) => k.id === kindParam);
   const picked = kind ? kind.id : kindParam === NONE ? NONE : ALL;
 
-  const current = { kind: p("kind") ?? null, kpage: p("kpage") ?? null, dpage: p("dpage") ?? null };
+  const current = { kind: p("kind") ?? null, kpage: p("kpage") ?? null };
   const here = linker("/meals/library", current);
   const returnTo = here({ recipe: p("recipe") ?? null, tab: p("tab") ?? null, batches: p("batches") ?? null });
 
@@ -58,7 +59,6 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   ];
   const tilePage = pageOf(tiles, Number(p("kpage") ?? 0), KIND_PAGE);
   const list = picked === ALL ? dishes : picked === NONE ? loose : dishes.filter((r) => r.kind_ids.includes(picked));
-  const dishPage = pageOf(list, Number(p("dpage") ?? 0), DISH_PAGE);
   const tagById = new Map(basics.tags.map((t) => [t.id, t]));
   const kindById = new Map(basics.kinds.map((k) => [k.id, k]));
   const pickedName = picked === ALL ? "All dishes" : picked === NONE ? "No kind" : (kind?.name ?? "");
@@ -82,7 +82,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
             {tilePage.items.map((t) => (
               <Link
                 key={t.id}
-                href={here({ kind: t.id === ALL ? null : t.id, dpage: null })}
+                href={here({ kind: t.id === ALL ? null : t.id })}
                 scroll={false}
                 className={`flex min-h-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 text-center ${t.id === picked ? "border-meal-ink bg-meal" : "border-frame hover:bg-rail"}`}
               >
@@ -100,8 +100,12 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
         </Card>
 
         <Card title={pickedName}>
-          <ul className="mt-2 flex min-h-0 flex-1 flex-col gap-2">
-            {dishPage.items.map((r) => (
+          <FitList
+            key={picked}
+            fallback={DISH_PAGE}
+            className="mt-2 gap-2"
+            empty={<li className="text-lg text-ink-muted">No dishes here yet. Add the first one below.</li>}
+            rows={list.map((r) => (
               <li key={r.id}>
                 <Link href={here({ recipe: r.id, tab: "recipe" })} scroll={false} className="flex min-h-18 items-center gap-3 rounded-2xl bg-rail px-4 hover:bg-panel">
                   <Emoji emoji={r.icon ?? kindById.get(r.kind_ids[0] ?? "")?.icon} className="size-12" />
@@ -121,9 +125,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
                 </Link>
               </li>
             ))}
-            {list.length === 0 ? <li className="text-lg text-ink-muted">No dishes here yet. Add the first one below.</li> : null}
-          </ul>
-          <Pager page={dishPage.page} pages={dishPage.pages} href={(n) => here({ dpage: n || null })} />
+          />
           <form action={addRecipe} className="mt-3 flex shrink-0 items-end gap-2">
             <input type="hidden" name="returnTo" value={returnTo} />
             <input type="hidden" name="kindId" value={kind?.id ?? ""} />

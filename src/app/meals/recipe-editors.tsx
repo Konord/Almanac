@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFitRows } from "@/components/use-fit-rows";
 import { CaretLeft, CaretRight, Plus, Trash, X } from "@phosphor-icons/react";
 import { helperText, spotHelpers, type Helper } from "@/lib/meal-helpers";
 
@@ -41,14 +42,15 @@ export const BLANK_INGREDIENT: IngredientDraft = { amount: "", unit: "", name: "
 
 export function IngredientsEditor({ rows, setRows }: { rows: IngredientDraft[]; setRows: (change: (rows: IngredientDraft[]) => IngredientDraft[]) => void }) {
   const [page, setPage] = useState(0);
-  const pages = Math.max(1, Math.ceil(rows.length / INGREDIENT_PAGE));
+  const [listRef, perPage] = useFitRows<HTMLDivElement>(INGREDIENT_PAGE);
+  const pages = Math.max(1, Math.ceil(rows.length / perPage));
   const p = Math.min(page, pages - 1);
-  const from = p * INGREDIENT_PAGE;
+  const from = p * perPage;
 
   const change = (i: number, patch: Partial<IngredientDraft>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
   const add = () => {
     setRows((r) => [...r, BLANK_INGREDIENT]);
-    setPage(Math.floor(rows.length / INGREDIENT_PAGE));
+    setPage(Math.floor(rows.length / perPage));
   };
 
   return (
@@ -61,8 +63,8 @@ export function IngredientsEditor({ rows, setRows }: { rows: IngredientDraft[]; 
         <span title="Fresh things to put away if the meal is swapped">Put away if swapped</span>
         <span />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2">
-        {rows.slice(from, from + INGREDIENT_PAGE).map((row, k) => {
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+        {rows.slice(from, from + perPage).map((row, k) => {
           const i = from + k;
           return (
             <div key={i} className="grid grid-cols-[7rem_8rem_minmax(0,1fr)_minmax(0,0.8fr)_10rem_3.5rem] items-center gap-2">

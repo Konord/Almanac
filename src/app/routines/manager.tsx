@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
 import { Avatar, EmptyState, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
 import { EATING_MINUTES } from "@/lib/meals";
@@ -108,6 +109,7 @@ export function RoutineManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [stepPage, setStepPage] = useState(0);
+  const [stepsRef, stepsPerPage] = useFitRows<HTMLUListElement>(STEPS_PER_PAGE);
   const [whoOpen, setWhoOpen] = useState<string | null>(null);
   /** A line under the routine's name: what just happened, or why something wasn't allowed. */
   const [note, setNote] = useState<{ text: string; warn: boolean } | null>(null);
@@ -219,7 +221,7 @@ export function RoutineManager({
       ...d,
       steps: [...d.steps, { id: newId(), routine_id: routine.id, text: text.trim(), icon: icon || null, habit: true, member_ids: [], daily_list: onList }],
     }));
-    setStepPage(Math.floor(steps.length / STEPS_PER_PAGE));
+    setStepPage(Math.floor(steps.length / stepsPerPage));
   };
   const removeRoutine = () => {
     if (!routine) return;
@@ -386,7 +388,7 @@ export function RoutineManager({
   /** Everyone who has the selected routine, for the step "who does it" buttons. */
   const people = routine ? routinePeople(draft, routine.id).flatMap((id) => members.filter((m) => m.id === id)) : [];
   const listState = dailyListState(steps);
-  const pages = Math.max(1, Math.ceil(steps.length / STEPS_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(steps.length / stepsPerPage));
   const page = Math.min(stepPage, pages - 1);
 
   return (
@@ -599,9 +601,10 @@ export function RoutineManager({
               </div>
 
               {/* Steps, in order */}
-              <ul className="mt-3 flex flex-col gap-1.5">
-                {steps.slice(page * STEPS_PER_PAGE, page * STEPS_PER_PAGE + STEPS_PER_PAGE).map((step, i) => {
-                  const index = page * STEPS_PER_PAGE + i;
+              {steps.length === 0 ? <p className="mt-2 text-base text-ink-muted">No steps yet. Add the first one below.</p> : null}
+              <ul ref={stepsRef} className="mt-3 flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
+                {steps.slice(page * stepsPerPage, page * stepsPerPage + stepsPerPage).map((step, i) => {
+                  const index = page * stepsPerPage + i;
                   return (
                     <li key={step.id} className="relative flex items-center gap-1.5">
                       <EmojiPicker
@@ -661,7 +664,6 @@ export function RoutineManager({
                   );
                 })}
               </ul>
-              {steps.length === 0 ? <p className="mt-2 text-base text-ink-muted">No steps yet. Add the first one below.</p> : null}
               <div className="mt-1.5 flex items-center gap-3 text-base font-bold">
                 {pages > 1 ? (
                   <>
@@ -669,7 +671,7 @@ export function RoutineManager({
                       ‹ Earlier
                     </button>
                     <span className="text-ink-muted">
-                      Steps {page * STEPS_PER_PAGE + 1}–{Math.min(steps.length, (page + 1) * STEPS_PER_PAGE)} of {steps.length}
+                      Steps {page * stepsPerPage + 1}–{Math.min(steps.length, (page + 1) * stepsPerPage)} of {steps.length}
                     </span>
                     <button type="button" disabled={page === pages - 1} onClick={() => setStepPage(page + 1)} className="flex min-h-10 items-center rounded-xl bg-rail px-3 text-ink disabled:opacity-40">
                       More ›
