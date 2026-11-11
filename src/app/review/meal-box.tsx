@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { ArrowLeft, ArrowsClockwise, Plus, Trash, X } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
+import { newId } from "@/lib/ids";
 import { BATCHES } from "@/lib/meals";
 import { dishesOfKind, mainDish, mealsUnder, startDishes, type DraftDish } from "@/lib/menu";
 import type { DraftMeal } from "@/lib/weekly-review";
@@ -87,7 +88,7 @@ export function MealBox({
   const backups = dishes.filter((r) => r.is_backup);
 
   const base = (): DraftMeal =>
-    meal ?? { id: `new-${crypto.randomUUID()}`, date: target.date, mealTimeId: target.mealTimeId, categoryId: null, menuMealId: null, dishes: [], memberIds: [] };
+    meal ?? { id: `new-${newId()}`, date: target.date, mealTimeId: target.mealTimeId, categoryId: null, menuMealId: null, dishes: [], memberIds: [] };
 
   const pickMeal = (m: ReviewMenuMeal, categoryId: string | null) => {
     const next = { ...base(), categoryId, menuMealId: m.id, dishes: startDishes(m, lastPicks, known) };
