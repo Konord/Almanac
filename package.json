@@ -10,7 +10,7 @@
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
     "test:db": "supabase test db",
-    "test": "node --test \"src/**/*.test.ts\""
+    "test": "node --test \"src/**/*.test.ts\" \"launcher-helper/*.test.ts\""
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

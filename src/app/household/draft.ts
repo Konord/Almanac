@@ -1,3 +1,5 @@
+import { appsProblem, type AppDraft } from "../../lib/launcher.ts";
+
 /*
  * The Settings screen keeps every change here until its one Save (Connor,
  * 2026-11-07: one Save per screen). People and household settings are
@@ -34,6 +36,8 @@ export type SettingsDraft = {
   reviewTime: string;
   panelBoxes: string[];
   members: MemberDraft[];
+  /** The kitchen screen's apps (Apps tab), in tray order. */
+  apps: AppDraft[];
 };
 
 export const isNewId = (id: string) => id.startsWith("new-");
@@ -58,5 +62,5 @@ export function draftProblem(d: SettingsDraft): string | null {
       if (m.pin !== m.pinAgain) return `${m.name}'s two PINs don't match.`;
     }
   }
-  return null;
+  return appsProblem(d.apps);
 }

@@ -1,0 +1,7 @@
+# Opens Almanac full screen when you sign in to the kitchen PC.
+# Install: see README.md, step 6. Change the address to wherever Almanac runs.
+[Desktop Entry]
+Type=Application
+Name=Almanac
+Exec=chromium --kiosk --class=almanac --user-data-dir=/home/USER/almanac-launcher/profiles/almanac --no-first-run --noerrdialogs --disable-session-crashed-bubble http://192.168.2.23:3001
+X-GNOME-Autostart-enabled=true
