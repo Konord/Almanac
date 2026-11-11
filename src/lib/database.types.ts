@@ -551,6 +551,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"launcher_apps": {
+                  Row: {
+                    "address": string | null,"check_up": boolean,"checked_at": string | null,"colour": string,"created_at": string,"down_since": string | null,"failures": number,"household_id": string,"icon": string | null,"id": string,"kind": string,"local_key": string | null,"name": string,"sort_order": number,"updated_at": string,"visibility": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address"?: string | null,"check_up"?: boolean,"checked_at"?: string | null,"colour"?: string,"created_at"?: string,"down_since"?: string | null,"failures"?: number,"household_id": string,"icon"?: string | null,"id"?: string,"kind": string,"local_key"?: string | null,"name": string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Update: {
+                    "address"?: string | null,"check_up"?: boolean,"checked_at"?: string | null,"colour"?: string,"created_at"?: string,"down_since"?: string | null,"failures"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"kind"?: string,"local_key"?: string | null,"name"?: string,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "launcher_apps_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"meal_categories": {
                   Row: {
                     "active": boolean,"created_at": string,"household_id": string,"icon": string | null,"id": string,"meal_time_ids": (string)[],"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"visibility": string

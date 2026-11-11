@@ -16,6 +16,7 @@ const base: SettingsDraft = {
   reviewTime: "09:00",
   panelBoxes: ["today", "bucket"],
   members: [{ id: "a", name: "Jess", role: "parent", colour: "blue", icon: null, birthYear: null, hasPin: false, pin: "", pinAgain: "", removed: false }],
+  apps: [],
 };
 
 test("a good settings draft passes", () => assert.equal(draftProblem(base), null));
@@ -27,4 +28,9 @@ test("the two PINs must match", () => {
 test("people marked to go aren't checked", () => {
   const m = { ...base.members[0], name: "", removed: true };
   assert.equal(draftProblem({ ...base, members: [m] }), null);
+});
+test("apps are checked with the rest of the settings", () => {
+  const app = { id: "new-1", name: "Jellyfin", icon: "🍿", colour: "purple", kind: "web" as const, address: "", localKey: "", checkUp: true, removed: false };
+  assert.match(draftProblem({ ...base, apps: [app] }) ?? "", /web address/);
+  assert.equal(draftProblem({ ...base, apps: [{ ...app, address: "192.168.2.10:8096" }] }), null);
 });

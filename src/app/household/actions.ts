@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isLocalTime } from "@/lib/time";
 import { isPersonColour } from "@/lib/colours";
 import { panelBoxes } from "@/lib/panel-boxes";
+import { cleanAddress } from "@/lib/launcher";
 import { draftProblem, isNewId, type SettingsDraft } from "./draft";
 
 /*
@@ -83,6 +84,46 @@ export async function saveHousehold(draft: SettingsDraft): Promise<Result> {
       const { error } = await supabase.rpc("set_member_pin", { member_id: id, pin: m.pin });
       if (error) return { ok: false, error: error.message };
       logs.push({ action: "member_pin_set", target_type: "member", target_id: id, details: {} });
+    }
+  }
+
+  // The kitchen screen's apps, in tray order. A new address starts its up checks afresh.
+  const { data: oldApps } = await supabase.from("launcher_apps").select("id, kind, address");
+  const before2 = new Map((oldApps ?? []).map((a) => [a.id, a]));
+  let order = 0;
+  for (const a of draft.apps) {
+    if (a.removed) {
+      if (isNewId(a.id)) continue;
+      const { error } = await supabase.from("launcher_apps").delete().eq("id", a.id);
+      if (error) return { ok: false, error: error.message };
+      logs.push({ action: "app_removed", target_type: "launcher_app", target_id: a.id, details: { name: a.name } });
+      continue;
+    }
+    const web = a.kind === "web";
+    const row = {
+      name: a.name.trim(),
+      icon: a.icon || null,
+      colour: isPersonColour(a.colour) ? a.colour : "slate",
+      kind: web ? "web" : "local",
+      address: web ? cleanAddress(a.address) : null,
+      local_key: web ? null : a.localKey,
+      check_up: web && a.checkUp,
+      sort_order: order++,
+    };
+    if (isNewId(a.id)) {
+      const { data, error } = await supabase
+        .from("launcher_apps")
+        .insert({ ...row, household_id: household.id })
+        .select("id")
+        .single();
+      if (error) return { ok: false, error: error.message };
+      logs.push({ action: "app_added", target_type: "launcher_app", target_id: data.id, details: { name: row.name } });
+    } else {
+      const old = before2.get(a.id);
+      const moved = !old || old.kind !== row.kind || old.address !== row.address;
+      const fresh = moved ? { failures: 0, checked_at: null, down_since: null } : {};
+      const { error } = await supabase.from("launcher_apps").update({ ...row, ...fresh }).eq("id", a.id);
+      if (error) return { ok: false, error: error.message };
     }
   }
 

@@ -36,6 +36,11 @@ async function HouseholdContent() {
   // The activity log is still kept, but no history shows for now (Connor, 2026-11-10).
   const { data: lists } = await supabase.from("task_lists").select("id, name, is_chores").order("sort_order").order("name");
   const { settings } = household;
+  const { data: apps } = await supabase
+    .from("launcher_apps")
+    .select("id, name, icon, colour, kind, address, local_key, check_up")
+    .order("sort_order")
+    .order("name");
 
   const initial: SettingsDraft = {
     name: household.name,
@@ -60,6 +65,17 @@ async function HouseholdContent() {
       hasPin: Boolean(pins[i].data),
       pin: "",
       pinAgain: "",
+      removed: false,
+    })),
+    apps: (apps ?? []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      icon: a.icon,
+      colour: a.colour,
+      kind: a.kind === "local" ? "local" : "web",
+      address: a.address ?? "",
+      localKey: a.local_key ?? "",
+      checkUp: a.check_up,
       removed: false,
     })),
   };

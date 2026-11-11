@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { CaretLeft, CaretRight, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { AppWindow, CaretLeft, CaretRight, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -9,17 +9,20 @@ import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved
 import { PERSON_COLOURS, strong } from "@/lib/colours";
 import type { PanelBox } from "@/lib/panel-boxes";
 import { signOut } from "@/app/login/actions";
+import { useSearchParams } from "next/navigation";
 import { saveHousehold } from "./actions";
+import { AppsTab } from "./apps-tab";
 import type { MemberDraft, SettingsDraft } from "./draft";
 
 /*
  * Settings (rebuilt 2026-11-10 so nothing scrolls and there's one Save):
- * two tabs. People: everyone on the left, the one you tap on the right.
- * Household: the household's settings as big chips. Every change waits
+ * three tabs. People: everyone on the left, the one you tap on the right.
+ * Household: the household's settings as big chips. Apps: the kitchen
+ * screen's apps (2026-11-11, apps-tab.tsx). Every change waits
  * for Save in the header; leaving with changes asks first.
  */
 
-type Tab = "people" | "household";
+type Tab = "people" | "household" | "apps";
 const PER_PAGE = 7;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -62,7 +65,9 @@ function TextField({ label, hint, children }: { label: string; hint?: string; ch
 
 export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; boxes: PanelBox[] }) {
   const [draft, setDraft] = useState<SettingsDraft>(initial);
-  const [tab, setTab] = useState<Tab>("people");
+  // The tray's "Settings › Apps" link opens straight on the Apps tab.
+  const askedTab = useSearchParams().get("tab");
+  const [tab, setTab] = useState<Tab>(askedTab === "apps" || askedTab === "household" ? askedTab : "people");
   const [selected, setSelected] = useState<string | null>(initial.members[0]?.id ?? null);
   const [page, setPage] = useState(0);
   const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
@@ -119,6 +124,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
             [
               { tab: "people", label: "People", icon: UsersThree },
               { tab: "household", label: "Household", icon: GearSix },
+              { tab: "apps", label: "Apps", icon: AppWindow },
             ] as const
           ).map((t) => (
             <button
@@ -136,7 +142,9 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
 
-      {tab === "people" ? (
+      {tab === "apps" ? (
+        <AppsTab apps={draft.apps} onChange={(apps) => set({ apps })} />
+      ) : tab === "people" ? (
         <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <Card
             title="People"
