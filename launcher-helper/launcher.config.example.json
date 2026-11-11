@@ -1,0 +1,18 @@
+{
+  "almanacOrigins": ["http://192.168.2.23:3001"],
+  "browser": ["chromium"],
+  "profiles": "~/almanac-launcher/profiles",
+  "almanacWindowClass": "almanac",
+  "touchscreen": "auto",
+  "pill": { "corner": "bottom-left", "hideAfterSeconds": 4 },
+  "programs": {
+    "freetube": { "name": "FreeTube", "command": ["flatpak", "run", "io.freetubeapp.FreeTube"] },
+    "steam": {
+      "name": "Steam",
+      "command": ["steam", "steam://open/bigpicture"],
+      "close": ["steam", "steam://close/bigpicture"],
+      "handsOff": true
+    },
+    "emulators": { "name": "Emulators", "command": ["flatpak", "run", "org.libretro.RetroArch", "--fullscreen"] }
+  }
+}

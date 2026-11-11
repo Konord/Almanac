@@ -1,0 +1,14 @@
+# Starts the Almanac launcher when you sign in to the kitchen PC.
+# Install: see README.md, step 5.
+[Unit]
+Description=Almanac launcher (opens apps from the kitchen screen)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/env node %h/almanac/launcher-helper/almanac-launcher.ts %h/almanac/launcher-helper/launcher.config.json
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
