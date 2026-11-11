@@ -109,7 +109,8 @@ export function Card({
   children,
   className = "",
 }: {
-  title: ReactNode;
+  /** Leave out to draw no title row (for a list that draws its own). */
+  title?: ReactNode;
   icon?: Icon;
   /** Person colour for the icon chip, e.g. "blue". */
   tint?: string;
@@ -119,6 +120,7 @@ export function Card({
 }) {
   return (
     <section className={`flex min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4.5 lg:min-h-0 ${className}`}>
+      {title === undefined && !IconComponent && !aside ? null : (
       <div className="mb-1 flex items-center gap-3">
         {IconComponent ? (
           <span
@@ -131,6 +133,7 @@ export function Card({
         <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">{title}</h2>
         {aside}
       </div>
+      )}
       {children}
     </section>
   );
