@@ -28,6 +28,8 @@ const draft = (changes: Partial<ManagerDraft> = {}): ManagerDraft => ({
   routines: [routine],
   steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit: true, member_ids: [], daily_list: false }],
   uses: [],
+  meals: [{ id: "dinner", name: "Dinner", icon: null, usual_time: "18:00", minutes: 30, presets: [null, null, "c:tacos", null, null, null, null] }],
+  mealUses: [],
   ...changes,
 });
 
@@ -37,6 +39,14 @@ test("drafts are checked before saving", () => {
   assert.match(draftProblem(draft({ routines: [{ ...routine, anchor: "clock" }] })) ?? "", /Choose a time/);
   assert.match(draftProblem(draft({ routines: [{ ...routine, usual_minutes: Number.NaN }] })) ?? "", /between 5 and 240/);
   assert.match(draftProblem(draft({ steps: [{ id: "x", routine_id: "new-1", text: "", icon: null, habit: true, member_ids: [], daily_list: false }] })) ?? "", /step is empty/);
+});
+
+test("meal blocks are checked too", () => {
+  const dinner = draft().meals[0];
+  assert.match(draftProblem(draft({ meals: [{ ...dinner, name: "" }] })) ?? "", /Every meal needs a name/);
+  assert.match(draftProblem(draft({ meals: [{ ...dinner, minutes: 5 }] })) ?? "", /between 10 and 240/);
+  assert.match(draftProblem(draft({ routines: [{ ...routine, anchor: "meal", anchor_meal_time_id: "gone" }] })) ?? "", /which meal/);
+  assert.equal(draftProblem(draft({ routines: [{ ...routine, anchor: "meal", anchor_meal_time_id: "dinner" }] })), null);
 });
 
 test("a step's people are only ones who still have the routine", () => {

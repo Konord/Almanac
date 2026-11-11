@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { headsUpTime } from "@/lib/heads-ups";
 import { guessAisle, weekDates, weekdayOf } from "@/lib/meals";
 import { addDays, zonedToUtc, localDateOf, type LocalDate } from "@/lib/time";
+import { dayFor } from "@/lib/day-types";
+import { blocksOn, storedEaters } from "@/lib/meal-blocks";
+import { loadRoutines } from "../routines/data";
 
 /*
  * Server-side helpers shared by the Meals actions and pages. (Not actions
@@ -43,46 +46,73 @@ export async function ensurePresets(householdId: string, weekStart: LocalDate, t
 }
 
 /**
- * Adds preset meals to these dates where that meal time doesn't already
- * have that category. A category with one meal gets that meal (and its
- * dishes, with last time's picks left to choose); with several, the kind
- * waits for someone to pick one in the review.
+ * Adds preset meals to these dates. A meal block's preset for a weekday
+ * (Tuesday dinner is Tacos, or Spaghetti) goes on the days someone has that
+ * block, for those people, unless that block already has a meal that day.
+ * A kind of meal with one meal gets that meal (and its dishes, with last
+ * time's picks left to choose); with several, the kind waits for someone to
+ * pick one in the review. Leftovers goes on as the blank.
  */
 export async function applyPresets(supabase: Supabase, householdId: string, dates: LocalDate[]): Promise<void> {
   if (dates.length === 0) return;
-  const [presets, existing, links, spots] = await Promise.all([
-    supabase.from("meal_presets").select("weekday, meal_time_id, category_id"),
-    supabase.from("meals").select("date, meal_time_id, category_id").gte("date", dates[0]).lte("date", dates[dates.length - 1]),
+  const [presets, existing, links, spots, uses, cats] = await Promise.all([
+    supabase.from("meal_presets").select("weekday, meal_time_id, category_id, menu_meal_id"),
+    supabase.from("meals").select("date, meal_time_id").gte("date", dates[0]).lte("date", dates[dates.length - 1]),
     supabase.from("menu_meal_categories").select("menu_meal_id, category_id"),
     supabase.from("menu_meal_spots").select("menu_meal_id, position, kind_id, recipe_id, batches").order("position"),
+    supabase.from("meal_time_uses").select("meal_time_id, member_id, day_type_id"),
+    supabase.from("meal_categories").select("id, is_leftovers"),
   ]);
-  for (const r of [presets, existing, links, spots]) if (r.error) throw r.error;
-  const have = new Set((existing.data ?? []).map((m) => `${m.date}|${m.meal_time_id}|${m.category_id}`));
+  for (const r of [presets, existing, links, spots, uses, cats]) if (r.error) throw r.error;
+  if ((presets.data ?? []).length === 0) return;
+  const have = new Set((existing.data ?? []).map((m) => `${m.date}|${m.meal_time_id}`));
+  const blanks = new Set((cats.data ?? []).filter((c) => c.is_leftovers).map((c) => c.id));
   const spotsOf = new Map<string, NonNullable<typeof spots.data>>();
   for (const sp of spots.data ?? []) spotsOf.set(sp.menu_meal_id, [...(spotsOf.get(sp.menu_meal_id) ?? []), sp]);
   const mealsOf = new Map<string, string[]>();
   for (const l of links.data ?? []) if (spotsOf.has(l.menu_meal_id)) mealsOf.set(l.category_id, [...(mealsOf.get(l.category_id) ?? []), l.menu_meal_id]);
-  const rows = dates.flatMap((date) =>
-    (presets.data ?? [])
-      .filter((p) => p.weekday === weekdayOf(date) && !have.has(`${date}|${p.meal_time_id}|${p.category_id}`))
+
+  // Each person's kind of day on each date (loaded a week at a time).
+  const everyone: string[] = [];
+  const kinds = new Map<LocalDate, Record<string, string | null>>();
+  for (let i = 0; i < dates.length; i += 7) {
+    const routines = await loadRoutines(dates[i]);
+    for (const date of dates.slice(i, i + 7)) {
+      kinds.set(date, Object.fromEntries(routines.members.map((m) => [m.id, dayFor(m, routines, date).dayType?.id ?? null])));
+    }
+    if (i === 0) everyone.push(...routines.members.map((m) => m.id));
+  }
+
+  const rows = dates.flatMap((date) => {
+    const on = blocksOn(uses.data ?? [], kinds.get(date) ?? {});
+    return (presets.data ?? [])
+      .filter((p) => p.weekday === weekdayOf(date) && on.has(p.meal_time_id) && !have.has(`${date}|${p.meal_time_id}`))
       .map((p) => {
-        const options = mealsOf.get(p.category_id) ?? [];
+        const options = p.menu_meal_id ? (spotsOf.has(p.menu_meal_id) ? [p.menu_meal_id] : []) : p.category_id && !blanks.has(p.category_id) ? (mealsOf.get(p.category_id) ?? []) : [];
         const only = options.length === 1 ? options[0] : null;
         return {
-          household_id: householdId,
-          date,
-          meal_time_id: p.meal_time_id,
-          category_id: p.category_id,
-          menu_meal_id: only,
-          recipe_id: only ? (spotsOf.get(only)!.find((sp) => sp.recipe_id)?.recipe_id ?? null) : null,
-          from_preset: true,
+          row: {
+            household_id: householdId,
+            date,
+            meal_time_id: p.meal_time_id,
+            category_id: p.category_id,
+            menu_meal_id: only,
+            recipe_id: only ? (spotsOf.get(only)!.find((sp) => sp.recipe_id)?.recipe_id ?? null) : null,
+            from_preset: true,
+          },
+          eaters: storedEaters(on.get(p.meal_time_id) ?? [], everyone),
         };
-      }),
-  );
+      })
+      .filter(({ row }) => row.category_id || row.menu_meal_id);
+  });
   if (rows.length === 0) return;
-  const { data, error } = await supabase.from("meals").insert(rows).select("id, menu_meal_id");
+  const { data, error } = await supabase
+    .from("meals")
+    .insert(rows.map((r) => r.row))
+    .select("id, menu_meal_id");
   if (error) throw error;
-  const dishes = (data ?? []).flatMap((m) =>
+  const made = data ?? [];
+  const dishes = made.flatMap((m) =>
     (m.menu_meal_id ? (spotsOf.get(m.menu_meal_id) ?? []) : []).map((sp, position) => ({
       household_id: householdId,
       meal_id: m.id,
@@ -97,6 +127,45 @@ export async function applyPresets(supabase: Supabase, householdId: string, date
     const { error: dishError } = await supabase.from("meal_dishes").insert(dishes);
     if (dishError) throw dishError;
   }
+  // Inserted rows come back in order, so each meal lines up with who it's for.
+  const people = made.flatMap((m, i) => rows[i].eaters.map((member_id) => ({ household_id: householdId, meal_id: m.id, member_id })));
+  if (people.length) {
+    const { error: peopleError } = await supabase.from("meal_members").insert(people);
+    if (peopleError) throw peopleError;
+  }
+}
+
+export type PresetRow = { household_id: string; weekday: number; meal_time_id: string; category_id: string | null; menu_meal_id: string | null };
+
+/**
+ * Replaces every preset ("Tuesday dinner is Tacos"), and puts presets that
+ * are new into weeks that were already filled in (from today on). Removed
+ * ones don't take meals off: those are changed in the weekly review.
+ */
+export async function writePresets(supabase: Supabase, householdId: string, today: LocalDate, rows: PresetRow[]): Promise<string | null> {
+  const key = (p: { weekday: number; meal_time_id: string; category_id: string | null; menu_meal_id: string | null }) =>
+    `${p.weekday}|${p.meal_time_id}|${p.category_id ?? ""}|${p.menu_meal_id ?? ""}`;
+  const { data: before, error: readError } = await supabase.from("meal_presets").select("weekday, meal_time_id, category_id, menu_meal_id");
+  if (readError) return readError.message;
+  const had = new Set((before ?? []).map(key));
+  const fresh = rows.filter((r) => !had.has(key(r)));
+  const put = async (list: PresetRow[]) => {
+    const { error } = await supabase.from("meal_presets").delete().eq("household_id", householdId);
+    if (error) return error.message;
+    if (list.length === 0) return null;
+    const { error: insertError } = await supabase.from("meal_presets").insert(list);
+    return insertError?.message ?? null;
+  };
+  if (fresh.length > 0) {
+    const dates = await seededDatesFrom(supabase, today);
+    if (dates.length > 0) {
+      // Only the new presets go into those weeks: a removed one shouldn't come back either.
+      const problem = await put(fresh);
+      if (problem) return problem;
+      await applyPresets(supabase, householdId, dates);
+    }
+  }
+  return put(rows);
 }
 
 /** Future weeks that already had their presets placed (so a new preset can join them). */
@@ -114,7 +183,7 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   const supabase = await createClient();
   const { data: meal, error } = await supabase
     .from("meals")
-    .select("id, date, status, recipe_id, cook_id, meal_times(usual_time), recipes(name, icon)")
+    .select("id, date, status, recipe_id, cook_id, eat_at, meal_times(usual_time), recipes(name, icon)")
     .eq("id", mealId)
     .maybeSingle();
   if (error) throw error;
@@ -134,7 +203,7 @@ export async function syncHeadsUps(householdId: string, mealId: string, timeZone
   const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").limit(1).maybeSingle();
   if (!list) return;
 
-  const usual = (meal.meal_times as unknown as { usual_time: string } | null)?.usual_time?.slice(0, 5) ?? "18:00";
+  const usual = (meal.eat_at ?? (meal.meal_times as unknown as { usual_time: string } | null)?.usual_time)?.slice(0, 5) ?? "18:00";
   const recipe = meal.recipes as unknown as { name: string; icon: string | null } | null;
   const eatAt = zonedToUtc(meal.date, usual, timeZone);
   const rows = helpers

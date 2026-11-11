@@ -1,8 +1,6 @@
 import { Suspense } from "react";
-import { AppFrame, Emoji, firstParam, LoadingOutline } from "@/components/ui";
-import { CategoryForm } from "../category-form";
+import { AppFrame, firstParam, LoadingOutline } from "@/components/ui";
 import { loadMealBasics } from "../data";
-import { Modal } from "../parts";
 import { MenuManager, type ManagerMeal } from "./manager";
 
 /**
@@ -40,16 +38,14 @@ async function Menu({ searchParams }: { searchParams: PageProps<"/meals/menu">["
     spots: m.spots.toSorted((a, b) => a.position - b.position).map((s) => ({ kindId: s.kind_id, recipeId: s.recipe_id, batches: s.batches })),
   }));
   const categoryParam = p("category") ?? null;
-  const editing = p("editCategory") ? basics.categories.find((c) => c.id === p("editCategory")) : undefined;
-  const back = categoryParam ? `/meals/menu?category=${categoryParam}` : "/meals/menu";
 
   return (
     <>
       <MenuManager
         // A fresh start after each save (or a meal changing elsewhere).
-        key={hash(JSON.stringify(initial))}
+        key={hash(JSON.stringify([initial, basics.categories]))}
         initial={initial}
-        categories={basics.categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, active: c.active }))}
+        categories={basics.categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, active: c.active, isLeftovers: c.is_leftovers }))}
         kinds={basics.kinds.map((k) => ({ id: k.id, name: k.name, icon: k.icon }))}
         dishes={basics.recipes.filter((r) => !r.is_backup).map((r) => ({ id: r.id, name: r.name, icon: r.icon, kind_ids: r.kind_ids }))}
         category={categoryParam}
@@ -57,16 +53,6 @@ async function Menu({ searchParams }: { searchParams: PageProps<"/meals/menu">["
         message={p("message") ?? null}
         problem={p("error") ?? null}
       />
-      {p("newCategory") ? (
-        <Modal title="New kind of meal" closeHref={back}>
-          <CategoryForm basics={basics} returnTo={`${back}${back.includes("?") ? "&" : "?"}newCategory=1`} />
-        </Modal>
-      ) : null}
-      {editing ? (
-        <Modal title={`Edit ${editing.name}`} icon={<Emoji emoji={editing.icon} className="size-12" />} closeHref={`/meals/menu?category=${editing.id}`}>
-          <CategoryForm basics={basics} category={editing} returnTo={`/meals/menu?category=${editing.id}&editCategory=${editing.id}`} />
-        </Modal>
-      ) : null}
     </>
   );
 }

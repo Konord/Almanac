@@ -573,14 +573,14 @@ isOneToOne: false
                   ]
                 },"meal_categories": {
                   Row: {
-                    "active": boolean,"created_at": string,"household_id": string,"icon": string | null,"id": string,"meal_time_ids": (string)[],"name": string,"premade": boolean,"sort_order": number,"updated_at": string,"visibility": string
+                    "active": boolean,"created_at": string,"household_id": string,"icon": string | null,"id": string,"is_leftovers": boolean,"name": string,"premade": boolean,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active"?: boolean,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"meal_time_ids"?: (string)[],"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "active"?: boolean,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"is_leftovers"?: boolean,"name": string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "active"?: boolean,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"meal_time_ids"?: (string)[],"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "active"?: boolean,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"is_leftovers"?: boolean,"name"?: string,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -663,14 +663,14 @@ isOneToOne: false
                   ]
                 },"meal_presets": {
                   Row: {
-                    "category_id": string,"created_at": string,"household_id": string,"id": string,"meal_time_id": string,"weekday": number
+                    "category_id": string | null,"created_at": string,"household_id": string,"id": string,"meal_time_id": string,"menu_meal_id": string | null,"weekday": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "category_id": string,"created_at"?: string,"household_id": string,"id"?: string,"meal_time_id": string,"weekday": number
+                    "category_id"?: string | null,"created_at"?: string,"household_id": string,"id"?: string,"meal_time_id": string,"menu_meal_id"?: string | null,"weekday": number
                   }
                   Update: {
-                    "category_id"?: string,"created_at"?: string,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"weekday"?: number
+                    "category_id"?: string | null,"created_at"?: string,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"menu_meal_id"?: string | null,"weekday"?: number
                   }
                   Relationships: [
                     {
@@ -690,6 +690,12 @@ isOneToOne: false
       columns: ["meal_time_id","household_id"]
 isOneToOne: false
       referencedRelation: "meal_times"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meal_presets_menu_meal_fk"
+      columns: ["menu_meal_id","household_id"]
+isOneToOne: false
+      referencedRelation: "menu_meals"
       referencedColumns: ["id","household_id"]
     }
                   ]
@@ -713,16 +719,54 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"meal_times": {
+                },"meal_time_uses": {
                   Row: {
-                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"show_on_planner": boolean,"sort_order": number,"updated_at": string,"usual_time": string
+                    "created_at": string,"day_type_id": string,"household_id": string,"id": string,"meal_time_id": string,"member_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"show_on_planner"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_time"?: string
+                    "created_at"?: string,"day_type_id": string,"household_id": string,"id"?: string,"meal_time_id": string,"member_id": string
                   }
                   Update: {
-                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"show_on_planner"?: boolean,"sort_order"?: number,"updated_at"?: string,"usual_time"?: string
+                    "created_at"?: string,"day_type_id"?: string,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"member_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "meal_time_uses_day_type_id_household_id_fkey"
+      columns: ["day_type_id","household_id"]
+isOneToOne: false
+      referencedRelation: "day_types"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meal_time_uses_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "meal_time_uses_meal_time_id_household_id_fkey"
+      columns: ["meal_time_id","household_id"]
+isOneToOne: false
+      referencedRelation: "meal_times"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "meal_time_uses_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"meal_times": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"minutes": number,"name": string,"sort_order": number,"updated_at": string,"usual_time": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"minutes"?: number,"name": string,"sort_order"?: number,"updated_at"?: string,"usual_time"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"minutes"?: number,"name"?: string,"sort_order"?: number,"updated_at"?: string,"usual_time"?: string
                   }
                   Relationships: [
                     {
@@ -755,14 +799,14 @@ isOneToOne: false
                   ]
                 },"meals": {
                   Row: {
-                    "category_id": string | null,"cook_id": string | null,"created_at": string,"date": string,"from_preset": boolean,"household_id": string,"id": string,"meal_time_id": string,"menu_meal_id": string | null,"recipe_id": string | null,"servings": number | null,"sort_order": number,"status": string,"swapped_for_id": string | null,"updated_at": string
+                    "category_id": string | null,"cook_id": string | null,"created_at": string,"date": string,"eat_at": string | null,"from_preset": boolean,"household_id": string,"id": string,"meal_time_id": string,"menu_meal_id": string | null,"recipe_id": string | null,"servings": number | null,"sort_order": number,"status": string,"swapped_for_id": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "category_id"?: string | null,"cook_id"?: string | null,"created_at"?: string,"date": string,"from_preset"?: boolean,"household_id": string,"id"?: string,"meal_time_id": string,"menu_meal_id"?: string | null,"recipe_id"?: string | null,"servings"?: number | null,"sort_order"?: number,"status"?: string,"swapped_for_id"?: string | null,"updated_at"?: string
+                    "category_id"?: string | null,"cook_id"?: string | null,"created_at"?: string,"date": string,"eat_at"?: string | null,"from_preset"?: boolean,"household_id": string,"id"?: string,"meal_time_id": string,"menu_meal_id"?: string | null,"recipe_id"?: string | null,"servings"?: number | null,"sort_order"?: number,"status"?: string,"swapped_for_id"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "category_id"?: string | null,"cook_id"?: string | null,"created_at"?: string,"date"?: string,"from_preset"?: boolean,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"menu_meal_id"?: string | null,"recipe_id"?: string | null,"servings"?: number | null,"sort_order"?: number,"status"?: string,"swapped_for_id"?: string | null,"updated_at"?: string
+                    "category_id"?: string | null,"cook_id"?: string | null,"created_at"?: string,"date"?: string,"eat_at"?: string | null,"from_preset"?: boolean,"household_id"?: string,"id"?: string,"meal_time_id"?: string,"menu_meal_id"?: string | null,"recipe_id"?: string | null,"servings"?: number | null,"sort_order"?: number,"status"?: string,"swapped_for_id"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -907,14 +951,14 @@ isOneToOne: false
                   ]
                 },"menu_meals": {
                   Row: {
-                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string | null,"premade": boolean,"sort_order": number,"updated_at": string,"visibility": string
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string | null,"premade": boolean,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name"?: string | null,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name"?: string | null,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string | null,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string,"visibility"?: string
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string | null,"premade"?: boolean,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1081,14 +1125,14 @@ isOneToOne: false
                   ]
                 },"recipes": {
                   Row: {
-                    "created_at": string,"hands_on_minutes": number | null,"household_id": string,"icon": string | null,"id": string,"is_backup": boolean,"last_cooked_on": string | null,"name": string,"notes": string | null,"premade": boolean,"serves": number,"source_url": string | null,"total_minutes": number | null,"updated_at": string,"visibility": string
+                    "created_at": string,"hands_on_minutes": number | null,"household_id": string,"icon": string | null,"id": string,"is_backup": boolean,"last_cooked_on": string | null,"name": string,"notes": string | null,"premade": boolean,"serves": number,"source_url": string | null,"total_minutes": number | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"hands_on_minutes"?: number | null,"household_id": string,"icon"?: string | null,"id"?: string,"is_backup"?: boolean,"last_cooked_on"?: string | null,"name": string,"notes"?: string | null,"premade"?: boolean,"serves"?: number,"source_url"?: string | null,"total_minutes"?: number | null,"updated_at"?: string,"visibility"?: string
+                    "created_at"?: string,"hands_on_minutes"?: number | null,"household_id": string,"icon"?: string | null,"id"?: string,"is_backup"?: boolean,"last_cooked_on"?: string | null,"name": string,"notes"?: string | null,"premade"?: boolean,"serves"?: number,"source_url"?: string | null,"total_minutes"?: number | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"hands_on_minutes"?: number | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"is_backup"?: boolean,"last_cooked_on"?: string | null,"name"?: string,"notes"?: string | null,"premade"?: boolean,"serves"?: number,"source_url"?: string | null,"total_minutes"?: number | null,"updated_at"?: string,"visibility"?: string
+                    "created_at"?: string,"hands_on_minutes"?: number | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"is_backup"?: boolean,"last_cooked_on"?: string | null,"name"?: string,"notes"?: string | null,"premade"?: boolean,"serves"?: number,"source_url"?: string | null,"total_minutes"?: number | null,"updated_at"?: string
                   }
                   Relationships: [
                     {

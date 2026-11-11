@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
+import { DraggableMeal } from "@/components/draggable-meal";
 import type { Household } from "@/lib/household";
 import { mealSlot } from "@/lib/meals";
 import { placeRoutines, type Busy } from "@/lib/routine-placement";
@@ -36,6 +37,10 @@ export type TodayMeal = {
   canCook: boolean;
   backup: boolean;
   movedFor: string | null;
+  /** Moved on the calendar for this day only. */
+  moved: boolean;
+  /** Leftovers: a blank, nothing to cook. */
+  blank: boolean;
 };
 
 /**
@@ -54,7 +59,9 @@ export function placeTodayMeals(
   const shown = meals.filter((m) => m.status === "planned" || m.status === "cooked");
   return shown.map((m) => {
     const recipe = m.recipe_id ? (recipes.get(m.recipe_id) ?? null) : null;
-    const slot = mealSlot(times.get(m.meal_time_id)?.usual_time ?? "18:00", recipe);
+    const block = times.get(m.meal_time_id);
+    // A meal moved on the calendar keeps its own time that day.
+    const slot = mealSlot(m.eat_at ?? block?.usual_time ?? "18:00", recipe, block?.minutes);
     const busy: Busy[] = events
       .filter(
         (e) =>
@@ -63,7 +70,8 @@ export function placeTodayMeals(
           (m.member_ids.length > 0 && m.member_ids.every((id) => e.memberIds.includes(id))),
       )
       .map(({ startMin, endMin, title }) => ({ startMin, endMin, title }));
-    const [placed] = m.status === "cooked" ? [{ startMin: slot.start, endMin: slot.start + slot.minutes, movedFor: null }] : placeRoutines([{ id: m.id, start: slot.start, minutes: slot.minutes, direction: "later" }], busy);
+    // A meal moved by hand stays where it was put; otherwise it makes way for plans.
+    const [placed] = m.status === "cooked" || m.eat_at ? [{ startMin: slot.start, endMin: slot.start + slot.minutes, movedFor: null }] : placeRoutines([{ id: m.id, start: slot.start, minutes: slot.minutes, direction: "later" }], busy);
     return {
       id: m.id,
       mealTimeId: m.meal_time_id,
@@ -81,6 +89,8 @@ export function placeTodayMeals(
       canCook: Boolean(m.recipe_id) || m.dishes.some((d) => d.recipe_id),
       backup: recipe?.is_backup ?? false,
       movedFor: placed.movedFor,
+      moved: m.eat_at !== null,
+      blank: categories.get(m.category_id ?? "")?.is_leftovers ?? false,
     };
   });
 }
@@ -102,17 +112,28 @@ function clock(minutes: number, date: LocalDate, household: Household): string {
 
 /**
  * A meal on the timeline: butter yellow, big picture, name in handwriting.
- * It's just the eating time; the cook's "Start dinner" is a point in their column.
+ * It's just the eating time; the cook's "Start dinner" is a point in their
+ * column. Drag it to move this one meal (its usual time stays the same).
  */
-export function MealBlock({ meal, date, household, style }: { meal: TodayMeal; date: LocalDate; household: Household; style: React.CSSProperties }) {
+export function MealBlock({
+  meal,
+  date,
+  household,
+  style,
+  first,
+  last,
+}: {
+  meal: TodayMeal;
+  date: LocalDate;
+  household: Household;
+  /** Left and width over the people's columns. */
+  style: React.CSSProperties;
+  first: number;
+  last: number;
+}) {
   const eat = clock(meal.eatStart, date, household);
-  return (
-    <Link
-      href={cookHref(meal)}
-      title={`${meal.name}: eat ${eat}`}
-      className={`absolute flex items-center gap-2 overflow-hidden rounded-xl bg-meal px-2.5 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`}
-      style={style}
-    >
+  const body = (
+    <>
       <Emoji emoji={meal.icon} className="size-7" />
       <span className="min-w-0 flex-1 truncate leading-none">
         <span className="font-hand text-xl">{meal.name}</span>{" "}
@@ -122,13 +143,37 @@ export function MealBlock({ meal, date, household, style }: { meal: TodayMeal; d
         </span>
       </span>
       {meal.cooked ? <Check size="1.5rem" weight="bold" className="shrink-0" aria-label="Cooked" /> : null}
-    </Link>
+    </>
+  );
+  const look = `absolute flex items-center gap-2 overflow-hidden rounded-xl bg-meal px-2.5 text-meal-ink ${meal.cooked ? "opacity-60" : ""}`;
+  if (meal.cooked) {
+    return (
+      <Link href={cookHref(meal)} title={`${meal.name}: eaten ${eat}`} className={look} style={{ ...style, top: `${((meal.eatStart - first * 60) / ((last - first) * 60)) * 100}%`, height: `max(${((meal.eatEnd - meal.eatStart) / ((last - first) * 60)) * 100}%, 2.25rem)` }}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <DraggableMeal
+      mealId={meal.id}
+      href={cookHref(meal)}
+      day={date}
+      start={meal.eatStart}
+      minutes={meal.eatEnd - meal.eatStart}
+      first={first}
+      last={last}
+      title={`${meal.name}: eat ${eat}. Drag to move this day's meal.`}
+      className={look}
+      style={style}
+    >
+      {body}
+    </DraggableMeal>
   );
 }
 
 /** The cook's "Start dinner" for a meal still to cook today: when and what. Null when there's nothing to start. */
 export function startCooking(meal: TodayMeal): { minute: number; title: string; href: string } | null {
-  if (!meal.cookId || meal.cooked || meal.backup) return null;
+  if (!meal.cookId || meal.cooked || meal.backup || meal.blank || !meal.canCook) return null;
   return {
     minute: Math.max(0, meal.eatStart - meal.cookMinutes),
     title: `Start ${meal.mealTimeName.toLowerCase()}: ${meal.name}`,
@@ -136,7 +181,7 @@ export function startCooking(meal: TodayMeal): { minute: number; title: string; 
   };
 }
 
-/** Where tapping a meal goes: Cooking Mode, or the review to choose its dishes when it has none yet. */
+/** Where tapping a meal goes: Cooking Mode, or the review to choose its dishes when it has none yet (or it's Leftovers). */
 export function cookHref(meal: Pick<TodayMeal, "id" | "canCook">): string {
   return meal.canCook ? `/meals/cook/${meal.id}` : `/review?meal=${meal.id}`;
 }

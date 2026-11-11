@@ -8,8 +8,7 @@ import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
-import { EATING_MINUTES } from "@/lib/meals";
-import { NEW_PREFIX, copyRoutine, dailyListState, draftProblem, joinRuns, routinePeople, sameDraft, stepPeople, type GridRun, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
+import { MEAL_MINUTES, NEW_PREFIX, copyRoutine, noPresets, dailyListState, draftProblem, joinRuns, routinePeople, sameDraft, stepPeople, type GridRun, type DraftMealBlock, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
 import { placeRoutines, toMinutes, wantedSlot, type Anchor, type DayAnchors } from "@/lib/routine-placement";
 import { SideHandles } from "@/components/side-handles";
 import { clock, useTimelineDrag } from "@/components/timeline-drag";
@@ -27,7 +26,11 @@ import { hourText, minutesText } from "@/lib/time-text";
 
 export type ManagerMember = { id: string; name: string; colour: string; icon: string | null };
 export type ManagerDayType = { id: string; member_id: string; name: string; icon: string | null; wake_time: string; bed_time: string; sort_order: number };
-export type ManagerMealTime = { id: string; name: string; usual_time: string };
+/** What a meal block's weekday presets can be: a kind of meal, or one meal from the menu. */
+export type MealChoices = {
+  kinds: { id: string; name: string; icon: string | null }[];
+  meals: { id: string; name: string; icon: string | null; categoryIds: string[] }[];
+};
 
 type View = { by: "day"; name: string } | { by: "person"; memberId: string };
 type Column = { key: string; member: ManagerMember; dayType: ManagerDayType | null; title: string; icon: string | null; isPerson: boolean };
@@ -72,7 +75,8 @@ export function RoutineManager({
   initial,
   members,
   dayTypes,
-  mealTimes,
+  mealChoices,
+  weekStartsOn,
   today,
   locale,
   flexMinutes,
@@ -80,7 +84,8 @@ export function RoutineManager({
   initial: ManagerDraft;
   members: ManagerMember[];
   dayTypes: ManagerDayType[];
-  mealTimes: ManagerMealTime[];
+  mealChoices: MealChoices;
+  weekStartsOn: 0 | 1;
   today: string;
   locale: string;
   flexMinutes: number;
@@ -101,7 +106,7 @@ export function RoutineManager({
     const id = recall(SELECTED_KEY);
     const saved = recall(VIEW_KEY);
     /* eslint-disable react-hooks/set-state-in-effect -- restoring what this browser remembered, once, after the first render */
-    if (id && initial.routines.some((r) => r.id === id)) setSelected(id);
+    if (id && (initial.routines.some((r) => r.id === id) || initial.meals.some((m) => m.id === id))) setSelected(id);
     if (saved?.startsWith("person:") && members.some((m) => `person:${m.id}` === saved)) setView({ by: "person", memberId: saved.slice(7) });
     else if (saved?.startsWith("day:") && dayNames.includes(saved.slice(4))) setView({ by: "day", name: saved.slice(4) });
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -136,9 +141,11 @@ export function RoutineManager({
     });
   }, [view, members, dayTypes]);
 
+  // Meal blocks are part of the draft, so routines after a meal follow it as it moves.
+  const mealTimes = draft.meals;
   const mealEnd = (id: string) => {
     const meal = mealTimes.find((m) => m.id === id);
-    return meal ? toMinutes(meal.usual_time) + EATING_MINUTES : null;
+    return meal ? toMinutes(meal.usual_time) + meal.minutes : null;
   };
   const placed = columns.map((c) => {
     if (!c.dayType) return { column: c, blocks: [] };
@@ -157,7 +164,20 @@ export function RoutineManager({
     );
     return { column: c, blocks: items.map((item, i) => ({ ...item, start: placements[i].startMin, end: placements[i].endMin })) };
   });
-  const allBlocks = placed.flatMap((p) => p.blocks);
+  // Meal blocks in each column: at their time, for as long as eating takes.
+  const mealPlaced = columns.map((c) =>
+    c.dayType
+      ? draft.mealUses
+          .filter((u) => u.member_id === c.member.id && u.day_type_id === c.dayType?.id)
+          .flatMap((u) => {
+            const m = draft.meals.find((x) => x.id === u.meal_id);
+            return m ? [{ routineId: m.id, start: toMinutes(m.usual_time), end: toMinutes(m.usual_time) + m.minutes }] : [];
+          })
+          .toSorted((a, b) => a.start - b.start)
+      : [],
+  );
+  const mealRuns = joinRuns(mealPlaced);
+  const allBlocks = [...placed.flatMap((p) => p.blocks), ...mealPlaced.flat()];
   const runs = joinRuns(placed.map((p) => p.blocks.map((b) => ({ ...b, routineId: b.routine.id }))));
   const wakeTimes = columns.flatMap((c) => (c.dayType ? [toMinutes(c.dayType.wake_time), toMinutes(c.dayType.bed_time)] : []));
   const firstHour = Math.max(0, Math.floor(Math.min(6 * 60, ...wakeTimes, ...allBlocks.map((b) => b.start)) / 60));
@@ -168,6 +188,7 @@ export function RoutineManager({
 
   // --- Changing the draft ------------------------------------------------------
   const routine = draft.routines.find((r) => r.id === selected) ?? null;
+  const mealBlock = draft.meals.find((m) => m.id === selected) ?? null;
   const steps = routine ? draft.steps.filter((s) => s.routine_id === routine.id) : [];
   const update = (change: (d: ManagerDraft) => ManagerDraft) => {
     setError(null);
@@ -226,6 +247,7 @@ export function RoutineManager({
   const removeRoutine = () => {
     if (!routine) return;
     update((d) => ({
+      ...d,
       routines: d.routines.filter((r) => r.id !== routine.id),
       steps: d.steps.filter((s) => s.routine_id !== routine.id),
       uses: d.uses.filter((u) => u.routine_id !== routine.id),
@@ -326,6 +348,60 @@ export function RoutineManager({
     select(r.id);
     if (problems.length > 0) setNote({ text: problems[0], warn: true });
   };
+  // --- Meal blocks ----------------------------------------------------------------
+  const setMeal = (id: string, patch: Partial<DraftMealBlock>) => update((d) => ({ ...d, meals: d.meals.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
+  /** Dragging a meal block: it moves (for everyone who has it), and its bottom edge sets how long eating takes. */
+  const moveMeal = (m: DraftMealBlock, start: number, minutes: number) =>
+    setMeal(m.id, { usual_time: clock(Math.min(23 * 60 + 45, Math.max(0, start))), minutes: Math.min(MEAL_MINUTES.max, Math.max(MEAL_MINUTES.min, Math.round(minutes))) });
+  const addMealUse = (mealId: string, column: Column) => {
+    if (!column.dayType) return;
+    const dayTypeId = column.dayType.id;
+    update((d) =>
+      d.mealUses.some((u) => u.meal_id === mealId && u.member_id === column.member.id && u.day_type_id === dayTypeId)
+        ? d
+        : { ...d, mealUses: [...d.mealUses, { id: newId(), meal_id: mealId, member_id: column.member.id, day_type_id: dayTypeId }] },
+    );
+    setAdding(null);
+    select(mealId);
+  };
+  /** A new meal block in the column it was added from (on the menu at noon until it's moved). */
+  const newMealIn = (column: Column) => {
+    if (!column.dayType) return;
+    const id = newId();
+    const fresh: DraftMealBlock = { id, name: "New meal", icon: "🍽️", usual_time: "12:00", minutes: 30, presets: noPresets() };
+    update((d) => ({ ...d, meals: [...d.meals, fresh], mealUses: [...d.mealUses, { id: newId(), meal_id: id, member_id: column.member.id, day_type_id: column.dayType!.id }] }));
+    setAdding(null);
+    select(id);
+  };
+  const removeMealUse = (id: string) => update((d) => ({ ...d, mealUses: d.mealUses.filter((u) => u.id !== id) }));
+  /** Deleting a meal block: routines that came after it keep their time, now set by the clock. */
+  const removeMeal = () => {
+    if (!mealBlock) return;
+    const end = toMinutes(mealBlock.usual_time) + mealBlock.minutes;
+    update((d) => ({
+      ...d,
+      meals: d.meals.filter((m) => m.id !== mealBlock.id),
+      mealUses: d.mealUses.filter((u) => u.meal_id !== mealBlock.id),
+      routines: d.routines.map((r) =>
+        r.anchor === "meal" && r.anchor_meal_time_id === mealBlock.id ? { ...r, anchor: "clock" as const, anchor_meal_time_id: null, usual_start: clock(Math.min(23 * 60, end + r.anchor_offset)) } : r,
+      ),
+    }));
+    select(null);
+  };
+  /** Pulling a meal block's side over more (or fewer) columns: more people, or more kinds of day. */
+  const spreadMeal = (run: { routineId: string; c0: number; c1: number }, range: [number, number]) => {
+    const before = columns.slice(run.c0, run.c1 + 1);
+    const after = columns.slice(range[0], range[1] + 1);
+    const inCol = (c: Column, u: { member_id: string; day_type_id: string }) => c.member.id === u.member_id && c.dayType?.id === u.day_type_id;
+    let mealUses = draft.mealUses.filter((u) => !(u.meal_id === run.routineId && before.some((c) => inCol(c, u)) && !after.some((c) => inCol(c, u))));
+    for (const c of after) {
+      if (!c.dayType || mealUses.some((u) => u.meal_id === run.routineId && inCol(c, u))) continue;
+      mealUses = [...mealUses, { id: newId(), meal_id: run.routineId, member_id: c.member.id, day_type_id: c.dayType.id }];
+    }
+    update((d) => ({ ...d, mealUses }));
+    select(run.routineId);
+  };
+
   /** A new routine copied from a template, given to the column it was picked in. */
   const startFrom = (templateId: string, column: Column) => {
     if (!column.dayType) return;
@@ -366,7 +442,7 @@ export function RoutineManager({
   const undo = () => {
     setDraft(initial);
     setError(null);
-    if (selected && !initial.routines.some((r) => r.id === selected)) select(null);
+    if (selected && !initial.routines.some((r) => r.id === selected) && !initial.meals.some((m) => m.id === selected)) select(null);
   };
 
   const pickView = (next: View) => {
@@ -490,6 +566,9 @@ export function RoutineManager({
                 ) : null}
                 {adding === column.key ? (
                   <AddExisting
+                    meals={draft.meals.filter((m) => !draft.mealUses.some((u) => u.meal_id === m.id && u.member_id === column.member.id && u.day_type_id === column.dayType?.id))}
+                    onPickMeal={(id) => addMealUse(id, column)}
+                    onNewMeal={() => newMealIn(column)}
                     routines={draft.routines.filter((r) => !r.is_template && !blocks.some((b) => b.routine.id === r.id))}
                     templates={draft.routines.filter((r) => r.is_template)}
                     onPick={(id) => addUse(id, column)}
@@ -503,20 +582,25 @@ export function RoutineManager({
                 ) : null}
               </div>
             ))}
-            {/* Meals (set in the meal planner, so faded here) and the routine blocks, over the columns. */}
+            {/* Meal blocks and routine blocks, over the columns. */}
             <div className="pointer-events-none absolute inset-y-0 right-0 left-16">
-              {mealTimes.map((m) => {
-                const at = toMinutes(m.usual_time);
-                if (at < firstHour * 60 || at >= lastHour * 60) return null;
+              {mealRuns.map((run) => {
+                const m = draft.meals.find((x) => x.id === run.routineId);
+                if (!m) return null;
                 return (
-                  <div
-                    key={m.id}
-                    className="absolute right-0 left-0 flex items-start gap-1.5 overflow-hidden rounded-xl border-2 border-dashed border-meal-ink/25 bg-meal/50 px-2 pt-0.5 text-sm font-bold text-meal-ink/70"
-                    style={{ top: `${((at - firstHour * 60) / span) * 100}%`, height: `${(EATING_MINUTES / span) * 100}%` }}
-                  >
-                    <Emoji emoji="🍽️" className="size-4" />
-                    {m.name} · {timeLabel(at)}
-                  </div>
+                  <MealRun
+                    key={`meal:${run.routineId}:${run.c0}`}
+                    meal={m}
+                    run={run}
+                    columns={columns.map((c) => c.key)}
+                    active={m.id === selected}
+                    first={firstHour}
+                    last={lastHour}
+                    timeLabel={timeLabel}
+                    onSelect={() => select(m.id)}
+                    onTime={(start, minutes) => moveMeal(m, start, minutes)}
+                    onSpread={(range) => spreadMeal(run, range)}
+                  />
                 );
               })}
               {runs.map((run) => {
@@ -770,8 +854,21 @@ export function RoutineManager({
                 </div>
               </div>
             </>
+          ) : mealBlock ? (
+            <MealEditor
+              key={mealBlock.id}
+              meal={mealBlock}
+              uses={draft.mealUses
+                .filter((u) => u.meal_id === mealBlock.id)
+                .map((u) => ({ id: u.id, member: members.find((m) => m.id === u.member_id), dayType: dayTypes.find((t) => t.id === u.day_type_id) }))}
+              choices={mealChoices}
+              weekStartsOn={weekStartsOn}
+              onChange={(patch) => setMeal(mealBlock.id, patch)}
+              onRemoveUse={removeMealUse}
+              onRemove={removeMeal}
+            />
           ) : (
-            <EmptyState emoji="📝" title="Tap a routine to edit it" hint="Or tap an empty spot to add one." />
+            <EmptyState emoji="📝" title="Tap a routine or meal to edit it" hint="Or tap an empty spot to add a routine. Meals are added with the + above a column." />
           )}
 
         </section>
@@ -983,6 +1080,9 @@ const ADD_PER_PAGE = 5;
  * one from a template (a copy you then change on its own).
  */
 function AddExisting({
+  meals,
+  onPickMeal,
+  onNewMeal,
   routines,
   templates,
   onPick,
@@ -990,6 +1090,10 @@ function AddExisting({
   onEditTemplate,
   onClose,
 }: {
+  /** Meal blocks this column doesn't have yet. */
+  meals: DraftMealBlock[];
+  onPickMeal: (id: string) => void;
+  onNewMeal: () => void;
   routines: DraftRoutine[];
   templates: DraftRoutine[];
   onPick: (id: string) => void;
@@ -997,32 +1101,49 @@ function AddExisting({
   onEditTemplate: (id: string) => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"share" | "template">(templates.length > 0 && routines.length === 0 ? "template" : "share");
+  const [tab, setTab] = useState<"share" | "template" | "meal">(templates.length > 0 && routines.length === 0 ? "template" : "share");
   const [page, setPage] = useState(0);
+  if (tab === "meal") {
+    // A row for "New meal", then the meal blocks to share.
+    const per = ADD_PER_PAGE - 1;
+    const mealPages = Math.max(1, Math.ceil(meals.length / per));
+    const p = Math.min(page, mealPages - 1);
+    return (
+      <div className="absolute top-1 right-0 left-0 z-40 flex flex-col gap-1 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)]">
+        <AddTabs tab={tab} setTab={(t) => (setTab(t), setPage(0))} onClose={onClose} />
+        <button type="button" onClick={onNewMeal} className="flex min-h-11 items-center gap-2 rounded-xl bg-meal px-2 text-left text-base font-bold text-meal-ink">
+          <Plus size="1rem" weight="bold" aria-hidden />
+          New meal
+        </button>
+        {meals.slice(p * per, p * per + per).map((m) => (
+          <button key={m.id} type="button" onClick={() => onPickMeal(m.id)} className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-left text-base font-bold text-ink hover:bg-rail">
+            <Emoji emoji={m.icon ?? "🍽️"} className="size-6" />
+            <span className="truncate">{m.name || "Meal"}</span>
+          </button>
+        ))}
+        {meals.length === 0 ? <p className="px-1 text-sm text-ink-muted">They have every meal already.</p> : null}
+        {mealPages > 1 ? (
+          <div className="flex items-center gap-2 px-1">
+            <button type="button" disabled={p === 0} onClick={() => setPage(p - 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
+              ‹
+            </button>
+            <span className="text-sm font-bold text-ink-muted">
+              {p + 1} of {mealPages}
+            </span>
+            <button type="button" disabled={p === mealPages - 1} onClick={() => setPage(p + 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
+              ›
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
   const list = tab === "share" ? routines : templates;
   const pages = Math.max(1, Math.ceil(list.length / ADD_PER_PAGE));
   const shown = list.slice(page * ADD_PER_PAGE, page * ADD_PER_PAGE + ADD_PER_PAGE);
   return (
     <div className="absolute top-1 right-0 left-0 z-40 flex flex-col gap-1 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)]">
-      <div className="flex items-center gap-1">
-        {(["share", "template"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            aria-pressed={tab === t}
-            onClick={() => {
-              setTab(t);
-              setPage(0);
-            }}
-            className={`min-h-10 flex-1 rounded-xl px-2 text-sm font-bold ${tab === t ? "bg-ink text-board" : "bg-rail text-ink"}`}
-          >
-            {t === "share" ? "Share one" : "From a template"}
-          </button>
-        ))}
-        <button type="button" onClick={onClose} aria-label="Close" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
-          <X size="1rem" weight="bold" aria-hidden />
-        </button>
-      </div>
+      <AddTabs tab={tab} setTab={(t) => (setTab(t), setPage(0))} onClose={onClose} />
       {shown.length === 0 ? (
         <p className="px-1 text-base text-ink-muted">
           {tab === "share"
@@ -1063,7 +1184,285 @@ function AddExisting({
   );
 }
 
+/** The + popover's tabs: share a routine, start from a template, or add a meal. */
+function AddTabs({ tab, setTab, onClose }: { tab: "share" | "template" | "meal"; setTab: (t: "share" | "template" | "meal") => void; onClose: () => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      {(["share", "template", "meal"] as const).map((t) => (
+        <button
+          key={t}
+          type="button"
+          aria-pressed={tab === t}
+          onClick={() => setTab(t)}
+          className={`min-h-10 flex-1 rounded-xl px-1.5 text-sm font-bold ${tab === t ? "bg-ink text-board" : "bg-rail text-ink"}`}
+        >
+          {t === "share" ? "Share one" : t === "template" ? "Template" : "Meal"}
+        </button>
+      ))}
+      <button type="button" onClick={onClose} aria-label="Close" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
+        <X size="1rem" weight="bold" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 const GRID_GAP = "0.625rem";
+
+/**
+ * A meal block (Lunch, Dinner) on the grid, over the columns of everyone who
+ * has it at that time. Tap to edit; drag to move it (for everyone who has
+ * it); drag the bottom edge for how long eating takes, and the sides to give
+ * it to more columns (or fewer). Moving a meal on the calendar changes only
+ * that day; this is its usual time.
+ */
+function MealRun({
+  meal,
+  run,
+  columns,
+  active,
+  first,
+  last,
+  timeLabel,
+  onSelect,
+  onTime,
+  onSpread,
+}: {
+  meal: DraftMealBlock;
+  run: GridRun<{ routineId: string; start: number; end: number }>;
+  columns: string[];
+  active: boolean;
+  first: number;
+  last: number;
+  timeLabel: (minutes: number) => string;
+  onSelect: () => void;
+  onTime: (start: number, minutes: number) => void;
+  onSpread: (range: [number, number]) => void;
+}) {
+  const drag = useTimelineDrag({
+    first,
+    last,
+    placement: { start: run.start, minutes: run.end - run.start, day: columns[run.c0] },
+    onTap: onSelect,
+    onDrop: (p) => onTime(p.start, p.minutes),
+  });
+  const [spreading, setSpreading] = useState<[number, number] | null>(null);
+  const span = (last - first) * 60;
+  const start = drag.shown.start;
+  const minutes = drag.shown.minutes;
+  const tall = Math.max(minutes, 30);
+  const box = spanBox(spreading?.[0] ?? run.c0, spreading?.[1] ?? run.c1, columns.length, GRID_GAP);
+  return (
+    <div
+      {...drag.bodyHandlers}
+      role="button"
+      tabIndex={0}
+      aria-pressed={active}
+      title="Tap to edit, drag to move"
+      onDragStart={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onSelect();
+      }}
+      className={`pointer-events-auto absolute z-[1] flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-xl border-2 border-meal-ink/40 bg-meal px-4 text-left text-meal-ink select-none active:cursor-grabbing ${active ? "shadow-[0_0_0_3px_var(--color-ink)]" : ""} ${drag.dragging || spreading ? "z-30 shadow-lg" : ""}`}
+      style={{
+        left: box.left,
+        width: box.width,
+        top: `calc(${((start - first * 60) / span) * 100}% + 1px)`,
+        height: `calc(${(tall / span) * 100}% - 2px)`,
+      }}
+    >
+      <Emoji emoji={meal.icon ?? "🍽️"} className="size-6" />
+      <span className="flex min-w-0 flex-1 items-baseline gap-2 leading-[1.1]">
+        <span className="truncate text-base font-bold">{meal.name || "Meal"}</span>
+        <span className="truncate text-sm font-semibold opacity-75">{timeLabel(start)}</span>
+      </span>
+      <SideHandles byDay fullHeight columns={columns} c0={run.c0} c1={run.c1} onPreview={setSpreading} onDone={onSpread} />
+      <div {...drag.handleHandlers} aria-hidden className="absolute inset-x-4 bottom-0 flex h-2.5 cursor-ns-resize touch-none items-end justify-center pb-0.5">
+        <span className="h-1 w-8 rounded-full bg-meal-ink/40" />
+      </div>
+    </div>
+  );
+}
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const CHOICES_PER_PAGE = 11;
+
+/**
+ * The editor for a meal block: its name, picture, usual time and length,
+ * who has it, and what goes on it each weekday (Tuesday dinner is Tacos).
+ * Presets fill the weekly review; each day can still be changed there.
+ */
+function MealEditor({
+  meal,
+  uses,
+  choices,
+  weekStartsOn,
+  onChange,
+  onRemoveUse,
+  onRemove,
+}: {
+  meal: DraftMealBlock;
+  uses: { id: string; member: ManagerMember | undefined; dayType: ManagerDayType | undefined }[];
+  choices: MealChoices;
+  weekStartsOn: 0 | 1;
+  onChange: (patch: Partial<DraftMealBlock>) => void;
+  onRemoveUse: (id: string) => void;
+  onRemove: () => void;
+}) {
+  const [day, setDay] = useState<number | null>(null);
+  const days = Array.from({ length: 7 }, (_, i) => (i + weekStartsOn) % 7);
+  const look = (value: string | null) => {
+    if (!value) return null;
+    const id = value.slice(2);
+    const found = value.startsWith("c:") ? choices.kinds.find((k) => k.id === id) : choices.meals.find((m) => m.id === id);
+    return found ? { name: found.name, icon: found.icon } : null;
+  };
+  const setPreset = (weekday: number, value: string | null) => onChange({ presets: meal.presets.map((p, i) => (i === weekday ? value : p)) });
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2.5">
+        <EmojiPicker
+          initial={meal.icon ?? ""}
+          fieldName=""
+          nameText={meal.name}
+          onChange={(icon) => onChange({ icon: icon || null })}
+          label={`Picture for ${meal.name || "this meal"}`}
+          className="size-14! self-center!"
+          fullScreen
+        />
+        <input
+          value={meal.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          maxLength={30}
+          aria-label="Meal name"
+          placeholder="Like Dinner"
+          className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
+        />
+        <button type="button" onClick={onRemove} className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-danger px-3 text-base font-bold text-danger">
+          <Trash size="1.125rem" weight="bold" aria-hidden />
+          Delete
+        </button>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink-muted">
+        {uses.length === 0 ? <span>Nobody has this meal yet. Tap + above a column, then Meal.</span> : <span>Eaten by</span>}
+        {uses.map(({ id, member, dayType }) => (
+          <span key={id} className="flex h-8 items-center gap-1 rounded-full pr-1 pl-2.5 text-ink" style={{ background: soft(member?.colour) }}>
+            {member?.name ?? "?"} · {dayType?.name ?? "?"}
+            <button type="button" onClick={() => onRemoveUse(id)} aria-label={`Take it off ${member?.name}'s ${dayType?.name}`} className="flex size-6 items-center justify-center rounded-full hover:bg-board">
+              <X size="0.875rem" weight="bold" aria-hidden />
+            </button>
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-end gap-2.5">
+        <Labelled label="Usually at">
+          <input type="time" value={meal.usual_time} onChange={(e) => e.target.value && onChange({ usual_time: e.target.value })} className={fieldClass} />
+        </Labelled>
+        <Labelled label="Eating takes (min)">
+          <NumberField value={meal.minutes} min={MEAL_MINUTES.min} max={MEAL_MINUTES.max} onChange={(v) => onChange({ minutes: v })} />
+        </Labelled>
+      </div>
+      <p className="mt-2 text-base text-ink-muted">Moving a meal on the calendar changes only that day. This is its usual time.</p>
+
+      <h3 className="mt-4 text-xl font-bold text-ink">Every week</h3>
+      <p className="text-base text-ink-muted">Put a kind of meal or one meal on a day, like Tacos on Tuesday. The weekly review fills it in, and you can still change any day there.</p>
+      <div className="mt-2 grid grid-cols-7 gap-1.5">
+        {days.map((d) => {
+          const chosen = look(meal.presets[d]);
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDay(d)}
+              aria-label={`${WEEKDAY_SHORT[d]}: ${chosen?.name ?? "nothing set"}`}
+              className={`flex min-h-24 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-1 ${chosen ? "border-meal-ink/40 bg-meal text-meal-ink" : "border-dashed border-frame text-ink-muted hover:bg-rail"}`}
+            >
+              <span className="text-sm font-bold">{WEEKDAY_SHORT[d]}</span>
+              {chosen ? <Emoji emoji={chosen.icon ?? "🍽️"} className="size-8" /> : <Plus size="1.25rem" weight="bold" aria-hidden />}
+              <span className="w-full truncate text-center text-xs font-bold">{chosen?.name ?? ""}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {day !== null ? <PresetChooser weekday={WEEKDAY_SHORT[day]} mealName={meal.name} current={meal.presets[day]} choices={choices} onPick={(v) => (setPreset(day, v), setDay(null))} onClose={() => setDay(null)} /> : null}
+    </div>
+  );
+}
+
+/** Choosing a weekday's preset: a kind of meal, or one meal. Covers the editor; pages instead of scrolling. */
+function PresetChooser({
+  weekday,
+  mealName,
+  current,
+  choices,
+  onPick,
+  onClose,
+}: {
+  weekday: string;
+  mealName: string;
+  current: string | null;
+  choices: MealChoices;
+  onPick: (value: string | null) => void;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"kinds" | "meals">(current?.startsWith("m:") ? "meals" : "kinds");
+  const [page, setPage] = useState(0);
+  const list = tab === "kinds" ? choices.kinds.map((k) => ({ value: `c:${k.id}`, name: k.name, icon: k.icon })) : choices.meals.map((m) => ({ value: `m:${m.id}`, name: m.name, icon: m.icon }));
+  const pages = Math.max(1, Math.ceil(list.length / CHOICES_PER_PAGE));
+  const p = Math.min(page, pages - 1);
+  const tile = "flex min-h-0 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-1.5 text-center";
+  return (
+    <div role="dialog" aria-label={`${weekday} ${mealName}`} className="absolute inset-0 z-20 flex flex-col gap-3 bg-board">
+      <div className="flex shrink-0 items-center gap-2">
+        <h3 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">
+          {weekday} {mealName.toLowerCase() || "meal"}
+        </h3>
+        <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
+          <X size="1.25rem" weight="bold" aria-hidden />
+        </button>
+      </div>
+      <div className="flex shrink-0 gap-1 rounded-2xl bg-panel p-1.25">
+        {(["kinds", "meals"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            aria-pressed={tab === t}
+            onClick={() => (setTab(t), setPage(0))}
+            className={`flex min-h-11 flex-1 items-center justify-center rounded-xl text-base font-bold ${tab === t ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
+          >
+            {t === "kinds" ? "Kinds of meal" : "Meals"}
+          </button>
+        ))}
+      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-3 gap-2">
+        <button type="button" onClick={() => onPick(null)} className={`${tile} ${current === null ? "border-ink bg-rail" : "border-dashed border-frame hover:bg-rail"}`}>
+          <X size="1.75rem" weight="bold" aria-hidden className="text-ink-muted" />
+          <span className="text-base font-bold text-ink">Nothing</span>
+        </button>
+        {list.slice(p * CHOICES_PER_PAGE, (p + 1) * CHOICES_PER_PAGE).map((c) => (
+          <button key={c.value} type="button" onClick={() => onPick(c.value)} className={`${tile} ${c.value === current ? "border-meal-ink bg-meal" : "border-frame hover:bg-rail"}`}>
+            <Emoji emoji={c.icon ?? "🍽️"} className="size-10" />
+            <span className="line-clamp-2 text-base font-bold text-ink">{c.name}</span>
+          </button>
+        ))}
+      </div>
+      {pages > 1 ? (
+        <div className="flex shrink-0 items-center justify-center gap-3">
+          <button type="button" disabled={p === 0} onClick={() => setPage(p - 1)} className="min-h-11 rounded-xl bg-rail px-4 text-base font-bold disabled:opacity-40">
+            ‹ Earlier
+          </button>
+          <span className="text-base font-bold text-ink-muted">
+            {p + 1} of {pages}
+          </span>
+          <button type="button" disabled={p === pages - 1} onClick={() => setPage(p + 1)} className="min-h-11 rounded-xl bg-rail px-4 text-base font-bold disabled:opacity-40">
+            More ›
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * A routine on the manager's grid, covering one column or several
