@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { CaretLeft, CaretRight, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { PERSON_COLOURS, strong } from "@/lib/colours";
 import type { PanelBox } from "@/lib/panel-boxes";
@@ -64,6 +65,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
   const [tab, setTab] = useState<Tab>("people");
   const [selected, setSelected] = useState<string | null>(initial.members[0]?.id ?? null);
   const [page, setPage] = useState(0);
+  const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -101,12 +103,12 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
     const colour = PERSON_COLOURS.find((c) => !used.has(c.value))?.value ?? "blue";
     set({ members: [...draft.members, { id, name: "", role: "child", colour, icon: null, birthYear: null, hasPin: false, pin: "", pinAgain: "", removed: false }] });
     setSelected(id);
-    setPage(Math.floor(draft.members.length / PER_PAGE));
+    setPage(Math.floor(draft.members.length / perPage));
   };
 
-  const pages = Math.max(1, Math.ceil(draft.members.length / PER_PAGE));
+  const pages = Math.max(1, Math.ceil(draft.members.length / perPage));
   const p = Math.min(page, pages - 1);
-  const shown = draft.members.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
+  const shown = draft.members.slice(p * perPage, (p + 1) * perPage);
   const member = draft.members.find((m) => m.id === selected);
 
   return (
@@ -156,7 +158,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
               ) : null
             }
           >
-            <ul className="mt-2 flex flex-col gap-2">
+            <ul ref={listRef} className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
               {shown.map((m) => (
                 <li key={m.id}>
                   <button

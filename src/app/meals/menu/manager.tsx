@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowsLeftRight, CaretLeft, CaretRight, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
 import { EmptyState, Emoji, Notice, ScreenHeader, Segmented } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { BATCHES } from "@/lib/meals";
 import { menuMealIcon, menuMealName, spotSummary, type DishLike, type MenuMealLike } from "@/lib/menu";
@@ -89,6 +90,8 @@ export function MenuManager({
   // Start on the page that shows the picked kind ("Every meal" is first).
   const [kindPage, setKindPage] = useState(() => Math.floor((categories.findIndex((c) => c.id === category) + 1) / KINDS_PER_PAGE));
   const [mealPage, setMealPage] = useState(0);
+  const [kindsRef, kindsPerPage] = useFitRows<HTMLUListElement>(KINDS_PER_PAGE);
+  const [mealsRef, mealsPerPage] = useFitRows<HTMLUListElement>(MEALS_PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -132,12 +135,12 @@ export function MenuManager({
     ...categories.map((c) => ({ ...c, count: draft.filter((m) => m.categoryIds.includes(c.id)).length })),
     ...(loose.length ? [{ id: NONE, name: "Under no kind", icon: "📒", count: loose.length, active: true }] : []),
   ];
-  const kindList = paged(rows, kindPage, KINDS_PER_PAGE);
+  const kindList = paged(rows, kindPage, kindsPerPage);
   const pickedRow = rows.find((r) => r.id === picked) ?? rows[0];
 
   // Middle: that kind's meals.
   const shown = pickedRow.id === ALL ? draft : pickedRow.id === NONE ? loose : draft.filter((m) => m.categoryIds.includes(pickedRow.id));
-  const mealList = paged(shown, mealPage, MEALS_PER_PAGE);
+  const mealList = paged(shown, mealPage, mealsPerPage);
   const meal = draft.find((m) => m.id === selected) ?? null;
 
   const addMeal = () => {
@@ -152,7 +155,7 @@ export function MenuManager({
     };
     setDraft((d) => [...d, fresh]);
     setSelected(id);
-    setMealPage(Math.floor(shown.length / MEALS_PER_PAGE));
+    setMealPage(Math.floor(shown.length / mealsPerPage));
   };
 
   return (
@@ -173,7 +176,7 @@ export function MenuManager({
               Kind
             </Link>
           </div>
-          <ul className="flex min-h-0 flex-1 flex-col gap-1.5">
+          <ul ref={kindsRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
             {kindList.items.map((r) => (
               <li key={r.id} className="flex items-center gap-1">
                 <button
@@ -211,7 +214,7 @@ export function MenuManager({
               New meal
             </button>
           </div>
-          <ul className="flex min-h-0 flex-1 flex-col gap-2">
+          <ul ref={mealsRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
             {mealList.items.map((m) => (
               <li key={m.id}>
                 <button
@@ -285,7 +288,8 @@ function MealEditor({
 }) {
   const [spotPage, setSpotPage] = useState(0);
   const [choosing, setChoosing] = useState<number | null>(meal.spots.length === 1 && !meal.spots[0].recipeId && meal.id.startsWith("new-") ? 0 : null);
-  const spots = paged(meal.spots.map((s, i) => ({ s, i })), spotPage, SPOTS_PER_PAGE);
+  const [spotsRef, spotsPerPage] = useFitRows<HTMLUListElement>(SPOTS_PER_PAGE);
+  const spots = paged(meal.spots.map((s, i) => ({ s, i })), spotPage, spotsPerPage);
   const setSpot = (i: number, changes: Partial<ManagerMeal["spots"][number]>) => onChange((m) => ({ ...m, spots: m.spots.map((s, j) => (j === i ? { ...s, ...changes } : s)) }));
 
   return (
@@ -346,7 +350,7 @@ function MealEditor({
           onClick={() => {
             const side = kinds.find((k) => k.name === "Veggie") ?? kinds[0];
             onChange((m) => ({ ...m, spots: [...m.spots, { kindId: side?.id ?? null, recipeId: null, batches: 1 }] }));
-            setSpotPage(Math.floor(meal.spots.length / SPOTS_PER_PAGE));
+            setSpotPage(Math.floor(meal.spots.length / spotsPerPage));
             setChoosing(meal.spots.length);
           }}
           className={soft}
@@ -355,7 +359,7 @@ function MealEditor({
           Dish
         </button>
       </div>
-      <ul className="flex min-h-0 flex-1 flex-col gap-2">
+      <ul ref={spotsRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
         {spots.items.map(({ s, i }) => {
           const dish = s.recipeId ? dishById.get(s.recipeId) : undefined;
           const kind = s.kindId ? kindById.get(s.kindId) : undefined;

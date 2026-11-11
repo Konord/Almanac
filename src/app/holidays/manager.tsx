@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
 import { EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { describeHolidayRule, nextDate, PUBLIC_HOLIDAYS, type Birthday, type Holiday, type HolidayRule } from "@/lib/holidays";
 import { saveHolidays, type HolidayDraft } from "./actions";
@@ -39,6 +40,7 @@ export function HolidayManager({
   const [tab, setTab] = useState<Tab>("holidays");
   const [selection, setSelection] = useState<Selection>(initial.holidays.length === 0 ? { kind: "public" } : null);
   const [page, setPage] = useState(0);
+  const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
@@ -85,7 +87,7 @@ export function HolidayManager({
     .toSorted((a, b) => (a.next ?? "9999").localeCompare(b.next ?? "9999"));
   const birthdays = draft.birthdays.map((b) => ({ b, next: nextDate(b, today) })).toSorted((a, b) => (a.next ?? "").localeCompare(b.next ?? ""));
   const count = tab === "holidays" ? holidays.length : birthdays.length;
-  const pages = Math.max(1, Math.ceil(count / PER_PAGE));
+  const pages = Math.max(1, Math.ceil(count / perPage));
   const p = Math.min(page, pages - 1);
 
   const switchTab = (next: Tab) => {
@@ -141,9 +143,12 @@ export function HolidayManager({
             ))}
           </div>
 
-          <ul className="flex flex-col gap-1">
+          {count === 0 ? (
+            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet. Add some from the public list." : "No birthdays yet."}</p>
+          ) : null}
+          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
             {tab === "holidays"
-              ? holidays.slice(p * PER_PAGE, (p + 1) * PER_PAGE).map(({ h, next }) => (
+              ? holidays.slice(p * perPage, (p + 1) * perPage).map(({ h, next }) => (
                   <Row
                     key={h.id}
                     emoji={h.icon || "🎉"}
@@ -153,7 +158,7 @@ export function HolidayManager({
                     onClick={() => setSelection({ kind: "holiday", id: h.id })}
                   />
                 ))
-              : birthdays.slice(p * PER_PAGE, (p + 1) * PER_PAGE).map(({ b, next }) => (
+              : birthdays.slice(p * perPage, (p + 1) * perPage).map(({ b, next }) => (
                   <Row
                     key={b.id}
                     emoji={b.icon || "🎂"}
@@ -164,9 +169,6 @@ export function HolidayManager({
                   />
                 ))}
           </ul>
-          {count === 0 ? (
-            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet. Add some from the public list." : "No birthdays yet."}</p>
-          ) : null}
 
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
             {tab === "holidays" ? (
