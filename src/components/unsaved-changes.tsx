@@ -11,14 +11,25 @@ import { Check } from "@phosphor-icons/react";
  * back, or leave without saving.
  */
 
-/** Watches for leaving the screen while `dirty`. */
-export function useUnsavedChanges(dirty: boolean) {
+/**
+ * Watches for leaving the screen while `dirty`. `discard` puts the screen
+ * back as it was saved (the screen's Undo).
+ *
+ * The app keeps screens you've left alive in the background (so going back
+ * is quick), with everything as you left it. So leaving without saving has
+ * to throw the changes away and close the box, or they'd still be there,
+ * box and all, the next time the screen opens (Connor, 2026-11-11: two
+ * screens with changes kept sending each other back and forth).
+ */
+export function useUnsavedChanges(dirty: boolean, discard: () => void) {
   const router = useRouter();
   const [leaving, setLeaving] = useState<string | null>(null);
   const dirtyRef = useRef(dirty);
+  const discardRef = useRef(discard);
   useEffect(() => {
     dirtyRef.current = dirty;
-  }, [dirty]);
+    discardRef.current = discard;
+  });
   useEffect(() => {
     const onUnload = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) e.preventDefault();
@@ -55,8 +66,11 @@ export function useUnsavedChanges(dirty: boolean) {
     },
     leaveWithoutSaving: () => {
       if (!leaving) return;
+      const to = leaving;
       dirtyRef.current = false;
-      router.push(leaving);
+      discardRef.current();
+      setLeaving(null);
+      router.push(to);
     },
   };
 }

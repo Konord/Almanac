@@ -74,7 +74,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
-  const guard = useUnsavedChanges(dirty);
+  const guard = useUnsavedChanges(dirty, () => setDraft(initial));
 
   const set = (changes: Partial<SettingsDraft>) => {
     setError(null);

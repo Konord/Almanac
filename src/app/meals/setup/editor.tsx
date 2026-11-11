@@ -34,7 +34,7 @@ export function MealSetupEditor({ initial, categories, weekStartsOn }: { initial
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
-  const guard = useUnsavedChanges(dirty);
+  const guard = useUnsavedChanges(dirty, () => setDraft(initial));
 
   const update = (change: (d: MealSetupDraft) => MealSetupDraft) => {
     setError(null);

@@ -68,7 +68,7 @@ export function ReviewBoard({
   const [error, setError] = useState<string | null>(null);
   const [goTo, setGoTo] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.initial);
-  const guard = useUnsavedChanges(dirty);
+  const guard = useUnsavedChanges(dirty, () => setDraft(data.initial));
 
   const members: Person[] = data.members;
   const person = new Map(members.map((m) => [m.id, m]));
