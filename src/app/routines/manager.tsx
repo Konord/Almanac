@@ -1249,7 +1249,8 @@ function MealRun({
   const span = (last - first) * 60;
   const start = drag.shown.start;
   const minutes = drag.shown.minutes;
-  const tall = Math.max(minutes, 30);
+  // Short meals still get room for their name.
+  const tall = Math.max(minutes, 40);
   const box = spanBox(spreading?.[0] ?? run.c0, spreading?.[1] ?? run.c1, columns.length, GRID_GAP);
   return (
     <div
