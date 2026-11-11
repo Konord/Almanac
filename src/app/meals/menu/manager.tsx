@@ -244,13 +244,13 @@ export function MenuManager({
                       autoFocus
                       className="h-11 min-w-0 flex-1 border-b-2 border-meal-ink/50 bg-transparent px-1 text-xl font-bold text-ink outline-none focus:border-meal-ink"
                     />
-                    {r.count !== null ? <span className="text-base text-ink-muted">{r.count}</span> : null}
+                    {/* While renaming, the delete sits where the count was (Leftovers can't be deleted). */}
+                    {r.isLeftovers ? null : (
+                      <button type="button" onClick={() => removeKind(r.id)} aria-label={`Remove ${r.name || "this kind"} (keeps its meals)`} className="flex size-10 shrink-0 items-center justify-center rounded-full text-danger hover:bg-board">
+                        <Trash size="1.25rem" aria-hidden />
+                      </button>
+                    )}
                   </div>
-                  {r.isLeftovers ? null : (
-                    <button type="button" onClick={() => removeKind(r.id)} aria-label={`Remove ${r.name || "this kind"} (keeps its meals)`} className="flex size-12 shrink-0 items-center justify-center rounded-full text-danger hover:bg-rail">
-                      <Trash size="1.25rem" aria-hidden />
-                    </button>
-                  )}
                   <button type="button" onClick={() => setEditingKind(null)} aria-label="Done" className="flex size-12 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
                     <Check size="1.375rem" weight="bold" aria-hidden />
                   </button>
