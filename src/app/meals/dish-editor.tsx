@@ -294,6 +294,8 @@ export function DishEditor({
             dirtyRef.current = false;
             const to = leaving;
             setLeaving(null);
+            // Screens left behind stay alive, so throw the changes away too.
+            undo();
             router.push(to, { scroll: false });
           }}
         />

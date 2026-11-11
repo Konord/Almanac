@@ -75,7 +75,7 @@ export function SetDays({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = !sameDays(draft, initial);
-  const guard = useUnsavedChanges(dirty);
+  const guard = useUnsavedChanges(dirty, () => setDraft(initial));
   const names = Object.fromEntries(members.map((m) => [m.id, m.name]));
 
   const update = (change: (d: DaysDraft) => DaysDraft) => {

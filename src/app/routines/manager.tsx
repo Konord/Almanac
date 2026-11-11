@@ -118,7 +118,7 @@ export function RoutineManager({
   const [error, setError] = useState<string | null>(null);
   const dirty = !sameDraft(draft, initial);
 
-  const guard = useUnsavedChanges(dirty);
+  const guard = useUnsavedChanges(dirty, () => setDraft(initial));
 
   // --- Columns and where each block sits ---------------------------------------
   const columns: Column[] = useMemo(() => {

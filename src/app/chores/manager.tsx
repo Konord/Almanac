@@ -156,7 +156,7 @@ export function ChoreManager({
   const [dayPage, setDayPage] = useState(0);
   const [daysRef, daysPerPage] = useFitRows<HTMLUListElement>(DAYS_PER_PAGE);
   const dirty = !sameDraft(draft, initial);
-  const guard = useUnsavedChanges(dirty);
+  const guard = useUnsavedChanges(dirty, () => setDraft(initial));
 
   const update = (change: (d: ChoreManagerDraft) => ChoreManagerDraft) => {
     setError(null);
