@@ -170,13 +170,13 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export function daysProblem(draft: DaysDraft, names: Record<string, string> = {}): string | null {
   const who = (id: string) => names[id] ?? "Someone";
   for (const m of draft.members) {
-    if (!draft.dayTypes.some((t) => t.member_id === m.member_id)) return `${who(m.member_id)} needs at least one kind of day.`;
+    if (!draft.dayTypes.some((t) => t.member_id === m.member_id)) return `${who(m.member_id)} needs at least one day.`;
     if (!draft.weekPlans.some((p) => p.member_id === m.member_id)) return `${who(m.member_id)} needs at least one week.`;
   }
   const seen = new Set<string>();
   for (const t of draft.dayTypes) {
     const name = t.name.trim();
-    if (!name) return "Every kind of day needs a name.";
+    if (!name) return "Every day needs a name.";
     if (name.length > 30) return `"${name.slice(0, 20)}…" is too long a name (30 letters at most).`;
     const key = `${t.member_id}|${groupKey(name)}`;
     if (seen.has(key)) return `${who(t.member_id)} has two kinds of day called ${name}.`;
@@ -191,7 +191,7 @@ export function daysProblem(draft: DaysDraft, names: Record<string, string> = {}
     if (name.length > 30) return `"${name.slice(0, 20)}…" is too long a name for a week (30 letters at most).`;
     for (let weekday = 0; weekday < 7; weekday++) {
       const day = draft.planDays.find((d) => d.plan_id === p.id && d.weekday === weekday);
-      if (!day || typeOwner.get(day.day_type_id) !== p.member_id) return `Pick a kind of day for every day of ${name}.`;
+      if (!day || typeOwner.get(day.day_type_id) !== p.member_id) return `Pick a day for every day of ${name}.`;
     }
   }
   for (const m of draft.members) {
@@ -207,8 +207,8 @@ export function daysProblem(draft: DaysDraft, names: Record<string, string> = {}
   }
   for (const b of draft.breaks) {
     const name = b.name.trim();
-    if (!name) return "Every break needs a name.";
-    if (name.length > 40) return `"${name.slice(0, 20)}…" is too long a name for a break (40 letters at most).`;
+    if (!name) return "Every day off needs a name.";
+    if (name.length > 40) return `"${name.slice(0, 20)}…" is too long a name for a day off (40 letters at most).`;
     if (!DATE.test(b.start) || !DATE.test(b.end)) return `Choose the dates for ${name}.`;
     if (b.end < b.start) return `${name} ends before it starts.`;
     if (Date.parse(b.end) - Date.parse(b.start) > 366 * 86_400_000) return `${name} is longer than a year.`;

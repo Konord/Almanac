@@ -193,7 +193,6 @@ export function DishEditor({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-7 py-5">
           {tab === "recipe" ? (
             <>
-              {dirty ? <p className="mb-2 shrink-0 text-base font-bold text-ink-muted">This shows the recipe as last saved. Save to see your changes here.</p> : null}
               {view}
             </>
           ) : null}

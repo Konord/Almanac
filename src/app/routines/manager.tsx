@@ -1044,7 +1044,7 @@ function AddStep({ onAdd }: { onAdd: (text: string, icon: string) => void }) {
           if (e.key === "Enter") add();
         }}
         maxLength={80}
-        placeholder="New step, e.g. Brush teeth"
+        placeholder="New step"
         aria-label="New step"
         className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
       />

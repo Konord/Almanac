@@ -458,7 +458,6 @@ function DayPanel({
                 if (e.key === "Enter") add();
               }}
               maxLength={80}
-              placeholder="Add a chore"
               aria-label="New regular chore"
               className={`${control} min-w-0 flex-1`}
             />
@@ -562,7 +561,6 @@ function DayPanel({
               <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">
                 Next {day.is_free ? "free day" : day.name} · {dateLabel(preview.date)}
               </h3>
-              {preview.items.length === 0 ? <p className="text-base text-ink-muted">Nothing on it yet.</p> : null}
               <ul className="flex flex-col gap-1">
                 {preview.items.slice(0, PREVIEW_SHOWN).map((item, i) => (
                   <li key={i} className={`flex items-center gap-2 text-base font-semibold ${item.occasional ? "text-accent" : "text-ink"}`}>
@@ -573,9 +571,7 @@ function DayPanel({
               </ul>
               {preview.items.length > PREVIEW_SHOWN ? <p className="text-base font-bold text-ink-muted">+{preview.items.length - PREVIEW_SHOWN} more</p> : null}
             </>
-          ) : (
-            <p className="text-base text-ink-muted">{dayId.startsWith(NEW_PREFIX) ? "Save to see when it comes round next." : "Not in the next two weeks."}</p>
-          )}
+          ) : null}
           {day.is_free ? null : confirmRemove ? (
             <div className="mt-auto flex flex-col gap-2">
               <p className="text-base font-bold text-danger">Remove {day.name} and its {regular.length} regular chores?</p>

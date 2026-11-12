@@ -454,7 +454,6 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 value={g.name}
                 onChange={(e) => setGroup(g.group, { name: e.target.value })}
                 maxLength={30}
-                placeholder="e.g. School day"
                 aria-label="Day name"
                 className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
               />
@@ -622,7 +621,6 @@ function KindHeadsUps({
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={80}
-                  placeholder="Pack a lunch"
                   className="min-h-11 rounded-xl border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
                 />
               </label>
@@ -824,7 +822,6 @@ function BreakEditor({
           value={item.name}
           onChange={(e) => set({ name: e.target.value })}
           maxLength={40}
-          placeholder="e.g. Winter break"
           aria-label="Name"
           className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
         />

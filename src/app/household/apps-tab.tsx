@@ -140,7 +140,7 @@ function AppEditor({ app, onChange }: { app: AppDraft; onChange: (c: Partial<App
         <EmojiPicker initial={app.icon ?? ""} fieldName="" nameText={app.name} letter fullScreen label={`Picture for ${app.name || "this app"}`} onChange={(icon) => onChange({ icon: icon || null })} />
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="text-base font-bold text-ink">Name</span>
-          <input value={app.name} onChange={(e) => onChange({ name: e.target.value })} maxLength={30} placeholder="Jellyfin" className={inputClass} autoFocus={!app.name} />
+          <input value={app.name} onChange={(e) => onChange({ name: e.target.value })} maxLength={30} className={inputClass} autoFocus={!app.name} />
         </label>
       </div>
 
@@ -204,7 +204,7 @@ function AppEditor({ app, onChange }: { app: AppDraft; onChange: (c: Partial<App
       ) : (
         <label className="flex flex-col gap-1.5">
           <span className="text-base font-bold text-ink">Program name in the launcher&apos;s list</span>
-          <input value={app.localKey} onChange={(e) => onChange({ localKey: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} maxLength={40} autoCapitalize="off" spellCheck={false} placeholder="steam" className={inputClass} />
+          <input value={app.localKey} onChange={(e) => onChange({ localKey: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} maxLength={40} autoCapitalize="off" spellCheck={false} className={inputClass} />
         </label>
       )}
 

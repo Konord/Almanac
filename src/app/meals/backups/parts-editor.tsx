@@ -41,7 +41,7 @@ export function PartsEditor({ recipeId, name, icon, initial, returnTo }: { recip
       <div className="flex min-h-0 flex-1 flex-col gap-2">
         {parts.map((p, i) => (
           <div key={i} className="grid grid-cols-[minmax(0,1fr)_9rem_9rem_9rem_3.5rem] items-center gap-2">
-            <input aria-label="Part" className={cell} value={p.name} placeholder="Frozen lasagne" maxLength={60} onChange={(e) => change(i, { name: e.target.value })} />
+            <input aria-label="Part" className={cell} value={p.name} maxLength={60} onChange={(e) => change(i, { name: e.target.value })} />
             <input aria-label="One meal uses" className={cell} value={p.uses} inputMode="decimal" onChange={(e) => change(i, { uses: e.target.value })} />
             <input aria-label="Have now" className={cell} value={p.onHand} inputMode="decimal" onChange={(e) => change(i, { onHand: e.target.value })} />
             <input aria-label="Keep at least" className={cell} value={p.keep} inputMode="decimal" onChange={(e) => change(i, { keep: e.target.value })} />

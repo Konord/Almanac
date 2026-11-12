@@ -55,10 +55,10 @@ export function IngredientsEditor({ rows, setRows }: { rows: IngredientDraft[]; 
           const i = from + k;
           return (
             <div key={i} className="grid grid-cols-[7rem_8rem_minmax(0,1fr)_minmax(0,0.8fr)_10rem_3.5rem] items-center gap-2">
-              <input aria-label="Amount" className={cell} value={row.amount} inputMode="decimal" placeholder="1.5" onChange={(e) => change(i, { amount: e.target.value })} />
-              <input aria-label="Unit" className={cell} value={row.unit} placeholder="cup" maxLength={20} onChange={(e) => change(i, { unit: e.target.value })} />
-              <input aria-label="Ingredient" className={cell} value={row.name} placeholder="Ground beef" maxLength={60} onChange={(e) => change(i, { name: e.target.value })} />
-              <input aria-label="Note" className={cell} value={row.note} placeholder="diced" maxLength={80} onChange={(e) => change(i, { note: e.target.value })} />
+              <input aria-label="Amount" className={cell} value={row.amount} inputMode="decimal" onChange={(e) => change(i, { amount: e.target.value })} />
+              <input aria-label="Unit" className={cell} value={row.unit} maxLength={20} onChange={(e) => change(i, { unit: e.target.value })} />
+              <input aria-label="Ingredient" className={cell} value={row.name} maxLength={60} onChange={(e) => change(i, { name: e.target.value })} />
+              <input aria-label="Note" className={cell} value={row.note} maxLength={80} onChange={(e) => change(i, { note: e.target.value })} />
               <button
                 type="button"
                 aria-pressed={row.putAway}
@@ -132,7 +132,6 @@ export function StepsEditor({
                   rows={2}
                   onChange={(e) => change(i, { text: e.target.value })}
                   className="min-h-0 flex-1 resize-none rounded-[var(--radius)] border-2 border-frame bg-board p-3 text-lg text-ink outline-none focus:border-accent"
-                  placeholder="Bake for 45 minutes at 375°F."
                 />
                 <div className="flex flex-wrap gap-2">
                   {step.helpers.map((h) => (

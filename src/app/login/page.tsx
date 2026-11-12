@@ -13,7 +13,7 @@ export default function LoginPage(props: PageProps<"/login">) {
           <Field label="Email">
             <Input name="email" type="email" autoComplete="email" required />
           </Field>
-          <Field label="Password" hint="At least 8 characters.">
+          <Field label="Password">
             <Input name="password" type="password" autoComplete="current-password" required minLength={8} />
           </Field>
           <div className="flex flex-wrap gap-3">

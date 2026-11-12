@@ -142,7 +142,7 @@ export function EventCardFields({
                   <EmojiPicker initial={defaults.icon} />
                   <div className="min-w-0 flex-1">
                     <Field label="What">
-                      <Input name="title" required maxLength={120} placeholder="Dentist, Hockey practice…" autoFocus={adding} defaultValue={defaults.title} />
+                      <Input name="title" required maxLength={120} autoFocus={adding} defaultValue={defaults.title} />
                     </Field>
                   </div>
                 </div>

@@ -135,7 +135,7 @@ export function EmojiPicker({
                 setQuery(e.target.value);
                 setPage(0);
               }}
-              placeholder="Search, e.g. hockey, dog, cake"
+              placeholder="Search"
               className="min-w-0 flex-1 bg-transparent text-lg text-ink outline-none"
               autoFocus
             />

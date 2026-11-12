@@ -114,7 +114,7 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
             <input type="hidden" name="returnTo" value={here({ new: "1" })} />
             <input type="hidden" name="backup" value="1" />
             <Field label="Name">
-              <Input name="name" placeholder="Frozen lasagne night" maxLength={80} required className="w-[30rem]" />
+              <Input name="name" maxLength={80} required className="w-[30rem]" />
             </Field>
             <Button>Next: its parts</Button>
           </form>
