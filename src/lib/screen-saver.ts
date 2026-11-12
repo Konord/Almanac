@@ -277,7 +277,8 @@ export type ArtChoice = { label: string; why: "birthday" | "holiday" | "mixed in
  * shows only that folder. A holiday within its "only this art" days shows
  * only its own (the nearest one, if two overlap). Any other day picks
  * General or seasonal, where seasonal means the season's folder and any
- * holiday that's mixing in, shared equally.
+ * holiday that's mixing in, shared equally. A day with none of those
+ * picks from everything else, so there's always a painting.
  */
 export function artChoices(date: LocalDate, folders: ArtFolder[], holidays: HolidayArt[], birthdays: BirthdayArt[], seasonal: SeasonalShare): ArtChoice[] {
   const year = Number(date.slice(0, 4));
@@ -311,7 +312,15 @@ export function artChoices(date: LocalDate, folders: ArtFolder[], holidays: Holi
   const share = general ? (side.length ? SHARE[seasonal] : 0) : 1;
   const out: ArtChoice[] = side.map((c) => ({ ...c, weight: share / side.length }));
   if (general && share < 1) out.push({ label: general.name, why: "general", files: general.files, weight: 1 - share });
-  return out.filter((c) => c.weight > 0 && c.files.length > 0);
+  const found = out.filter((c) => c.weight > 0 && c.files.length > 0);
+  if (found.length) return found;
+
+  // Nothing for today (no General folder yet, say): any painting that isn't
+  // saved for a holiday or a birthday, or failing that, any painting at all.
+  const kept = new Set([...holidays.map((h) => folderNamed(folders, h.name)), ...birthdays.map((b) => folderNamed(folders, b.name, true))]);
+  const free = folders.filter((f) => !kept.has(f)).flatMap((f) => f.files);
+  const any = free.length ? free : folders.flatMap((f) => f.files);
+  return any.length ? [{ label: "All paintings", why: "general", files: any, weight: 1 }] : [];
 }
 
 /**
