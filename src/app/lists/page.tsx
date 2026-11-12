@@ -233,6 +233,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           </Card>
         ) : (
           <Card title="No lists yet" icon={ListChecks} tint="teal">
+            {null}
           </Card>
         )}
 
