@@ -109,8 +109,9 @@ body {
  * The art screen saver's mat (src/components/screen-saver.tsx), like a
  * Samsung Frame TV: a thin, even mat around the painting at its own shape.
  * The depth comes from the cut bevel, its four faces shaded as if lit from
- * above (the top face in shade, the bottom one catching the light), and
- * the soft shadow the mat casts onto the painting just below it.
+ * above (the top face in slight shade, the bottom one catching the light),
+ * and the soft shadow the mat casts onto the painting just below it. The
+ * bevel runs straight on from the mat with no edge line (Connor, 2026-11-12).
  * --mat is the mat colour and --core the bevel's paper core.
  */
 .art-mat {
@@ -121,16 +122,14 @@ body {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.42 0 0 0 0 0.36 0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 .art-opening {
+  /* One continuous mat: the bevel is the same board, cut at an angle, so
+     there's no line or shadow where it meets the face of the mat. */
   position: relative;
   border: 0.32vw solid;
-  border-top-color: color-mix(in srgb, var(--core) 72%, #6d6252);
-  border-left-color: color-mix(in srgb, var(--core) 84%, #6d6252);
-  border-right-color: color-mix(in srgb, var(--core) 96%, #6d6252);
+  border-top-color: color-mix(in srgb, var(--core) 80%, #6d6252);
+  border-left-color: color-mix(in srgb, var(--core) 89%, #6d6252);
+  border-right-color: color-mix(in srgb, var(--core) 97%, #6d6252);
   border-bottom-color: var(--core);
-  box-shadow:
-    0 0 0 0.05vw color-mix(in srgb, var(--mat) 70%, #000),
-    0 -0.08vw 0 0.05vw rgb(255 255 255 / 0.35),
-    0 0.12vw 0.3vw 0.05vw rgb(0 0 0 / 0.1);
 }
 .art-opening img {
   display: block;
@@ -145,9 +144,8 @@ body {
   inset: 0;
   pointer-events: none;
   box-shadow:
-    inset 0 0.5vw 0.7vw -0.3vw rgb(0 0 0 / 0.5),
-    inset 0.35vw 0 0.6vw -0.35vw rgb(0 0 0 / 0.3),
-    inset 0 0 0 0.05vw rgb(0 0 0 / 0.25);
+    inset 0 0.45vw 0.6vw -0.3vw rgb(0 0 0 / 0.38),
+    inset 0.3vw 0 0.5vw -0.3vw rgb(0 0 0 / 0.22);
 }
 @keyframes art-fade-in {
   from {
