@@ -86,3 +86,117 @@ export function datesBetween(from: LocalDate, to: LocalDate): LocalDate[] {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// The Habits page (2026-11-12): habits from routines and the Habit Manager
+// ---------------------------------------------------------------------------
+
+/**
+ * A tracked step is one habit per person, matched by its name across
+ * routines (Connor, 2026-11-12): "Brush teeth" in the weekday and the
+ * weekend bedtime routine is one habit, so weekends don't break the
+ * streak. Renaming one of them keeps them apart.
+ */
+export function stepKey(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export type Frequency = "daily" | "days" | "week" | "month";
+
+/** How a Habit Manager habit works. */
+export type HabitRule = {
+  measure: "check" | "count";
+  /** For count habits: how much makes a day. 1 for check habits. */
+  goal: number;
+  frequency: Frequency;
+  /** For "days": the weekdays it's on (0 = Sunday). */
+  weekdays: number[];
+  /** For "week" and "month": how many days in each. */
+  times: number;
+  since: LocalDate;
+};
+
+/** 0 = Sunday … 6 = Saturday. */
+export function weekdayOf(date: LocalDate): number {
+  return new Date(`${date}T12:00:00Z`).getUTCDay();
+}
+
+/** Is a daily or some-days habit on that day? Week and month habits can be done on any day. */
+export function habitOn(rule: Pick<HabitRule, "frequency" | "weekdays">, date: LocalDate): boolean {
+  return rule.frequency === "days" ? rule.weekdays.includes(weekdayOf(date)) : true;
+}
+
+/** Is a day's amount enough? */
+export function dayMet(rule: Pick<HabitRule, "measure" | "goal">, amount: number): boolean {
+  return rule.measure === "check" ? amount > 0 : amount >= rule.goal;
+}
+
+/** A Habit Manager habit's day, for a daily or some-days habit (like habitDay for routines). */
+export function ruleDay(rule: HabitRule, date: LocalDate, amount: number, today: LocalDate): HabitDay {
+  return habitDay({ date, scheduled: habitOn(rule, date), done: dayMet(rule, amount), survival: false }, rule.since, today);
+}
+
+/** The Monday a date's week starts on (habit weeks run Monday to Sunday, like the 12-month calendars). */
+export function weekStart(date: LocalDate): LocalDate {
+  return addDaysTo(date, -((weekdayOf(date) + 6) % 7));
+}
+
+export type PeriodStatus = "done" | "missed" | "open" | "future" | "off";
+
+export type HabitPeriod = {
+  from: LocalDate;
+  to: LocalDate;
+  status: PeriodStatus;
+  /** Days met in the period, against the habit's `times`. */
+  met: number;
+};
+
+/** The weeks (Monday to Sunday) or months that cover from…to, each with how it went. */
+export function habitPeriods(rule: HabitRule, from: LocalDate, to: LocalDate, amountOn: (date: LocalDate) => number, today: LocalDate): HabitPeriod[] {
+  const out: HabitPeriod[] = [];
+  let start = rule.frequency === "month" ? `${from.slice(0, 7)}-01` : weekStart(from);
+  while (start <= to) {
+    const end = rule.frequency === "month" ? addDaysTo(`${addMonthTo(start)}`, -1) : addDaysTo(start, 6);
+    let met = 0;
+    for (const date of datesBetween(start, end < today ? end : today)) if (date >= rule.since && dayMet(rule, amountOn(date))) met += 1;
+    const status: PeriodStatus =
+      met >= rule.times ? "done" : end < rule.since ? "off" : start > today ? "future" : end >= today ? "open" : "missed";
+    out.push({ from: start, to: end, status, met });
+    start = addDaysTo(end, 1);
+  }
+  return out;
+}
+
+/** Streaks over weeks or months: like habitStats, where each period is one step. */
+export function periodStats(periods: HabitPeriod[]): HabitStats {
+  return habitStats(periods.map((p) => (p.status === "done" ? "done" : p.status === "missed" ? "missed" : "off")));
+}
+
+function addDaysTo(date: LocalDate, days: number): LocalDate {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** The first of the next month. */
+function addMonthTo(firstOfMonth: LocalDate): LocalDate {
+  const [y, m] = firstOfMonth.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+}
+
+/** The dates of a month ("2026-11"), first to last. */
+export function monthDates(month: string): LocalDate[] {
+  return datesBetween(`${month}-01`, addDaysTo(addMonthTo(`${month}-01`), -1));
+}
+
+/** A month ("2026-11") moved by some months. */
+export function shiftMonth(month: string, by: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const n = y * 12 + (m - 1) + by;
+  return `${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, "0")}`;
+}
+
+/** How a count chart's y-axis tops out: a round number a bit above the goal and the biggest day. */
+export function chartTop(goal: number, biggest: number): number {
+  const want = Math.max(goal * 2, biggest, 1);
+  const step = want <= 10 ? 2 : want <= 50 ? 10 : want <= 200 ? 50 : 100;
+  return Math.ceil(want / step) * step;
+}

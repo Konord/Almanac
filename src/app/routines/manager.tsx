@@ -36,8 +36,6 @@ export type MealChoices = {
 type Column = { key: string; member: ManagerMember; dayType: ManagerDayType | null; title: string; icon: string | null };
 
 const STEPS_PER_PAGE = 7;
-/** Habit tracking (Track) is hidden for now: no history on screen (Connor, 2026-11-10). Ticks are still recorded. */
-const SHOW_HABITS = false;
 const ANCHOR_LABEL: Record<Anchor, string> = {
   wake: "After wake-up",
   bed: "Ends by bedtime",
@@ -232,7 +230,7 @@ export function RoutineManager({
     const onList = steps.length > 0 && dailyListState(steps) === "all";
     update((d) => ({
       ...d,
-      steps: [...d.steps, { id: newId(), routine_id: routine.id, text: text.trim(), icon: icon || null, habit: true, member_ids: [], daily_list: onList }],
+      steps: [...d.steps, { id: newId(), routine_id: routine.id, text: text.trim(), icon: icon || null, habit_since: null, member_ids: [], daily_list: onList }],
     }));
     setStepPage(Math.floor(steps.length / stepsPerPage));
   };
@@ -690,16 +688,17 @@ export function RoutineManager({
                       >
                         <ListChecks size="1.125rem" weight="bold" aria-hidden />
                       </SmallButton>
-                      {SHOW_HABITS && routine.habit_since ? (
+                      {/* Track one step as a habit on the Habits page (2026-11-12). Not needed when the whole routine is tracked. */}
+                      {routine.habit_since ? null : (
                         <SmallButton
-                          label={step.habit ? `Stop tracking ${step.text}` : `Track ${step.text} as a habit`}
-                          pressed={step.habit}
-                          onClick={() => setStep(step.id, { habit: !step.habit })}
-                          tone={step.habit ? "on" : "plain"}
+                          label={step.habit_since ? `Stop tracking ${step.text}` : `Track ${step.text} as a habit`}
+                          pressed={Boolean(step.habit_since)}
+                          onClick={() => setStep(step.id, { habit_since: step.habit_since ? null : today })}
+                          tone={step.habit_since ? "on" : "plain"}
                         >
                           <ChartLineUp size="1.125rem" weight="bold" aria-hidden />
                         </SmallButton>
-                      ) : null}
+                      )}
                       <SmallButton label={`Move ${step.text} up`} disabled={index === 0} onClick={() => moveStep(step.id, -1)}>
                         <ArrowUp size="1.125rem" weight="bold" aria-hidden />
                       </SmallButton>
@@ -720,12 +719,6 @@ export function RoutineManager({
                     <ListChecks size="1rem" weight="bold" aria-hidden />
                     Blue = on the Daily list
                   </span>
-                  {SHOW_HABITS && routine.habit_since ? (
-                    <span className="flex items-center gap-1.5 text-success">
-                      <ChartLineUp size="1rem" weight="bold" aria-hidden />
-                      Green = tracked
-                    </span>
-                  ) : null}
                 </span>
               </div>
               <AddStep key={routine.id} onAdd={addStep} />
@@ -779,13 +772,11 @@ export function RoutineManager({
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" />
-                  {SHOW_HABITS ? (
-                    <Switch
-                      on={Boolean(routine.habit_since)}
-                      onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
-                      label="Track"
-                    />
-                  ) : null}
+                  <Switch
+                    on={Boolean(routine.habit_since)}
+                    onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
+                    label="Track"
+                  />
                   <Switch
                     on={listState === "all"}
                     partly={listState === "some"}

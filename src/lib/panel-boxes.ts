@@ -1,7 +1,8 @@
 /*
  * The boxes the Today panel's working part flips between with its arrows
  * (Connor, 2026-11-10): the daily list, Up next, any list (To-do,
- * Groceries…), today's routines and the chore bucket. Each household picks
+ * Groceries…), today's routines, habits to tick or count, health logging
+ * (2026-11-12) and the chore bucket. Each household picks
  * which ones show in Settings; they always come in the same order.
  */
 
@@ -12,8 +13,13 @@ export const FIXED_BOXES = {
   today: "Daily list",
   upnext: "Up next",
   routines: "Routines",
+  habits: "Habits",
+  health: "Health",
   bucket: "Chores",
 } as const;
+
+/** What a box's id can look like: a fixed box, or a list's id. */
+export const BOX_ID = /^(today|upnext|routines|habits|health|bucket|[0-9a-f-]{36})$/;
 
 type ListLike = { id: string; name: string; is_chores: boolean };
 
@@ -25,6 +31,8 @@ export function allBoxes(lists: ListLike[]): PanelBox[] {
     // The Chores list isn't a box of its own: the Chores box shows it (Connor, 2026-11-11: one "Chores").
     ...lists.filter((l) => !l.is_chores).map((l) => ({ id: l.id, name: l.name })),
     { id: "routines", name: FIXED_BOXES.routines },
+    { id: "habits", name: FIXED_BOXES.habits },
+    { id: "health", name: FIXED_BOXES.health },
     { id: "bucket", name: FIXED_BOXES.bucket },
   ];
 }

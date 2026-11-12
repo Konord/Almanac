@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { combineDays, datesBetween, habitDay, habitStats, type HabitDay } from "./habits.ts";
+import { chartTop, combineDays, datesBetween, habitDay, habitPeriods, habitStats, monthDates, periodStats, ruleDay, shiftMonth, stepKey, weekStart, type HabitDay, type HabitRule } from "./habits.ts";
 
 const today = "2026-11-07";
 const since = "2026-11-01";
@@ -43,4 +43,56 @@ test("a routine's day needs every tracked step", () => {
 test("dates between", () => {
   assert.deepEqual(datesBetween("2026-10-30", "2026-11-02"), ["2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02"]);
   assert.deepEqual(datesBetween("2026-11-02", "2026-11-01"), []);
+});
+
+test("tracked steps match by name, whatever the spacing or capitals", () => {
+  assert.equal(stepKey("Brush teeth"), stepKey("  brush   Teeth "));
+  assert.notEqual(stepKey("Brush teeth"), stepKey("Brush teeth (night)"));
+});
+
+const rule = (extra: Partial<HabitRule> = {}): HabitRule => ({ measure: "check", goal: 1, frequency: "daily", weekdays: [], times: 1, since: "2026-11-01", ...extra });
+
+test("a Habit Manager habit's day", () => {
+  // 2026-11-09 is a Monday, 2026-11-08 a Sunday.
+  const weekdays = rule({ frequency: "days", weekdays: [1, 2, 3, 4, 5] });
+  assert.equal(ruleDay(weekdays, "2026-11-09", 0, "2026-11-12"), "missed");
+  assert.equal(ruleDay(weekdays, "2026-11-08", 0, "2026-11-12"), "off");
+  const water = rule({ measure: "count", goal: 8 });
+  assert.equal(ruleDay(water, "2026-11-09", 6, "2026-11-12"), "missed");
+  assert.equal(ruleDay(water, "2026-11-09", 8, "2026-11-12"), "done");
+  assert.equal(ruleDay(water, "2026-11-12", 3, "2026-11-12"), "open");
+});
+
+test("weekly habits count met days in each Monday-to-Sunday week", () => {
+  const swim = rule({ frequency: "week", times: 2 });
+  const done = new Set(["2026-11-03", "2026-11-05", "2026-11-10"]);
+  const periods = habitPeriods(swim, "2026-11-01", "2026-11-30", (d) => (done.has(d) ? 1 : 0), "2026-11-12");
+  assert.deepEqual(
+    periods.map((p) => [p.from, p.status, p.met]),
+    [
+      ["2026-10-26", "missed", 0],
+      ["2026-11-02", "done", 2],
+      ["2026-11-09", "open", 1],
+      ["2026-11-16", "future", 0],
+      ["2026-11-23", "future", 0],
+      ["2026-11-30", "future", 0],
+    ],
+  );
+  assert.equal(periodStats(periods).streak, 1);
+  const monthly = habitPeriods(rule({ frequency: "month", since: "2026-10-15" }), "2026-09-01", "2026-11-30", (d) => (d === "2026-10-20" ? 1 : 0), "2026-11-12");
+  assert.deepEqual(monthly.map((p) => [p.from, p.to, p.status]), [
+    ["2026-09-01", "2026-09-30", "off"],
+    ["2026-10-01", "2026-10-31", "done"],
+    ["2026-11-01", "2026-11-30", "open"],
+  ]);
+});
+
+test("months and chart tops", () => {
+  assert.equal(monthDates("2026-02").length, 28);
+  assert.equal(shiftMonth("2026-01", -1), "2025-12");
+  assert.equal(shiftMonth("2026-11", 2), "2027-01");
+  assert.equal(weekStart("2026-11-08"), "2026-11-02");
+  assert.equal(chartTop(20, 26), 40);
+  assert.equal(chartTop(8, 3), 20);
+  assert.equal(chartTop(3, 0), 6);
 });

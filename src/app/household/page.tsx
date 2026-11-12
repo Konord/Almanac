@@ -48,6 +48,7 @@ async function HouseholdContent() {
     currency: settings.currency,
     weekStartsOn: settings.weekStartsOn,
     monthStyle: settings.monthStyle,
+    habitsView: settings.habitsView,
     units: settings.units,
     temperatureUnit: settings.temperatureUnit,
     measures: settings.measures,

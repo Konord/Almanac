@@ -43,6 +43,7 @@ export async function saveHousehold(draft: SettingsDraft): Promise<Result> {
     currency: draft.currency.trim().toUpperCase(),
     weekStartsOn: draft.weekStartsOn === 1 ? 1 : 0,
     monthStyle: draft.monthStyle === "calendar" ? "calendar" : "rolling",
+    habitsView: draft.habitsView === "rings" ? "rings" : "lines",
     units: draft.units === "imperial" ? "imperial" : "metric",
     temperatureUnit: draft.temperatureUnit === "fahrenheit" ? "fahrenheit" : "celsius",
     measures: draft.measures === "us" ? "us" : "canadian",

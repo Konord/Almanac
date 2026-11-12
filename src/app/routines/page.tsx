@@ -49,7 +49,7 @@ async function Manager() {
       routine_id: s.template_id,
       text: s.text,
       icon: s.icon,
-      habit: s.habit,
+      habit_since: s.habit_since,
       member_ids: s.member_ids,
       daily_list: s.daily_list,
     })),
