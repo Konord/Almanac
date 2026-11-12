@@ -127,7 +127,7 @@ export function MealBox({
 
   const mainId = meal ? mainDish(meal.dishes) : null;
   const menuMeal = meal?.menuMealId ? menuMeals.find((m) => m.id === meal.menuMealId) : undefined;
-  const title = meal ? (menuMeal?.name ?? (mainId ? dish.get(mainId)?.name : undefined) ?? category.get(meal.categoryId ?? "")?.name ?? "Custom meal") : `What's for ${target.where.split(" · ")[0].toLowerCase()}?`;
+  const title = meal ? (menuMeal?.name ?? (mainId ? dish.get(mainId)?.name : undefined) ?? category.get(meal.categoryId ?? "")?.name ?? meal.name ?? "Custom meal") : `What's for ${target.where.split(" · ")[0].toLowerCase()}?`;
   const icon = meal ? (menuMeal?.icon ?? (mainId ? dish.get(mainId)?.icon : undefined) ?? category.get(meal.categoryId ?? "")?.icon ?? "🍽️") : "🍽️";
 
   // --- The middle -----------------------------------------------------------

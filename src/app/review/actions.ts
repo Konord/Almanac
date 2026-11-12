@@ -122,6 +122,12 @@ export async function saveReview(week: string, draft: ReviewDraft): Promise<Save
   return { ok: true };
 }
 
+/** A meal's own name, trimmed and short enough to keep (null: none). */
+function cleanName(meal: DraftMeal): string | null {
+  const name = (meal.name ?? "").trim().slice(0, 60);
+  return name.length > 0 ? name : null;
+}
+
 /** Writes the draft's meals (and their dishes) on the open days. Returns a problem, or null. */
 async function saveMeals(householdId: string, timeZone: string, draft: ReviewDraft, dates: string[]): Promise<string | null> {
   const entries = Object.entries(draft.meals);
@@ -176,8 +182,8 @@ async function saveMeals(householdId: string, timeZone: string, draft: ReviewDra
     if (isNewMeal(id)) {
       if (!meal || !open.has(meal.date)) continue;
       const list = cleanDishes(meal);
-      // A meal with nothing in it (no kind, no dishes) isn't worth keeping.
-      if (list.length === 0 && !meal.categoryId) continue;
+      // A meal with nothing in it (no name, kind or dishes) isn't worth keeping.
+      if (list.length === 0 && !meal.categoryId && !cleanName(meal)) continue;
       const { data, error } = await supabase
         .from("meals")
         .insert({
@@ -187,6 +193,7 @@ async function saveMeals(householdId: string, timeZone: string, draft: ReviewDra
           category_id: meal.categoryId,
           menu_meal_id: meal.menuMealId && menuIds.has(meal.menuMealId) ? meal.menuMealId : null,
           recipe_id: list.find((d) => d.recipe_id)?.recipe_id ?? null,
+          name: cleanName(meal),
           sort_order: 10,
         })
         .select("id")
@@ -213,6 +220,7 @@ async function saveMeals(householdId: string, timeZone: string, draft: ReviewDra
         recipe_id: list.find((d) => d.recipe_id)?.recipe_id ?? null,
         servings: null,
         from_preset: false,
+        name: cleanName(meal),
       })
       .eq("id", id);
     if (error) return error.message;
