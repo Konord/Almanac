@@ -89,7 +89,14 @@ export type PlannableChore = {
 };
 
 /** A one-off chore: a list task waiting for a day (its chore day's, if it has one). */
-export type OneOffChore = { id: string; chore_day_id: string | null; tags?: ChoreTag[]; big?: boolean };
+export type OneOffChore = {
+  id: string;
+  chore_day_id: string | null;
+  tags?: ChoreTag[];
+  big?: boolean;
+  /** Put off (on the Planner): not placed before this day. */
+  not_before?: LocalDate | null;
+};
 
 export type PlanItem = {
   id: string;
@@ -292,9 +299,9 @@ export function planChoreDays(input: {
   for (const one of waiting) {
     const item = oneOffItem(one);
     const ids = one.chore_day_id ? [one.chore_day_id] : [];
-    const fits = (d: PlanDay) => takes(d, ids) && room(d, item);
+    const fits = (d: PlanDay) => (!one.not_before || d.date >= one.not_before) && takes(d, ids) && room(d, item);
     let chosen: PlanDay | undefined;
-    if (one.tags?.includes("essential") && first && takes(first, ids)) chosen = first;
+    if (one.tags?.includes("essential") && first && takes(first, ids) && !(one.not_before && one.not_before > first.date)) chosen = first;
     if (item.errand) chosen ??= days.find((d) => d.errands && fits(d)) ?? days.find((d) => d.items.some((i) => i.errand) && fits(d));
     chosen ??= days.find(fits);
     if (chosen) chosen.items.push(item);

@@ -2,16 +2,19 @@
 
 import { blocksOn, storedEaters } from "@/lib/meal-blocks";
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CaretDown, CaretLeft, CaretRight, ShoppingCart, Sparkle, Suitcase } from "@phosphor-icons/react";
+import { Broom, CalendarDots, CaretLeft, CaretRight, ShoppingCart, Suitcase } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { eventEmoji } from "@/lib/emoji";
-import { strong } from "@/lib/colours";
-import { hasOpenDish, mainDish } from "@/lib/menu";
+import { mainDish } from "@/lib/menu";
+import { addDays } from "@/lib/time";
+import { useFitRows } from "@/components/use-fit-rows";
 import {
   addChoreDay,
   applyFix,
+  delayChore,
   dismiss,
   kindGroups,
   mealsIn,
@@ -25,48 +28,48 @@ import {
   type ReviewDraft,
 } from "@/lib/weekly-review";
 import { saveReview } from "./actions";
-import { ChecksBox, KindBox, PickerBox, type KindChoice, type Picker } from "./boxes";
+import { ChecksMenu, KindBox, PickerBox, type KindChoice, type Picker } from "./boxes";
 import type { ReviewColumn, ReviewData } from "./data";
+import { ChoreColumn, choresOnDay, useChorePlan, type PlannedChore } from "./chores-view";
 import { GrocerySheet } from "./grocery-sheet";
 import { MealBox, type MealTarget } from "./meal-box";
 import { Face, SectionTitle, type Person } from "./parts";
 
 /**
- * The weekly review, where the coming week is planned (Connor's redesign,
- * 2026-11-09). It looks like the Week calendar without times: seven days
- * side by side, each with big meal tiles and a grey box summing up the
- * rest. Tapping the grey box opens it up over the day's meals to show and
- * change its kinds of day, chore days and plans; Close shrinks it back.
- * Tapping a meal tile opens the meal picker. One Save in the header keeps
- * it all; the grocery list beside it is live.
+ * The Planner, where the coming week is planned. It looks like the Week
+ * calendar without times: seven days side by side, each one a column of
+ * Day (kinds of day), Meals, Chores and Plans, each with its own + (Connor's
+ * sketch, 2026-11-12). Tapping a meal tile opens the meal picker; + beside
+ * Plans opens the calendar's "Add an event" card on that day. One Save in
+ * the header keeps it all; the grocery list beside it is live.
  */
-
-/** How many of a day's plans its box names before "+ N more". */
-const PLANS_SHOWN = 3;
 export function ReviewBoard({
   data,
   range,
   weekHref,
   openMeal = null,
+  eventError = null,
 }: {
   data: ReviewData;
   range: string;
   weekHref: { prev: string; next: string; coming: string; isComing: boolean };
   /** A meal to open the picker on straight away. */
   openMeal?: { id: string; date: string; mealTimeId: string } | null;
+  /** Why adding an event didn't work, if it didn't. */
+  eventError?: string | null;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<ReviewDraft>(data.initial);
-  const [openDay, setOpenDay] = useState<string | null>(null);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [mealAt, setMealAt] = useState<{ mealId: string | null; date: string; mealTimeId: string } | null>(
     openMeal && data.meals.some((m) => m.id === openMeal.id) ? { mealId: openMeal.id, date: openMeal.date, mealTimeId: openMeal.mealTimeId } : null,
   );
   const [kindAt, setKindAt] = useState<{ date: string; start: string | null } | null>(null);
-  const [checks, setChecks] = useState(false);
   const [groceries, setGroceries] = useState(false);
+  /** The week (Day, Meals, Chores, Plans) or the chore view (each chore day with its chores). */
+  const [view, setView] = useState<"week" | "chores">("week");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(eventError);
   const [goTo, setGoTo] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.initial);
   const guard = useUnsavedChanges(dirty, () => setDraft(data.initial));
@@ -123,21 +126,19 @@ export function ReviewBoard({
 
   // --- How things look ------------------------------------------------------
 
-  const mealLook = (m: DraftMeal) => {
+  /**
+   * A meal tile shows one name (Connor, 2026-11-12): the main dish if one is
+   * picked ("Beef tacos"), else the kind of meal ("Tacos"), else the meal
+   * block ("Lunch"). No sides or notes.
+   */
+  const mealLook = (m: DraftMeal, blockName: string) => {
     const mm = m.menuMealId ? menuMeal.get(m.menuMealId) : undefined;
     const main = mainDish(m.dishes);
     const r = main ? dish.get(main) : undefined;
     const c = m.categoryId ? category.get(m.categoryId) : undefined;
-    const options = c ? data.menuMeals.filter((x) => x.category_ids.includes(c.id)).length : 0;
-    // A saved meal with sides keeps its own name; a custom one is called after its main dish.
-    const title = mm?.name ?? r?.name ?? c?.name ?? "Meal";
-    const sides = m.dishes.filter((d) => d.recipeId && d.recipeId !== main).length;
     return {
-      title,
-      icon: mm?.icon ?? r?.icon ?? c?.icon ?? "🍽️",
-      kind: (mm || r) && c ? c.name : null,
-      pick: (!mm && !r && options > 1) || hasOpenDish(m.dishes),
-      sides,
+      title: r?.name ?? c?.name ?? mm?.name ?? blockName,
+      icon: r?.icon ?? c?.icon ?? mm?.icon ?? "🍽️",
     };
   };
   const mealChanged = (id: string) => id in draft.meals;
@@ -156,11 +157,74 @@ export function ReviewBoard({
       options: [
         ...open
           .filter((c) => c.date !== col.date && !choresOn(c.date).includes(id))
-          .map((c) => ({ key: c.date, label: `Move to ${c.name}`, icon: cd.icon, pick: () => change((d) => moveChoreDay(d, id, col.date, c.date)) })),
+          .map((c) => ({ key: c.date, label: `Move to ${c.label}`, icon: cd.icon, pick: () => change((d) => moveChoreDay(d, id, col.date, c.date)) })),
+        // Swap places with a chore day on another day (Laundry here, Kitchen there).
+        ...open
+          .filter((c) => c.date !== col.date && !choresOn(c.date).includes(id))
+          .flatMap((c) =>
+            choresOn(c.date)
+              .filter((other) => !choresOn(col.date).includes(other))
+              .map((other) => ({
+                key: `swap-${c.date}-${other}`,
+                label: `Swap: ${choreDay.get(other)?.name ?? "it"} ${c.label.split(" ")[0]}`,
+                icon: choreDay.get(other)?.icon,
+                pick: () => change((d) => moveChoreDay(moveChoreDay(d, id, col.date, c.date), other, c.date, col.date)),
+              })),
+          ),
         { key: "off", label: `Take off ${col.name}`, danger: true, pick: () => change((d) => takeOffChoreDay(d, col.date, id)) },
       ],
     });
   };
+
+  // --- The chore view ---------------------------------------------------------
+
+  const chorePlan = useChorePlan(data, draft);
+  const planned = (col: ReviewColumn) => {
+    const day = chorePlan.get(col.date);
+    return day ? choresOnDay(day, data, draft) : null;
+  };
+
+  /** Tapping a chore: a regular one moves with its chore day; others can be put off a day or more. */
+  const pickChore = (col: ReviewColumn, c: PlannedChore) => {
+    if (c.kind === "preset") return pickChoreDay(col, c.choreDayId);
+    const later = open.filter((x) => x.date > col.date);
+    const delayed = draft.choreDelays?.[c.id];
+    const kind = c.kind;
+    setPicker({
+      title: c.name,
+      options: [
+        ...later.map((x) => ({ key: x.date, label: `Put off to ${x.label}`, icon: c.icon, pick: () => change((d) => delayChore(d, c.id, { kind, date: x.date })) })),
+        { key: "next", label: "Next week", icon: "⏭️", pick: () => change((d) => delayChore(d, c.id, { kind, date: addDays(data.week, 7) })) },
+        ...(delayed ? [{ key: "back", label: "Put back", icon: "↩️", pick: () => change((d) => delayChore(d, c.id, null)) }] : []),
+      ],
+    });
+  };
+
+  /** Everything on a day, when its column can't show it all. */
+  const pickFromDay = (col: ReviewColumn) => {
+    const groups = planned(col) ?? [];
+    setPicker({
+      title: `Chores on ${col.name}`,
+      options: groups.flatMap((g) =>
+        g.chores.map((c) => ({ key: `${g.tile.id}-${c.id}`, label: c.name, icon: c.icon, pick: () => pickChore(col, c) })),
+      ),
+    });
+  };
+
+  /** The + beside Meals: pick a meal block, then the meal picker opens on it. */
+  const addMeal = (col: ReviewColumn) =>
+    setPicker({
+      title: `Add a meal on ${col.name}`,
+      options: data.mealTimes.map((t) => ({
+        key: t.id,
+        label: t.name,
+        icon: t.icon ?? "🍽️",
+        pick: () => {
+          setPicker(null);
+          setMealAt({ mealId: null, date: col.date, mealTimeId: t.id });
+        },
+      })),
+    });
 
   const addChore = (col: ReviewColumn) =>
     setPicker({
@@ -214,17 +278,13 @@ export function ReviewBoard({
             The coming week
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setChecks(true)}
-          className={`flex min-h-13 items-center gap-2 rounded-2xl px-4 text-lg font-bold whitespace-nowrap ${
-            problems.length > 0 ? "bg-[color-mix(in_srgb,var(--color-accent)_11%,white)] text-accent" : "text-ink-muted hover:bg-rail"
-          }`}
-        >
-          <Sparkle size="1.375rem" weight="fill" aria-hidden />
-          {problems.length > 0 ? `${problems.length} to check` : "All clear"}
-        </button>
-        <div className="flex-1" />
+        <div className="flex min-w-0 flex-1">
+          <ChecksMenu problems={problems} onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))} onLeave={(p) => change((d) => dismiss(d, p.id))} />
+        </div>
+        <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25" role="group" aria-label="Show">
+          <ViewButton on={view === "week"} onClick={() => setView("week")} icon={<CalendarDots size="1.5rem" weight="bold" aria-hidden />} label="Week" />
+          <ViewButton on={view === "chores"} onClick={() => setView("chores")} icon={<Broom size="1.5rem" weight="bold" aria-hidden />} label="Chores" />
+        </div>
         <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-meal px-5 text-lg font-bold whitespace-nowrap text-meal-ink">
           <ShoppingCart size="1.625rem" weight="bold" aria-hidden />
           Grocery list
@@ -243,180 +303,141 @@ export function ReviewBoard({
 
       <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-grid sm:grid-cols-4 lg:grid-cols-7">
         {data.columns.map((col, i) => {
-          const isOpen = openDay === col.date && !col.past;
           const groups = groupsOn(col.date);
           const chores = choresOn(col.date);
           const slots = slotsOn(col.date);
-          const roomy = slots.length <= 2;
+          const tiles = slots.reduce((n, s) => n + Math.max(1, s.meals.length), 0);
+          // Two tiles or fewer get the big look (picture over the name); more sit in rows.
+          const big = tiles <= 2;
+          const can = !col.past;
           return (
             <section
               key={col.date}
               aria-label={col.name}
-              className={`relative flex min-h-0 min-w-0 flex-col gap-2.5 px-3 pt-3 pb-3 ${i > 0 ? "border-l border-grid" : ""} ${col.past ? "bg-rail" : ""}`}
+              className={`relative flex min-h-0 min-w-0 flex-col gap-1 px-2.5 pt-3 pb-2.5 ${i > 0 ? "border-l border-grid" : ""} ${col.past ? "bg-rail" : ""}`}
             >
-              <div className={`flex h-12 shrink-0 items-center gap-2.5 px-1 ${col.past ? "opacity-50" : ""}`}>
+              <div className={`flex h-11 shrink-0 items-center gap-2.5 px-1 ${col.past ? "opacity-50" : ""}`}>
                 <h2 className="truncate text-[1.75rem] text-ink">
                   <span className="font-extrabold">{col.label.split(" ")[0]}</span> <span className="font-medium text-ink-soft">{col.label.split(" ").slice(1).join(" ")}</span>
                 </h2>
                 {col.away ? <Badge /> : null}
               </div>
 
-              {/* Meal tiles, one row per meal time. */}
-              <div className={`flex min-h-0 flex-1 flex-col gap-2 ${col.past ? "opacity-50" : ""}`}>
-                {slots.map(({ time, meals }) =>
-                  meals.length === 0 ? (
-                    <button
-                      key={time.id}
-                      type="button"
-                      disabled={col.past}
-                      onClick={() => setMealAt({ mealId: null, date: col.date, mealTimeId: time.id })}
-                      className="flex min-h-14 flex-1 basis-[6.875rem] items-center justify-center rounded-[1.375rem] border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_28%,var(--color-meal))] text-lg font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,white)] disabled:opacity-60"
-                    >
-                      + {time.name}
-                    </button>
-                  ) : (
-                    <div key={time.id} className="flex min-h-0 shrink flex-col gap-1.5" style={{ flex: `${meals.length} 1 0` }}>
-                      {meals.map((m) => {
-                        const look = mealLook(m);
-                        const big = roomy && meals.length === 1;
-                        return (
+              {view === "chores" ? (
+                <div className={`flex min-h-0 flex-1 flex-col ${col.past ? "opacity-50" : ""}`}>
+                  {(() => {
+                    const groups = planned(col);
+                    return (
+                      <ChoreColumn
+                        col={col}
+                        groups={
+                          groups ??
+                          (chores.length > 0 ? chores : freeDay ? [freeDay.id] : [])
+                            .map((id) => choreDay.get(id))
+                            .filter((cd) => cd !== undefined)
+                            .map((tile) => ({ tile, chores: [] }))
+                        }
+                        changedTile={(id) => id !== freeDay?.id && choreChanged(col.date, id)}
+                        onTile={(id) => pickChoreDay(col, id)}
+                        onChore={(c) => pickChore(col, c)}
+                        onMore={() => pickFromDay(col)}
+                        note={groups ? undefined : col.past ? undefined : "Too far ahead to plan yet"}
+                      />
+                    );
+                  })()}
+                </div>
+              ) : (
+              <div className={`flex min-h-0 flex-1 flex-col gap-1 ${col.past ? "opacity-50" : ""}`}>
+                {/* Day: each kind of day once, with who has it. */}
+                <SectionTitle title="Day" onAdd={can ? () => setKindAt({ date: col.date, start: null }) : undefined} addLabel={`Add a day on ${col.name}`} />
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  {groups.map((g) => (
+                    <Row key={g.key} changed={kindChanged(col.date, g)} onClick={can ? () => setKindAt({ date: col.date, start: g.key }) : undefined}>
+                      <Emoji emoji={g.icon ?? "📅"} className="size-7" />
+                      <span className="min-w-0 flex-1 truncate">{g.name}</span>
+                      <span className="flex shrink-0">
+                        {g.memberIds.map((id) => (
+                          <span key={id} className="-ml-1.5 first:ml-0">
+                            <Face person={person.get(id)} size="size-6 text-[0.6875rem]" />
+                          </span>
+                        ))}
+                      </span>
+                    </Row>
+                  ))}
+                </div>
+
+                {/* Meals: one tile per meal block; dashed only while nothing is picked. */}
+                <SectionTitle title="Meals" onAdd={can ? () => addMeal(col) : undefined} addLabel={`Add a meal on ${col.name}`} />
+                <div className="flex min-h-0 shrink flex-col gap-1.5">
+                  {slots.flatMap(({ time, meals }) =>
+                    meals.length === 0
+                      ? [
                           <button
-                            key={m.id}
+                            key={time.id}
                             type="button"
-                            disabled={col.past}
-                            onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
-                            title={`${time.name}: ${look.title}`}
-                            className={`relative flex min-h-14 min-w-0 flex-1 rounded-[1.375rem] border-2 bg-meal px-2.5 text-meal-ink ${big ? "flex-col items-center justify-center gap-1.5 text-center" : "max-h-[6rem] items-center gap-2.5 text-left"} ${
-                              mealChanged(m.id) ? "border-dashed border-accent" : "border-transparent"
+                            disabled={!can}
+                            onClick={() => setMealAt({ mealId: null, date: col.date, mealTimeId: time.id })}
+                            className={`flex min-h-12 min-w-0 shrink rounded-[1.375rem] border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_32%,var(--color-meal))] px-2.5 font-extrabold text-[color-mix(in_srgb,var(--color-meal-ink)_72%,white)] ${
+                              big ? "basis-[8.5rem] flex-col items-center justify-center gap-1 text-center text-xl" : "basis-[4rem] items-center gap-2.5 text-left text-lg"
                             }`}
                           >
-                            {m.memberIds.length > 0 ? (
-                              <span className={`flex ${big ? "absolute top-2 right-2" : "order-last ml-auto"}`}>
-                                {m.memberIds.map((id) => (
-                                  <span key={id} className="-ml-1.5 first:ml-0">
-                                    <Face person={person.get(id)} size="size-6 text-[0.6875rem]" />
-                                  </span>
-                                ))}
-                              </span>
-                            ) : null}
-                            <Emoji emoji={look.icon} className={big ? "size-[4.75rem]" : "size-10"} />
-                            <span className="flex min-w-0 flex-col">
-                              <span className="truncate text-sm font-bold tracking-wide uppercase opacity-70">{time.name}</span>
-                              <span className={`line-clamp-2 leading-tight font-extrabold ${big ? "text-xl" : "text-lg"}`}>{look.title}</span>
-                              {look.pick ? (
-                                <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">Pick which one</span>
-                              ) : look.sides > 0 ? (
-                                <span className="text-sm font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]">
-                                  + {look.sides} {look.sides === 1 ? "side" : "sides"}
+                            <Emoji emoji={time.icon ?? "🍽️"} className={`${big ? "size-14" : "size-9"} opacity-60`} />
+                            <span className="min-w-0 truncate">{time.name}</span>
+                          </button>,
+                        ]
+                      : meals.map((m) => {
+                          const look = mealLook(m, time.name);
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              disabled={!can}
+                              onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
+                              title={`${time.name}: ${look.title}`}
+                              className={`relative flex min-h-12 min-w-0 shrink rounded-[1.375rem] border-2 bg-meal px-2.5 font-extrabold text-meal-ink ${
+                                big ? "basis-[8.5rem] flex-col items-center justify-center gap-1 text-center text-xl" : "basis-[4rem] items-center gap-2.5 text-left text-lg"
+                              } ${mealChanged(m.id) ? "border-accent" : "border-[color-mix(in_srgb,var(--color-meal-ink)_16%,var(--color-meal))]"}`}
+                            >
+                              {m.memberIds.length > 0 ? (
+                                <span className={`flex ${big ? "absolute top-2 right-2" : "order-last ml-auto"}`}>
+                                  {m.memberIds.map((id) => (
+                                    <span key={id} className="-ml-1.5 first:ml-0">
+                                      <Face person={person.get(id)} size="size-6 text-[0.6875rem]" />
+                                    </span>
+                                  ))}
                                 </span>
                               ) : null}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ),
-                )}
-              </div>
+                              <Emoji emoji={look.icon} className={big ? "size-14" : "size-9"} />
+                              <span className={`min-w-0 leading-tight ${big ? "line-clamp-2" : "truncate"}`}>{look.title}</span>
+                            </button>
+                          );
+                        }),
+                  )}
+                </div>
 
-              {/* The grey box: a glance at the rest of the day. */}
-              <button
-                type="button"
-                disabled={col.past}
-                onClick={() => setOpenDay(col.date)}
-                aria-label={`Open ${col.name}`}
-                className={`flex shrink-0 flex-col gap-2.5 rounded-[1.25rem] bg-rail p-3 text-left ${col.past ? "opacity-50" : "hover:bg-panel"}`}
-              >
-                <span className="flex flex-wrap gap-1.5">
-                  {groups.map((g) => (
-                    <span key={g.key} className={`flex items-center gap-0.5 rounded-xl border-2 bg-board py-0.5 pr-1.5 pl-1 ${kindChanged(col.date, g) ? "border-dashed border-accent" : "border-transparent"}`} title={g.name}>
-                      <Emoji emoji={g.icon ?? "📅"} className="mr-0.5 size-7" />
-                      {g.memberIds.map((id) => (
-                        <Face key={id} person={person.get(id)} size="size-6 text-[0.6875rem]" />
-                      ))}
-                    </span>
-                  ))}
-                </span>
-                <span className="flex min-h-10 flex-wrap items-center gap-1.5">
+                {/* Chores: the chore days on this day. */}
+                <SectionTitle title="Chores" onAdd={can ? () => addChore(col) : undefined} addLabel={`Add a chore day on ${col.name}`} />
+                <div className="flex shrink-0 flex-col gap-1.5">
                   {chores.length === 0 ? (
-                    <span className="text-base text-ink-muted">{col.away ? "Away" : (freeDay?.name ?? "Free day")}</span>
+                    <Row muted>
+                      <Emoji emoji={col.away ? "🧳" : (freeDay?.icon ?? "🌿")} className="size-7" />
+                      <span className="min-w-0 truncate">{col.away ? "Away" : (freeDay?.name ?? "Free day")}</span>
+                    </Row>
                   ) : (
                     chores.map((id) => (
-                      <span
-                        key={id}
-                        title={choreDay.get(id)?.name}
-                        className={`flex size-11 items-center justify-center rounded-[0.875rem] border-2 bg-board ${choreChanged(col.date, id) ? "border-dashed border-accent" : "border-transparent"}`}
-                      >
+                      <Row key={id} changed={choreChanged(col.date, id)} onClick={can ? () => pickChoreDay(col, id) : undefined}>
                         <Emoji emoji={choreDay.get(id)?.icon ?? "🧹"} className="size-7" />
-                      </span>
+                        <span className="min-w-0 truncate">{choreDay.get(id)?.name}</span>
+                      </Row>
                     ))
                   )}
-                </span>
-                {/* The day's plans by name, so the box says what's on (2026-11-10). */}
-                {col.events.length > 0 ? (
-                  <span className="flex min-h-[4.25rem] flex-col gap-1">
-                    {col.events.slice(0, PLANS_SHOWN).map((e) => (
-                      <span key={e.id} className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink">
-                        <Dot colour={person.get(e.memberId ?? "")?.colour} />
-                        <span className="truncate">{e.title}</span>
-                      </span>
-                    ))}
-                    {col.events.length > PLANS_SHOWN ? (
-                      <span className="text-sm font-bold text-ink-muted">+ {col.events.length - PLANS_SHOWN} more</span>
-                    ) : null}
-                  </span>
-                ) : (
-                  <span className="min-h-[4.25rem]" />
-                )}
-              </button>
+                </div>
 
-              {isOpen ? (
-                <OpenDay
-                  onClose={() => setOpenDay(null)}
-                  meals={slots.map(({ time, meals }) => ({
-                    time,
-                    meals: meals.map((m) => ({ ...mealLook(m), id: m.id, changed: mealChanged(m.id) })),
-                  }))}
-                  onMeal={(mealId, mealTimeId) => setMealAt({ mealId, date: col.date, mealTimeId })}
-                  kinds={
-                    <>
-                      <SectionTitle title="Day" onAdd={() => setKindAt({ date: col.date, start: null })} addLabel={`Add a day on ${col.name}`} />
-                      {groups.map((g) => (
-                        <Row key={g.key} changed={kindChanged(col.date, g)} onClick={() => setKindAt({ date: col.date, start: g.key })}>
-                          <Emoji emoji={g.icon ?? "📅"} className="size-7" />
-                          <span className="min-w-0 flex-1 truncate">{g.name}</span>
-                          <span className="flex gap-0.5">
-                            {g.memberIds.map((id) => (
-                              <Face key={id} person={person.get(id)} size="size-6 text-[0.6875rem]" />
-                            ))}
-                          </span>
-                        </Row>
-                      ))}
-                    </>
-                  }
-                  chores={
-                    <>
-                      <SectionTitle title="Chores" onAdd={() => addChore(col)} addLabel={`Add a chore day on ${col.name}`} />
-                      {chores.length === 0 ? (
-                        <Row muted>
-                          <Emoji emoji={col.away ? "🧳" : (freeDay?.icon ?? "🌿")} className="size-7" />
-                          <span className="truncate">{col.away ? "None: away" : (freeDay?.name ?? "Free day")}</span>
-                        </Row>
-                      ) : (
-                        chores.map((id) => (
-                          <Row key={id} changed={choreChanged(col.date, id)} onClick={() => pickChoreDay(col, id)}>
-                            <Emoji emoji={choreDay.get(id)?.icon ?? "🧹"} className="size-7" />
-                            <span className="min-w-0 truncate">{choreDay.get(id)?.name}</span>
-                          </Row>
-                        ))
-                      )}
-                    </>
-                  }
-                  plans={col.events}
-                  roomFor={Math.max(1, 9 - groups.length - Math.max(1, chores.length) - slots.reduce((n, s) => n + Math.max(1, s.meals.length), 0))}
-                  person={person}
-                />
-              ) : null}
+                {/* Plans: the day's events by picture and name; + adds one on this day. */}
+                <SectionTitle title="Plans" onAdd={can ? () => router.push(`/review?week=${data.week}&add=${col.date}&allday=1`) : undefined} addLabel={`Add an event on ${col.name}`} />
+                <Plans plans={col.events} moreHref={`/calendar?view=week&date=${col.date}`} />
+              </div>
+              )}
             </section>
           );
         })}
@@ -459,14 +480,6 @@ export function ReviewBoard({
           })()
         : null}
       {picker ? <PickerBox picker={picker} onClose={() => setPicker(null)} /> : null}
-      {checks ? (
-        <ChecksBox
-          problems={problems}
-          onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))}
-          onLeave={(p) => change((d) => dismiss(d, p.id))}
-          onClose={() => setChecks(false)}
-        />
-      ) : null}
       {groceries ? <GrocerySheet dirty={dirty} onClose={() => setGroceries(false)} /> : null}
       {guard.leaving || goTo ? (
         <LeaveDialog
@@ -491,80 +504,32 @@ export function ReviewBoard({
   );
 }
 
-/** A day opened up: its grey box grows over the meals to show and change everything. */
-function OpenDay({
-  meals,
-  onMeal,
-  kinds,
-  chores,
-  plans,
-  roomFor,
-  person,
-  onClose,
-}: {
-  meals: { time: { id: string; name: string }; meals: { id: string; title: string; icon: string; changed: boolean }[] }[];
-  onMeal: (mealId: string | null, mealTimeId: string) => void;
-  kinds: ReactNode;
-  chores: ReactNode;
-  plans: ReviewColumn["events"];
-  /** How many plans fit below everything else. */
-  roomFor: number;
-  person: Map<string, Person>;
-  onClose: () => void;
-}) {
-  const shown = plans.slice(0, roomFor);
+/** A day's plans: as many as fit, then "+ N more" (to the calendar). */
+function Plans({ plans, moreHref }: { plans: ReviewColumn["events"]; moreHref: string }) {
+  const [ref, fit] = useFitRows<HTMLUListElement>(4);
+  const shown = plans.length > fit ? plans.slice(0, Math.max(0, fit - 1)) : plans;
   return (
-    <div className="absolute inset-x-2 top-[4.25rem] bottom-3 z-10 flex flex-col gap-1.5 overflow-hidden rounded-[1.375rem] bg-rail p-3 shadow-[0_0_0_2px_var(--color-frame),0_18px_40px_rgba(20,30,50,0.14)]">
-      <button type="button" onClick={onClose} className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-[0.875rem] bg-board text-base font-bold text-ink-soft hover:bg-panel">
-        <CaretDown size="1.125rem" weight="bold" aria-hidden />
-        Close
-      </button>
-      <div className="flex shrink-0 flex-col gap-1.5 pt-1">
-        {meals.map(({ time, meals: list }) =>
-          list.length === 0 ? (
-            <button
-              key={time.id}
-              type="button"
-              onClick={() => onMeal(null, time.id)}
-              className="flex min-h-11 items-center justify-center rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_28%,var(--color-meal))] text-base font-bold text-[color-mix(in_srgb,var(--color-meal-ink)_70%,white)]"
-            >
-              + {time.name}
-            </button>
-          ) : (
-            list.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => onMeal(m.id, time.id)}
-                className={`flex min-h-11 min-w-0 items-center gap-2 rounded-xl border-2 bg-meal px-2 text-left text-sm font-extrabold text-meal-ink ${m.changed ? "border-dashed border-accent" : "border-transparent"}`}
-              >
-                <Emoji emoji={m.icon} className="size-7" />
-                <span className="min-w-0 truncate">{m.title}</span>
-              </button>
-            ))
-          ),
-        )}
-      </div>
-      <div className="flex shrink-0 flex-col gap-1.5">{kinds}</div>
-      <div className="flex shrink-0 flex-col gap-1.5">{chores}</div>
-      <div className="flex min-h-0 flex-col gap-1">
-        <SectionTitle title="Plans" />
-        {shown.map((e) => (
-          <span key={e.id} className="flex min-h-8 min-w-0 items-center gap-2 px-0.5 text-base font-bold text-ink">
-            <Dot colour={person.get(e.memberId ?? "")?.colour} />
-            <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-5" />
-            <span className="min-w-0 truncate">{e.title}</span>
-          </span>
-        ))}
-        {plans.length > shown.length ? <span className="px-0.5 text-sm font-bold text-ink-muted">+ {plans.length - shown.length} more on the calendar</span> : null}
-      </div>
-    </div>
+    <ul ref={ref} className="flex min-h-10 flex-1 flex-col gap-0.5 overflow-hidden">
+      {shown.map((e) => (
+        <li key={e.id} className="flex min-h-9 min-w-0 shrink-0 items-center gap-2 px-1 text-base font-bold text-ink">
+          <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
+          <span className="min-w-0 truncate">{e.title}</span>
+        </li>
+      ))}
+      {plans.length > shown.length ? (
+        <li className="flex min-h-9 shrink-0 items-center px-1">
+          <Link href={moreHref} className="text-sm font-bold text-accent">
+            + {plans.length - shown.length} more
+          </Link>
+        </li>
+      ) : null}
+    </ul>
   );
 }
 
 function Row({ children, onClick, changed = false, muted = false }: { children: ReactNode; onClick?: () => void; changed?: boolean; muted?: boolean }) {
-  const className = `flex min-h-12 w-full min-w-0 items-center gap-2 rounded-[0.875rem] border-2 bg-board px-2 text-left text-base font-extrabold ${
-    changed ? "border-dashed border-accent" : "border-transparent"
+  const className = `flex min-h-11 w-full min-w-0 shrink-0 items-center gap-2 rounded-[0.875rem] border-2 bg-rail px-2 text-left text-base font-extrabold ${
+    changed ? "border-accent" : "border-transparent"
   } ${muted ? "font-bold text-ink-muted" : "text-ink"}`;
   return onClick ? (
     <button type="button" onClick={onClick} className={`${className} hover:bg-panel`}>
@@ -575,8 +540,18 @@ function Row({ children, onClick, changed = false, muted = false }: { children: 
   );
 }
 
-function Dot({ colour }: { colour: string | null | undefined }) {
-  return <span aria-hidden className="size-3 shrink-0 rounded-full" style={{ background: colour ? strong(colour) : "var(--color-check-border)" }} />;
+function ViewButton({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl px-3.5 text-lg font-bold whitespace-nowrap ${on ? "bg-board text-ink shadow-sm" : "text-ink-soft hover:bg-board"}`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }
 
 function WeekButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: "prev" | "next" }) {

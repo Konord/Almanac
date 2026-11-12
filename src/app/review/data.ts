@@ -6,9 +6,9 @@ import { EATING_MINUTES, weekDates, weekStartOf } from "@/lib/meals";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { lastPicksFrom, menuMealIcon, menuMealName, spotSummary } from "@/lib/menu";
 import { reviewDue, type DraftMeal, type ReviewDay, type ReviewDraft } from "@/lib/weekly-review";
-import { loadCalendar, rangeOf } from "../calendar/data";
+import { loadCalendar, rangeOf, type CalendarData } from "../calendar/data";
 import { eventsOnDay, isAllDayStyle } from "../calendar/views";
-import { choreSchedule, loadChoreDayMoves } from "../chores/plan";
+import { choreSchedule, loadChoreDayMoves, type PlanInput } from "../chores/plan";
 import { loadChoreDays } from "../chores/data";
 import { loadMealBasics, loadMeals } from "../meals/data";
 import { ensurePresets } from "../meals/shared";
@@ -65,6 +65,10 @@ export type ReviewData = {
   /** The week's meals as saved (the draft holds changes to them). */
   meals: DraftMeal[];
   hardChores: { id: string; name: string }[];
+  /** The chore planner's input from today, so the chore view can plan again as things move. */
+  chorePlan: PlanInput;
+  /** Regular and occasional chores by id: name, picture and which. */
+  choreNames: Record<string, { name: string; icon: string | null; kind: "preset" | "generated" }>;
   initial: ReviewDraft;
   reviewed: boolean;
 };
@@ -105,8 +109,11 @@ export async function reviewReminder(household: Household, today: LocalDate, now
   return !(await loadWeekReview(nextWeek));
 }
 
-/** Everything the review screen shows for a week. */
-export async function loadReview(household: Household, week: LocalDate, today: LocalDate): Promise<ReviewData> {
+/** What the "Add an event" card needs (the + beside a day's Plans). */
+export type EventCardData = Pick<CalendarData, "members" | "templates" | "dayKinds">;
+
+/** Everything the review screen shows for a week, and what its event card needs. */
+export async function loadReview(household: Household, week: LocalDate, today: LocalDate): Promise<{ data: ReviewData; eventCard: EventCardData }> {
   const { timeZone, locale } = household.settings;
   const dates = weekDates(week);
   // Preset meals ("Tuesday is Tacos") fill the week the first time it's looked at, as on the planner.
@@ -181,9 +188,10 @@ export async function loadReview(household: Household, week: LocalDate, today: L
     ),
     meals: {},
     dismissed: review?.dismissed ?? [],
+    choreDelays: {},
   };
 
-  return {
+  const data: ReviewData = {
     week,
     columns,
     members: routines.members.map((m) => ({ id: m.id, name: m.name, colour: m.colour, icon: m.icon })),
@@ -223,7 +231,10 @@ export async function loadReview(household: Household, week: LocalDate, today: L
         memberIds: m.member_ids,
       })),
     hardChores: schedule.chores.filter((c) => schedule.hard.has(c.id)).map((c) => ({ id: c.id, name: c.name })),
+    chorePlan: schedule.input,
+    choreNames: Object.fromEntries(schedule.chores.filter((c) => c.active).map((c) => [c.id, { name: c.name, icon: c.icon, kind: c.kind }])),
     initial,
     reviewed: review !== null,
   };
+  return { data, eventCard: { members: calendar.members, templates: calendar.templates, dayKinds: calendar.dayKinds } };
 }

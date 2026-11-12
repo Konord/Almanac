@@ -4,6 +4,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { weekStartOf } from "@/lib/meals";
 import { addDays, isLocalDate, localDateOf, zonedToUtc } from "@/lib/time";
+import { QuickAddSheet, readAdding } from "../calendar/adding";
 import { ReviewBoard } from "./board";
 import { comingWeek, loadReview } from "./data";
 
@@ -33,13 +34,17 @@ async function Review({ searchParams }: { searchParams: PageProps<"/review">["se
   const meal = mealParam && /^[0-9a-f-]{36}$/i.test(mealParam) ? await findMeal(mealParam) : null;
   const asked = meal?.date ?? firstParam(params.week);
   const week = asked && isLocalDate(asked) ? weekStartOf(asked, weekStartsOn) : coming;
-  const data = await loadReview(household, week, today);
+  const { data, eventCard } = await loadReview(household, week, today);
+  // The + beside a day's Plans opens the calendar's "Add an event" card here (?add=<date>).
+  const { pending, templateHref } = readAdding(params, household.settings, eventCard.members, eventCard.templates, "/review");
+  const adding = pending && data.columns.some((c) => c.date === pending.date && !c.past) ? pending : null;
 
   const format = new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" });
   const range = format.formatRange(zonedToUtc(week, "12:00", timeZone), zonedToUtc(addDays(week, 6), "12:00", timeZone));
   const href = (w: string) => (w === coming ? "/review" : `/review?week=${w}`);
 
   return (
+    <>
     <ReviewBoard
       // A new key after Save starts the screen afresh from what was saved.
       key={`${week}:${data.reviewed}:${JSON.stringify(data.initial)}:${JSON.stringify(data.meals)}`}
@@ -47,7 +52,23 @@ async function Review({ searchParams }: { searchParams: PageProps<"/review">["se
       range={range}
       openMeal={meal && meal.date >= today ? meal : null}
       weekHref={{ prev: href(addDays(week, -7)), next: href(addDays(week, 7)), coming: "/review", isComing: week === coming }}
+      eventError={firstParam(params.error) ?? null}
     />
+    {adding ? (
+      <QuickAddSheet
+        // A day late in the week opens the card on the left, so the day stays in view.
+        side={data.columns.findIndex((c) => c.date === adding.date) >= 4 ? "left" : "right"}
+        pending={adding}
+        members={eventCard.members}
+        dayKinds={eventCard.dayKinds}
+        templates={eventCard.templates}
+        templateHref={templateHref}
+        closeHref={`/review?week=${week}`}
+        returnTo={`week=${week}`}
+        returnPath="/review"
+      />
+    ) : null}
+    </>
   );
 }
 
