@@ -72,7 +72,7 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     // The card sends the end; with no end, the length it sends (or the usual length).
     defaultMinutes: readMinutes(formData) ?? settings.defaultEventMinutes,
   });
-  if (!times) back(formData, "error", "Add a start time (the end time is optional), or leave both blank for all day.");
+  if (!times) back(formData, "error", "Add a start time, or make it all day.");
   if (icon && [...icon].length > 8) back(formData, "error", "The picture should be one emoji, like 🦷.");
   if (!isVisibility(visibility)) back(formData, "error", "Choose who can see this event.");
 
@@ -247,7 +247,7 @@ export async function saveEventAsTemplate(formData: FormData) {
   const templateError = await insertTemplate(formData, household, event);
   if (templateError) back(formData, "error", `The template didn't save: ${templateError}`);
   revalidatePath("/calendar");
-  back(formData, "message", `Saved ${event.title} as a template. Pick it from "Start from" when you add an event.`);
+  back(formData, "message", `Saved ${event.title} as a template.`);
 }
 
 export async function removeEvent(formData: FormData) {

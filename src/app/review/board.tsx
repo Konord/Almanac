@@ -203,7 +203,7 @@ export function ReviewBoard({
   return (
     <>
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Weekly review</h1>
+        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Planner</h1>
         <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25">
           <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
           <span className="px-2 text-lg font-bold whitespace-nowrap text-ink">{range}</span>

@@ -162,7 +162,7 @@ export function QuickAddSheet({
           </Link>
           {pending.templateId ? null : (
             <Button variant="secondary" name="saveTemplate" value="on" className="ml-auto">
-              Add and save as a template
+              Add and save as template
             </Button>
           )}
         </div>

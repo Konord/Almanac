@@ -68,7 +68,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
 
   return (
     <>
-      <MealsHeader title="Menu Manager" tab="library" error={p("error")} message={p("message")}>
+      <MealsHeader title="Meals" tab="library" error={p("error")} message={p("message")}>
         <SoftLink href={here({ add: "type" })}>
           <Plus size="1.5rem" weight="bold" aria-hidden />
           Add a dish

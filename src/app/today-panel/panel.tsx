@@ -550,7 +550,7 @@ export async function TodayPanel({
         ) : (
           <>
             <Emoji emoji="🍽️" className="size-12" />
-            <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals yet</span>
+            <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals</span>
             <span className="shrink-0 rounded-full bg-board/70 px-4 py-2 text-base font-extrabold">Plan meals</span>
           </>
         )}

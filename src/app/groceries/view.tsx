@@ -172,7 +172,7 @@ export function GroceryView({
       ) : null}
 
       <div className={`grid min-h-0 flex-1 content-start gap-x-7 ${compact ? "grid-cols-1" : ""}`} style={compact ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {lines && lines.length === 0 ? <p className="col-span-full text-lg text-ink-muted">Nothing on the list. Saving the weekly review puts the menu&rsquo;s ingredients here.</p> : null}
+        {lines && lines.length === 0 ? <p className="col-span-full text-lg text-ink-muted">Nothing on the list.</p> : null}
         {pages[p].map((col, i) => (
           <div key={i} className="flex min-w-0 flex-col">
             {col.map((part) => (

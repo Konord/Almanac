@@ -170,7 +170,7 @@ export function EmojiPicker({
                 choices={found.slice(shownPage * PER_PAGE, (shownPage + 1) * PER_PAGE)}
                 current={icon}
                 onPick={pick}
-                empty="Nothing by that name. Try another word, or look through the tabs."
+                empty="Nothing found"
               />
             ) : browsing ? (
               <Grid label={EMOJI_GROUPS[tab - 1]} choices={browsing.choices} current={icon} onPick={pick} />

@@ -225,7 +225,7 @@ export function ChoreManager({
 
   return (
     <>
-      <ScreenHeader title="Chore Manager">
+      <ScreenHeader title="Chores">
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">

@@ -377,7 +377,6 @@ function HolidayEditor({ holiday, next, onChange, onRemove }: { holiday: Holiday
           {rule.kind === "before" || rule.kind === "easter" ? <p className="text-lg text-ink-soft">{describeHolidayRule(rule)}</p> : null}
         </>
       )}
-      <p className="mt-auto text-base text-ink-muted">Holidays don&rsquo;t change anyone&rsquo;s days or chores. Do that in the Weekly review.</p>
     </>
   );
 }

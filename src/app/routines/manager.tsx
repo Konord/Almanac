@@ -472,7 +472,7 @@ export function RoutineManager({
     <>
       {/* Title, how to look (by day or by person), which one, and Set days */}
       <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routine Manager</h1>
+        <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routines</h1>
         <div role="group" aria-label="Look by" className="flex shrink-0 gap-1 rounded-2xl bg-panel p-1.25">
           {(["day", "person"] as const).map((by) => (
             <button

@@ -93,12 +93,12 @@ export function onCalendar(todo: TodoTiming & { template_id: string | null; head
 
 /** The parts of the app a to-do can open. */
 export const FEATURE_LINKS = [
-  { path: "/review", label: "Weekly review" },
-  { path: "/meals", label: "Menu Manager" },
+  { path: "/review", label: "Planner" },
+  { path: "/meals", label: "Meals" },
   { path: "/meals/groceries", label: "Grocery list" },
   { path: "/meals/backups", label: "Backup meals" },
   { path: "/chores", label: "Chores" },
-  { path: "/routines", label: "Routine Manager" },
+  { path: "/routines", label: "Routines" },
   { path: "/calendar", label: "Calendar" },
 ] as const;
 

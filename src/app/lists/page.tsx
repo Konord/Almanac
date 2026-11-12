@@ -70,7 +70,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
   return (
     <>
-      <ScreenHeader title="List Manager" />
+      <ScreenHeader title="Lists" />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -268,11 +268,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <Button variant="save">Save</Button>
             </div>
           </form>
-          {list.is_groceries ? (
-            <p className="mt-6 text-lg text-ink-muted">The grocery list. The weekly review fills it from the menu.</p>
-          ) : list.is_chores ? (
-            <p className="mt-6 text-lg text-ink-muted">Everything on this list is a chore. The list stays, but you can rename it.</p>
-          ) : (
+          {list.is_groceries || list.is_chores ? null : (
             <form action={removeList} className="mt-6">
               <input type="hidden" name="id" value={list.id} />
               <input type="hidden" name="name" value={list.name} />

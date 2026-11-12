@@ -147,7 +147,7 @@ export function SetDays({
           className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
         >
           <ArrowLeft size="1.5rem" aria-hidden />
-          Routine Manager
+          Routines
         </Link>
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </header>
@@ -448,7 +448,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <p className="shrink-0 text-base text-ink-muted">
-        Each person has their own wake-up and bedtime on each kind of day. Which routines happen on a kind of day is set in the Routine Manager.
+        Each person has their own wake-up and bedtime on each kind of day. Which routines happen on a kind of day is set in the Routines.
       </p>
       <div className={`grid min-h-0 flex-1 gap-4 lg:grid-cols-3 ${perPage === 6 ? "lg:grid-rows-2" : "lg:grid-rows-1"}`}>
         {shown.map((g) => (

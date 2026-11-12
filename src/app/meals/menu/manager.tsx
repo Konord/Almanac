@@ -186,8 +186,8 @@ export function MenuManager({
 
   return (
     <>
-      <ScreenHeader title="Menu Manager">
-        <Segmented label="Menu Manager" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />
+      <ScreenHeader title="Meals">
+        <Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />
         <div className="flex items-center gap-4 lg:ml-auto">
           <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
         </div>

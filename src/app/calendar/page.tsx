@@ -210,7 +210,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
           </SoftLink>
           <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
           <Segmented
-            label="How much to show"
+            label="View"
             options={[
               { href: "/", label: "Agenda", active: false },
               { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
@@ -224,7 +224,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       {message ? <Notice tone="success">{message}</Notice> : null}
       {placing ? (
         <PlacingBar
-          hint={view === "week" ? "Tap a time to add an event there, or drag down to set how long. Tap a day's name for all day." : "Tap a day to add an event on it."}
+          hint="Adding an event"
           cancelHref={closeHref}
         />
       ) : null}
@@ -439,7 +439,7 @@ function EditEventPanel({
       <div className="flex shrink-0 flex-wrap items-center gap-3">
         <Button form="edit-event" variant="save">Save</Button>
         <Button form="edit-event" formAction={saveEventAsTemplate} variant="secondary">
-          Save as a template
+          Save as template
         </Button>
         <CloseLink href={closeHref} />
         <form action={removeEvent} className="ml-auto">
@@ -517,7 +517,6 @@ function OccurrenceControls({
   return (
     <div className="shrink-0 rounded-[var(--radius-card)] bg-rail p-5">
       <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
-      <p className="mb-4 text-base text-ink-muted">Changes here leave the rest of the dates alone.</p>
       <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
         {hidden}
         <input type="hidden" name="allDay" value={String(event.all_day)} />
@@ -638,11 +637,7 @@ function TemplatesPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="flex flex-col gap-3">
-        {templates.length === 0 ? (
-          <p className="text-lg text-ink-muted">No templates yet. Open an event and press &ldquo;Save as a template&rdquo;.</p>
-        ) : (
-          <p className="text-base text-ink-muted">Tap a template to change it.</p>
-        )}
+        {templates.length === 0 ? <p className="text-lg text-ink-muted">No templates yet.</p> : null}
         <ul className="grid grid-cols-2 gap-2">
           {templates.slice(0, TEMPLATES_SHOWN).map((t) => {
             const who = t.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(", ");
@@ -718,7 +713,7 @@ function TemplateCard({
         </div>
         <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1 group-has-[input[name=allDay]:checked]:invisible">
-            <Field label="Usually starts at" hint="Leave blank to use wherever you tap.">
+            <Field label="Usually starts at">
               <Input name="startTime" type="time" step={900} defaultValue={template.start_time ?? ""} />
             </Field>
           </div>

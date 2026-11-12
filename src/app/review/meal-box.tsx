@@ -168,7 +168,7 @@ export function MealBox({
           <span className="text-2xl font-extrabold">Custom meal</span>
           <span className="text-base text-ink-muted">Pick a {c?.name.toLowerCase() ?? ""} main, then add sides</span>
         </button>
-        {options.length === 0 ? <p className="col-span-2 self-center text-lg text-ink-muted">No meals under {c?.name ?? "this"} yet. Add them in the Menu Manager, or make a custom one.</p> : null}
+        {options.length === 0 ? <p className="col-span-2 self-center text-lg text-ink-muted">No {c?.name ?? ""} meals yet.</p> : null}
       </div>
     );
   } else if (mode.name === "backups") {
@@ -598,7 +598,6 @@ function DishPicker({
               className="min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-xl text-ink outline-none focus:border-accent"
             />
           </label>
-          <span className="text-base text-ink-muted">Add its ingredients later in the Menu Manager, so they go on the grocery list.</span>
           {error ? <span className="text-base font-bold text-danger">{error}</span> : null}
           <div className="flex gap-2">
             <button type="button" onClick={() => setAdding(false)} className="min-h-[var(--touch-target)] flex-1 rounded-2xl bg-board text-lg font-bold text-ink">

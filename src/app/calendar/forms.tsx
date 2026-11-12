@@ -22,7 +22,7 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
       <legend className="px-1 text-base font-bold text-ink">Repeat details</legend>
       <div className="grid grid-cols-[7rem_1fr] items-end gap-4">
         <Field label="Every">
-          <Input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} aria-describedby="repeat-every-hint" />
+          <Input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} />
         </Field>
         <Chips
           name="repeatEnd"
@@ -37,7 +37,7 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
       </div>
       <Chips
         name="repeatWeekdays"
-        label="On these days (weekly only)"
+        label="On these days"
         multiple
         defaultValue={(repeat?.weekdays ?? []).map(String)}
         options={WEEKDAY_LABELS.map((label, i) => ({ value: String(i), label }))}
@@ -50,7 +50,6 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
           <Input name="repeatCount" type="number" min={1} max={500} defaultValue={repeat?.count ?? ""} />
         </Field>
       </div>
-      <p id="repeat-every-hint" className="text-sm text-ink-muted">Every 2 weekly = every other week.</p>
     </fieldset>
   )
 }
@@ -70,7 +69,7 @@ export function DayKindChips({ kinds, value }: { kinds: DayKind[]; value?: strin
   return (
     <Chips
       name="dayKind"
-      label="Makes it a … day"
+      label="Makes it a…"
       defaultValue={chosen}
       options={[
         { value: "", label: "No change" },
@@ -220,7 +219,7 @@ function TemplateRow({
     <div className="flex min-w-0 items-center gap-2">
       <span className="shrink-0 text-base font-bold text-ink">Start from</span>
       {list.length === 0 ? (
-        <span className="text-base text-ink-muted">No templates yet. Open an event and press &ldquo;Save as a template&rdquo;.</span>
+        <span className="text-base text-ink-muted">No templates yet.</span>
       ) : (
         <div className="flex min-w-0 flex-wrap gap-2">
           {list.slice(0, 6).map((t) => (

@@ -249,7 +249,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                 </div>
                 <div className="flex items-end gap-4">
                   <div className="min-w-0 flex-1">
-                    <Choice label="Weekly review on" value={draft.reviewWeekday} onChange={(reviewWeekday) => set({ reviewWeekday })} options={WEEKDAYS.map((d, i) => ({ value: i, label: d }))} />
+                    <Choice label="Planner on" value={draft.reviewWeekday} onChange={(reviewWeekday) => set({ reviewWeekday })} options={WEEKDAYS.map((d, i) => ({ value: i, label: d }))} />
                   </div>
                   <TextField label="At">
                     <input type="time" value={draft.reviewTime} onChange={(e) => set({ reviewTime: e.target.value })} className={`${inputClass} w-40`} />
