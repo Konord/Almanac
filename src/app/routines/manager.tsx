@@ -18,7 +18,7 @@ import { hourText, minutesText } from "@/lib/time-text";
 
 /*
  * The Routine Manager. Left: routine blocks on a time grid, one column per
- * person (for one kind of day) or per kind of day (for one person). Right:
+ * person, for the kind of day picked at the top. Right:
  * the editor for the block you tap. Every change stays on this screen until
  * Save; leaving with changes asks first. Nothing scrolls: long step lists
  * page, and the time grid squeezes to fit.
@@ -32,8 +32,7 @@ export type MealChoices = {
   meals: { id: string; name: string; icon: string | null; categoryIds: string[] }[];
 };
 
-type View = { by: "day"; name: string } | { by: "person"; memberId: string };
-type Column = { key: string; member: ManagerMember; dayType: ManagerDayType | null; title: string; icon: string | null; isPerson: boolean };
+type Column = { key: string; member: ManagerMember; dayType: ManagerDayType | null; title: string; icon: string | null };
 
 const STEPS_PER_PAGE = 7;
 /** Habit tracking (Track) is hidden for now: no history on screen (Connor, 2026-11-10). Ticks are still recorded. */
@@ -101,14 +100,14 @@ export function RoutineManager({
     for (const t of dayTypes.toSorted((a, b) => a.sort_order - b.sort_order)) if (!names.includes(t.name)) names.push(t.name);
     return names;
   }, [dayTypes]);
-  const [view, setView] = useState<View>({ by: "day", name: dayNames[0] ?? "" });
+  /** The kind of day on screen (by name: each person has their own copy of it). */
+  const [view, setView] = useState(dayNames[0] ?? "");
   useEffect(() => {
     const id = recall(SELECTED_KEY);
     const saved = recall(VIEW_KEY);
     /* eslint-disable react-hooks/set-state-in-effect -- restoring what this browser remembered, once, after the first render */
     if (id && (initial.routines.some((r) => r.id === id) || initial.meals.some((m) => m.id === id))) setSelected(id);
-    if (saved?.startsWith("person:") && members.some((m) => `person:${m.id}` === saved)) setView({ by: "person", memberId: saved.slice(7) });
-    else if (saved?.startsWith("day:") && dayNames.includes(saved.slice(4))) setView({ by: "day", name: saved.slice(4) });
+    if (saved?.startsWith("day:") && dayNames.includes(saved.slice(4))) setView(saved.slice(4));
     /* eslint-enable react-hooks/set-state-in-effect */
     // Only on the first render: later changes come from taps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,17 +126,9 @@ export function RoutineManager({
 
   // --- Columns and where each block sits ---------------------------------------
   const columns: Column[] = useMemo(() => {
-    if (view.by === "person") {
-      const member = members.find((m) => m.id === view.memberId) ?? members[0];
-      if (!member) return [];
-      return dayTypes
-        .filter((t) => t.member_id === member.id)
-        .toSorted((a, b) => a.sort_order - b.sort_order)
-        .map((t) => ({ key: `${member.id}:${t.id}`, member, dayType: t, title: t.name, icon: t.icon, isPerson: false }));
-    }
     return members.map((m) => {
-      const t = dayTypes.find((d) => d.member_id === m.id && d.name === view.name) ?? null;
-      return { key: `${m.id}:${t?.id ?? "none"}`, member: m, dayType: t, title: m.name, icon: m.icon, isPerson: true };
+      const t = dayTypes.find((d) => d.member_id === m.id && d.name === view) ?? null;
+      return { key: `${m.id}:${t?.id ?? "none"}`, member: m, dayType: t, title: m.name, icon: m.icon };
     });
   }, [view, members, dayTypes]);
 
@@ -445,10 +436,10 @@ export function RoutineManager({
     if (selected && !initial.routines.some((r) => r.id === selected) && !initial.meals.some((m) => m.id === selected)) select(null);
   };
 
-  const pickView = (next: View) => {
-    setView(next);
+  const pickView = (name: string) => {
+    setView(name);
     setAdding(null);
-    remember(VIEW_KEY, next.by === "day" ? `day:${next.name}` : `person:${next.memberId}`);
+    remember(VIEW_KEY, `day:${name}`);
   };
 
   const usedBy = routine
@@ -460,7 +451,6 @@ export function RoutineManager({
           dayType: dayTypes.find((t) => t.id === u.day_type_id),
         }))
     : [];
-  const selectedMember = usedBy[0]?.member;
   /** Everyone who has the selected routine, for the step "who does it" buttons. */
   const people = routine ? routinePeople(draft, routine.id).flatMap((id) => members.filter((m) => m.id === id)) : [];
   const listState = dailyListState(steps);
@@ -469,39 +459,15 @@ export function RoutineManager({
 
   return (
     <>
-      {/* Title, how to look (by day or by person), which one, and Set days */}
+      {/* Title, which kind of day, and Set days */}
       <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
         <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routine Manager</h1>
-        <div role="group" aria-label="Look by" className="flex shrink-0 gap-1 rounded-2xl bg-panel p-1.25">
-          {(["day", "person"] as const).map((by) => (
-            <button
-              key={by}
-              type="button"
-              aria-pressed={view.by === by}
-              onClick={() => {
-                if (view.by === by) return;
-                if (by === "day") pickView({ by: "day", name: dayNames[0] ?? "" });
-                else pickView({ by: "person", memberId: (selectedMember ?? members[0])?.id ?? "" });
-              }}
-              className={`flex min-h-[var(--touch-target)] min-w-28 items-center justify-center rounded-xl px-4 text-base font-bold ${view.by === by ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
-            >
-              {by === "day" ? "Whole family" : "One person"}
-            </button>
+        <div role="group" aria-label="Which kind of day" className="flex min-w-0 flex-wrap items-center gap-2">
+          {dayNames.map((name) => (
+            <Chip key={name} active={view === name} onClick={() => pickView(name)}>
+              {name}
+            </Chip>
           ))}
-        </div>
-        <div role="group" aria-label={view.by === "day" ? "Which kind of day" : "Whose routines"} className="flex min-w-0 flex-wrap items-center gap-2">
-          {view.by === "day"
-            ? dayNames.map((name) => (
-                <Chip key={name} active={view.name === name} onClick={() => pickView({ by: "day", name })}>
-                  {name}
-                </Chip>
-              ))
-            : members.map((m) => (
-                <Chip key={m.id} active={view.memberId === m.id} onClick={() => pickView({ by: "person", memberId: m.id })}>
-                  <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" />
-                  {m.name}
-                </Chip>
-              ))}
         </div>
         <Link
           href="/routines/manage"
@@ -518,15 +484,15 @@ export function RoutineManager({
         <section aria-label="Routines" className="relative flex min-h-[32rem] min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-4 pt-3 pb-4 lg:min-h-0">
           <div className="flex shrink-0 gap-2.5 pl-16">
             {columns.map((c) => (
-              <div key={c.key} className="flex min-w-0 flex-1 basis-0 items-center gap-2 border-b-2 pb-2" style={{ borderColor: c.isPerson ? strong(c.member.colour) : "var(--color-frame)" }}>
-                {c.isPerson ? <Avatar name={c.member.name} colour={c.member.colour} icon={c.member.icon} size="sm" /> : <Emoji emoji={c.icon} className="size-7" />}
+              <div key={c.key} className="flex min-w-0 flex-1 basis-0 items-center gap-2 border-b-2 pb-2" style={{ borderColor: strong(c.member.colour) }}>
+                <Avatar name={c.member.name} colour={c.member.colour} icon={c.member.icon} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{c.title}</span>
                 {c.dayType ? (
                   <button
                     type="button"
                     onClick={() => setAdding(adding === c.key ? null : c.key)}
                     aria-expanded={adding === c.key}
-                    aria-label={`Add a routine for ${c.member.name}${c.isPerson ? "" : ` on ${c.title}`}`}
+                    aria-label={`Add a routine for ${c.member.name}`}
                     className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rail text-ink hover:bg-panel"
                   >
                     <Plus size="1.25rem" weight="bold" aria-hidden />
@@ -561,7 +527,7 @@ export function RoutineManager({
               >
                 {!column.dayType ? (
                   <p className="mt-4 px-2 text-center text-base text-ink-muted">
-                    {column.member.name} has no {view.by === "day" ? view.name : ""} day.
+                    {column.member.name} has no {view} day.
                   </p>
                 ) : null}
                 {adding === column.key ? (
