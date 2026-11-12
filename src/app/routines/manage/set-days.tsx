@@ -1,8 +1,9 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Bell, CalendarCheck, Car, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
+import { ArrowLeft, Bell, CalendarCheck, Car, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -119,8 +120,8 @@ export function SetDays({
           {(
             [
               ["week", "Week", CalendarCheck],
-              ["kinds", "Kinds of day", SunHorizon],
-              ["breaks", "Breaks", Umbrella],
+              ["kinds", "Days", SunHorizon],
+              ["breaks", "Days off", Umbrella],
             ] as const
           ).map(([value, label, Icon]) => (
             <button
@@ -146,7 +147,7 @@ export function SetDays({
           className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
         >
           <ArrowLeft size="1.5rem" aria-hidden />
-          Routine Manager
+          Routines
         </Link>
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </header>
@@ -159,7 +160,7 @@ export function SetDays({
 
       {losing > 0 ? (
         <p className="shrink-0 text-base font-bold text-danger">
-          Saving also takes {losing === 1 ? "1 routine" : `${losing} routines`} off the kinds of day you removed.
+          Saving also takes {losing === 1 ? "1 routine" : `${losing} routines`} off the days you removed.
         </p>
       ) : null}
 
@@ -198,7 +199,7 @@ function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekd
     <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
       <section aria-label="The week" className="flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-5 py-4">
         <div className="grid shrink-0 grid-cols-[13rem_repeat(7,minmax(0,1fr))] gap-1.5 pb-2">
-          <span className="text-base font-bold text-ink-muted">Tap a day to change it</span>
+          <span aria-hidden />
           {weekdays.map((w) => (
             <span key={w.value} className="text-center text-lg font-bold text-ink" title={w.long}>
               {w.short}
@@ -298,10 +299,6 @@ function WeeksPanel({
     return (
       <section className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-frame bg-board p-6 text-center">
         <Emoji emoji="🗓️" className="size-16" />
-        <p className="text-xl font-bold text-ink">Tap someone&rsquo;s name</p>
-        <p className="text-base text-ink-muted">
-          To give them another week, like a night shift week, and swap between weeks or let them take turns.
-        </p>
       </section>
     );
   }
@@ -353,13 +350,6 @@ function WeeksPanel({
           </div>
         ))}
       </div>
-      <p className="text-base text-ink-muted">
-        {plans.length < 2
-          ? "Someone with shifts can have more than one week, then swap weeks or let them take turns."
-          : rotate
-            ? "The weeks take turns, one after another, in this order."
-            : "The ticked week is used every week."}
-      </p>
       {plans.length > 1 ? (
         <button
           type="button"
@@ -416,7 +406,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
     const mine = draft.dayTypes.find((t) => t.group === group && t.member_id === member.id);
     if (mine) {
       if (!draft.dayTypes.some((t) => t.member_id === member.id && t.id !== mine.id)) {
-        setError(`${member.name} needs at least one kind of day.`);
+        setError(`${member.name} needs at least one day.`);
         return;
       }
       update((d) => removeDayType(d, mine.id));
@@ -430,7 +420,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
     const types = draft.dayTypes.filter((t) => t.group === group);
     const stuck = members.find((m) => types.some((t) => t.member_id === m.id) && !draft.dayTypes.some((t) => t.member_id === m.id && t.group !== group));
     if (stuck) {
-      setError(`${stuck.name} needs at least one kind of day, so this one can't go.`);
+      setError(`${stuck.name} needs at least one day, so this one can't go.`);
       return;
     }
     update((d) => types.reduce((acc, t) => removeDayType(acc, t.id), d));
@@ -446,12 +436,9 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <p className="shrink-0 text-base text-ink-muted">
-        Each person has their own wake-up and bedtime on each kind of day. Which routines happen on a kind of day is set in the Routine Manager.
-      </p>
       <div className={`grid min-h-0 flex-1 gap-4 lg:grid-cols-3 ${perPage === 6 ? "lg:grid-rows-2" : "lg:grid-rows-1"}`}>
         {shown.map((g) => (
-          <section key={g.group} aria-label={g.name || "New kind of day"} className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-frame bg-board px-4 py-3">
+          <section key={g.group} aria-label={g.name || "New day"} className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-frame bg-board px-4 py-3">
             <div className="flex items-center gap-2">
               <EmojiPicker
                 key={g.group}
@@ -459,7 +446,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 fieldName=""
                 nameText={g.name}
                 onChange={(icon) => setGroup(g.group, { icon: icon || null })}
-                label={`Picture for ${g.name || "this kind of day"}`}
+                label={`Picture for ${g.name || "this day"}`}
                 className="size-11! self-center!"
                 fullScreen
               />
@@ -467,15 +454,13 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 value={g.name}
                 onChange={(e) => setGroup(g.group, { name: e.target.value })}
                 maxLength={30}
-                placeholder="e.g. School day"
-                aria-label="Kind of day"
+                aria-label="Day name"
                 className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
               />
               <button
                 type="button"
                 aria-pressed={g.types[0]?.errands ?? false}
                 onClick={() => setGroup(g.group, { errands: !(g.types[0]?.errands ?? false) })}
-                title="Good for errands: the chore planner puts errands on these days first"
                 className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-frame px-3 text-sm font-bold text-ink-muted aria-pressed:border-solid aria-pressed:border-ink aria-pressed:bg-rail aria-pressed:text-ink"
               >
                 <Car size="1.25rem" aria-hidden />
@@ -484,8 +469,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
               <button
                 type="button"
                 onClick={() => setBells(g.group)}
-                aria-label={`Heads-ups for ${g.name || "this kind of day"}`}
-                title="Heads-ups: a to-do before each of these days, like “Pack a lunch” the night before"
+                aria-label={`Heads-ups for ${g.name || "this day"}`}
                 className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-ink"
               >
                 <Bell size="1.25rem" aria-hidden />
@@ -498,8 +482,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
               <button
                 type="button"
                 onClick={() => removeGroup(g.group)}
-                aria-label={`Remove ${g.name || "this kind of day"}`}
-                title="Remove for everyone"
+                aria-label={`Remove ${g.name || "this day"}`}
                 className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-danger"
               >
                 <Trash size="1.25rem" aria-hidden />
@@ -530,7 +513,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                       <input type="time" value={mine.bed} onChange={(e) => setType(mine.id, { bed: e.target.value })} aria-label={`${m.name} goes to bed`} className={timeClass} />
                     </>
                   ) : (
-                    <span className="col-span-2 text-sm text-ink-muted">Tap to give it to {m.name}</span>
+                    <span className="col-span-2" aria-hidden />
                   )}
                 </div>
               );
@@ -544,15 +527,14 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
             className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 border-dashed border-frame text-lg font-bold text-ink hover:border-ink"
           >
             <Plus size="2rem" weight="bold" aria-hidden />
-            Kind of day
-            <span className="max-w-64 text-center text-sm font-semibold text-ink-muted">For everyone, or just some people. Tap names to choose.</span>
+            Day
           </button>
         ) : null}
       </div>
       {pages > 1 ? <Pager page={at} pages={pages} setPage={setPage} /> : null}
       {bellGroup ? (
         <KindHeadsUps
-          name={bellGroup.name || "this kind of day"}
+          name={bellGroup.name || "this day"}
           headsUps={draft.headsUps.filter((h) => h.group === bellGroup.group)}
           onAdd={(h) => update((d) => ({ ...d, headsUps: [...d.headsUps, { ...h, id: newId(), group: bellGroup.group }] }))}
           onRemove={(id) => update((d) => ({ ...d, headsUps: d.headsUps.filter((h) => h.id !== id) }))}
@@ -606,9 +588,6 @@ function KindHeadsUps({
             <X size="1.25rem" weight="bold" aria-hidden />
           </button>
         </div>
-        <p className="text-base text-ink-muted">
-          A to-do before each {name}, counted back from wake-up. Like &ldquo;Pack a lunch&rdquo; 12 hours before. However it became {name}: the week, a break or an event.
-        </p>
         {headsUps.length > 0 ? (
           <ul className="flex flex-col">
             {headsUps.map((h) => (
@@ -642,7 +621,6 @@ function KindHeadsUps({
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={80}
-                  placeholder="Pack a lunch"
                   className="min-h-11 rounded-xl border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
                 />
               </label>
@@ -686,9 +664,8 @@ function KindHeadsUps({
             </div>
           </div>
         ) : (
-          <p className="text-base text-ink-muted">That&rsquo;s the most for one kind of day.</p>
+          <p className="text-base text-ink-muted">That&rsquo;s the most for one day.</p>
         )}
-        <p className="text-sm text-ink-muted">Changes are kept when you press Save.</p>
       </div>
     </div>
   );
@@ -721,20 +698,15 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
 
   return (
     <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-      <section aria-label="Breaks" className="flex min-h-0 min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame bg-board px-4 py-4">
+      <section aria-label="Days off" className="flex min-h-0 min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame bg-board px-4 py-4">
         <button
           type="button"
           onClick={add}
           className="flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-ink text-base font-bold text-board"
         >
           <Plus size="1.25rem" weight="bold" aria-hidden />
-          Break
+          Day off
         </button>
-        {list.length === 0 ? (
-          <p className="px-1 text-base text-ink-muted">
-            No breaks coming up. A break is a few days that aren&rsquo;t like the usual week: a holiday, summer, a sick day.
-          </p>
-        ) : null}
         {shown.map((b) => {
           const now = b.start <= today && today <= b.end;
           return (
@@ -747,7 +719,7 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
             >
               <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-10" />
               <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                <span className="truncate text-lg font-bold text-ink">{b.name || "New break"}</span>
+                <span className="truncate text-lg font-bold text-ink">{b.name || "New day off"}</span>
                 <span className="truncate text-sm font-semibold text-ink-muted">
                   {now ? "Now · " : ""}
                   {b.start === b.end ? dateLabel(b.start, true) : `${dateLabel(b.start)} – ${dateLabel(b.end)}`}
@@ -782,10 +754,6 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
       ) : (
         <section className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-frame bg-board p-6 text-center">
           <Emoji emoji="🏖️" className="size-16" />
-          <p className="text-xl font-bold text-ink">Holidays, summer, a sick day</p>
-          <p className="max-w-[30rem] text-base text-ink-muted">
-            Tap + Break, pick the dates and who it&rsquo;s for, and what kind of day they have. Breaks show on the calendar. One day is fine too.
-          </p>
         </section>
       )}
     </div>
@@ -839,14 +807,14 @@ function BreakEditor({
     (!group || item.people.some((p) => draft.dayTypes.some((x) => x.group === group && x.id === p.day_type_id)));
 
   return (
-    <section aria-label="Edit break" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4">
+    <section aria-label="Edit day off" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4">
       <div className="flex items-center gap-2.5">
         <EmojiPicker
           initial={item.icon ?? ""}
           fieldName=""
           nameText={item.name}
           onChange={(icon) => set({ icon: icon || null })}
-          label={`Picture for ${item.name || "this break"}`}
+          label={`Picture for ${item.name || "this day off"}`}
           className="size-14! self-center!"
           fullScreen
         />
@@ -854,8 +822,7 @@ function BreakEditor({
           value={item.name}
           onChange={(e) => set({ name: e.target.value })}
           maxLength={40}
-          placeholder="e.g. Winter break"
-          aria-label="Break name"
+          aria-label="Name"
           className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
         />
         <button type="button" onClick={remove} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-rail px-3 text-base font-bold text-danger">
@@ -943,7 +910,7 @@ function BreakEditor({
                   </MiniChip>
                 </div>
               ) : (
-                <span className="text-base text-ink-muted">Not on this break</span>
+                <span className="text-base text-ink-muted">Not on these days off</span>
               )}
             </div>
           );
@@ -980,29 +947,5 @@ function MiniChip({ active, onClick, colour, children }: { active: boolean; onCl
 }
 
 function Pager({ page, pages, setPage }: { page: number; pages: number; setPage: (p: number) => void }) {
-  return (
-    <div className="mt-auto flex shrink-0 items-center gap-3 pt-2 text-base font-bold">
-      <button
-        type="button"
-        disabled={page === 0}
-        onClick={() => setPage(page - 1)}
-        aria-label="Back"
-        className="flex size-11 items-center justify-center rounded-xl bg-rail text-ink disabled:opacity-30"
-      >
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      <button
-        type="button"
-        disabled={page >= pages - 1}
-        onClick={() => setPage(page + 1)}
-        aria-label="More"
-        className="flex size-11 items-center justify-center rounded-xl bg-rail text-ink disabled:opacity-30"
-      >
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={setPage} className="mt-auto pt-2" />;
 }

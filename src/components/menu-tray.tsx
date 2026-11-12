@@ -23,7 +23,7 @@ import type { Icon } from "@phosphor-icons/react";
  * section, when you tap outside it, or when you press Escape.
  *
  * On the kitchen screen the tray has a second tier (2026-11-11): drag it
- * further up (or tap "Drag up for apps") and it grows to show the apps,
+ * further up (or tap the handle) and it grows to show the apps,
  * like a phone's home screen. Only the kitchen PC runs the launcher
  * helper, so only it gets the second tier (see launcher-store.ts).
  */
@@ -35,11 +35,11 @@ const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   // showed last; you switch between them at the top right (Connor, 2026-11-09).
   { section: "calendar", href: "/calendar", label: "Calendar", icon: CalendarBlank },
   // Planning happens in the weekly review; the rest are managers (Connor, 2026-11-09).
-  { section: "review", href: "/review", label: "Weekly review", icon: CalendarCheck },
-  { section: "routines", href: "/routines", label: "Routine Manager", icon: Alarm },
-  { section: "lists", href: "/lists", label: "List Manager", icon: ListChecks },
-  { section: "chores", href: "/chores", label: "Chore Manager", icon: Broom },
-  { section: "meals", href: "/meals/menu", label: "Menu Manager", icon: ForkKnife },
+  { section: "review", href: "/review", label: "Planner", icon: CalendarCheck },
+  { section: "routines", href: "/routines", label: "Routines", icon: Alarm },
+  { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
+  { section: "chores", href: "/chores", label: "Chores", icon: Broom },
+  { section: "meals", href: "/meals/menu", label: "Meals", icon: ForkKnife },
   { section: "settings", href: "/household", label: "Settings", icon: GearSix },
 ];
 
@@ -171,21 +171,13 @@ export function MenuTray({ section }: { section: Section }) {
           ) : tier === 2 ? (
             <CaretDown size="1.75rem" aria-hidden />
           ) : (
-            <>
-              <CaretUp size="1.5rem" weight="bold" aria-hidden />
-              Drag up for apps
-            </>
+            <CaretUp size="1.75rem" aria-hidden />
           )}
         </button>
 
         {tier === 2 ? (
           <section aria-label="Apps" className="flex w-full flex-col gap-2 pb-3">
-            <h2 className="px-2 text-base font-bold tracking-[0.04em] text-ink-muted">APPS</h2>
-            {apps.length === 0 ? (
-              <p className="px-2 py-4 text-lg text-ink-muted">
-                No apps yet. Add them in <Link href="/household?tab=apps" className="font-bold text-accent">Settings › Apps</Link>.
-              </p>
-            ) : (
+            {apps.length === 0 ? null : (
               <ul className="flex justify-center gap-4">
                 {apps.map((app) => (
                   <li key={app.id}>

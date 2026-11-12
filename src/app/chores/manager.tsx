@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, CalendarCheck, CaretLeft, CaretRight, Minus, Plus, Trash, X } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, CalendarCheck, Minus, Plus, Trash, X } from "@phosphor-icons/react";
 import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -224,7 +225,7 @@ export function ChoreManager({
 
   return (
     <>
-      <ScreenHeader title="Chore Manager">
+      <ScreenHeader title="Chores">
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">
@@ -248,7 +249,7 @@ export function ChoreManager({
             </span>
           </span>
           <span className="truncate text-base font-bold" style={{ color: strong("orange") }}>
-            {nextUp ? `Next: ${nextUp.name}, ${nextLabel(info[nextUp.id].placedOn ?? info[nextUp.id].dueOn)}` : "Chores that come back every so often"}
+            {nextUp ? `Next: ${nextUp.name}, ${nextLabel(info[nextUp.id].placedOn ?? info[nextUp.id].dueOn)}` : ""}
           </span>
           {hardCount > 0 ? (
             <span className="text-base font-bold text-now">
@@ -278,7 +279,7 @@ export function ChoreManager({
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-lg font-bold text-ink">{d.name || "Unnamed"}</span>
                     <span className="truncate text-sm font-semibold text-ink-muted">
-                      {d.is_free ? "Any other day" : d.weekdays.length ? weekdaysLabel(d.weekdays) : "No days yet"} · {count === 1 ? "1 chore" : `${count} chores`}
+                      {d.is_free ? "" : d.weekdays.length ? `${weekdaysLabel(d.weekdays)} · ` : ""}{count === 1 ? "1 chore" : `${count} chores`}
                     </span>
                   </span>
                 </button>
@@ -432,7 +433,7 @@ function DayPanel({
           className={`${control} w-[16rem] text-2xl! font-extrabold`}
         />
         {day.is_free ? (
-          <span className="text-lg text-ink-muted lg:ml-auto">Any day with no other chore day</span>
+          <span className="text-lg text-ink-muted lg:ml-auto">Free day</span>
         ) : (
           <div className="flex flex-wrap gap-1.5 lg:ml-auto" role="group" aria-label="Days of the week">
             {weekdays.map((w) => (
@@ -457,7 +458,6 @@ function DayPanel({
                 if (e.key === "Enter") add();
               }}
               maxLength={80}
-              placeholder="Add a chore"
               aria-label="New regular chore"
               className={`${control} min-w-0 flex-1`}
             />
@@ -469,17 +469,13 @@ function DayPanel({
                 </option>
               ))}
             </select>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Due by (optional)" title="Due by (optional)" className={`${control} w-[9rem]`} />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Due by" className={`${control} w-[9rem]`} />
             <button type="button" onClick={add} disabled={!name.trim()} className="flex min-h-[var(--touch-target)] items-center gap-1.5 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board disabled:opacity-40">
               <Plus size="1.25rem" weight="bold" aria-hidden />
               Add
             </button>
           </div>
-          {regular.length === 0 ? (
-            <p className="py-3 text-lg text-ink-muted">
-              Nothing yet. Add the chores that happen every time this day comes round, like &ldquo;Wash the bed sheets&rdquo;. A due time is optional.
-            </p>
-          ) : null}
+          {regular.length === 0 ? <p className="py-3 text-lg text-ink-muted">No chores yet</p> : null}
           <ul ref={regularRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {shown.map((c) => {
               const person = c.assignee_id ? memberById.get(c.assignee_id) : undefined;
@@ -500,7 +496,7 @@ function DayPanel({
                       <input type="time" value={c.due_time ?? ""} onChange={(e) => setChore(c.id, { due_time: e.target.value || null })} aria-label="Due by" className={`${control} w-[9rem]`} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <input value={c.notes ?? ""} onChange={(e) => setChore(c.id, { notes: e.target.value || null })} maxLength={2000} placeholder="Notes (optional)" aria-label="Notes" className={`${control} min-w-0 flex-1`} />
+                      <input value={c.notes ?? ""} onChange={(e) => setChore(c.id, { notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={`${control} min-w-0 flex-1`} />
                       <IconButton label="Move up" onClick={() => move(c.id, -1)}>
                         <ArrowUp size="1.25rem" aria-hidden />
                       </IconButton>
@@ -536,7 +532,7 @@ function DayPanel({
             })}
           </ul>
           <div className="mt-auto flex items-center gap-3">
-            <p className="flex-1 text-base text-ink-muted">Tap a chore to change it, move it or remove it.</p>
+            <span className="flex-1" />
             <MiniPager page={p} pages={pages} onPage={setPage} />
           </div>
         </div>
@@ -565,7 +561,6 @@ function DayPanel({
               <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">
                 Next {day.is_free ? "free day" : day.name} · {dateLabel(preview.date)}
               </h3>
-              {preview.items.length === 0 ? <p className="text-base text-ink-muted">Nothing on it yet.</p> : null}
               <ul className="flex flex-col gap-1">
                 {preview.items.slice(0, PREVIEW_SHOWN).map((item, i) => (
                   <li key={i} className={`flex items-center gap-2 text-base font-semibold ${item.occasional ? "text-accent" : "text-ink"}`}>
@@ -576,9 +571,7 @@ function DayPanel({
               </ul>
               {preview.items.length > PREVIEW_SHOWN ? <p className="text-base font-bold text-ink-muted">+{preview.items.length - PREVIEW_SHOWN} more</p> : null}
             </>
-          ) : (
-            <p className="text-base text-ink-muted">{dayId.startsWith(NEW_PREFIX) ? "Save to see when it comes round next." : "Not in the next two weeks."}</p>
-          )}
+          ) : null}
           {day.is_free ? null : confirmRemove ? (
             <div className="mt-auto flex flex-col gap-2">
               <p className="text-base font-bold text-danger">Remove {day.name} and its {regular.length} regular chores?</p>
@@ -733,7 +726,6 @@ function OccasionalPanel({
             </button>
           ))}
         </div>
-        {tab.chores.length === 0 ? <p className="py-3 text-lg text-ink-muted">Nothing comes due in {tab.label.toLowerCase()}.</p> : null}
         <ul ref={occasionalRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {shown.map(({ chore: c }) => {
             const i = info[c.id];
@@ -754,15 +746,14 @@ function OccasionalPanel({
                 </button>
                 {i?.onToday ? (
                   <span className="shrink-0 rounded-full px-2.5 py-1 text-sm font-extrabold" style={{ background: soft("teal"), color: strong("teal") }}>
-                    On today&rsquo;s list
+                    On the Daily list
                   </span>
                 ) : !isNew && c.active ? (
                   <button
                     type="button"
                     onClick={() => plus(c.id)}
                     disabled={busy !== null}
-                    aria-label={`Put ${c.name} on today's list`}
-                    title="Do it today"
+                    aria-label={`Add ${c.name} to the Daily list`}
                     className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ink text-board disabled:opacity-40"
                   >
                     <Plus size="1.375rem" weight="bold" aria-hidden />
@@ -800,7 +791,7 @@ function OccasionalPanel({
           timeZone={timeZone}
         />
       ) : (
-        <EmptyState emoji="🧹" title="Tap a chore to change it" hint={<>Tap <b>+</b> to add it to today&rsquo;s list.</>} />
+        <EmptyState emoji="🧹" />
       )}
     </div>
   );
@@ -847,7 +838,7 @@ function OccasionalEditor({
       ]
         .filter(Boolean)
         .join(" · ")
-    : "New: save to see when it's due.";
+    : "";
 
   return (
     <div className="flex min-h-0 flex-col gap-2.5 rounded-2xl border border-frame p-3.5">
@@ -862,10 +853,10 @@ function OccasionalEditor({
           <input type="date" value={firstDue} onChange={(e) => set({ first_due: e.target.value || null })} aria-label="First time it's due" className={`${control} py-1!`} />
           {info ? null : c.first_due ? (
             <button type="button" onClick={() => set({ first_due: null })} className="flex min-h-11 items-center rounded-xl px-3 font-bold text-accent hover:bg-rail">
-              Pick a quiet day
+              Pick a free day
             </button>
           ) : (
-            <span>· a quiet day</span>
+            <span>· a free day</span>
           )}
         </div>
       ) : (
@@ -913,7 +904,7 @@ function OccasionalEditor({
                 </Chip>
               ))}
             </Group>
-            <Group label="Chore days it can go on (none picked: any day)">
+            <Group label="Chore days">
               {draft.days.map((d) => (
                 <Chip key={d.id} on={c.chore_day_ids.includes(d.id)} onClick={() => set({ chore_day_ids: toggle(c.chore_day_ids, d.id) })}>
                   {d.icon ? <Emoji emoji={d.icon} className="size-6" /> : null}
@@ -921,14 +912,14 @@ function OccasionalEditor({
                 </Chip>
               ))}
             </Group>
-            {info?.hard && c.active ? <p className="text-base font-bold text-now">{info.hard}. Give it another chore day, or more room on its days.</p> : null}
+            {info?.hard && c.active ? <p className="text-base font-bold text-now">{info.hard}</p> : null}
           </>
         ) : null}
 
         {tab === "repeats" ? (
           <>
             {c.only_in === "dates" ? (
-              <p className="text-base text-ink-muted">Once a year, between the dates under &ldquo;Only in&rdquo;.</p>
+              <p className="text-base text-ink-muted">Once a year</p>
             ) : (
               <>
                 <Group label="Counts from">
@@ -1035,7 +1026,7 @@ function OccasionalEditor({
                 ))}
               </Group>
             </div>
-            <input value={c.notes ?? ""} onChange={(e) => set({ notes: e.target.value || null })} maxLength={2000} placeholder="Notes (optional), e.g. which filter to buy" aria-label="Notes" className={control} />
+            <input value={c.notes ?? ""} onChange={(e) => set({ notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={control} />
             <HeadsUps list={c.heads_ups} onChange={(heads_ups) => set({ heads_ups })} />
             {c.at_time ? <p className="text-sm text-ink-muted">Shows at {timeLabel(c.at_time)} on its day.</p> : null}
           </>
@@ -1091,7 +1082,6 @@ function HeadsUps({ list, onChange }: { list: DraftHeadsUp[]; onChange: (list: D
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-base font-bold text-ink">Heads-ups</span>
-      {list.length === 0 ? <p className="text-sm text-ink-muted">A to-do (or a grocery item) a set time before it&rsquo;s due, like &ldquo;Buy a new filter&rdquo;.</p> : null}
       <ul className="flex flex-col">
         {list.map((h) => (
           <li key={h.id} className="flex min-h-11 items-center gap-2.5 border-b border-panel last:border-0">
@@ -1195,21 +1185,7 @@ function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean
 }
 
 function MiniPager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="flex shrink-0 items-center gap-2">
-      <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 0} aria-label="Previous page" className={arrow}>
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-base font-bold text-ink-muted tabular-nums">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pages - 1} aria-label="Next page" className={arrow}>
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={onPage} />;
 }
 
 function MonthDay({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {

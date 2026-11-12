@@ -1,6 +1,7 @@
+import { Pager as PageArrows } from "@/components/pager";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, X } from "@phosphor-icons/react/dist/ssr";
+import { X } from "@phosphor-icons/react/dist/ssr";
 import { Notice, ScreenHeader, Segmented } from "@/components/ui";
 import { MENU_TABS, type MealsTab } from "./menu-tabs";
 
@@ -29,7 +30,7 @@ export function MealsHeader({
     <>
       {/* The tabs sit straight after the title on every Menu Manager screen, so they never move. */}
       <ScreenHeader title={title}>
-        <Segmented label="Menu Manager" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
+        <Segmented label="Meals" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
         {children ? <div className="flex items-center gap-4 lg:ml-auto">{children}</div> : null}
       </ScreenHeader>
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -88,33 +89,7 @@ export function Modal({
 
 /** ‹ 2 of 5 › arrows for a list shown a page at a time. */
 export function Pager({ page, pages, href }: { page: number; pages: number; href: (page: number) => string }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink";
-  return (
-    <div className="flex shrink-0 items-center justify-center gap-3">
-      {page > 0 ? (
-        <Link href={href(page - 1)} scroll={false} aria-label="Previous page" className={arrow}>
-          <CaretLeft size="1.5rem" weight="bold" aria-hidden />
-        </Link>
-      ) : (
-        <span className={`${arrow} opacity-30`} aria-hidden>
-          <CaretLeft size="1.5rem" weight="bold" />
-        </span>
-      )}
-      <span className="min-w-20 text-center text-lg font-bold text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      {page < pages - 1 ? (
-        <Link href={href(page + 1)} scroll={false} aria-label="Next page" className={arrow}>
-          <CaretRight size="1.5rem" weight="bold" aria-hidden />
-        </Link>
-      ) : (
-        <span className={`${arrow} opacity-30`} aria-hidden>
-          <CaretRight size="1.5rem" weight="bold" />
-        </span>
-      )}
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} href={href} className="justify-center" />;
 }
 
 /** A page of a list, and how many pages there are. */

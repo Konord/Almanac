@@ -172,7 +172,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             <Link
               key={b.id}
               href="/routines/manage?tab=breaks"
-              title={`A break until ${b.end_date}`}
+              title={`Days off until ${b.end_date}`}
               className="inline-flex min-h-[var(--touch-target)] max-w-64 shrink-0 items-center gap-2 rounded-2xl border-2 border-dashed border-frame bg-rail px-4 text-base font-bold text-ink"
             >
               <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />
@@ -185,13 +185,13 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-[color-mix(in_srgb,var(--color-accent)_12%,white)] px-4 text-base font-bold text-accent"
           >
             <CalendarCheck size="1.5rem" weight="bold" aria-hidden />
-            Weekly review
+            Planner
           </Link>
         ) : null}
         <div className="flex items-center gap-3 lg:ml-auto">
           <PeopleButton members={members} shown={people} href="/?panel=people" />
           <Segmented
-            label="How much to show"
+            label="View"
             options={[
               { href: "/", label: "Agenda", active: true },
               {
@@ -211,7 +211,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
-      {placing ? <PlacingBar hint="Tap someone's column at a time to add an event for them, or drag down to set how long." cancelHref="/" /> : null}
+      {placing ? <PlacingBar hint="Adding an event" cancelHref="/" /> : null}
 
       <div className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
         <PeopleTimeline

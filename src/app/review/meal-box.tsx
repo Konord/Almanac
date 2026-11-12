@@ -166,9 +166,8 @@ export function MealBox({
         >
           <Plus size="3rem" weight="bold" aria-hidden className="text-ink-muted" />
           <span className="text-2xl font-extrabold">Custom meal</span>
-          <span className="text-base text-ink-muted">Pick a {c?.name.toLowerCase() ?? ""} main, then add sides</span>
         </button>
-        {options.length === 0 ? <p className="col-span-2 self-center text-lg text-ink-muted">No meals under {c?.name ?? "this"} yet. Add them in the Menu Manager, or make a custom one.</p> : null}
+        {options.length === 0 ? <p className="col-span-2 self-center text-lg text-ink-muted">No {c?.name ?? ""} meals yet.</p> : null}
       </div>
     );
   } else if (mode.name === "backups") {
@@ -219,7 +218,7 @@ export function MealBox({
         ? { label: "Change meal", to: { name: "meals", categoryId: meal.categoryId } as Mode }
         : { label: "Change meal", to: { name: "kinds" } as Mode }
       : mode.name === "meals" || mode.name === "backups"
-        ? { label: "All kinds", to: { name: "kinds" } as Mode }
+        ? { label: "All", to: { name: "kinds" } as Mode }
         : null;
 
   return (
@@ -452,14 +451,10 @@ function Plate({
             </button>
           ))}
           <div className="flex-1" />
-          {pages > 1 ? (
-            <button type="button" onClick={() => setPage((p + 1) % pages)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-rail px-4 text-base font-bold text-ink">
-              Dishes {p + 1} of {pages}
-            </button>
-          ) : null}
+          <Pager page={p} pages={pages} setPage={setPage} />
         </div>
         <div className="mt-auto flex flex-col gap-2">
-          <span className="text-sm font-bold tracking-wide text-ink-muted uppercase">Who&rsquo;s eating? (none picked means everyone)</span>
+          <span className="text-sm font-bold tracking-wide text-ink-muted uppercase">Who&rsquo;s eating?</span>
           <div className="flex flex-wrap gap-2">
             {members.map((m) => {
               const on = meal.memberIds.includes(m.id);
@@ -501,11 +496,8 @@ function Plate({
           />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-4">
-            <p className="text-xl text-ink-soft">Swap a dish for this day only, or pick ×2 or ×3 for leftovers or guests.</p>
-            <p className="text-lg text-ink-muted">Batches are whole numbers, so the grocery list never asks for half an onion.</p>
             <div className="mt-auto flex flex-col gap-2 rounded-2xl bg-rail p-4">
               <span className="text-lg font-bold text-ink">Want this exact meal again?</span>
-              <span className="text-base text-ink-muted">Save it as a meal and it shows up under its kind next time, ready to place.</span>
               <button
                 type="button"
                 onClick={() => setSaving(true)}
@@ -602,7 +594,6 @@ function DishPicker({
               className="min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-xl text-ink outline-none focus:border-accent"
             />
           </label>
-          <span className="text-base text-ink-muted">Add its ingredients later in the Menu Manager, so they go on the grocery list.</span>
           {error ? <span className="text-base font-bold text-danger">{error}</span> : null}
           <div className="flex gap-2">
             <button type="button" onClick={() => setAdding(false)} className="min-h-[var(--touch-target)] flex-1 rounded-2xl bg-board text-lg font-bold text-ink">
@@ -691,7 +682,6 @@ function SaveAsMeal({
         />
       </label>
       <div className="flex min-h-0 flex-col gap-2">
-        <span className="text-base font-bold text-ink-soft">Shows under</span>
         <div className="flex flex-wrap gap-2 overflow-hidden">
           {categories.slice(0, 12).map((c) => {
             const on = cats.includes(c.id);
@@ -710,14 +700,13 @@ function SaveAsMeal({
           })}
         </div>
       </div>
-      <span className="text-base text-ink-muted">Next time it comes with these dishes. You can still swap any of them.</span>
       {error ? <span className="text-base font-bold text-danger">{error}</span> : null}
       <div className="mt-auto flex gap-2">
         <button type="button" onClick={onCancel} className="min-h-[var(--touch-target)] flex-1 rounded-2xl bg-board text-lg font-bold text-ink">
           Not now
         </button>
         <button type="button" disabled={!name.trim() || pending} onClick={save} className="min-h-[var(--touch-target)] flex-1 rounded-2xl bg-accent text-lg font-bold text-board disabled:opacity-50">
-          {pending ? "Saving…" : "Save meal"}
+          {pending ? "Saving…" : "Save"}
         </button>
       </div>
     </div>

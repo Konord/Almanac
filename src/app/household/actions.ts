@@ -23,8 +23,8 @@ export async function saveHousehold(draft: SettingsDraft): Promise<Result> {
   const problem = draftProblem(draft);
   if (problem) return { ok: false, error: problem };
   const timeZone = draft.timeZone.trim();
-  if (!isTimeZone(timeZone)) return { ok: false, error: `"${timeZone}" isn't a time zone I recognise.` };
-  if (!isLocalTime(draft.reviewTime)) return { ok: false, error: "Pick a time for the weekly review." };
+  if (!isTimeZone(timeZone)) return { ok: false, error: `"${timeZone}" isn't a time zone.` };
+  if (!isLocalTime(draft.reviewTime)) return { ok: false, error: "Pick a time for the Planner." };
   if (draft.members.some((m) => !m.removed && (!isPersonColour(m.colour) || (m.role !== "parent" && m.role !== "child")))) {
     return { ok: false, error: "Everyone needs a colour and a role." };
   }

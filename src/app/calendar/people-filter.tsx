@@ -20,7 +20,6 @@ export function PeopleButton({ members, shown, href }: { members: Member[]; show
     <Link
       href={href}
       scroll={false}
-      title="Whose things this screen shows"
       className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel"
     >
       {people.length === 0 ? (
@@ -74,9 +73,6 @@ export function PeopleChooser({
   );
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-lg text-ink-muted">
-        Show just some people&apos;s things on this screen. Things for everyone always show. Each screen remembers its own.
-      </p>
       <div className="grid grid-cols-2 gap-2">
         {option(
           "everyone",

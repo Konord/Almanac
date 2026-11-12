@@ -18,9 +18,7 @@ export function GrocerySheet({ dirty, onClose }: { dirty: boolean; onClose: () =
           <ShoppingCart size="2.5rem" className="text-meal-ink" aria-hidden />
           <div className="min-w-0 flex-1">
             <h2 className="text-3xl font-extrabold text-ink">Grocery list</h2>
-            <p className="text-base text-ink-muted">
-              {dirty ? "Save the week to put your meal changes on the list. " : ""}Tap what you already have to cross it off. Changes save as you go.
-            </p>
+            {dirty ? <p className="text-base text-ink-muted">Save the week to put your meal changes on the list.</p> : null}
           </div>
           <CloseButton onClick={onClose} />
         </div>

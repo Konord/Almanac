@@ -1,3 +1,4 @@
+import { Pager } from "@/components/pager";
 import Link from "next/link";
 import { Check, X } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji, ProgressBar } from "@/components/ui";
@@ -84,7 +85,7 @@ export function RoutineChecklist({
                   {step.icon ? <Emoji emoji={step.icon} className="size-8" faded={done} /> : <span className="size-8 shrink-0" aria-hidden />}
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className={`truncate text-xl leading-[1.1] font-semibold ${done || over ? "text-ink-muted" : "text-ink"}`}>{step.text}</span>
-                    {over && !done ? <span className="text-sm font-bold text-ink-muted">Missed · tap if it got done</span> : null}
+                    {over && !done ? <span className="text-sm font-bold text-ink-muted">Missed</span> : null}
                   </span>
                   <span
                     className={`flex size-8 shrink-0 items-center justify-center rounded-full text-white ${done ? "bg-success" : "border-[2.5px] border-check-border"}`}
@@ -99,23 +100,7 @@ export function RoutineChecklist({
         })}
       </ul>
       <div className="mt-auto flex items-center gap-2 pt-1 text-base font-bold">
-        {pages > 1 ? (
-          <>
-            {shownPage > 0 ? (
-              <Link href={hereHref(shownPage - 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
-                ‹ Back
-              </Link>
-            ) : null}
-            <span className="text-ink-muted">
-              {shownPage + 1} of {pages}
-            </span>
-            {shownPage < pages - 1 ? (
-              <Link href={hereHref(shownPage + 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
-                More ›
-              </Link>
-            ) : null}
-          </>
-        ) : null}
+        <Pager page={shownPage} pages={pages} href={hereHref} />
         {date === today && !progress.complete ? (
           <form action={endRoutine} className="ml-auto">
             <input type="hidden" name="memberId" value={member.id} />
@@ -123,7 +108,7 @@ export function RoutineChecklist({
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="returnTo" value={returnTo} />
             {ended ? <input type="hidden" name="reopen" value="true" /> : null}
-            <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink" title={ended ? "Carry on with it" : "Finish it now; anything unticked counts as missed"}>
+            <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
               {ended ? "Reopen" : "End"}
             </button>
           </form>

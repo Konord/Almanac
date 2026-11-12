@@ -28,17 +28,11 @@ export function HeadsUpEditor({
   headsUps,
   source,
   returnTo,
-  what,
-  example = "Pack the hockey bag",
 }: {
-  /** A placeholder for the new heads-up. */
-  example?: string;
   headsUps: HeadsUp[];
   source: { eventId: string } | { choreId: string };
   /** The page to come back to, opened on this tab. */
   returnTo: string;
-  /** "the game", "this chore": used in the hint. */
-  what: string;
 }) {
   return (
     <div className="grid content-start gap-4">
@@ -49,9 +43,7 @@ export function HeadsUpEditor({
         <input type="hidden" name="huChoreId" value={source.choreId} />
       )}
       {headsUps.length === 0 ? (
-        <p className="text-lg text-ink-muted">
-          A heads-up makes a to-do (or adds to the grocery list) a set time before {what}. Like &ldquo;Pack the bag&rdquo; the night before.
-        </p>
+        null
       ) : (
         <ul className="flex flex-col">
           {headsUps.map((h) => (
@@ -81,7 +73,7 @@ export function HeadsUpEditor({
           <div className="flex items-end gap-3">
             <label className="flex min-w-0 flex-1 flex-col gap-1.5">
               <span className="text-base font-bold text-ink">New heads-up</span>
-              <Input name="huLabel" maxLength={80} placeholder={example} />
+              <Input name="huLabel" maxLength={80} />
             </label>
             <label className="flex w-24 shrink-0 flex-col gap-1.5">
               <span className="text-base font-bold text-ink">How long</span>

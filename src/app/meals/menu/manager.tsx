@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState } from "react";
-import { ArrowsLeftRight, CaretLeft, CaretRight, Check, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
+import { ArrowsLeftRight, Check, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
 import { EmptyState, Emoji, Notice, ScreenHeader, Segmented } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -39,21 +40,7 @@ function asLike(m: ManagerMeal): MenuMealLike {
 }
 
 function Arrows({ page, pages, setPage }: { page: number; pages: number; setPage: (n: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="flex shrink-0 items-center justify-center gap-3">
-      <button type="button" aria-label="Previous page" disabled={page === 0} onClick={() => setPage(page - 1)} className={arrow}>
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="min-w-16 text-center text-base font-bold text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" aria-label="Next page" disabled={page >= pages - 1} onClick={() => setPage(page + 1)} className={arrow}>
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={setPage} />;
 }
 
 function paged<T>(items: T[], page: number, per: number) {
@@ -199,8 +186,8 @@ export function MenuManager({
 
   return (
     <>
-      <ScreenHeader title="Menu Manager">
-        <Segmented label="Menu Manager" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />
+      <ScreenHeader title="Meals">
+        <Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />
         <div className="flex items-center gap-4 lg:ml-auto">
           <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
         </div>
@@ -211,10 +198,11 @@ export function MenuManager({
         {/* Kinds of meal */}
         <section className={card}>
           <div className="flex shrink-0 items-center gap-2">
-            <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">Kinds of meal</h2>
-            <button type="button" onClick={addKind} aria-label="Add a kind of meal" className={soft}>
+            {/* No word for these (Connor, 2026-11-11): just the tiles and New. */}
+            <span className="flex-1" />
+            <button type="button" onClick={addKind} className={soft}>
               <Plus size="1.25rem" weight="bold" aria-hidden />
-              Kind
+              New
             </button>
           </div>
           <ul ref={kindsRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
@@ -228,7 +216,7 @@ export function MenuManager({
                       fieldName=""
                       nameText={r.name}
                       onChange={(icon) => changeKind(r.id, { icon: icon || null })}
-                      label={`Picture for ${r.name || "this kind of meal"}`}
+                      label={`Picture for ${r.name || "this one"}`}
                       className="size-11! self-center!"
                       fullScreen
                     />
@@ -239,14 +227,13 @@ export function MenuManager({
                         if (e.key === "Enter") setEditingKind(null);
                       }}
                       maxLength={40}
-                      placeholder="Like Tacos"
                       aria-label="Name"
                       autoFocus
                       className="h-11 min-w-0 flex-1 border-b-2 border-meal-ink/50 bg-transparent px-1 text-xl font-bold text-ink outline-none focus:border-meal-ink"
                     />
                     {/* While renaming, the delete sits where the count was (Leftovers can't be deleted). */}
                     {r.isLeftovers ? null : (
-                      <button type="button" onClick={() => removeKind(r.id)} aria-label={`Remove ${r.name || "this kind"} (keeps its meals)`} className="flex size-10 shrink-0 items-center justify-center rounded-full text-danger hover:bg-board">
+                      <button type="button" onClick={() => removeKind(r.id)} aria-label={`Remove ${r.name || "this one"} (keeps its meals)`} className="flex size-10 shrink-0 items-center justify-center rounded-full text-danger hover:bg-board">
                         <Trash size="1.25rem" aria-hidden />
                       </button>
                     )}
@@ -268,8 +255,8 @@ export function MenuManager({
                     className={`flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-2xl border-2 px-3 text-left ${r.id === pickedRow.id ? "border-meal-ink bg-meal" : "border-transparent hover:bg-rail"} ${r.active ? "" : "opacity-55"}`}
                   >
                     <Emoji emoji={r.icon} className="size-9" />
-                    <span className={`min-w-0 flex-1 truncate text-xl font-bold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name yet"}</span>
-                    <span className="text-base text-ink-muted">{r.count ?? "Blank"}</span>
+                    <span className={`min-w-0 flex-1 truncate text-xl font-bold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name"}</span>
+                    <span className="text-base text-ink-muted">{r.count ?? ""}</span>
                   </button>
                   {r.id === pickedRow.id && r.id !== ALL && r.id !== NONE ? (
                     <button type="button" onClick={() => setEditingKind(r.id)} aria-label={`Rename ${r.name}`} className="flex size-12 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
@@ -281,7 +268,6 @@ export function MenuManager({
             )}
           </ul>
           <Arrows page={kindList.page} pages={kindList.pages} setPage={setKindPage} />
-          <p className="shrink-0 text-base text-ink-muted">Tap a kind to see its meals.</p>
         </section>
 
         {/* That kind's meals */}
@@ -296,11 +282,6 @@ export function MenuManager({
               </button>
             )}
           </div>
-          {blank ? (
-            <p className="text-lg text-ink-muted">
-              {pickedRow.name || "Leftovers"} is a blank, not a kind of meal. Put it in the weekly review on a night with no cooking: it has no dishes, no cooking mode, no heads-ups, and adds nothing to the grocery list.
-            </p>
-          ) : null}
           <ul ref={mealsRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
             {mealList.items.map((m) => (
               <li key={m.id}>
@@ -318,7 +299,7 @@ export function MenuManager({
                 </button>
               </li>
             ))}
-            {shown.length === 0 && !blank ? <li className="text-lg text-ink-muted">No meals here yet. Tap New meal to make one.</li> : null}
+            {shown.length === 0 && !blank ? <li className="text-lg text-ink-muted">No meals yet</li> : null}
           </ul>
           <Arrows page={mealList.page} pages={mealList.pages} setPage={setMealPage} />
         </section>
@@ -342,7 +323,7 @@ export function MenuManager({
               }}
             />
           ) : (
-            <EmptyState emoji="🍽️" title="Pick a meal to change its dishes" />
+            <EmptyState emoji="🍽️" />
           )}
         </section>
       </div>
@@ -397,7 +378,6 @@ function MealEditor({
           <input
             value={meal.name}
             maxLength={80}
-            placeholder={`Blank: called ${name}`}
             onChange={(e) => onChange((m) => ({ ...m, name: e.target.value }))}
             className="h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-xl text-ink outline-none focus:border-accent"
           />
@@ -409,7 +389,6 @@ function MealEditor({
       </div>
 
       <div className="flex shrink-0 flex-col gap-1.5">
-        <span className="text-base font-bold text-ink">Shows under</span>
         <div className="flex flex-wrap gap-2">
           {categories.slice(0, 12).map((c) => {
             const on = meal.categoryIds.includes(c.id);
@@ -455,7 +434,7 @@ function MealEditor({
               <Emoji emoji={dish?.icon ?? kind?.icon ?? "🍽️"} className="size-10" />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-xl font-bold text-ink">{dish ? dish.name : `Any ${kind?.name.toLowerCase() ?? "dish"}`}</span>
-                <span className="truncate text-sm font-bold tracking-wide text-ink-muted uppercase">{dish ? (kind?.name ?? "Dish") : "Picked on the day"}</span>
+                <span className="truncate text-sm font-bold tracking-wide text-ink-muted uppercase">{dish ? (kind?.name ?? "Dish") : "On the day"}</span>
               </span>
               <span className="flex shrink-0 gap-1 rounded-xl bg-board p-1" role="group" aria-label="Batches">
                 {BATCHES.map((b) => (
@@ -559,7 +538,7 @@ function DishChooser({
           <button type="button" onClick={() => onPick(kind.id, null)} className={`${tile} border-dashed border-meal-ink bg-[color-mix(in_srgb,var(--color-meal)_40%,white)]`}>
             <Emoji emoji={kind.icon} className="size-12" />
             <span className="line-clamp-2 text-lg font-bold text-ink">You pick</span>
-            <span className="text-sm text-ink-muted">Any {kind.name.toLowerCase()}, on the day</span>
+            <span className="text-sm text-ink-muted">On the day</span>
           </button>
         ) : null}
         {shown.items.map((d) => (
@@ -573,7 +552,7 @@ function DishChooser({
             <span className="line-clamp-2 text-lg font-bold text-ink">{d.name}</span>
           </button>
         ))}
-        {list.length === 0 ? <p className="col-span-full text-lg text-ink-muted">No dishes of this kind yet. Add them in the Dishes tab.</p> : null}
+        {list.length === 0 ? <p className="col-span-full text-lg text-ink-muted">No {kind?.name.toLowerCase() ?? "dishes"} yet</p> : null}
       </div>
       <Arrows page={shown.page} pages={shown.pages} setPage={setPage} />
     </div>

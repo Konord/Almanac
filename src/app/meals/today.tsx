@@ -162,7 +162,6 @@ export function MealBlock({
       minutes={meal.eatEnd - meal.eatStart}
       first={first}
       last={last}
-      title={`${meal.name}: eat ${eat}. Drag to move this day's meal.`}
       className={look}
       style={style}
     >

@@ -193,7 +193,6 @@ export function DishEditor({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-7 py-5">
           {tab === "recipe" ? (
             <>
-              {dirty ? <p className="mb-2 shrink-0 text-base font-bold text-ink-muted">This shows the recipe as last saved. Save to see your changes here.</p> : null}
               {view}
             </>
           ) : null}
@@ -231,19 +230,18 @@ export function DishEditor({
                       <Input name="totalMinutes" type="number" min={0} max={2880} defaultValue={dish.total_minutes ?? ""} className="w-36" />
                     </Field>
                   </div>
-                  <p className="-mt-3 text-base text-ink-muted">Hands-on time is how early the meal shows on Today, so you start in time.</p>
                 </div>
                 <div className="flex flex-col gap-5">
                   <Chips
                     name="kindIds"
-                    label="What it can be in a meal"
+                    label="Course"
                     multiple
                     defaultValue={dish.kind_ids}
                     options={kinds.slice(0, 14).map((k) => ({ value: k.id, label: k.name, leading: <Emoji emoji={k.icon} className="size-7" /> }))}
                   />
                   <Chips
                     name="goesWith"
-                    label="Goes with (offered first in these meals)"
+                    label="Goes with"
                     multiple
                     defaultValue={dish.category_ids}
                     options={categories.slice(0, 12).map((c) => ({ value: c.id, label: c.name, leading: <Emoji emoji={c.icon} className="size-7" /> }))}
@@ -260,7 +258,7 @@ export function DishEditor({
             </div>
             <div className={tab === "notes" ? "flex min-h-0 flex-1 flex-col gap-4" : "hidden"}>
               <label className="flex min-h-0 flex-1 flex-col gap-1.5">
-                <span className="text-base font-bold text-ink">Notes (swaps, what the kids think, where it came from)</span>
+                <span className="text-base font-bold text-ink">Notes</span>
                 <textarea
                   name="notes"
                   defaultValue={dish.notes ?? ""}

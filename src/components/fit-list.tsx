@@ -1,7 +1,7 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { useFitRows } from "./use-fit-rows";
 
 /**
@@ -35,21 +35,7 @@ export function FitList({
   const [page, setPage] = useState(0);
   const pages = Math.max(1, Math.ceil(rows.length / perPage));
   const p = Math.min(page, pages - 1);
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  const pager =
-    pages > 1 ? (
-      <div className="flex shrink-0 items-center gap-2">
-        <button type="button" aria-label="Previous page" disabled={p === 0} onClick={() => setPage(p - 1)} className={arrow}>
-          <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-        </button>
-        <span className="min-w-16 text-center text-base font-bold text-ink-muted">
-          {p + 1} of {pages}
-        </span>
-        <button type="button" aria-label="Next page" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} className={arrow}>
-          <CaretRight size="1.25rem" weight="bold" aria-hidden />
-        </button>
-      </div>
-    ) : null;
+  const pager = <Pager page={p} pages={pages} onPage={setPage} />;
   const inHeading = heading !== undefined;
   return (
     <>

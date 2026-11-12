@@ -27,7 +27,7 @@ export function PickerBox({ picker, onClose }: { picker: Picker; onClose: () => 
         <h2 className="min-w-0 flex-1 truncate text-2xl font-extrabold text-ink">{picker.title}</h2>
         <CloseButton onClick={onClose} />
       </div>
-      {shown.length === 0 ? <p className="text-lg text-ink-muted">Nothing else to pick.</p> : null}
+      
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {shown.map((o) => (
           <button
@@ -88,12 +88,12 @@ export function KindBox({
   const kindName = (key: string | undefined) => kinds.find((k) => k.key === key)?.name;
 
   return (
-    <Box label={start ? `${kind?.name} on ${dayName}` : `Add a kind of day on ${dayName}`} width="w-[68rem]" onClose={onClose}>
+    <Box label={start ? `${kind?.name} on ${dayName}` : `Add a day on ${dayName}`} width="w-[68rem]" onClose={onClose}>
       <div className="flex items-center gap-3">
-        <h2 className="min-w-0 flex-1 truncate text-3xl font-extrabold text-ink">{start ? `${kind?.name ?? "Kind of day"} on ${dayName}` : `Add a kind of day on ${dayName}`}</h2>
+        <h2 className="min-w-0 flex-1 truncate text-3xl font-extrabold text-ink">{start ? `${kind?.name ?? "Day"} on ${dayName}` : `Add a day on ${dayName}`}</h2>
         <CloseButton onClick={onClose} />
       </div>
-      <h3 className="text-sm font-bold tracking-wide text-ink-muted uppercase">Kind of day</h3>
+      <h3 className="text-sm font-bold tracking-wide text-ink-muted uppercase">Day</h3>
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
         {kinds.slice(page * 8, (page + 1) * 8).map((k) => (
           <Tile
@@ -129,7 +129,7 @@ export function KindBox({
                   disabled={has || !can}
                   onClick={() => setPicked((p) => (p.includes(m.id) ? p.filter((x) => x !== m.id) : [...p, m.id]))}
                   aria-pressed={on}
-                  title={!can ? `${m.name} has no ${kind.name} kind of day` : undefined}
+                  title={!can ? `No ${kind.name} for ${m.name}` : undefined}
                   className={`flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-full border-2 pr-5 pl-2 text-lg font-bold disabled:opacity-60 ${
                     on ? "border-ink bg-rail text-ink" : "border-frame text-ink"
                   } ${!can ? "opacity-40" : ""}`}
@@ -156,7 +156,7 @@ export function KindBox({
           }}
           className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-ink px-6 text-lg font-bold text-board disabled:opacity-40"
         >
-          {kind ? `${start ? "Move to" : "Add"} ${kind.name}` : "Pick a kind"}
+          {kind ? `${start ? "Move to" : "Add"} ${kind.name}` : "Pick a day"}
         </button>
       </div>
     </Box>
@@ -174,10 +174,10 @@ export function ChecksBox({ problems, onFix, onLeave, onClose }: { problems: Pro
     <Box label="Things to check" width="w-[64rem]" onClose={onClose}>
       <div className="flex items-center gap-3">
         <Sparkle size="1.75rem" weight="fill" className="text-accent" aria-hidden />
-        <h2 className="min-w-0 flex-1 text-3xl font-extrabold text-ink">{problems.length === 0 ? "Nothing to check" : `Things to check (${problems.length})`}</h2>
+        <h2 className="min-w-0 flex-1 text-3xl font-extrabold text-ink">{problems.length === 0 ? "All clear" : `Things to check (${problems.length})`}</h2>
         <CloseButton onClick={onClose} />
       </div>
-      {problems.length === 0 ? <p className="text-lg text-ink-muted">Every day has its usual kind of day, chore days and meals, with nothing in the way.</p> : null}
+      
       <div className="flex flex-col gap-2">
         {problems.slice(at * CHECKS_SHOWN, (at + 1) * CHECKS_SHOWN).map((p) => (
           <div key={p.id} className="flex min-h-[var(--touch-target)] items-center gap-3 rounded-2xl bg-rail px-4 py-2">

@@ -21,12 +21,9 @@ async function SetupForm({ searchParams }: { searchParams: PageProps<"/setup">["
   const error = firstParam((await searchParams).error);
   return (
     <Panel title="Name your household">
-      <p className="mb-5 text-lg text-ink-muted">
-        This is a one-time step. You&apos;ll add the people in it next.
-      </p>
       {error ? <Notice tone="error">{error}</Notice> : null}
       <form action={createHousehold} className="mt-4 flex flex-col gap-4">
-        <Field label="Household name" hint='For example, "The Dohertys".'>
+        <Field label="Household name">
           <Input name="name" required maxLength={80} />
         </Field>
         <div>

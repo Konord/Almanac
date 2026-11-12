@@ -13,7 +13,7 @@ export function Stickers({ members, memberIds = [] }: { members: Member[]; membe
   return (
     <fieldset className="flex min-w-0 flex-col gap-1.5">
       <legend className="mb-1.5 text-base font-bold text-ink">
-        Who <span className="font-normal text-ink-muted">(tap any; nobody means everyone)</span>
+        Who
       </legend>
       <div className="flex flex-wrap items-start gap-1">
         {members.map((m) => (

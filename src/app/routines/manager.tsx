@@ -1,5 +1,6 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
@@ -40,7 +41,7 @@ const SHOW_HABITS = false;
 const ANCHOR_LABEL: Record<Anchor, string> = {
   wake: "After wake-up",
   bed: "Ends by bedtime",
-  meal: "After a meal",
+  meal: "After a mealtime",
   clock: "At a set time",
 };
 const VISIBILITY = [
@@ -359,7 +360,7 @@ export function RoutineManager({
   const newMealIn = (column: Column) => {
     if (!column.dayType) return;
     const id = newId();
-    const fresh: DraftMealBlock = { id, name: "New meal", icon: "🍽️", usual_time: "12:00", minutes: 30, presets: noPresets() };
+    const fresh: DraftMealBlock = { id, name: "New mealtime", icon: "🍽️", usual_time: "12:00", minutes: 30, presets: noPresets() };
     update((d) => ({ ...d, meals: [...d.meals, fresh], mealUses: [...d.mealUses, { id: newId(), meal_id: id, member_id: column.member.id, day_type_id: column.dayType!.id }] }));
     setAdding(null);
     select(id);
@@ -461,8 +462,8 @@ export function RoutineManager({
     <>
       {/* Title, which kind of day, and Set days */}
       <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routine Manager</h1>
-        <div role="group" aria-label="Which kind of day" className="flex min-w-0 flex-wrap items-center gap-2">
+        <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routines</h1>
+        <div role="group" aria-label="Which day" className="flex min-w-0 flex-wrap items-center gap-2">
           {dayNames.map((name) => (
             <Chip key={name} active={view === name} onClick={() => pickView(name)}>
               {name}
@@ -523,11 +524,10 @@ export function RoutineManager({
                   const box = e.currentTarget.getBoundingClientRect();
                   newRoutineAt(column, firstHour * 60 + ((e.clientY - box.top) / box.height) * span);
                 }}
-                title={column.dayType ? "Tap an empty spot to add a routine there" : undefined}
               >
                 {!column.dayType ? (
                   <p className="mt-4 px-2 text-center text-base text-ink-muted">
-                    {column.member.name} has no {view} day.
+                    {`No ${view} for ${column.member.name}`}
                   </p>
                 ) : null}
                 {adding === column.key ? (
@@ -611,7 +611,6 @@ export function RoutineManager({
                   <button
                     type="button"
                     onClick={saveAsTemplate}
-                    title="Save a copy as a template, to start new routines from"
                     aria-label="Save as template"
                     className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-rail px-3 text-base font-bold text-ink hover:bg-panel"
                   >
@@ -636,7 +635,7 @@ export function RoutineManager({
                 ) : routine.is_template ? (
                   <span className="rounded-full bg-panel px-2.5 py-1 text-ink">Template</span>
                 ) : usedBy.length === 0 ? (
-                  <span>Nobody has this routine yet. Tap + above a column to give it to someone.</span>
+                  <span>Nobody yet</span>
                 ) : (
                   <span>Used by</span>
                 )}
@@ -651,7 +650,7 @@ export function RoutineManager({
               </div>
 
               {/* Steps, in order */}
-              {steps.length === 0 ? <p className="mt-2 text-base text-ink-muted">No steps yet. Add the first one below.</p> : null}
+              {steps.length === 0 ? <p className="mt-2 text-base text-ink-muted">No steps yet</p> : null}
               <ul ref={stepsRef} className="mt-3 flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
                 {steps.slice(page * stepsPerPage, page * stepsPerPage + stepsPerPage).map((step, i) => {
                   const index = page * stepsPerPage + i;
@@ -715,23 +714,11 @@ export function RoutineManager({
                 })}
               </ul>
               <div className="mt-1.5 flex items-center gap-3 text-base font-bold">
-                {pages > 1 ? (
-                  <>
-                    <button type="button" disabled={page === 0} onClick={() => setStepPage(page - 1)} className="flex min-h-10 items-center rounded-xl bg-rail px-3 text-ink disabled:opacity-40">
-                      ‹ Earlier
-                    </button>
-                    <span className="text-ink-muted">
-                      Steps {page * stepsPerPage + 1}–{Math.min(steps.length, (page + 1) * stepsPerPage)} of {steps.length}
-                    </span>
-                    <button type="button" disabled={page === pages - 1} onClick={() => setStepPage(page + 1)} className="flex min-h-10 items-center rounded-xl bg-rail px-3 text-ink disabled:opacity-40">
-                      More ›
-                    </button>
-                  </>
-                ) : null}
+                <Pager page={page} pages={pages} onPage={setStepPage} />
                 <span className="ml-auto flex items-center gap-3 text-sm">
                   <span className="flex items-center gap-1.5 text-accent">
                     <ListChecks size="1rem" weight="bold" aria-hidden />
-                    Blue = on the daily list
+                    Blue = on the Daily list
                   </span>
                   {SHOW_HABITS && routine.habit_since ? (
                     <span className="flex items-center gap-1.5 text-success">
@@ -767,7 +754,7 @@ export function RoutineManager({
                     </select>
                   </Labelled>
                   {routine.anchor === "meal" ? (
-                    <Labelled label="Which meal">
+                    <Labelled label="Which mealtime">
                       <select value={routine.anchor_meal_time_id ?? ""} onChange={(e) => setRoutine({ anchor_meal_time_id: e.target.value || null })} className={fieldClass}>
                         {mealTimes.map((m) => (
                           <option key={m.id} value={m.id}>
@@ -791,24 +778,22 @@ export function RoutineManager({
                   </Labelled>
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" hint="Can move later in the day" />
+                  <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" />
                   {SHOW_HABITS ? (
                     <Switch
                       on={Boolean(routine.habit_since)}
                       onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
                       label="Track"
-                      hint="Keeps a habit history"
                     />
                   ) : null}
                   <Switch
                     on={listState === "all"}
                     partly={listState === "some"}
                     onClick={() => setWholeDailyList(listState !== "all")}
-                    label={listState === "some" ? "Daily list: some steps" : "Whole routine on daily list"}
-                    hint="Shows as one row on the daily list. Or put single steps on it."
+                    label={listState === "some" ? "Daily list: some steps" : "On the Daily list"}
                   />
                   <label className="ml-auto flex items-center gap-2 text-sm font-bold text-ink-muted">
-                    Who sees it
+                    Who can see it
                     <select value={routine.visibility} onChange={(e) => setRoutine({ visibility: e.target.value })} className={`${fieldClass} min-h-11`}>
                       {VISIBILITY.map((v) => (
                         <option key={v.value} value={v.value}>
@@ -834,7 +819,7 @@ export function RoutineManager({
               onRemove={removeMeal}
             />
           ) : (
-            <EmptyState emoji="📝" title="Tap a routine or meal to edit it" hint="Or tap an empty spot to add a routine. Meals are added with the + above a column." />
+            <EmptyState emoji="📝" />
           )}
 
         </section>
@@ -962,7 +947,6 @@ function StepWho({
         onClick={onOpen}
         aria-expanded={open}
         aria-label={`Who does ${step.text}: ${everyone ? "everyone" : faces.map((p) => p.name).join(", ")}`}
-        title="Who does this step"
         className={`flex h-11 shrink-0 items-center justify-center rounded-xl px-1.5 ${open ? "bg-ink text-board" : "bg-rail text-ink"}`}
       >
         {everyone ? (
@@ -1026,7 +1010,7 @@ function AddStep({ onAdd }: { onAdd: (text: string, icon: string) => void }) {
           if (e.key === "Enter") add();
         }}
         maxLength={80}
-        placeholder="New step, e.g. Brush teeth"
+        placeholder="New step"
         aria-label="New step"
         className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
       />
@@ -1079,7 +1063,7 @@ function AddExisting({
         <AddTabs tab={tab} setTab={(t) => (setTab(t), setPage(0))} onClose={onClose} />
         <button type="button" onClick={onNewMeal} className="flex min-h-11 items-center gap-2 rounded-xl bg-meal px-2 text-left text-base font-bold text-meal-ink">
           <Plus size="1rem" weight="bold" aria-hidden />
-          New meal
+          New mealtime
         </button>
         {meals.slice(p * per, p * per + per).map((m) => (
           <button key={m.id} type="button" onClick={() => onPickMeal(m.id)} className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-left text-base font-bold text-ink hover:bg-rail">
@@ -1087,20 +1071,8 @@ function AddExisting({
             <span className="truncate">{m.name || "Meal"}</span>
           </button>
         ))}
-        {meals.length === 0 ? <p className="px-1 text-sm text-ink-muted">They have every meal already.</p> : null}
-        {mealPages > 1 ? (
-          <div className="flex items-center gap-2 px-1">
-            <button type="button" disabled={p === 0} onClick={() => setPage(p - 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-              ‹
-            </button>
-            <span className="text-sm font-bold text-ink-muted">
-              {p + 1} of {mealPages}
-            </span>
-            <button type="button" disabled={p === mealPages - 1} onClick={() => setPage(p + 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-              ›
-            </button>
-          </div>
-        ) : null}
+        {meals.length === 0 ? <p className="px-1 text-sm text-ink-muted">Nothing to add</p> : null}
+        <Pager page={p} pages={mealPages} onPage={setPage} />
       </div>
     );
   }
@@ -1113,8 +1085,8 @@ function AddExisting({
       {shown.length === 0 ? (
         <p className="px-1 text-base text-ink-muted">
           {tab === "share"
-            ? "They have every routine already. Tap an empty spot to make a new one."
-            : "No templates yet. Open a routine and tap Save as template."}
+            ? "Nothing to add"
+            : "No templates yet"}
         </p>
       ) : null}
       {shown.map((r) => (
@@ -1133,19 +1105,7 @@ function AddExisting({
           ) : null}
         </div>
       ))}
-      {pages > 1 ? (
-        <div className="flex items-center gap-2 px-1">
-          <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-            ‹
-          </button>
-          <span className="text-sm font-bold text-ink-muted">
-            {page + 1} of {pages}
-          </span>
-          <button type="button" disabled={page === pages - 1} onClick={() => setPage(page + 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-            ›
-          </button>
-        </div>
-      ) : null}
+      <Pager page={page} pages={pages} onPage={setPage} />
     </div>
   );
 }
@@ -1162,7 +1122,7 @@ function AddTabs({ tab, setTab, onClose }: { tab: "share" | "template" | "meal";
           onClick={() => setTab(t)}
           className={`min-h-10 flex-1 rounded-xl px-1.5 text-sm font-bold ${tab === t ? "bg-ink text-board" : "bg-rail text-ink"}`}
         >
-          {t === "share" ? "Share one" : t === "template" ? "Template" : "Meal"}
+          {t === "share" ? "Share one" : t === "template" ? "Template" : "Mealtime"}
         </button>
       ))}
       <button type="button" onClick={onClose} aria-label="Close" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
@@ -1224,7 +1184,6 @@ function MealRun({
       role="button"
       tabIndex={0}
       aria-pressed={active}
-      title="Tap to edit, drag to move"
       onDragStart={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === "Enter") onSelect();
@@ -1300,8 +1259,7 @@ function MealEditor({
           value={meal.name}
           onChange={(e) => onChange({ name: e.target.value })}
           maxLength={30}
-          aria-label="Meal name"
-          placeholder="Like Dinner"
+          aria-label="Mealtime name"
           className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
         />
         <button type="button" onClick={onRemove} className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-danger px-3 text-base font-bold text-danger">
@@ -1310,7 +1268,7 @@ function MealEditor({
         </button>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink-muted">
-        {uses.length === 0 ? <span>Nobody has this meal yet. Tap + above a column, then Meal.</span> : <span>Eaten by</span>}
+        {uses.length === 0 ? <span>Nobody yet</span> : <span>Eaten by</span>}
         {uses.map(({ id, member, dayType }) => (
           <span key={id} className="flex h-8 items-center gap-1 rounded-full pr-1 pl-2.5 text-ink" style={{ background: soft(member?.colour) }}>
             {member?.name ?? "?"} · {dayType?.name ?? "?"}
@@ -1329,10 +1287,8 @@ function MealEditor({
           <NumberField value={meal.minutes} min={MEAL_MINUTES.min} max={MEAL_MINUTES.max} onChange={(v) => onChange({ minutes: v })} />
         </Labelled>
       </div>
-      <p className="mt-2 text-base text-ink-muted">Moving a meal on the calendar changes only that day. This is its usual time.</p>
 
       <h3 className="mt-4 text-xl font-bold text-ink">Every week</h3>
-      <p className="text-base text-ink-muted">Put a kind of meal or one meal on a day, like Tacos on Tuesday. The weekly review fills it in, and you can still change any day there.</p>
       <div className="mt-2 grid grid-cols-7 gap-1.5">
         {days.map((d) => {
           const chosen = look(meal.presets[d]);
@@ -1373,9 +1329,12 @@ function PresetChooser({
   onPick: (value: string | null) => void;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<"kinds" | "meals">(current?.startsWith("m:") ? "meals" : "kinds");
   const [page, setPage] = useState(0);
-  const list = tab === "kinds" ? choices.kinds.map((k) => ({ value: `c:${k.id}`, name: k.name, icon: k.icon })) : choices.meals.map((m) => ({ value: `m:${m.id}`, name: m.name, icon: m.icon }));
+  // One list, no tabs: the categories (Tacos, Pasta) first, then single meals (Connor, 2026-11-11: no word for categories).
+  const list = [
+    ...choices.kinds.map((k) => ({ value: `c:${k.id}`, name: k.name, icon: k.icon })),
+    ...choices.meals.map((m) => ({ value: `m:${m.id}`, name: m.name, icon: m.icon })),
+  ];
   const pages = Math.max(1, Math.ceil(list.length / CHOICES_PER_PAGE));
   const p = Math.min(page, pages - 1);
   const tile = "flex min-h-0 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-1.5 text-center";
@@ -1389,19 +1348,6 @@ function PresetChooser({
           <X size="1.25rem" weight="bold" aria-hidden />
         </button>
       </div>
-      <div className="flex shrink-0 gap-1 rounded-2xl bg-panel p-1.25">
-        {(["kinds", "meals"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            aria-pressed={tab === t}
-            onClick={() => (setTab(t), setPage(0))}
-            className={`flex min-h-11 flex-1 items-center justify-center rounded-xl text-base font-bold ${tab === t ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
-          >
-            {t === "kinds" ? "Kinds of meal" : "Meals"}
-          </button>
-        ))}
-      </div>
       <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-3 gap-2">
         <button type="button" onClick={() => onPick(null)} className={`${tile} ${current === null ? "border-ink bg-rail" : "border-dashed border-frame hover:bg-rail"}`}>
           <X size="1.75rem" weight="bold" aria-hidden className="text-ink-muted" />
@@ -1414,19 +1360,7 @@ function PresetChooser({
           </button>
         ))}
       </div>
-      {pages > 1 ? (
-        <div className="flex shrink-0 items-center justify-center gap-3">
-          <button type="button" disabled={p === 0} onClick={() => setPage(p - 1)} className="min-h-11 rounded-xl bg-rail px-4 text-base font-bold disabled:opacity-40">
-            ‹ Earlier
-          </button>
-          <span className="text-base font-bold text-ink-muted">
-            {p + 1} of {pages}
-          </span>
-          <button type="button" disabled={p === pages - 1} onClick={() => setPage(p + 1)} className="min-h-11 rounded-xl bg-rail px-4 text-base font-bold disabled:opacity-40">
-            More ›
-          </button>
-        </div>
-      ) : null}
+      <Pager page={p} pages={pages} onPage={setPage} className="justify-center" />
     </div>
   );
 }
@@ -1493,7 +1427,6 @@ function RoutineRun({
       role="button"
       tabIndex={0}
       aria-pressed={active}
-      title={movable ? "Tap to edit, drag to move" : "Tap to edit. It follows wake-up, a meal or bedtime, so only its length drags."}
       onDragStart={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === "Enter") onSelect();

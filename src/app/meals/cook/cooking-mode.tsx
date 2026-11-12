@@ -1,5 +1,6 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useEffect, useState } from "react";
 import { useFitRows } from "@/components/use-fit-rows";
 import Link from "next/link";
@@ -177,19 +178,7 @@ export function CookingMode({
             })}
             {ingredients.length === 0 ? <li className="text-lg text-ink-muted">No ingredients written down.</li> : null}
           </ul>
-          {pages > 1 ? (
-            <div className="flex items-center justify-center gap-3">
-              <button type="button" aria-label="Previous" disabled={iPage === 0} onClick={() => setIngredientPage(iPage - 1)} className="flex size-12 items-center justify-center rounded-full bg-rail disabled:opacity-30">
-                <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-              </button>
-              <span className="text-lg font-bold text-ink-muted">
-                {iPage + 1} of {pages}
-              </span>
-              <button type="button" aria-label="Next" disabled={iPage >= pages - 1} onClick={() => setIngredientPage(iPage + 1)} className="flex size-12 items-center justify-center rounded-full bg-rail disabled:opacity-30">
-                <CaretRight size="1.25rem" weight="bold" aria-hidden />
-              </button>
-            </div>
-          ) : null}
+          <Pager page={iPage} pages={pages} onPage={setIngredientPage} className="justify-center" />
         </section>
 
         {/* Steps */}
@@ -229,7 +218,7 @@ export function CookingMode({
               </div>
             </>
           ) : (
-            <p className="text-2xl text-ink-muted">This recipe has no steps yet. Add them in the recipe card.</p>
+            <p className="text-2xl text-ink-muted">No steps yet</p>
           )}
           <div className="flex shrink-0 gap-4">
             <button

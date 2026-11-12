@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
+import { Plus, Trash } from "@phosphor-icons/react";
 import { EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -144,7 +145,7 @@ export function HolidayManager({
           </div>
 
           {count === 0 ? (
-            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet. Add some from the public list." : "No birthdays yet."}</p>
+            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet" : "No birthdays yet"}</p>
           ) : null}
           <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
             {tab === "holidays"
@@ -219,9 +220,9 @@ export function HolidayManager({
               }}
             />
           ) : tab === "holidays" ? (
-            <EmptyState emoji="🎉" title="Tap a holiday to change it" />
+            <EmptyState emoji="🎉" />
           ) : (
-            <EmptyState emoji="🎂" title="Tap a birthday to change it" hint="Add a birth year and the calendar shows how old they turn." />
+            <EmptyState emoji="🎂" />
           )}
         </section>
       </div>
@@ -266,21 +267,7 @@ function SmallButton({ onClick, active = false, children }: { onClick: () => voi
 }
 
 function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="ml-auto flex shrink-0 items-center gap-2">
-      <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 0} aria-label="Previous page" className={arrow}>
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-base font-bold text-ink-muted tabular-nums">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pages - 1} aria-label="Next page" className={arrow}>
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={onPage} className="ml-auto" />;
 }
 
 /** The public holidays not added yet, a page at a time; tap one to add it. */
@@ -293,7 +280,6 @@ function PublicList({ added, onAdd, dateLabel }: { added: Set<string>; onAdd: (k
       <div className="flex shrink-0 items-center gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl font-extrabold text-ink">Public holidays</h2>
-          <p className="text-base text-ink-muted">Tap the ones you want on your calendar. You can rename them or change the picture after.</p>
         </div>
         <Pager page={p} pages={pages} onPage={setPage} />
       </div>
@@ -390,7 +376,6 @@ function HolidayEditor({ holiday, next, onChange, onRemove }: { holiday: Holiday
           {rule.kind === "before" || rule.kind === "easter" ? <p className="text-lg text-ink-soft">{describeHolidayRule(rule)}</p> : null}
         </>
       )}
-      <p className="mt-auto text-base text-ink-muted">Holidays don&rsquo;t change anyone&rsquo;s days or chores. Do that in the Weekly review.</p>
     </>
   );
 }
@@ -411,7 +396,7 @@ function BirthdayEditor({ birthday, thisYear, onChange, onRemove }: { birthday: 
         />
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="text-base font-bold text-ink">Whose birthday</span>
-          <input value={birthday.name} maxLength={40} placeholder="Grandma" autoFocus={birthday.name === ""} onChange={(e) => onChange({ name: e.target.value })} className={input} />
+          <input value={birthday.name} maxLength={40} autoFocus={birthday.name === ""} onChange={(e) => onChange({ name: e.target.value })} className={input} />
         </label>
         <RemoveButton onClick={onRemove} label="Take it away" />
       </div>
@@ -425,7 +410,6 @@ function BirthdayEditor({ birthday, thisYear, onChange, onRemove }: { birthday: 
             inputMode="numeric"
             min={1900}
             max={thisYear}
-            placeholder="e.g. 2018"
             value={birthday.birth_year ?? ""}
             onChange={(e) => onChange({ birth_year: e.target.value === "" ? null : Number(e.target.value) })}
             className={`${input} w-40`}

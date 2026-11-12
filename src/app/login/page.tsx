@@ -6,9 +6,6 @@ export default function LoginPage(props: PageProps<"/login">) {
   return (
     <PageShell title="Almanac">
       <Panel title="Sign in">
-        <p className="mb-5 text-lg text-ink-muted">
-          The whole household shares one login. Everyone gets their own profile once you&apos;re in.
-        </p>
         <Suspense>
           <Messages searchParams={props.searchParams} />
         </Suspense>
@@ -16,7 +13,7 @@ export default function LoginPage(props: PageProps<"/login">) {
           <Field label="Email">
             <Input name="email" type="email" autoComplete="email" required />
           </Field>
-          <Field label="Password" hint="At least 8 characters.">
+          <Field label="Password">
             <Input name="password" type="password" autoComplete="current-password" required minLength={8} />
           </Field>
           <div className="flex flex-wrap gap-3">

@@ -47,7 +47,7 @@ export function draftProblem(d: SettingsDraft): string | null {
   if (!d.name.trim()) return "The household needs a name.";
   if (!/^[A-Za-z]{3}$/.test(d.currency.trim())) return "Currency should be a 3-letter code like CAD.";
   if (!(Number.isInteger(d.reviewWeekday) && d.reviewWeekday >= 0 && d.reviewWeekday <= 6) || !/^\d{2}:\d{2}$/.test(d.reviewTime)) {
-    return "Pick a day and a time for the weekly review.";
+    return "Pick a day and a time for the Planner.";
   }
   if (!d.panelBoxes.every((v) => /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(v))) return "Something went wrong with the Today panel boxes.";
   for (const m of d.members) {

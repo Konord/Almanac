@@ -39,9 +39,9 @@ async function Days({ searchParams }: { searchParams: PageProps<"/routines/manag
   if (data.members.length === 0) {
     return (
       <Notice tone="error">
-        Add the people in your household first, on{" "}
+        Add the people in your household first, in{" "}
         <Link href="/household" className="font-bold underline">
-          Household &amp; people
+          Settings
         </Link>
         .
       </Notice>

@@ -203,7 +203,7 @@ export function ReviewBoard({
   return (
     <>
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Weekly review</h1>
+        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Planner</h1>
         <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25">
           <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
           <span className="px-2 text-lg font-bold whitespace-nowrap text-ink">{range}</span>
@@ -222,7 +222,7 @@ export function ReviewBoard({
           }`}
         >
           <Sparkle size="1.375rem" weight="fill" aria-hidden />
-          {problems.length > 0 ? `${problems.length} to check` : "Nothing to check"}
+          {problems.length > 0 ? `${problems.length} to check` : "All clear"}
         </button>
         <div className="flex-1" />
         <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-meal px-5 text-lg font-bold whitespace-nowrap text-meal-ink">
@@ -380,7 +380,7 @@ export function ReviewBoard({
                   onMeal={(mealId, mealTimeId) => setMealAt({ mealId, date: col.date, mealTimeId })}
                   kinds={
                     <>
-                      <SectionTitle title="Kind of day" onAdd={() => setKindAt({ date: col.date, start: null })} addLabel={`Add a kind of day on ${col.name}`} />
+                      <SectionTitle title="Day" onAdd={() => setKindAt({ date: col.date, start: null })} addLabel={`Add a day on ${col.name}`} />
                       {groups.map((g) => (
                         <Row key={g.key} changed={kindChanged(col.date, g)} onClick={() => setKindAt({ date: col.date, start: g.key })}>
                           <Emoji emoji={g.icon ?? "📅"} className="size-7" />
@@ -549,7 +549,6 @@ function OpenDay({
       <div className="flex shrink-0 flex-col gap-1.5">{chores}</div>
       <div className="flex min-h-0 flex-col gap-1">
         <SectionTitle title="Plans" />
-        {plans.length === 0 ? <span className="px-0.5 text-base text-ink-muted">Nothing on</span> : null}
         {shown.map((e) => (
           <span key={e.id} className="flex min-h-8 min-w-0 items-center gap-2 px-0.5 text-base font-bold text-ink">
             <Dot colour={person.get(e.memberId ?? "")?.colour} />

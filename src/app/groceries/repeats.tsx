@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useEffect, useState, useTransition } from "react";
-import { CaretLeft, CaretRight, Plus, X } from "@phosphor-icons/react";
+import { Plus, X } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import { REPEAT_UNITS, type RepeatEvery } from "@/lib/grocery-repeats";
 import { addRepeat, readRepeats, removeRepeat, type RepeatsResult } from "./actions";
@@ -66,7 +67,6 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
           <X size="1.125rem" weight="bold" aria-hidden />
         </button>
       </div>
-      <p className="text-base text-ink-muted">These go on the list by themselves when they come round.</p>
       <form
         className="flex items-center gap-2"
         onSubmit={(e) => {
@@ -116,7 +116,6 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
               disabled={pending}
               onClick={() => start(async () => take(await removeRepeat(r.id)))}
               aria-label={`Stop ${r.name} repeating`}
-              title="Stop repeating"
               className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-danger"
             >
               <X size="1.125rem" weight="bold" aria-hidden />
@@ -124,19 +123,7 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
           </li>
         ))}
       </ul>
-      {pages > 1 ? (
-        <div className="flex items-center justify-end gap-2">
-          <button type="button" aria-label="Previous repeats" disabled={p === 0} onClick={() => setPage(p - 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-            <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-          </button>
-          <span className="text-base font-bold text-ink-muted">
-            {p + 1} of {pages}
-          </span>
-          <button type="button" aria-label="More repeats" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-            <CaretRight size="1.25rem" weight="bold" aria-hidden />
-          </button>
-        </div>
-      ) : null}
+      <Pager page={p} pages={pages} onPage={setPage} className="justify-end" />
     </div>
   );
 }

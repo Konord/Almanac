@@ -100,7 +100,7 @@ export function SaveButton({ dirty, saving, error, onSave, onUndo }: { dirty: bo
             className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-accent px-6 text-lg font-bold text-white shadow-[0_2px_8px_color-mix(in_srgb,var(--color-accent)_35%,transparent)] disabled:opacity-70"
           >
             <span aria-hidden className="size-2.5 rounded-full bg-white" />
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? "Saving…" : "Save"}
           </button>
         </>
       ) : (

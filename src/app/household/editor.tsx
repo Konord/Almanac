@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { AppWindow, CaretLeft, CaretRight, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { AppWindow, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -151,19 +152,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
             icon={UsersThree}
             tint="blue"
             aside={
-              pages > 1 ? (
-                <div className="flex items-center gap-2">
-                  <button type="button" aria-label="Previous page" disabled={p === 0} onClick={() => setPage(p - 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-                    <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-                  </button>
-                  <span className="text-base font-bold text-ink-muted">
-                    {p + 1} of {pages}
-                  </span>
-                  <button type="button" aria-label="Next page" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-                    <CaretRight size="1.25rem" weight="bold" aria-hidden />
-                  </button>
-                </div>
-              ) : null
+              <Pager page={p} pages={pages} onPage={setPage} />
             }
           >
             <ul ref={listRef} className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
@@ -204,7 +193,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                 }}
               />
             ) : (
-              <EmptyState emoji="👋" title="Tap someone to change them" hint="Or add someone new." />
+              <EmptyState emoji="👋" />
             )}
           </Card>
         </div>
@@ -220,7 +209,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                   <input value={draft.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} maxLength={3} className={`${inputClass} uppercase`} />
                 </TextField>
               </div>
-              <TextField label="Time zone" hint="For example, America/Toronto.">
+              <TextField label="Time zone">
                 <input value={draft.timeZone} onChange={(e) => set({ timeZone: e.target.value })} className={inputClass} />
               </TextField>
               <Choice label="Units" value={draft.units} onChange={(units) => set({ units })} options={[{ value: "metric", label: "Metric" }, { value: "imperial", label: "Imperial" }]} />
@@ -260,7 +249,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                 </div>
                 <div className="flex items-end gap-4">
                   <div className="min-w-0 flex-1">
-                    <Choice label="Weekly review on" value={draft.reviewWeekday} onChange={(reviewWeekday) => set({ reviewWeekday })} options={WEEKDAYS.map((d, i) => ({ value: i, label: d }))} />
+                    <Choice label="Planner on" value={draft.reviewWeekday} onChange={(reviewWeekday) => set({ reviewWeekday })} options={WEEKDAYS.map((d, i) => ({ value: i, label: d }))} />
                   </div>
                   <TextField label="At">
                     <input type="time" value={draft.reviewTime} onChange={(e) => set({ reviewTime: e.target.value })} className={`${inputClass} w-40`} />
@@ -275,7 +264,6 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
               </div>
             </Card>
             <Card title="Today panel" icon={SquaresFour} tint="orange">
-              <p className="mb-3 text-base text-ink-muted">The boxes you flip through on the Today panel.</p>
               <div className="flex flex-wrap gap-2">
                 {boxes.map((b) => {
                   const on = draft.panelBoxes.includes(b.id);
@@ -344,7 +332,7 @@ function PersonEditor({ member, onChange }: { member: MemberDraft; onChange: (c:
       </fieldset>
       {member.role === "parent" ? (
         <div className="grid grid-cols-2 gap-4">
-          <TextField label={member.hasPin ? "New PIN" : "PIN"} hint="4 to 8 digits, for parent mode later.">
+          <TextField label={member.hasPin ? "New PIN" : "PIN"} hint="4 to 8 digits">
             <input type="password" inputMode="numeric" autoComplete="off" value={member.pin} onChange={(e) => onChange({ pin: e.target.value.replace(/\D/g, "").slice(0, 8) })} className={inputClass} />
           </TextField>
           <TextField label="Type it again">
