@@ -1,7 +1,7 @@
 "use client";
 
 import { Pager } from "@/components/pager";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AppWindow, FrameCorners, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
@@ -14,7 +14,7 @@ import { useSearchParams } from "next/navigation";
 import { saveHousehold } from "./actions";
 import { AppsTab } from "./apps-tab";
 import { Choice } from "./fields";
-import { ScreenSaverTab, type ArtOverview } from "./screen-saver-tab";
+import { ScreenSaverTab, type ArtOverview, type ScreenSaverView } from "./screen-saver-tab";
 import { setScreenSaverHere, useScreenSaverHere } from "@/components/screen-saver-here";
 import { useLauncher } from "@/components/launcher-store";
 import type { MemberDraft, SettingsDraft } from "./draft";
@@ -28,6 +28,14 @@ import type { MemberDraft, SettingsDraft } from "./draft";
  */
 
 type Tab = "people" | "household" | "apps" | "screen";
+
+/*
+ * Saving starts the editor afresh (its key is the saved data), so it would
+ * jump back to the People tab. Where you were is kept here across a save
+ * and picked up again straight after.
+ */
+type Place = { tab: Tab; view: ScreenSaverView; selected: string | null; page: number };
+let placeAfterSave: Place | null = null;
 const PER_PAGE = 7;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -50,9 +58,14 @@ export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: Se
   const [draft, setDraft] = useState<SettingsDraft>(initial);
   // The tray's "Settings › Apps" link opens straight on the Apps tab.
   const askedTab = useSearchParams().get("tab");
-  const [tab, setTab] = useState<Tab>(askedTab === "apps" || askedTab === "household" || askedTab === "screen" ? askedTab : "people");
-  const [selected, setSelected] = useState<string | null>(initial.members[0]?.id ?? null);
-  const [page, setPage] = useState(0);
+  const [kept] = useState(() => placeAfterSave);
+  useEffect(() => {
+    placeAfterSave = null;
+  }, []);
+  const [tab, setTab] = useState<Tab>(kept?.tab ?? (askedTab === "apps" || askedTab === "household" || askedTab === "screen" ? askedTab : "people"));
+  const [view, setView] = useState<ScreenSaverView>(kept?.view ?? "when");
+  const [selected, setSelected] = useState<string | null>(kept && initial.members.some((m) => m.id === kept.selected) ? kept.selected : (initial.members[0]?.id ?? null));
+  const [page, setPage] = useState(kept?.page ?? 0);
   const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +101,8 @@ export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: Se
     }
     if (here !== hereSaved) setScreenSaverHere(here ? "on" : "off");
     setHereDraft(null);
+    // Only when the saved data changed, since only then does the editor start afresh.
+    if (!then && JSON.stringify(draft) !== JSON.stringify(initial)) placeAfterSave = { tab, view, selected, page };
     guard.saved(then);
   };
   const undo = () => {
@@ -139,7 +154,7 @@ export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: Se
       </ScreenHeader>
 
       {tab === "screen" ? (
-        <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} />
+        <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} view={view} onView={setView} />
       ) : tab === "apps" ? (
         <AppsTab apps={draft.apps} onChange={(apps) => set({ apps })} />
       ) : tab === "people" ? (
