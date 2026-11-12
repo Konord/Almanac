@@ -27,10 +27,12 @@ const PLAN_MS = 5 * 60_000;
 /** Settings › Screen saver's "Try it" button sends this. */
 export const PREVIEW_EVENT = "almanac-screen-saver-preview";
 
-const MAT: Record<MatColour, { mat: string; core: string }> = {
-  white: { mat: "var(--color-mat-white)", core: "var(--color-board)" },
-  cream: { mat: "var(--color-mat-cream)", core: "color-mix(in srgb, var(--color-mat-cream) 30%, var(--color-board))" },
-  charcoal: { mat: "var(--color-mat-charcoal)", core: "var(--color-mat-white)" },
+// The bevel is the same board as the mat, a touch lighter where it's cut, and
+// its faces are shaded toward a darker tone of that same board.
+const MAT: Record<MatColour, { mat: string; core: string; shade: string }> = {
+  white: { mat: "var(--color-mat-white)", core: "var(--color-board)", shade: "#6d6252" },
+  cream: { mat: "var(--color-mat-cream)", core: "color-mix(in srgb, var(--color-mat-cream) 55%, var(--color-board))", shade: "#6b5634" },
+  charcoal: { mat: "var(--color-mat-charcoal)", core: "color-mix(in srgb, var(--color-mat-charcoal) 89%, var(--color-board))", shade: "#000000" },
 };
 
 async function screenPower(on: boolean) {
@@ -186,7 +188,7 @@ export function ScreenSaver() {
       }
       onPointerUp={shown ? wake : undefined}
       className={`fixed inset-0 z-[1000] grid place-items-center transition-opacity duration-700 ${shown ? "opacity-100" : "pointer-events-none opacity-0"} ${off ? "bg-black" : "art-mat"}`}
-      style={{ "--mat": mat.mat, "--core": mat.core } as CSSProperties}
+      style={{ "--mat": mat.mat, "--core": mat.core, "--shade": mat.shade } as CSSProperties}
     >
       {painting && !off ? (
         <div key={painting.src} className="art-opening art-fade-in">

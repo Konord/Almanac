@@ -112,7 +112,8 @@ body {
  * above (the top face in slight shade, the bottom one catching the light),
  * and the soft shadow the mat casts onto the painting just below it. The
  * bevel runs straight on from the mat with no edge line (Connor, 2026-11-12).
- * --mat is the mat colour and --core the bevel's paper core.
+ * --mat is the mat colour, --core the bevel's cut face and --shade the
+ * darker tone its shaded faces lean toward.
  */
 .art-mat {
   background-color: var(--mat);
@@ -125,9 +126,9 @@ body {
      there's no line or shadow where it meets the face of the mat. */
   position: relative;
   border: 0.32vw solid;
-  border-top-color: color-mix(in srgb, var(--core) 80%, #6d6252);
-  border-left-color: color-mix(in srgb, var(--core) 89%, #6d6252);
-  border-right-color: color-mix(in srgb, var(--core) 85%, #6d6252);
+  border-top-color: color-mix(in srgb, var(--core) 80%, var(--shade));
+  border-left-color: color-mix(in srgb, var(--core) 89%, var(--shade));
+  border-right-color: color-mix(in srgb, var(--core) 85%, var(--shade));
   border-bottom-color: var(--core);
 }
 .art-opening img {
