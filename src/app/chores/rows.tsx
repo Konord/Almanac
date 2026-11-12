@@ -226,7 +226,7 @@ export function TodoRow({
         </span>
       ) : null}
       {todo.must_do && !done ? (
-        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
+        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Essential</span>
       ) : todo.due_date && !done && planned === undefined ? (
         <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{todoWhen(todo, today, household)}</span>
       ) : !done && planned !== today ? (
@@ -238,7 +238,7 @@ export function TodoRow({
             className="flex min-h-11 items-center gap-1.5 rounded-full bg-rail px-3 text-sm font-bold text-ink"
           >
             <SunHorizon size="1.125rem" aria-hidden />
-            Do today
+            Add to Daily list
           </button>
         </form>
       ) : null}

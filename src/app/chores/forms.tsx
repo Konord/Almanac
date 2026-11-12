@@ -43,14 +43,14 @@ export function TodoFields({
       <Field label="What needs doing">
         <Input name="title" defaultValue={todo?.title} required maxLength={120} />
       </Field>
-      <Field label="Picture" hint="Optional. Tap to pick one.">
+      <Field label="Picture">
         <EmojiPicker initial={todo?.icon ?? ""} nameField="title" className="self-start!" fullScreen />
       </Field>
       {chore ? (
         <ChoreFields choreDays={choreDays} tags={todo?.tags ?? []} choreDayId={todo?.chore_day_id ?? null} />
       ) : (
       <>
-        <Field label="Day" hint="Optional.">
+        <Field label="Day">
           <Input name="dueDate" type="date" defaultValue={todo?.due_date ?? ""} />
         </Field>
         <Chips
@@ -62,15 +62,15 @@ export function TodoFields({
           ]}
           defaultValue={todo?.date_kind ?? "due"}
         />
-        <Field label="Time" hint="Optional. With a day, it shows on the calendar then.">
+        <Field label="Time">
           <Input name="atTime" type="time" defaultValue={todo?.at_time?.slice(0, 5) ?? ""} />
         </Field>
-        <Field label="Show it ahead (days)" hint="For one done by a day. Empty: show it all along.">
+        <Field label="Show it ahead (days)">
           <Input name="leadDays" type="number" min={0} max={60} defaultValue={todo?.lead_days ?? ""} />
         </Field>
       </>
       )}
-      <Field label="For someone" hint="Optional.">
+      <Field label="For someone">
         <Select name="assigneeId" defaultValue={todo?.assignee_id ?? ""}>
           <option value="">Anyone</option>
           {members.map((m) => (
@@ -91,7 +91,7 @@ export function TodoFields({
           </Select>
         </Field>
       ) : null}
-      <Field label="Notes" hint="Optional.">
+      <Field label="Notes">
         <Input name="notes" defaultValue={todo?.notes ?? ""} maxLength={2000} />
       </Field>
     </>
@@ -117,9 +117,9 @@ export function ChoreFields({
         options={CHORE_TAGS.map((t) => ({ value: t.value, label: t.label }))}
         defaultValue={tags.filter(isChoreTag)}
       />
-      <Field label="Chore day" hint="Optional. Leave it empty for any day.">
+      <Field label="Chore day">
         <Select name="choreDayId" defaultValue={choreDayId ?? ""}>
-          <option value="">Any day with room</option>
+          <option value="">Any day</option>
           {choreDays.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}

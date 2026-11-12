@@ -85,7 +85,7 @@ export function RoutineChecklist({
                   {step.icon ? <Emoji emoji={step.icon} className="size-8" faded={done} /> : <span className="size-8 shrink-0" aria-hidden />}
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className={`truncate text-xl leading-[1.1] font-semibold ${done || over ? "text-ink-muted" : "text-ink"}`}>{step.text}</span>
-                    {over && !done ? <span className="text-sm font-bold text-ink-muted">Missed · tap if it got done</span> : null}
+                    {over && !done ? <span className="text-sm font-bold text-ink-muted">Missed</span> : null}
                   </span>
                   <span
                     className={`flex size-8 shrink-0 items-center justify-center rounded-full text-white ${done ? "bg-success" : "border-[2.5px] border-check-border"}`}

@@ -131,7 +131,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 <input type="hidden" name="listId" value={list.id} />
                 <input type="hidden" name="returnTo" value={returnTo} />
                 <div className="flex items-center gap-2">
-                  <Input name="title" placeholder="Add a chore… the planner picks a day" required maxLength={120} aria-label="New chore" className="min-w-0 flex-1" />
+                  <Input name="title" required maxLength={120} aria-label="New chore" className="min-w-0 flex-1" />
                   <Button>
                     <Plus size="1.25rem" weight="bold" aria-hidden />
                     Add
@@ -141,7 +141,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                   {CHORE_TAGS.map((t) => (
                     <label
                       key={t.value}
-                      title={t.hint}
                       className="flex min-h-11 cursor-pointer items-center rounded-full border-2 border-frame bg-board px-3.5 text-base text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold"
                     >
                       <input type="checkbox" name="tags" value={t.value} className="sr-only" />
@@ -155,7 +154,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <input type="hidden" name="listId" value={list.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
               <div className="min-w-56 flex-[3]">
-                <Input name="title" placeholder="Add a to-do…" required maxLength={120} aria-label="New to-do" className="w-full" />
+                <Input name="title" required maxLength={120} aria-label="New to-do" className="w-full" />
               </div>
               <div className="min-w-36 flex-1">
                 <Select name="dateKind" aria-label="What the day means" defaultValue="due" className="w-full">
@@ -209,7 +208,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 </>
               ) : (
                 <>
-                  {open.length === 0 ? <p className="py-4 text-xl text-ink-muted">Nothing on this list. Add something above.</p> : null}
+                  {open.length === 0 ? <p className="py-4 text-xl text-ink-muted">Nothing on this list</p> : null}
                   <FitList
                     key={list.id}
                     fallback={LIST_PAGE}
@@ -234,7 +233,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           </Card>
         ) : (
           <Card title="No lists yet" icon={ListChecks} tint="teal">
-            <p className="text-xl text-ink-muted">Make a list to start adding to-dos.</p>
           </Card>
         )}
 
@@ -299,12 +297,11 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
     <>
       <label className="flex flex-col gap-1.5">
         <span className="text-base font-bold text-ink">Name</span>
-        <Input name="name" defaultValue={name} required maxLength={40} placeholder="Errands" />
+        <Input name="name" defaultValue={name} required maxLength={40} />
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-base font-bold text-ink">Picture</span>
         <EmojiPicker initial={icon ?? ""} nameField="name" className="self-start!" fullScreen />
-        <span className="text-sm text-ink-muted">Tap to pick one.</span>
       </label>
     </>
   );
