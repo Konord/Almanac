@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/database.types";
 import { isLocalTime } from "@/lib/time";
 import { BOX_ID } from "@/lib/panel-boxes";
+import { DEFAULT_SCREEN_SAVER, parseScreenSaver, type ScreenSaverSettings } from "@/lib/screen-saver";
 
 /**
  * Household settings live in the database (households.settings), not in
@@ -33,6 +34,8 @@ export type HouseholdSettings = {
   weeklyReview: { weekday: number; time: string };
   /** Which boxes the Today panel flips between (see src/lib/panel-boxes.ts). Null: the usual ones. */
   panelBoxes: string[] | null;
+  /** The art screen saver on the kitchen screen (see src/lib/screen-saver.ts). */
+  screenSaver: ScreenSaverSettings;
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -52,6 +55,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   routineFlexMinutes: 60,
   weeklyReview: { weekday: 6, time: "09:00" },
   panelBoxes: null,
+  screenSaver: DEFAULT_SCREEN_SAVER,
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -83,6 +87,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
       return typeof r.weekday === "number" && Number.isInteger(r.weekday) && r.weekday >= 0 && r.weekday <= 6 && typeof r.time === "string" && isLocalTime(r.time);
     }),
     panelBoxes: pick("panelBoxes", (v) => Array.isArray(v) && v.length <= 40 && v.every((x) => typeof x === "string" && BOX_ID.test(x))),
+    screenSaver: parseScreenSaver(value.screenSaver),
   };
 }
 

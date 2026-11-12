@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { draftProblem, type SettingsDraft } from "./draft.ts";
+import { DEFAULT_SCREEN_SAVER } from "../../lib/screen-saver.ts";
 
 const base: SettingsDraft = {
   name: "Home",
@@ -18,6 +19,7 @@ const base: SettingsDraft = {
   panelBoxes: ["today", "bucket"],
   members: [{ id: "a", name: "Jess", role: "parent", colour: "blue", icon: null, birthYear: null, hasPin: false, pin: "", pinAgain: "", removed: false }],
   apps: [],
+  screenSaver: DEFAULT_SCREEN_SAVER,
 };
 
 test("a good settings draft passes", () => assert.equal(draftProblem(base), null));

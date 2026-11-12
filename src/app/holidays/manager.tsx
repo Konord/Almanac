@@ -8,6 +8,7 @@ import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { describeHolidayRule, nextDate, PUBLIC_HOLIDAYS, type Birthday, type Holiday, type HolidayRule } from "@/lib/holidays";
+import { folderNamed, MAX_MIX_DAYS, MAX_ONLY_DAYS, type ArtFolder } from "@/lib/screen-saver";
 import { saveHolidays, type HolidayDraft } from "./actions";
 
 /*
@@ -25,6 +26,9 @@ const PUBLIC_PER_PAGE = 12;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/** A new holiday's art days for the screen saver (the database's defaults). */
+const ART_DAYS = { art_only_days: 0, art_mix_days: 14 };
+
 let counter = 0;
 const newId = () => `new-${Date.now()}-${counter++}`;
 
@@ -32,10 +36,13 @@ export function HolidayManager({
   initial,
   today,
   locale,
+  art,
 }: {
   initial: HolidayDraft;
   today: string;
   locale: string;
+  /** The screen saver's art folders (names and pictures), or null when there's no art folder. */
+  art: ArtFolder[] | null;
 }) {
   const [draft, setDraft] = useState<HolidayDraft>(initial);
   const [tab, setTab] = useState<Tab>("holidays");
@@ -99,13 +106,13 @@ export function HolidayManager({
 
   const addOwnHoliday = () => {
     const id = newId();
-    update((d) => ({ ...d, holidays: [...d.holidays, { id, name: "New holiday", icon: null, rule: { kind: "fixed", month: Number(today.slice(5, 7)), day: Number(today.slice(8)) }, public_key: null }] }));
+    update((d) => ({ ...d, holidays: [...d.holidays, { id, name: "New holiday", icon: null, rule: { kind: "fixed", month: Number(today.slice(5, 7)), day: Number(today.slice(8)) }, public_key: null, ...ART_DAYS }] }));
     setSelection({ kind: "holiday", id });
   };
   const addPublic = (key: string) => {
     const pub = PUBLIC_HOLIDAYS.find((x) => x.key === key);
     if (!pub) return;
-    update((d) => ({ ...d, holidays: [...d.holidays, { id: newId(), name: pub.name, icon: pub.icon, rule: pub.rule, public_key: pub.key }] }));
+    update((d) => ({ ...d, holidays: [...d.holidays, { id: newId(), name: pub.name, icon: pub.icon, rule: pub.rule, public_key: pub.key, ...ART_DAYS }] }));
   };
   const addBirthday = () => {
     const id = newId();
@@ -202,6 +209,7 @@ export function HolidayManager({
               key={selectedHoliday.id}
               holiday={selectedHoliday}
               next={dateLabel(nextDate(selectedHoliday, today))}
+              art={art}
               onChange={(c) => setHoliday(selectedHoliday.id, c)}
               onRemove={() => {
                 update((d) => ({ ...d, holidays: d.holidays.filter((h) => h.id !== selectedHoliday.id) }));
@@ -213,6 +221,7 @@ export function HolidayManager({
               key={selectedBirthday.id}
               birthday={selectedBirthday}
               thisYear={Number(today.slice(0, 4))}
+              art={art}
               onChange={(c) => setBirthday(selectedBirthday.id, c)}
               onRemove={() => {
                 update((d) => ({ ...d, birthdays: d.birthdays.filter((b) => b.id !== selectedBirthday.id) }));
@@ -308,7 +317,7 @@ function PublicList({ added, onAdd, dateLabel }: { added: Set<string>; onAdd: (k
   );
 }
 
-function HolidayEditor({ holiday, next, onChange, onRemove }: { holiday: Holiday; next: string; onChange: (c: Partial<Holiday>) => void; onRemove: () => void }) {
+function HolidayEditor({ holiday, next, art, onChange, onRemove }: { holiday: Holiday; next: string; art: ArtFolder[] | null; onChange: (c: Partial<Holiday>) => void; onRemove: () => void }) {
   const fromList = holiday.public_key !== null;
   const rule = holiday.rule;
   return (
@@ -376,11 +385,17 @@ function HolidayEditor({ holiday, next, onChange, onRemove }: { holiday: Holiday
           {rule.kind === "before" || rule.kind === "easter" ? <p className="text-lg text-ink-soft">{describeHolidayRule(rule)}</p> : null}
         </>
       )}
+      {art ? (
+        <ArtBox folder={folderNamed(art, holiday.name)} name={holiday.name}>
+          <Stepper label="Only its art, days before" value={holiday.art_only_days} max={MAX_ONLY_DAYS} onChange={(art_only_days) => onChange({ art_only_days })} />
+          <Stepper label="Mixed in, days before" value={holiday.art_mix_days} max={MAX_MIX_DAYS} onChange={(art_mix_days) => onChange({ art_mix_days })} />
+        </ArtBox>
+      ) : null}
     </>
   );
 }
 
-function BirthdayEditor({ birthday, thisYear, onChange, onRemove }: { birthday: Birthday; thisYear: number; onChange: (c: Partial<Birthday>) => void; onRemove: () => void }) {
+function BirthdayEditor({ birthday, thisYear, art, onChange, onRemove }: { birthday: Birthday; thisYear: number; art: ArtFolder[] | null; onChange: (c: Partial<Birthday>) => void; onRemove: () => void }) {
   return (
     <>
       <div className="flex shrink-0 items-end gap-4">
@@ -419,6 +434,7 @@ function BirthdayEditor({ birthday, thisYear, onChange, onRemove }: { birthday: 
           <span className="pb-3 text-lg font-bold text-ink-soft">Turns {thisYear - birthday.birth_year} this year</span>
         ) : null}
       </div>
+      {art && birthday.name.trim() ? <ArtBox folder={folderNamed(art, birthday.name, true)} name={birthday.name} /> : null}
     </>
   );
 }
@@ -483,6 +499,40 @@ function DayInput({ value, onChange }: { value: number; onChange: (d: number) =>
         ))}
       </div>
     </fieldset>
+  );
+}
+
+/** The screen saver's art for a holiday or birthday: its folder (found by name) and, for a holiday, its days. */
+function ArtBox({ folder, name, children }: { folder: ArtFolder | null; name: string; children?: ReactNode }) {
+  return (
+    <div className="mt-auto flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl bg-rail px-4 py-3">
+      <span className="flex min-w-0 items-center gap-3">
+        <Emoji emoji="🖼" className="size-9" faded={!folder} />
+        <span className="flex min-w-0 flex-col">
+          <span className="text-base font-bold text-ink-muted">Screen saver art</span>
+          <span className="truncate text-lg font-bold text-ink">
+            {folder ? `${folder.name} · ${folder.files.length === 1 ? "1 painting" : `${folder.files.length} paintings`}` : `No folder named ${name.trim() || "this"}`}
+          </span>
+        </span>
+      </span>
+      {children ? <span className="ml-auto flex flex-wrap items-center gap-5">{children}</span> : null}
+    </div>
+  );
+}
+
+function Stepper({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (v: number) => void }) {
+  const step = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-board text-2xl font-bold text-ink disabled:opacity-40";
+  return (
+    <span className="flex items-center gap-2">
+      <span className="text-base font-bold text-ink">{label}</span>
+      <button type="button" aria-label={`Fewer: ${label}`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - 1))} className={step}>
+        −
+      </button>
+      <span className="w-8 text-center text-xl font-bold text-ink tabular-nums">{value}</span>
+      <button type="button" aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className={step}>
+        +
+      </button>
+    </span>
   );
 }
 

@@ -19,6 +19,10 @@ never show the apps.
   to close the app and go back to Almanac.
 - **Coming back by itself.** When you quit an app the normal way, Almanac is
   brought back to the front.
+- **Screen off overnight.** When the art screen saver is set to "Screen off"
+  overnight (Settings › Screen saver), Almanac asks the helper to put the
+  monitor to sleep (`xset dpms force off`). A touch wakes it. It never does
+  this while an app is open. `xset` comes with Ubuntu's Xorg desktop.
 
 The up checks and the "isn't answering" heads-up are done by Almanac itself
 (Settings › Apps), not by this helper.

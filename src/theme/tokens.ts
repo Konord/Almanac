@@ -50,6 +50,10 @@ export type ThemeTokens = {
     missedSoft: string;
     /** Health: the shaded band on a reading above its line (a fever) */
     alertSoft: string;
+    /** The art screen saver's mat board: white, cream and charcoal (src/components/screen-saver.tsx) */
+    matWhite: string;
+    matCream: string;
+    matCharcoal: string;
     /** One strong + one pastel colour per person (see src/lib/colours.ts) */
     personBlue: string;
     personBlueSoft: string;
@@ -106,6 +110,9 @@ export const brightTheme: Theme = {
       missed: "#D9533F",
       missedSoft: "#F2A79A",
       alertSoft: "#FDECE8",
+      matWhite: "#F7F6F2",
+      matCream: "#ECE5D6",
+      matCharcoal: "#36383C",
       personBlue: "#2F74C0",
       personBlueSoft: "#CFE3F8",
       personPink: "#CC4A78",

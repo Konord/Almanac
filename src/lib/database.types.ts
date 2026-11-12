@@ -49,6 +49,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"art_shown": {
+                  Row: {
+                    "file": string,"household_id": string,"id": string,"shown_at": string,"slot": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "file": string,"household_id": string,"id"?: string,"shown_at"?: string,"slot": string
+                  }
+                  Update: {
+                    "file"?: string,"household_id"?: string,"id"?: string,"shown_at"?: string,"slot"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "art_shown_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"backup_parts": {
                   Row: {
                     "household_id": string,"id": string,"item_id": string,"keep_at_least": number,"on_hand": number,"position": number,"recipe_id": string,"uses": number
@@ -711,14 +731,14 @@ isOneToOne: false
                   ]
                 },"holidays": {
                   Row: {
-                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"public_key": string | null,"rule": NonNullable<Json>,"sort_order": number,"updated_at": string
+                    "art_mix_days": number,"art_only_days": number,"created_at": string,"household_id": string,"icon": string | null,"id": string,"name": string,"public_key": string | null,"rule": NonNullable<Json>,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"public_key"?: string | null,"rule": NonNullable<Json>,"sort_order"?: number,"updated_at"?: string
+                    "art_mix_days"?: number,"art_only_days"?: number,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"name": string,"public_key"?: string | null,"rule": NonNullable<Json>,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"public_key"?: string | null,"rule"?: NonNullable<Json>,"sort_order"?: number,"updated_at"?: string
+                    "art_mix_days"?: number,"art_only_days"?: number,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"name"?: string,"public_key"?: string | null,"rule"?: NonNullable<Json>,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {

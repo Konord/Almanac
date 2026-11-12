@@ -2,7 +2,7 @@
 
 import { Pager } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { AppWindow, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { AppWindow, FrameCorners, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -13,6 +13,10 @@ import { signOut } from "@/app/login/actions";
 import { useSearchParams } from "next/navigation";
 import { saveHousehold } from "./actions";
 import { AppsTab } from "./apps-tab";
+import { Choice } from "./fields";
+import { ScreenSaverTab, type ArtOverview } from "./screen-saver-tab";
+import { setScreenSaverHere, useScreenSaverHere } from "@/components/screen-saver-here";
+import { useLauncher } from "@/components/launcher-store";
 import type { MemberDraft, SettingsDraft } from "./draft";
 
 /*
@@ -23,7 +27,7 @@ import type { MemberDraft, SettingsDraft } from "./draft";
  * for Save in the header; leaving with changes asks first.
  */
 
-type Tab = "people" | "household" | "apps";
+type Tab = "people" | "household" | "apps" | "screen";
 const PER_PAGE = 7;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -31,28 +35,6 @@ let counter = 0;
 const newId = () => `new-${Date.now()}-${counter++}`;
 
 const inputClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink outline-none focus:border-accent";
-
-/** One tap choices (a controlled version of the Chips in ui.tsx). */
-function Choice<T extends string | number>({ label, options, value, onChange }: { label: string; options: readonly { value: T; label: ReactNode }[]; value: T; onChange: (v: T) => void }) {
-  return (
-    <fieldset className="flex min-w-0 flex-col gap-1.5">
-      <legend className="mb-1.5 text-base font-bold text-ink">{label}</legend>
-      <div className="flex flex-wrap gap-2">
-        {options.map((o) => (
-          <button
-            key={String(o.value)}
-            type="button"
-            aria-pressed={o.value === value}
-            onClick={() => onChange(o.value)}
-            className={`flex min-h-[var(--touch-target)] items-center rounded-full border-2 px-4 text-lg text-ink ${o.value === value ? "border-ink bg-rail font-bold" : "border-frame bg-board"}`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
 
 function TextField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -64,18 +46,27 @@ function TextField({ label, hint, children }: { label: string; hint?: string; ch
   );
 }
 
-export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; boxes: PanelBox[] }) {
+export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: SettingsDraft; boxes: PanelBox[]; mealTimes: { id: string; name: string }[]; art: ArtOverview }) {
   const [draft, setDraft] = useState<SettingsDraft>(initial);
   // The tray's "Settings › Apps" link opens straight on the Apps tab.
   const askedTab = useSearchParams().get("tab");
-  const [tab, setTab] = useState<Tab>(askedTab === "apps" || askedTab === "household" ? askedTab : "people");
+  const [tab, setTab] = useState<Tab>(askedTab === "apps" || askedTab === "household" || askedTab === "screen" ? askedTab : "people");
   const [selected, setSelected] = useState<string | null>(initial.members[0]?.id ?? null);
   const [page, setPage] = useState(0);
   const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
-  const guard = useUnsavedChanges(dirty, () => setDraft(initial));
+  // Whether this screen uses the screen saver is kept in this browser, but saved with the rest.
+  const hereNow = useScreenSaverHere();
+  const { helper } = useLauncher();
+  const hereSaved = hereNow === "on" || (hereNow === null && Boolean(helper));
+  const [hereDraft, setHereDraft] = useState<boolean | null>(null);
+  const here = hereDraft ?? hereSaved;
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || here !== hereSaved;
+  const guard = useUnsavedChanges(dirty, () => {
+    setDraft(initial);
+    setHereDraft(null);
+  });
 
   const set = (changes: Partial<SettingsDraft>) => {
     setError(null);
@@ -95,10 +86,13 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
       guard.stay();
       return;
     }
+    if (here !== hereSaved) setScreenSaverHere(here ? "on" : "off");
+    setHereDraft(null);
     guard.saved(then);
   };
   const undo = () => {
     setDraft(initial);
+    setHereDraft(null);
     setError(null);
     setSelected(initial.members[0]?.id ?? null);
   };
@@ -126,6 +120,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
               { tab: "people", label: "People", icon: UsersThree },
               { tab: "household", label: "Household", icon: GearSix },
               { tab: "apps", label: "Apps", icon: AppWindow },
+              { tab: "screen", label: "Screen saver", icon: FrameCorners },
             ] as const
           ).map((t) => (
             <button
@@ -143,7 +138,9 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
 
-      {tab === "apps" ? (
+      {tab === "screen" ? (
+        <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} />
+      ) : tab === "apps" ? (
         <AppsTab apps={draft.apps} onChange={(apps) => set({ apps })} />
       ) : tab === "people" ? (
         <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">

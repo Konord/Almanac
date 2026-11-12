@@ -5,6 +5,9 @@ import { allBoxes, panelBoxes } from "@/lib/panel-boxes";
 import { createClient } from "@/lib/supabase/server";
 import type { SettingsDraft } from "./draft";
 import { SettingsEditor } from "./editor";
+import { listArt } from "@/lib/art-folder";
+import { folderUse } from "@/lib/screen-saver";
+import type { ArtOverview } from "./screen-saver-tab";
 
 /**
  * Settings: the people in the household and the household's settings.
@@ -41,6 +44,31 @@ async function HouseholdContent() {
     .select("id, name, icon, colour, kind, address, local_key, check_up")
     .order("sort_order")
     .order("name");
+  const [{ data: mealTimes }, { data: holidays }, { data: birthdays }, art] = await Promise.all([
+    supabase.from("meal_times").select("id, name").order("sort_order").order("name"),
+    supabase.from("holidays").select("id, name"),
+    supabase.from("birthdays").select("id, name"),
+    listArt(),
+  ]);
+  const SEASON_LABEL = { spring: "Spring", summer: "Summer", fall: "Autumn", winter: "Winter" } as const;
+  const overview: ArtOverview = {
+    root: art.root,
+    problem: art.problem,
+    folders: art.folders.map((f) => {
+      const use = folderUse(f.name, holidays ?? [], birthdays ?? []);
+      const label =
+        use.kind === "general"
+          ? "Any day"
+          : use.kind === "season"
+            ? `${SEASON_LABEL[use.season]}`
+            : use.kind === "holiday"
+              ? `Holiday: ${use.name}`
+              : use.kind === "birthday"
+                ? `Birthday: ${use.name}`
+                : "Matches nothing";
+      return { name: f.name, count: f.files.length, use: label, matched: use.kind !== "none" };
+    }),
+  };
 
   const initial: SettingsDraft = {
     name: household.name,
@@ -79,7 +107,8 @@ async function HouseholdContent() {
       checkUp: a.check_up,
       removed: false,
     })),
+    screenSaver: settings.screenSaver,
   };
 
-  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} />;
+  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} mealTimes={mealTimes ?? []} art={overview} />;
 }

@@ -7,6 +7,7 @@ import "@fontsource/kalam/400.css";
 import "@fontsource/kalam/700.css";
 import { brightTheme, themeToCssVariables } from "@/theme/tokens";
 import { HouseholdTheme } from "@/theme/HouseholdTheme";
+import { ScreenSaver } from "@/components/screen-saver";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,6 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <HouseholdTheme />
         </Suspense>
         {children}
+        {/* The art screen saver covers every screen when it comes on (kitchen screen only). */}
+        <ScreenSaver />
       </body>
     </html>
   );
