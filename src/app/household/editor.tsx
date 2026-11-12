@@ -209,7 +209,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                   <input value={draft.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} maxLength={3} className={`${inputClass} uppercase`} />
                 </TextField>
               </div>
-              <TextField label="Time zone" hint="For example, America/Toronto.">
+              <TextField label="Time zone">
                 <input value={draft.timeZone} onChange={(e) => set({ timeZone: e.target.value })} className={inputClass} />
               </TextField>
               <Choice label="Units" value={draft.units} onChange={(units) => set({ units })} options={[{ value: "metric", label: "Metric" }, { value: "imperial", label: "Imperial" }]} />
@@ -264,7 +264,6 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
               </div>
             </Card>
             <Card title="Today panel" icon={SquaresFour} tint="orange">
-              <p className="mb-3 text-base text-ink-muted">The boxes you flip through on the Today panel.</p>
               <div className="flex flex-wrap gap-2">
                 {boxes.map((b) => {
                   const on = draft.panelBoxes.includes(b.id);
@@ -333,7 +332,7 @@ function PersonEditor({ member, onChange }: { member: MemberDraft; onChange: (c:
       </fieldset>
       {member.role === "parent" ? (
         <div className="grid grid-cols-2 gap-4">
-          <TextField label={member.hasPin ? "New PIN" : "PIN"} hint="4 to 8 digits, for parent mode later.">
+          <TextField label={member.hasPin ? "New PIN" : "PIN"} hint="4 to 8 digits">
             <input type="password" inputMode="numeric" autoComplete="off" value={member.pin} onChange={(e) => onChange({ pin: e.target.value.replace(/\D/g, "").slice(0, 8) })} className={inputClass} />
           </TextField>
           <TextField label="Type it again">

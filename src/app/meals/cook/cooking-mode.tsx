@@ -218,7 +218,7 @@ export function CookingMode({
               </div>
             </>
           ) : (
-            <p className="text-2xl text-ink-muted">This recipe has no steps yet. Add them in the recipe card.</p>
+            <p className="text-2xl text-ink-muted">No steps yet</p>
           )}
           <div className="flex shrink-0 gap-4">
             <button

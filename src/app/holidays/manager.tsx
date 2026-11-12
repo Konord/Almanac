@@ -145,7 +145,7 @@ export function HolidayManager({
           </div>
 
           {count === 0 ? (
-            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet. Add some from the public list." : "No birthdays yet."}</p>
+            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet" : "No birthdays yet"}</p>
           ) : null}
           <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
             {tab === "holidays"
@@ -280,7 +280,6 @@ function PublicList({ added, onAdd, dateLabel }: { added: Set<string>; onAdd: (k
       <div className="flex shrink-0 items-center gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl font-extrabold text-ink">Public holidays</h2>
-          <p className="text-base text-ink-muted">Tap the ones you want on your calendar. You can rename them or change the picture after.</p>
         </div>
         <Pager page={p} pages={pages} onPage={setPage} />
       </div>
@@ -397,7 +396,7 @@ function BirthdayEditor({ birthday, thisYear, onChange, onRemove }: { birthday: 
         />
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="text-base font-bold text-ink">Whose birthday</span>
-          <input value={birthday.name} maxLength={40} placeholder="Grandma" autoFocus={birthday.name === ""} onChange={(e) => onChange({ name: e.target.value })} className={input} />
+          <input value={birthday.name} maxLength={40} autoFocus={birthday.name === ""} onChange={(e) => onChange({ name: e.target.value })} className={input} />
         </label>
         <RemoveButton onClick={onRemove} label="Take it away" />
       </div>
@@ -411,7 +410,6 @@ function BirthdayEditor({ birthday, thisYear, onChange, onRemove }: { birthday: 
             inputMode="numeric"
             min={1900}
             max={thisYear}
-            placeholder="e.g. 2018"
             value={birthday.birth_year ?? ""}
             onChange={(e) => onChange({ birth_year: e.target.value === "" ? null : Number(e.target.value) })}
             className={`${input} w-40`}

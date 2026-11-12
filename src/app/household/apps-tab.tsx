@@ -76,7 +76,6 @@ export function AppsTab({ apps, onChange }: { apps: AppDraft[]; onChange: (apps:
   return (
     <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <Card title="Apps" icon={AppWindow} tint="purple" aside={<span className="text-base font-bold text-ink-muted">{kept} of {MAX_APPS}</span>}>
-        <p className="text-base text-ink-muted">They show on the kitchen screen: drag the menu up twice.</p>
         {/* At most 8 apps, so the list always fits without pages. */}
         <ul className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
           {apps.map((a, i) => (
@@ -201,13 +200,11 @@ function AppEditor({ app, onChange }: { app: AppDraft; onChange: (c: Partial<App
               </Pill>
             ))}
           </div>
-          <span className="text-base text-ink-muted">These come from the launcher&apos;s list on the kitchen PC.</span>
         </fieldset>
       ) : (
         <label className="flex flex-col gap-1.5">
           <span className="text-base font-bold text-ink">Program name in the launcher&apos;s list</span>
           <input value={app.localKey} onChange={(e) => onChange({ localKey: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} maxLength={40} autoCapitalize="off" spellCheck={false} placeholder="steam" className={inputClass} />
-          <span className="text-base text-ink-muted">On the kitchen screen you can pick from the list instead.</span>
         </label>
       )}
 

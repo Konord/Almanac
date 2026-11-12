@@ -54,13 +54,13 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   const tiles = [
     { id: ALL, name: "All dishes", icon: "📖", count: dishes.length },
     ...basics.kinds.map((k) => ({ id: k.id, name: k.name, icon: k.icon, count: dishes.filter((r) => r.kind_ids.includes(k.id)).length })),
-    ...(loose.length ? [{ id: NONE, name: "No kind", icon: "📒", count: loose.length }] : []),
+    ...(loose.length ? [{ id: NONE, name: "No course", icon: "📒", count: loose.length }] : []),
   ];
   const tilePage = pageOf(tiles, Number(p("kpage") ?? 0), KIND_PAGE);
   const list = picked === ALL ? dishes : picked === NONE ? loose : dishes.filter((r) => r.kind_ids.includes(picked));
   const tagById = new Map(basics.tags.map((t) => [t.id, t]));
   const kindById = new Map(basics.kinds.map((k) => [k.id, k]));
-  const pickedName = picked === ALL ? "All dishes" : picked === NONE ? "No kind" : (kind?.name ?? "");
+  const pickedName = picked === ALL ? "All dishes" : picked === NONE ? "No course" : (kind?.name ?? "");
 
   const recipeId = p("recipe");
   const openRecipe = recipeId ? basics.recipes.find((r) => r.id === recipeId) : undefined;
@@ -76,7 +76,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
       </MealsHeader>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
-        <Card title="Kinds of dish" icon={BookOpen} tint="yellow">
+        <Card title="Courses" icon={BookOpen} tint="yellow">
           <div className="grid min-h-0 flex-1 grid-cols-4 gap-2.5" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
             {tilePage.items.map((t) => (
               <Link
@@ -104,7 +104,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
             heading={pickedName}
             fallback={DISH_PAGE}
             className="mt-2 gap-2"
-            empty={<li className="text-lg text-ink-muted">No dishes here yet. Tap Add a dish at the top.</li>}
+            empty={<li className="text-lg text-ink-muted">No dishes yet</li>}
             rows={list.map((r) => (
               <li key={r.id}>
                 <Link href={here({ recipe: r.id, tab: "recipe" })} scroll={false} className="flex min-h-18 items-center gap-3 rounded-2xl bg-rail px-4 hover:bg-panel">
@@ -176,25 +176,21 @@ function AddCard({ mode, basics, kindId, here }: { mode: AddMode; basics: MealBa
         <input type="hidden" name="mode" value={mode} />
         {mode === "type" ? (
           <>
-            <p className="text-lg text-ink-muted">Give it a name to start. The dish then opens so you can add its ingredients, steps and notes, the same as a recipe you paste in.</p>
             <Field label="Name">
-              <Input name="name" maxLength={80} required autoFocus placeholder="Grandma's chili" className="text-2xl" />
+              <Input name="name" maxLength={80} required autoFocus className="text-2xl" />
             </Field>
           </>
         ) : mode === "paste" ? (
           <>
-            <p className="text-lg text-ink-muted">Paste the whole recipe. Almanac looks for &quot;Ingredients&quot; and &quot;Directions&quot;, then you check it over.</p>
             <textarea
               name="text"
               rows={12}
               required
               className="min-h-0 flex-1 resize-none rounded-[var(--radius)] border-2 border-frame p-4 text-lg text-ink outline-none focus:border-accent"
-              placeholder={"Grandma's chili\n\nIngredients\n1 lb ground beef\n1 can kidney beans\n\nDirections\nBrown the beef.\nSimmer 30 minutes."}
             />
           </>
         ) : (
           <>
-            <p className="text-lg text-ink-muted">Paste a recipe page&apos;s link and Almanac reads it in.</p>
             <Field label="Link">
               <Input name="url" type="url" required placeholder="https://…" />
             </Field>
@@ -203,10 +199,10 @@ function AddCard({ mode, basics, kindId, here }: { mode: AddMode; basics: MealBa
         <div className="mt-auto flex items-end gap-4">
           {mode === "type" ? null : (
             <Field label="Name (optional)">
-              <Input name="name" maxLength={80} placeholder="Use the recipe's own" className="w-[20rem]" />
+              <Input name="name" maxLength={80} className="w-[20rem]" />
             </Field>
           )}
-          <Field label="Kind of dish">
+          <Field label="Course">
             <Select name="kindId" defaultValue={kindId}>
               <option value="">None</option>
               {basics.kinds.map((k) => (
@@ -222,7 +218,7 @@ function AddCard({ mode, basics, kindId, here }: { mode: AddMode; basics: MealBa
               <option value="none">Also a meal</option>
               {basics.categories.filter((c) => !c.is_leftovers).map((c) => (
                 <option key={c.id} value={c.id}>
-                  A meal under {c.name}
+                  Also a {c.name} meal
                 </option>
               ))}
             </Select>
@@ -360,14 +356,13 @@ function RecipeView({
             ))}
           </nav>
         </div>
-        <p className="shrink-0 text-base text-ink-muted">Tap an amount to see it in other units.</p>
         {ingredients.length ? (
           <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-6">
             {column(shown.slice(0, VIEW_INGREDIENTS))}
             {column(shown.slice(VIEW_INGREDIENTS))}
           </div>
         ) : (
-          <p className="text-lg text-ink-muted">No ingredients yet. Add them in the Ingredients tab.</p>
+          <p className="text-lg text-ink-muted">No ingredients yet</p>
         )}
         {ingredients.length > shown.length ? (
           <Link href={here({ recipe: recipe.id, tab: "ingredients" })} scroll={false} className="text-base font-bold text-accent">
@@ -384,7 +379,7 @@ function RecipeView({
               <span className="line-clamp-3 text-lg leading-snug text-ink">{s.text}</span>
             </li>
           ))}
-          {detail.steps.length === 0 ? <li className="text-lg text-ink-muted">No steps yet. Add them in the Steps tab.</li> : null}
+          {detail.steps.length === 0 ? <li className="text-lg text-ink-muted">No steps yet</li> : null}
         </ol>
         {detail.steps.length > VIEW_STEPS ? (
           <Link href={here({ recipe: recipe.id, tab: "steps" })} scroll={false} className="shrink-0 text-base font-bold text-accent">
@@ -392,7 +387,7 @@ function RecipeView({
           </Link>
         ) : null}
         <p className="shrink-0 border-t border-frame pt-3 text-base text-ink-muted">
-          {inMeals.length ? `On the menu in ${inMeals.slice(0, 3).join(", ")}${inMeals.length > 3 ? ` and ${inMeals.length - 3} more` : ""}.` : "Not in a meal on the menu yet."} Cooking mode opens from a planned meal on Today.
+          {inMeals.length ? `On the menu in ${inMeals.slice(0, 3).join(", ")}${inMeals.length > 3 ? ` and ${inMeals.length - 3} more` : ""}.` : "Not in a meal yet."}
         </p>
       </section>
     </div>

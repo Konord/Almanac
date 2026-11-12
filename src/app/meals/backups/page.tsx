@@ -48,9 +48,7 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
       </MealsHeader>
 
       {backups.length === 0 ? (
-        <p className="max-w-[60rem] text-xl text-ink-soft">
-          A backup meal is one you keep ready for days when cooking isn&apos;t happening. Make one, then say what it&apos;s made of, how many you have, and the fewest you want to keep.
-        </p>
+        null
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-3 gap-5" style={{ gridTemplateRows: "repeat(2, minmax(0, 1fr))" }}>
           {shown.items.map((b) => {
@@ -94,7 +92,7 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
                       </li>
                     );
                   })}
-                  {mine.length === 0 ? <li className="text-lg text-ink-muted">No parts yet. Tap the pencil to add them.</li> : null}
+                  {mine.length === 0 ? <li className="text-lg text-ink-muted">No parts yet</li> : null}
                   {mine.length > 4 ? (
                     <li>
                       <Link href={here({ edit: b.id })} scroll={false} className="text-lg font-bold text-accent">

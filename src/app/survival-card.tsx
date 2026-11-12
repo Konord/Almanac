@@ -64,7 +64,6 @@ export function SurvivalCard({
                 <Link href="/meals/backups" className="font-bold text-accent underline">
                   Make one
                 </Link>
-                , like a frozen lasagne and garlic bread.
               </p>
             ) : (
               <div className="flex flex-col gap-5">
@@ -131,11 +130,10 @@ export function SurvivalCard({
             )}
             {moreChores > 0 ? (
               <p className="mt-2 text-lg text-ink-muted">
-                +{moreChores} more stay on the{" "}
+                +{moreChores} more stay on{" "}
                 <Link href="/chores" className="font-bold text-accent">
-                  chores list
+                  Chores
                 </Link>
-                .
               </p>
             ) : null}
           </section>
@@ -143,7 +141,6 @@ export function SurvivalCard({
 
         <div className="flex shrink-0 items-center gap-5 border-t border-frame pt-4">
           <Button className="px-8 text-xl">Do it</Button>
-          <p className="text-lg text-ink-muted">Skipped chores find another day. Routines and other tasks stay as they are.</p>
         </div>
       </form>
     </Modal>

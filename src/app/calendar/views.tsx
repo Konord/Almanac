@@ -956,7 +956,7 @@ export function MonthView({
                 key={b.id}
                 href={BREAKS_HREF}
                 title={`${b.name}: ${breakWho(b, memberById)}`}
-                aria-label={`${b.name}, a break for ${breakWho(b, memberById)}`}
+                aria-label={`${b.name}, days off for ${breakWho(b, memberById)}`}
                 className="shrink-0 rounded-lg border-2 border-dashed p-px"
                 style={{ background: soft(breakColour(b, memberById)), borderColor: strong(breakColour(b, memberById)) }}
               >

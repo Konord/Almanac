@@ -58,7 +58,6 @@ async function HouseholdsContent({ searchParams }: { searchParams: PageProps<"/h
             <Pager page={page - 1} pages={pages} href={(n) => `/households?page=${n + 1}`} />
           }
         >
-          <p className="mb-4 text-lg text-ink-muted">Tap a household to switch this screen to it.</p>
           <ul className="grid gap-4 sm:grid-cols-2 lg:min-h-0 lg:flex-1 lg:grid-rows-3">
             {shown.map((h) => (
               <li key={h.id}>
@@ -77,7 +76,6 @@ async function HouseholdsContent({ searchParams }: { searchParams: PageProps<"/h
                       <Emoji emoji="🏠" className="size-16" />
                       <span className="min-w-0">
                         <span className="block truncate text-3xl font-bold text-ink">{h.name}</span>
-                        <span className="block text-base text-ink-muted">Tap to switch</span>
                       </span>
                     </button>
                   </form>
@@ -90,8 +88,8 @@ async function HouseholdsContent({ searchParams }: { searchParams: PageProps<"/h
         <div className="flex flex-col gap-5 lg:min-h-0">
           <Card title="New household" icon={Plus} tint="green">
             <form action={newHousehold} className="mt-2 flex flex-col gap-4">
-              <Field label="Name" hint="It starts with the usual starter routines and meals, and no chores.">
-                <Input name="name" required maxLength={80} placeholder="Test house" />
+              <Field label="Name">
+                <Input name="name" required maxLength={80} />
               </Field>
               <div>
                 <Button>Make and switch to it</Button>

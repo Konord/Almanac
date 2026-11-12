@@ -172,7 +172,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             <Link
               key={b.id}
               href="/routines/manage?tab=breaks"
-              title={`A break until ${b.end_date}`}
+              title={`Days off until ${b.end_date}`}
               className="inline-flex min-h-[var(--touch-target)] max-w-64 shrink-0 items-center gap-2 rounded-2xl border-2 border-dashed border-frame bg-rail px-4 text-base font-bold text-ink"
             >
               <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-7" />

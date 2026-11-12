@@ -116,9 +116,6 @@ export function StepsEditor({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <p className="text-lg text-ink-muted">
-        Almanac spots timers, heads-ups and temperatures in each step. Dotted ones are suggestions: tap to keep them for Cooking mode.
-      </p>
       <ol className="flex min-h-0 flex-1 flex-col gap-3">
         {steps.slice(from, from + STEP_PAGE).map((step, k) => {
           const i = from + k;

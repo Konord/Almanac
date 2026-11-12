@@ -6,9 +6,6 @@ export default function LoginPage(props: PageProps<"/login">) {
   return (
     <PageShell title="Almanac">
       <Panel title="Sign in">
-        <p className="mb-5 text-lg text-ink-muted">
-          The whole household shares one login. Everyone gets their own profile once you&apos;re in.
-        </p>
         <Suspense>
           <Messages searchParams={props.searchParams} />
         </Suspense>

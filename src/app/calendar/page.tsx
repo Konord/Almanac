@@ -432,7 +432,7 @@ function EditEventPanel({
             icon: event.icon ?? "",
             repeat: parseRule(event.recurrence_rule),
           }}
-          headsUps={<HeadsUpEditor headsUps={headsUps} source={{ eventId: event.id }} returnTo={headsUpReturn} what={event.recurrence_rule ? "each one" : "it"} />}
+          headsUps={<HeadsUpEditor headsUps={headsUps} source={{ eventId: event.id }} returnTo={headsUpReturn} />}
           initialTab={initialTab}
         />
       </form>

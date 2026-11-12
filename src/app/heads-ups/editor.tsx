@@ -28,7 +28,6 @@ export function HeadsUpEditor({
   headsUps,
   source,
   returnTo,
-  what,
   example = "Pack the hockey bag",
 }: {
   /** A placeholder for the new heads-up. */
@@ -37,8 +36,6 @@ export function HeadsUpEditor({
   source: { eventId: string } | { choreId: string };
   /** The page to come back to, opened on this tab. */
   returnTo: string;
-  /** "the game", "this chore": used in the hint. */
-  what: string;
 }) {
   return (
     <div className="grid content-start gap-4">
@@ -49,9 +46,7 @@ export function HeadsUpEditor({
         <input type="hidden" name="huChoreId" value={source.choreId} />
       )}
       {headsUps.length === 0 ? (
-        <p className="text-lg text-ink-muted">
-          A heads-up makes a to-do (or adds to the grocery list) a set time before {what}. Like &ldquo;Pack the bag&rdquo; the night before.
-        </p>
+        null
       ) : (
         <ul className="flex flex-col">
           {headsUps.map((h) => (

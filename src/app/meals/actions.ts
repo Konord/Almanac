@@ -544,7 +544,7 @@ export async function swapMeal(formData: FormData) {
   back(
     formData,
     "message",
-    `Swapped to ${result.backupName}.${movedDay ? ` ${result.originalName} moved to ${movedDay}.` : ""} Check the to-do list for anything to put away.`,
+    `Swapped to ${result.backupName}.${movedDay ? ` ${result.originalName} moved to ${movedDay}.` : ""}`,
     { swap: null, meal: null },
   );
 }
