@@ -40,6 +40,8 @@ function Toggle({ on, onClick, children, label }: { on: boolean; onClick: () => 
 
 const minutesLabel = (m: number) => (m === 0 ? "Never" : m === 60 ? "1 hour" : `${m} min`);
 
+export type ScreenSaverView = "when" | "folders";
+
 export function ScreenSaverTab({
   value,
   onChange,
@@ -47,6 +49,8 @@ export function ScreenSaverTab({
   onHere,
   mealTimes,
   art,
+  view,
+  onView: setView,
 }: {
   value: ScreenSaverSettings;
   onChange: (v: ScreenSaverSettings) => void;
@@ -54,8 +58,9 @@ export function ScreenSaverTab({
   onHere: (on: boolean) => void;
   mealTimes: { id: string; name: string }[];
   art: ArtOverview;
+  view: ScreenSaverView;
+  onView: (v: ScreenSaverView) => void;
 }) {
-  const [view, setView] = useState<"when" | "folders">("when");
   const [page, setPage] = useState(0);
   const set = (c: Partial<ScreenSaverSettings>) => onChange({ ...value, ...c });
   const meals = value.duringMeals ?? dinnerBlocks(mealTimes);
