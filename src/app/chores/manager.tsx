@@ -279,7 +279,7 @@ export function ChoreManager({
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-lg font-bold text-ink">{d.name || "Unnamed"}</span>
                     <span className="truncate text-sm font-semibold text-ink-muted">
-                      {d.is_free ? "Free day" : d.weekdays.length ? weekdaysLabel(d.weekdays) : "No days yet"} · {count === 1 ? "1 chore" : `${count} chores`}
+                      {d.is_free ? "" : d.weekdays.length ? `${weekdaysLabel(d.weekdays)} · ` : ""}{count === 1 ? "1 chore" : `${count} chores`}
                     </span>
                   </span>
                 </button>
@@ -730,7 +730,6 @@ function OccasionalPanel({
             </button>
           ))}
         </div>
-        {tab.chores.length === 0 ? <p className="py-3 text-lg text-ink-muted">Nothing comes due in {tab.label.toLowerCase()}.</p> : null}
         <ul ref={occasionalRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {shown.map(({ chore: c }) => {
             const i = info[c.id];
