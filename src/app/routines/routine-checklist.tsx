@@ -1,3 +1,4 @@
+import { Pager } from "@/components/pager";
 import Link from "next/link";
 import { Check, X } from "@phosphor-icons/react/dist/ssr";
 import { Avatar, Emoji, ProgressBar } from "@/components/ui";
@@ -99,23 +100,7 @@ export function RoutineChecklist({
         })}
       </ul>
       <div className="mt-auto flex items-center gap-2 pt-1 text-base font-bold">
-        {pages > 1 ? (
-          <>
-            {shownPage > 0 ? (
-              <Link href={hereHref(shownPage - 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
-                ‹ Back
-              </Link>
-            ) : null}
-            <span className="text-ink-muted">
-              {shownPage + 1} of {pages}
-            </span>
-            {shownPage < pages - 1 ? (
-              <Link href={hereHref(shownPage + 1)} className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
-                More ›
-              </Link>
-            ) : null}
-          </>
-        ) : null}
+        <Pager page={shownPage} pages={pages} href={hereHref} />
         {date === today && !progress.complete ? (
           <form action={endRoutine} className="ml-auto">
             <input type="hidden" name="memberId" value={member.id} />

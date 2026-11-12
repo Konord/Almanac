@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useEffect, useState, useTransition } from "react";
-import { ArrowsClockwise, CaretLeft, CaretRight, Check, Plus, Stack, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, Check, Plus, Stack, X } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import { addGrocery, clearTickedGroceries, readGroceries, tickGrocery, type GroceriesResult } from "./actions";
 import type { GroceryLine } from "./data";
@@ -122,7 +123,7 @@ export function GroceryView({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={compact ? "Add to the list" : "Add something, like birthday candles"}
+          placeholder={compact ? undefined : "Add something"}
           aria-label="Something to buy"
           maxLength={60}
           className={`h-[var(--touch-target)] min-w-0 flex-1 rounded-2xl border-2 border-frame bg-rail px-4 text-lg text-ink outline-none focus:border-accent ${compact ? "" : "max-w-[44rem]"}`}
@@ -146,19 +147,7 @@ export function GroceryView({
         <span className="text-base font-bold text-ink-muted">{lines === null ? "Getting the list…" : `${toGet} to get${got ? ` · ${got} got` : ""}`}</span>
         {note ? <span className="truncate text-base text-ink-muted">{note}</span> : null}
         <div className="flex-1" />
-        {pages.length > 1 ? (
-          <div className="flex items-center gap-2">
-            <button type="button" aria-label="Previous page" disabled={p === 0} onClick={() => setPage(p - 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-              <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-            </button>
-            <span className="text-base font-bold text-ink-muted">
-              {p + 1} of {pages.length}
-            </span>
-            <button type="button" aria-label="Next page" disabled={p >= pages.length - 1} onClick={() => setPage(p + 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-              <CaretRight size="1.25rem" weight="bold" aria-hidden />
-            </button>
-          </div>
-        ) : null}
+        <Pager page={p} pages={pages.length} onPage={setPage} />
         {compact ? null : (
           <button
             type="button"

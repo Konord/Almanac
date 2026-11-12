@@ -77,7 +77,9 @@ type Row =
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
-/** The chore bucket's rows, leaving room for its add box. */
+/** The rows that fit above an add box. */
+const ADD_ROWS = 5;
+/** The Chores box's rows, leaving room for its add box. */
 const BUCKET_ROWS = 4;
 
 export async function TodayPanel({
@@ -287,6 +289,25 @@ export async function TodayPanel({
   // The chore bucket: occasional and one-off chores the planner has put on the coming days.
   const bucket = showing === "bucket" ? await bucketRows(household, today, todos) : null;
   const choresList = lists.find((l) => l.is_chores);
+  // Where the add box puts things: the list showing, or for the Daily list
+  // the first ordinary list (dated today, so it lands on the Daily list).
+  const addListId =
+    showing === "today"
+      ? (lists.find((l) => !l.is_chores && !l.is_groceries)?.id ?? null)
+      : list && !list.is_groceries
+        ? list.id
+        : null;
+  // The heading opens the box's own screen.
+  const boxHref =
+    showing === "upnext"
+      ? "/"
+      : showing === "routines"
+        ? "/routines"
+        : showing === "bucket"
+          ? "/chores"
+          : showing === "today"
+            ? "/lists"
+            : `/lists?list=${showing}`;
 
   return (
     <aside
@@ -324,18 +345,21 @@ export async function TodayPanel({
       {/* Which box: arrows flip between the ones chosen in Settings. */}
       <div className="mt-6 flex items-center gap-2">
         {boxes.length > 1 ? arrowButton(-1) : null}
-        <h3 className="min-w-0 flex-1 truncate text-center text-2xl font-extrabold text-ink">{box.name}</h3>
+        {/* The heading opens the box's own screen (Connor, 2026-11-11). */}
+        <h3 className="min-w-0 flex-1 text-center text-2xl font-extrabold text-ink">
+          <Link href={boxHref} className="block truncate rounded-xl py-1 hover:bg-board">
+            {box.name}
+          </Link>
+        </h3>
         {boxes.length > 1 ? arrowButton(1) : null}
       </div>
       <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">
         {showing === "upnext" ? (
-          upNext.length === 0 ? (
-            <p className="py-3 text-lg text-ink-muted">
-              Nothing else on today.
-            </p>
-          ) : (
-            <ul className="flex flex-col">
-              {upNext.slice(0, ROWS).map((item, i) => (
+          upNext.length === 0 ? null : (
+            <PanelPages
+              pages={pagesOf(upNext, ROWS).map((items, p) => (
+            <ul key={p} className="flex flex-col">
+              {items.map((item, i) => (
                 <li
                   key={item.id}
                   className="flex min-h-16 items-center gap-3.5 border-b border-panel last:border-0"
@@ -360,13 +384,12 @@ export async function TodayPanel({
                 </li>
               ))}
             </ul>
+              ))}
+            />
           )
         ) : showing === "routines" ? (
-          routineRows.length === 0 ? (
-            <p className="py-3 text-lg text-ink-muted">No routines today.</p>
-          ) : (
+          routineRows.length === 0 ? null : (
             <PanelPages
-              link={{ href: "/routines", label: "Routine Manager" }}
               pages={pagesOf(routineRows, ROWS).map((rows, p) => (
                 <ul key={p} className="flex flex-col">
                   {rows.map(({ key, member, routine: r, startMin }) => (
@@ -388,9 +411,7 @@ export async function TodayPanel({
           )
         ) : showing === "bucket" && bucket ? (
           <>
-            {bucket.length === 0 ? <p className="py-3 text-lg text-ink-muted">Nothing waiting in the next two weeks.</p> : null}
             <PanelPages
-              link={{ href: "/chores", label: "Chore Manager" }}
               pages={pagesOf(bucket, BUCKET_ROWS).map((rows, p) => (
                 <ul key={p} className="flex flex-col">
                   {rows.map((row) => (
@@ -405,33 +426,16 @@ export async function TodayPanel({
                 </ul>
               ))}
             />
-            {/* Adding to the bucket adds a one-off chore to the Chores list; the planner finds it a day. */}
-            {choresList ? (
-              <form action={addTodo} className="mt-2 flex shrink-0 items-center gap-2 border-t border-panel pt-2">
-                <input type="hidden" name="listId" value={choresList.id} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <input
-                  name="title"
-                  required
-                  maxLength={120}
-                  placeholder="Add a chore"
-                  aria-label="Add a chore to the bucket"
-                  className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 font-hand text-xl text-ink outline-none focus:border-accent"
-                />
-                <button className="min-h-[var(--touch-target)] shrink-0 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board">Add</button>
-              </form>
-            ) : null}
+            {/* Adding here adds a one-off chore to the Chores list; the planner finds it a day. */}
+            {choresList ? <AddRow listId={choresList.id} returnTo={returnTo} label="Add a chore" /> : null}
           </>
         ) : groceries ? (
           <GroceryView initial={groceries} compact rows={8} />
-        ) : open.length === 0 ? (
-          <p className="py-3 text-lg text-ink-muted">
-            {showing === "today" ? "Nothing on today's list." : "Nothing on this list."}
-          </p>
         ) : (
+          <>
+          {open.length === 0 ? null : (
           <PanelPages
-            link={showing === "today" ? { href: "/lists", label: "See all lists" } : { href: `/lists?list=${showing}`, label: "Open the list" }}
-            pages={pagesOf(open, ROWS).map((rows, p) => (
+            pages={pagesOf(open, ADD_ROWS).map((rows, p) => (
               <ul key={p} className="flex flex-col">
             {rows.map((row) => {
               const colour =
@@ -499,7 +503,7 @@ export async function TodayPanel({
                       {taskTime(row.time)}
                     </span>
                   ) : row.kind === "todo" && row.todo.must_do ? (
-                    <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Must do</span>
+                    <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Essential</span>
                   ) : null}
                 </li>
               );
@@ -507,27 +511,13 @@ export async function TodayPanel({
               </ul>
             ))}
           />
+          )}
+          {/* Add straight to the list showing; the Daily list adds a to-do for today. */}
+          {addListId ? (
+            <AddRow listId={addListId} returnTo={returnTo} dueDate={showing === "today" ? today : undefined} label={showing === "today" ? "Add to the Daily list" : `Add to ${box.name}`} />
+          ) : null}
+          </>
         )}
-        {/* Paged lists have their own bottom row; Up next, groceries and empty lists get a link. */}
-        {showing === "routines" || showing === "bucket" || (showing !== "upnext" && !groceries && open.length > 0) ? null : (() => {
-          const extra =
-            showing === "upnext" ? upNext.length - ROWS : open.length - ROWS;
-          const href = showing === "upnext" ? "/" : showing === "today" ? "/lists" : `/lists?list=${showing}`;
-          return (
-            <Link
-              href={href}
-              className="mt-auto flex min-h-11 items-center text-lg font-bold text-accent"
-            >
-              {extra > 0
-                ? `+${extra} more`
-                : showing === "upnext"
-                  ? "Open the agenda"
-                  : showing === "today"
-                    ? "See all lists"
-                    : "Open the list"}
-            </Link>
-          );
-        })()}
       </div>
       </>
       )}
@@ -649,5 +639,29 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[])
 function weekdayShort(date: LocalDate, household: Household): string {
   return new Intl.DateTimeFormat(household.settings.locale, { timeZone: household.settings.timeZone, weekday: "short" }).format(
     zonedToUtc(date, "12:00", household.settings.timeZone),
+  );
+}
+
+/** The add box at the bottom of a Today panel list: a bare field and Add (Connor, 2026-11-11: no placeholder words). */
+function AddRow({ listId, returnTo, dueDate, label }: { listId: string; returnTo: string; dueDate?: LocalDate; label: string }) {
+  return (
+    <form action={addTodo} className="mt-2 flex shrink-0 items-center gap-2 border-t border-panel pt-2">
+      <input type="hidden" name="listId" value={listId} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      {dueDate ? (
+        <>
+          <input type="hidden" name="dueDate" value={dueDate} />
+          <input type="hidden" name="dateKind" value="start" />
+        </>
+      ) : null}
+      <input
+        name="title"
+        required
+        maxLength={120}
+        aria-label={label}
+        className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 font-hand text-xl text-ink outline-none focus:border-accent"
+      />
+      <button className="min-h-[var(--touch-target)] shrink-0 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board">Add</button>
+    </form>
   );
 }

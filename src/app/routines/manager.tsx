@@ -1,5 +1,6 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
@@ -749,19 +750,7 @@ export function RoutineManager({
                 })}
               </ul>
               <div className="mt-1.5 flex items-center gap-3 text-base font-bold">
-                {pages > 1 ? (
-                  <>
-                    <button type="button" disabled={page === 0} onClick={() => setStepPage(page - 1)} className="flex min-h-10 items-center rounded-xl bg-rail px-3 text-ink disabled:opacity-40">
-                      ‹ Earlier
-                    </button>
-                    <span className="text-ink-muted">
-                      Steps {page * stepsPerPage + 1}–{Math.min(steps.length, (page + 1) * stepsPerPage)} of {steps.length}
-                    </span>
-                    <button type="button" disabled={page === pages - 1} onClick={() => setStepPage(page + 1)} className="flex min-h-10 items-center rounded-xl bg-rail px-3 text-ink disabled:opacity-40">
-                      More ›
-                    </button>
-                  </>
-                ) : null}
+                <Pager page={page} pages={pages} onPage={setStepPage} />
                 <span className="ml-auto flex items-center gap-3 text-sm">
                   <span className="flex items-center gap-1.5 text-accent">
                     <ListChecks size="1rem" weight="bold" aria-hidden />
@@ -1122,19 +1111,7 @@ function AddExisting({
           </button>
         ))}
         {meals.length === 0 ? <p className="px-1 text-sm text-ink-muted">They have every meal already.</p> : null}
-        {mealPages > 1 ? (
-          <div className="flex items-center gap-2 px-1">
-            <button type="button" disabled={p === 0} onClick={() => setPage(p - 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-              ‹
-            </button>
-            <span className="text-sm font-bold text-ink-muted">
-              {p + 1} of {mealPages}
-            </span>
-            <button type="button" disabled={p === mealPages - 1} onClick={() => setPage(p + 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-              ›
-            </button>
-          </div>
-        ) : null}
+        <Pager page={p} pages={mealPages} onPage={setPage} />
       </div>
     );
   }
@@ -1167,19 +1144,7 @@ function AddExisting({
           ) : null}
         </div>
       ))}
-      {pages > 1 ? (
-        <div className="flex items-center gap-2 px-1">
-          <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-            ‹
-          </button>
-          <span className="text-sm font-bold text-ink-muted">
-            {page + 1} of {pages}
-          </span>
-          <button type="button" disabled={page === pages - 1} onClick={() => setPage(page + 1)} className="min-h-9 rounded-lg bg-rail px-2.5 text-sm font-bold disabled:opacity-40">
-            ›
-          </button>
-        </div>
-      ) : null}
+      <Pager page={page} pages={pages} onPage={setPage} />
     </div>
   );
 }
@@ -1448,19 +1413,7 @@ function PresetChooser({
           </button>
         ))}
       </div>
-      {pages > 1 ? (
-        <div className="flex shrink-0 items-center justify-center gap-3">
-          <button type="button" disabled={p === 0} onClick={() => setPage(p - 1)} className="min-h-11 rounded-xl bg-rail px-4 text-base font-bold disabled:opacity-40">
-            ‹ Earlier
-          </button>
-          <span className="text-base font-bold text-ink-muted">
-            {p + 1} of {pages}
-          </span>
-          <button type="button" disabled={p === pages - 1} onClick={() => setPage(p + 1)} className="min-h-11 rounded-xl bg-rail px-4 text-base font-bold disabled:opacity-40">
-            More ›
-          </button>
-        </div>
-      ) : null}
+      <Pager page={p} pages={pages} onPage={setPage} className="justify-center" />
     </div>
   );
 }

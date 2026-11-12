@@ -452,11 +452,7 @@ function Plate({
             </button>
           ))}
           <div className="flex-1" />
-          {pages > 1 ? (
-            <button type="button" onClick={() => setPage((p + 1) % pages)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-rail px-4 text-base font-bold text-ink">
-              Dishes {p + 1} of {pages}
-            </button>
-          ) : null}
+          <Pager page={p} pages={pages} setPage={setPage} />
         </div>
         <div className="mt-auto flex flex-col gap-2">
           <span className="text-sm font-bold tracking-wide text-ink-muted uppercase">Who&rsquo;s eating? (none picked means everyone)</span>

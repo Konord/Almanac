@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { AppWindow, CaretLeft, CaretRight, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { AppWindow, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -151,19 +152,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
             icon={UsersThree}
             tint="blue"
             aside={
-              pages > 1 ? (
-                <div className="flex items-center gap-2">
-                  <button type="button" aria-label="Previous page" disabled={p === 0} onClick={() => setPage(p - 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-                    <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-                  </button>
-                  <span className="text-base font-bold text-ink-muted">
-                    {p + 1} of {pages}
-                  </span>
-                  <button type="button" aria-label="Next page" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} className="flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30">
-                    <CaretRight size="1.25rem" weight="bold" aria-hidden />
-                  </button>
-                </div>
-              ) : null
+              <Pager page={p} pages={pages} onPage={setPage} />
             }
           >
             <ul ref={listRef} className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">

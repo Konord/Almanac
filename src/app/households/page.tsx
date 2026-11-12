@@ -1,6 +1,7 @@
+import { Pager } from "@/components/pager";
 import { Suspense } from "react";
-import { ArrowLeft, CaretLeft, CaretRight, HouseLine, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { ArrowLeft, HouseLine, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, Button, Card, Emoji, Field, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { deleteHousehold, newHousehold, switchHousehold } from "./actions";
@@ -54,15 +55,7 @@ async function HouseholdsContent({ searchParams }: { searchParams: PageProps<"/h
           icon={HouseLine}
           tint="orange"
           aside={
-            pages > 1 ? (
-              <div className="flex items-center gap-2">
-                {page > 1 ? <IconLink href={`/households?page=${page - 1}`} label="Previous households" icon={CaretLeft} /> : null}
-                <span className="text-base font-bold text-ink-muted">
-                  {page} of {pages}
-                </span>
-                {page < pages ? <IconLink href={`/households?page=${page + 1}`} label="More households" icon={CaretRight} /> : null}
-              </div>
-            ) : null
+            <Pager page={page - 1} pages={pages} href={(n) => `/households?page=${n + 1}`} />
           }
         >
           <p className="mb-4 text-lg text-ink-muted">Tap a household to switch this screen to it.</p>

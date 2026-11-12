@@ -1,8 +1,9 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Bell, CalendarCheck, Car, CaretLeft, CaretRight, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
+import { ArrowLeft, Bell, CalendarCheck, Car, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
 import { Avatar, Emoji } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -980,29 +981,5 @@ function MiniChip({ active, onClick, colour, children }: { active: boolean; onCl
 }
 
 function Pager({ page, pages, setPage }: { page: number; pages: number; setPage: (p: number) => void }) {
-  return (
-    <div className="mt-auto flex shrink-0 items-center gap-3 pt-2 text-base font-bold">
-      <button
-        type="button"
-        disabled={page === 0}
-        onClick={() => setPage(page - 1)}
-        aria-label="Back"
-        className="flex size-11 items-center justify-center rounded-xl bg-rail text-ink disabled:opacity-30"
-      >
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      <button
-        type="button"
-        disabled={page >= pages - 1}
-        onClick={() => setPage(page + 1)}
-        aria-label="More"
-        className="flex size-11 items-center justify-center rounded-xl bg-rail text-ink disabled:opacity-30"
-      >
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={setPage} className="mt-auto pt-2" />;
 }

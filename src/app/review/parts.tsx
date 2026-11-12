@@ -1,5 +1,6 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import type { ReactNode } from "react";
 import { X } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
@@ -59,17 +60,7 @@ export function CloseButton({ onClick }: { onClick: () => void }) {
 
 /** "1 of 3" with a next button, for anything that would otherwise scroll. */
 export function Pager({ page, pages, setPage }: { page: number; pages: number; setPage: (p: number) => void }) {
-  if (pages <= 1) return null;
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-base font-bold text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" onClick={() => setPage((page + 1) % pages)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel">
-        More
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={setPage} />;
 }
 
 /** A big square choice with a picture, as in the meal picker. */

@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { CaretLeft, CaretRight, Plus, Trash } from "@phosphor-icons/react";
+import { Plus, Trash } from "@phosphor-icons/react";
 import { EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -266,21 +267,7 @@ function SmallButton({ onClick, active = false, children }: { onClick: () => voi
 }
 
 function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="ml-auto flex shrink-0 items-center gap-2">
-      <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 0} aria-label="Previous page" className={arrow}>
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-base font-bold text-ink-muted tabular-nums">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pages - 1} aria-label="Next page" className={arrow}>
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={onPage} className="ml-auto" />;
 }
 
 /** The public holidays not added yet, a page at a time; tap one to add it. */

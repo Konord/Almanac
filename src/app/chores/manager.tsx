@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, CalendarCheck, CaretLeft, CaretRight, Minus, Plus, Trash, X } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, CalendarCheck, Minus, Plus, Trash, X } from "@phosphor-icons/react";
 import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -1195,21 +1196,7 @@ function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean
 }
 
 function MiniPager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="flex shrink-0 items-center gap-2">
-      <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 0} aria-label="Previous page" className={arrow}>
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-base font-bold text-ink-muted tabular-nums">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pages - 1} aria-label="Next page" className={arrow}>
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={onPage} />;
 }
 
 function MonthDay({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {

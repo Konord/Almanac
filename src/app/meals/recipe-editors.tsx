@@ -1,8 +1,9 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useState } from "react";
 import { useFitRows } from "@/components/use-fit-rows";
-import { CaretLeft, CaretRight, Plus, Trash, X } from "@phosphor-icons/react";
+import { Plus, Trash, X } from "@phosphor-icons/react";
 import { helperText, spotHelpers, type Helper } from "@/lib/meal-helpers";
 
 /*
@@ -12,21 +13,7 @@ import { helperText, spotHelpers, type Helper } from "@/lib/meal-helpers";
  */
 
 function PageArrows({ page, pages, setPage }: { page: number; pages: number; setPage: (n: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="flex items-center gap-3">
-      <button type="button" aria-label="Previous page" className={arrow} disabled={page === 0} onClick={() => setPage(page - 1)}>
-        <CaretLeft size="1.5rem" weight="bold" aria-hidden />
-      </button>
-      <span className="text-lg font-bold text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" aria-label="Next page" className={arrow} disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>
-        <CaretRight size="1.5rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <Pager page={page} pages={pages} onPage={setPage} />;
 }
 
 // ---------------------------------------------------------------------------

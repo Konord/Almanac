@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager as PageArrows } from "@/components/pager";
 import { useState } from "react";
-import { ArrowsLeftRight, CaretLeft, CaretRight, Check, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
+import { ArrowsLeftRight, Check, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
 import { EmptyState, Emoji, Notice, ScreenHeader, Segmented } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -39,21 +40,7 @@ function asLike(m: ManagerMeal): MenuMealLike {
 }
 
 function Arrows({ page, pages, setPage }: { page: number; pages: number; setPage: (n: number) => void }) {
-  if (pages <= 1) return null;
-  const arrow = "flex size-12 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
-  return (
-    <div className="flex shrink-0 items-center justify-center gap-3">
-      <button type="button" aria-label="Previous page" disabled={page === 0} onClick={() => setPage(page - 1)} className={arrow}>
-        <CaretLeft size="1.25rem" weight="bold" aria-hidden />
-      </button>
-      <span className="min-w-16 text-center text-base font-bold text-ink-muted">
-        {page + 1} of {pages}
-      </span>
-      <button type="button" aria-label="Next page" disabled={page >= pages - 1} onClick={() => setPage(page + 1)} className={arrow}>
-        <CaretRight size="1.25rem" weight="bold" aria-hidden />
-      </button>
-    </div>
-  );
+  return <PageArrows page={page} pages={pages} onPage={setPage} />;
 }
 
 function paged<T>(items: T[], page: number, per: number) {

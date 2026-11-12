@@ -1,7 +1,8 @@
 "use client";
 
+import { Pager } from "@/components/pager";
 import { useEffect, useRef, useState } from "react";
-import { CaretLeft, CaretRight, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { MagnifyingGlass, X } from "@phosphor-icons/react";
 import { EMOJI_GROUPS, emojiImage, emojiPage, eventEmoji, searchEmoji, suggestEmoji, type EmojiChoice } from "@/lib/emoji";
 
 /** How many pictures fit on one page without scrolling (6 rows of 7). */
@@ -202,29 +203,7 @@ export function EmojiPicker({
               )}
             </button>
             {pages > 1 ? (
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.max(shownPage - 1, 0))}
-                  disabled={shownPage === 0}
-                  aria-label="Previous page"
-                  className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink disabled:opacity-40"
-                >
-                  <CaretLeft size="1.5rem" weight="bold" aria-hidden />
-                </button>
-                <span className="min-w-[4.5rem] text-center text-lg font-bold text-ink" aria-live="polite">
-                  {shownPage + 1} of {pages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage(Math.min(shownPage + 1, pages - 1))}
-                  disabled={shownPage === pages - 1}
-                  aria-label="Next page"
-                  className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink disabled:opacity-40"
-                >
-                  <CaretRight size="1.5rem" weight="bold" aria-hidden />
-                </button>
-              </div>
+              <Pager page={shownPage} pages={pages} onPage={setPage} className="ml-auto" />
             ) : null}
           </div>
         </div>
