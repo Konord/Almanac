@@ -177,11 +177,7 @@ export function MenuTray({ section }: { section: Section }) {
 
         {tier === 2 ? (
           <section aria-label="Apps" className="flex w-full flex-col gap-2 pb-3">
-            {apps.length === 0 ? (
-              <p className="px-2 py-4 text-lg text-ink-muted">
-                No apps yet. Add them in <Link href="/household?tab=apps" className="font-bold text-accent">Settings › Apps</Link>.
-              </p>
-            ) : (
+            {apps.length === 0 ? null : (
               <ul className="flex justify-center gap-4">
                 {apps.map((app) => (
                   <li key={app.id}>

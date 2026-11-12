@@ -34,7 +34,7 @@ export function DraggableMeal({
   className: string;
   /** Left, width and the like (top and height come from the drag). */
   style: CSSProperties;
-  title: string;
+  title?: string;
   children: ReactNode;
 }) {
   const router = useRouter();

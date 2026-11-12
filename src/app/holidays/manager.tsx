@@ -220,9 +220,9 @@ export function HolidayManager({
               }}
             />
           ) : tab === "holidays" ? (
-            <EmptyState emoji="🎉" title="Tap a holiday to change it" />
+            <EmptyState emoji="🎉" />
           ) : (
-            <EmptyState emoji="🎂" title="Tap a birthday to change it" hint="Add a birth year and the calendar shows how old they turn." />
+            <EmptyState emoji="🎂" />
           )}
         </section>
       </div>

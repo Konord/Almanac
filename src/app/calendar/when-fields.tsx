@@ -153,7 +153,6 @@ export function WhenFields({
               type="button"
               onClick={() => changeLength(point ? 60 : 0)}
               aria-pressed={point}
-              title="A time with no length, like Homework due 9am"
               className={`flex min-h-[var(--touch-target)] w-fit items-center rounded-full border-2 px-4 text-lg text-ink ${
                 point ? "border-ink bg-rail font-bold" : "border-frame bg-board"
               }`}
@@ -182,7 +181,6 @@ export function LengthInput({ initial }: { initial: number }) {
         type="button"
         onClick={() => setMinutes(point ? 60 : 0)}
         aria-pressed={point}
-        title="A time with no length, like Homework due 9am"
         className={`flex min-h-[var(--touch-target)] items-center rounded-full border-2 px-4 text-lg text-ink ${
           point ? "border-ink bg-rail font-bold" : "border-frame bg-board"
         }`}

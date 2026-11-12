@@ -125,7 +125,7 @@ export function AppsTab({ apps, onChange }: { apps: AppDraft[]; onChange: (apps:
             }}
           />
         ) : (
-          <EmptyState emoji="🕹️" title="Tap an app to change it" hint="Or add one: Jellyfin, Actual, Steam…" />
+          <EmptyState emoji="🕹️" />
         )}
       </Card>
     </div>

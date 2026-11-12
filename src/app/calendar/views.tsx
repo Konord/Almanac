@@ -673,7 +673,6 @@ export function WeekView({
                 <Link
                   href={adding ? adding.addHref(day, { allday: "1" }) : href({ add: day, allday: "1", edit: null, panel: null })}
                   scroll={false}
-                  title="Add an all-day event on this day"
                   className="flex h-12.5 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-xl pl-2.5 text-2xl font-bold whitespace-nowrap text-ink hover:bg-rail lg:text-3xl"
                 >
                   {weekdayLabel(day, household)}
@@ -843,7 +842,6 @@ function WeekMealBlock({ meal, first, last, household, day }: { meal: WeekMeal; 
       minutes={Math.max(20, meal.endMin - meal.startMin)}
       first={first}
       last={last}
-      title={`${meal.name}, ${time}. Tap to start cooking, or drag to move this day's meal.`}
       className={look}
       style={{ left: "4px", width: "calc(100% - 8px)" }}
     >
@@ -937,7 +935,6 @@ export function MonthView({
             className={`flex h-9 min-w-9 items-center justify-center rounded-full px-1.5 text-xl font-bold whitespace-nowrap ${
               day === today ? "bg-now text-white" : inMonth ? "text-ink" : "text-ink-muted"
             }`}
-            title="Open this week"
           >
             {label}
           </Link>

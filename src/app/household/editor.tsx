@@ -193,7 +193,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                 }}
               />
             ) : (
-              <EmptyState emoji="👋" title="Tap someone to change them" hint="Or add someone new." />
+              <EmptyState emoji="👋" />
             )}
           </Card>
         </div>

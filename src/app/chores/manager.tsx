@@ -763,7 +763,6 @@ function OccasionalPanel({
                     onClick={() => plus(c.id)}
                     disabled={busy !== null}
                     aria-label={`Put ${c.name} on today's list`}
-                    title="Do it today"
                     className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ink text-board disabled:opacity-40"
                   >
                     <Plus size="1.375rem" weight="bold" aria-hidden />
@@ -801,7 +800,7 @@ function OccasionalPanel({
           timeZone={timeZone}
         />
       ) : (
-        <EmptyState emoji="🧹" title="Tap a chore to change it" hint={<>Tap <b>+</b> to add it to today&rsquo;s list.</>} />
+        <EmptyState emoji="🧹" />
       )}
     </div>
   );

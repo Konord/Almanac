@@ -108,7 +108,7 @@ export function RoutineChecklist({
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="returnTo" value={returnTo} />
             {ended ? <input type="hidden" name="reopen" value="true" /> : null}
-            <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink" title={ended ? "Carry on with it" : "Finish it now; anything unticked counts as missed"}>
+            <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
               {ended ? "Reopen" : "End"}
             </button>
           </form>

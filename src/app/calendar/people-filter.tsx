@@ -20,7 +20,6 @@ export function PeopleButton({ members, shown, href }: { members: Member[]; show
     <Link
       href={href}
       scroll={false}
-      title="Whose things this screen shows"
       className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel"
     >
       {people.length === 0 ? (

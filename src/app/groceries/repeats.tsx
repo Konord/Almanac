@@ -117,7 +117,6 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
               disabled={pending}
               onClick={() => start(async () => take(await removeRepeat(r.id)))}
               aria-label={`Stop ${r.name} repeating`}
-              title="Stop repeating"
               className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-danger"
             >
               <X size="1.125rem" weight="bold" aria-hidden />

@@ -329,7 +329,7 @@ export function MenuManager({
               }}
             />
           ) : (
-            <EmptyState emoji="🍽️" title="Pick a meal to change its dishes" />
+            <EmptyState emoji="🍽️" />
           )}
         </section>
       </div>

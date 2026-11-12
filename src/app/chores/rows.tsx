@@ -89,7 +89,6 @@ export function ChoreRow({
         {hidden}
         <button
           className="min-h-[var(--touch-target)] rounded-2xl px-3.5 text-base font-bold text-ink-muted hover:bg-rail"
-          title="Not today. It finds another day."
         >
           Skip
         </button>
@@ -149,7 +148,6 @@ export function RoundRow({
         <input type="hidden" name="returnTo" value={returnTo} />
         <button
           aria-label="Take it back"
-          title="Take it back"
           className="flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-rail"
         >
           <ArrowCounterClockwise size="1.5rem" aria-hidden />
@@ -223,7 +221,7 @@ export function TodoRow({
         )}
       </span>
       {planned !== undefined && !done ? (
-        <span className={`shrink-0 text-sm font-bold ${planned ? "text-ink-muted" : "text-now"}`} title="The day the chore planner picked">
+        <span className={`shrink-0 text-sm font-bold ${planned ? "text-ink-muted" : "text-now"}`}>
           {planned ? dayLabel(planned, today, household) : "No room yet"}
         </span>
       ) : null}
@@ -238,7 +236,6 @@ export function TodoRow({
           <input type="hidden" name="returnTo" value={returnTo} />
           <button
             className="flex min-h-11 items-center gap-1.5 rounded-full bg-rail px-3 text-sm font-bold text-ink"
-            title="Put this on today's list"
           >
             <SunHorizon size="1.125rem" aria-hidden />
             Do today

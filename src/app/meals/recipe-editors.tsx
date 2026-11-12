@@ -47,7 +47,7 @@ export function IngredientsEditor({ rows, setRows }: { rows: IngredientDraft[]; 
         <span>Unit</span>
         <span>Ingredient</span>
         <span>Note</span>
-        <span title="Fresh things to put away if the meal is swapped">Put away if swapped</span>
+        <span>Put away if swapped</span>
         <span />
       </div>
       <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
