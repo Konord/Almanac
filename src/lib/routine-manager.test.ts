@@ -26,7 +26,7 @@ const routine = {
 };
 const draft = (changes: Partial<ManagerDraft> = {}): ManagerDraft => ({
   routines: [routine],
-  steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit: true, member_ids: [], daily_list: false }],
+  steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit_since: null, member_ids: [], daily_list: false }],
   uses: [],
   meals: [{ id: "dinner", name: "Dinner", icon: null, usual_time: "18:00", minutes: 30, presets: [null, null, "c:tacos", null, null, null, null] }],
   mealUses: [],
@@ -38,7 +38,7 @@ test("drafts are checked before saving", () => {
   assert.match(draftProblem(draft({ routines: [{ ...routine, name: " " }] })) ?? "", /needs a name/);
   assert.match(draftProblem(draft({ routines: [{ ...routine, anchor: "clock" }] })) ?? "", /Choose a time/);
   assert.match(draftProblem(draft({ routines: [{ ...routine, usual_minutes: Number.NaN }] })) ?? "", /between 5 and 240/);
-  assert.match(draftProblem(draft({ steps: [{ id: "x", routine_id: "new-1", text: "", icon: null, habit: true, member_ids: [], daily_list: false }] })) ?? "", /step is empty/);
+  assert.match(draftProblem(draft({ steps: [{ id: "x", routine_id: "new-1", text: "", icon: null, habit_since: null, member_ids: [], daily_list: false }] })) ?? "", /step is empty/);
 });
 
 test("meal blocks are checked too", () => {
@@ -54,7 +54,7 @@ test("a step's people are only ones who still have the routine", () => {
     { id: "u1", routine_id: "new-1", member_id: "ava", day_type_id: "weekday" },
     { id: "u2", routine_id: "new-1", member_id: "mom", day_type_id: "weekday" },
   ];
-  const step = { id: "s", routine_id: "new-1", text: "Clear the table", icon: null, habit: true, member_ids: ["ava", "ben"], daily_list: false };
+  const step = { id: "s", routine_id: "new-1", text: "Clear the table", icon: null, habit_since: null, member_ids: ["ava", "ben"], daily_list: false };
   assert.deepEqual(stepPeople({ uses }, step), ["ava"]);
   assert.equal(draftProblem(draft({ uses, steps: [step] })), null);
   // Ava and Ben both gone: nobody does it, so it must be fixed before saving.
@@ -95,7 +95,7 @@ test("neighbouring columns at the same time share one bubble", () => {
 test("templates are copies, and never on anyone's day", () => {
   let n = 0;
   const id = () => `new-c${(n += 1)}`;
-  const shared = { ...draft({ uses: [{ id: "u0", routine_id: "new-1", member_id: "ava", day_type_id: "d" }] }), steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit: true, member_ids: ["ava"], daily_list: true }] };
+  const shared = { ...draft({ uses: [{ id: "u0", routine_id: "new-1", member_id: "ava", day_type_id: "d" }] }), steps: [{ id: "new-2", routine_id: "new-1", text: "Brush teeth", icon: null, habit_since: null, member_ids: ["ava"], daily_list: true }] };
   const copy = copyRoutine(shared, "new-1", id, true);
   assert.ok(copy);
   assert.equal(copy.routine.is_template, true);

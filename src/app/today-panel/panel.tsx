@@ -28,6 +28,9 @@ import { panelBoxes, stepBox } from "@/lib/panel-boxes";
 import { addTodo, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
 import { shortClockTime } from "@/lib/time-text";
+import { HabitsBox } from "./habits-box";
+import { HealthBox } from "./health-box";
+import { loadHealthLogs, loadTrackers } from "../habits/health-data";
 
 /**
  * The Today panel: a column on the left of the calendar with three parts.
@@ -303,6 +306,10 @@ export async function TodayPanel({
       ? "/"
       : showing === "routines"
         ? "/routines"
+        : showing === "habits"
+          ? "/habits"
+          : showing === "health"
+            ? "/habits/health"
         : showing === "bucket"
           ? "/chores"
           : showing === "today"
@@ -429,6 +436,10 @@ export async function TodayPanel({
             {/* Adding here adds a one-off chore to the Chores list; the planner finds it a day. */}
             {choresList ? <AddRow listId={choresList.id} returnTo={returnTo} label="Add a chore" /> : null}
           </>
+        ) : showing === "habits" ? (
+          <HabitsBox today={today} returnTo={returnTo} />
+        ) : showing === "health" ? (
+          <HealthPanelBox household={household} today={today} />
         ) : groceries ? (
           <GroceryView initial={groceries} compact rows={8} />
         ) : (
@@ -663,5 +674,25 @@ function AddRow({ listId, returnTo, dueDate, label }: { listId: string; returnTo
       />
       <button className="min-h-[var(--touch-target)] shrink-0 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board">Add</button>
     </form>
+  );
+}
+
+/** The Health box: trackers and the last two days of entries, for logging. */
+async function HealthPanelBox({ household, today }: { household: Household; today: LocalDate }) {
+  const { locale, timeZone } = household.settings;
+  const now = new Date();
+  const { trackers, members } = await loadTrackers();
+  if (trackers.length === 0) return null;
+  const logs = await loadHealthLogs(zonedToUtc(addDays(today, -2), "00:00", timeZone), new Date(now.getTime() + 60_000));
+  return (
+    <HealthBox
+      trackers={trackers}
+      members={members}
+      logs={logs}
+      now={now.toISOString()}
+      dayStart={zonedToUtc(today, "00:00", timeZone).toISOString()}
+      locale={locale}
+      timeZone={timeZone}
+    />
   );
 }

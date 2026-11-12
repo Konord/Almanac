@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/database.types";
 import { isLocalTime } from "@/lib/time";
+import { BOX_ID } from "@/lib/panel-boxes";
 
 /**
  * Household settings live in the database (households.settings), not in
@@ -19,6 +20,8 @@ export type HouseholdSettings = {
   weekStartsOn: 0 | 1;
   /** What "Month" shows: a rolling 5 weeks from this week, or the calendar month (5 rows). */
   monthStyle: "rolling" | "calendar";
+  /** How the Habits page draws habits: a row of days per habit, or one person's rings. */
+  habitsView: "lines" | "rings";
   activeTheme: string;
   /** Show family-written things (to-dos, meals, notes) in handwriting. */
   handwriting: boolean;
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   currency: "CAD",
   weekStartsOn: 0,
   monthStyle: "rolling",
+  habitsView: "lines",
   activeTheme: "bright",
   handwriting: true,
   defaultEventMinutes: 60,
@@ -68,6 +72,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     currency: pick("currency", (v) => typeof v === "string" && /^[A-Z]{3}$/.test(v)),
     weekStartsOn: pick("weekStartsOn", (v) => v === 0 || v === 1),
     monthStyle: pick("monthStyle", (v) => v === "rolling" || v === "calendar"),
+    habitsView: pick("habitsView", (v) => v === "lines" || v === "rings"),
     activeTheme: pick("activeTheme", (v) => typeof v === "string" && v.length > 0),
     handwriting: pick("handwriting", (v) => typeof v === "boolean"),
     defaultEventMinutes: pick("defaultEventMinutes", (v) => typeof v === "number" && Number.isInteger(v) && v >= 5 && v <= 24 * 60),
@@ -77,7 +82,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
       const r = v as { weekday?: unknown; time?: unknown };
       return typeof r.weekday === "number" && Number.isInteger(r.weekday) && r.weekday >= 0 && r.weekday <= 6 && typeof r.time === "string" && isLocalTime(r.time);
     }),
-    panelBoxes: pick("panelBoxes", (v) => Array.isArray(v) && v.length <= 40 && v.every((x) => typeof x === "string" && /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(x))),
+    panelBoxes: pick("panelBoxes", (v) => Array.isArray(v) && v.length <= 40 && v.every((x) => typeof x === "string" && BOX_ID.test(x))),
   };
 }
 

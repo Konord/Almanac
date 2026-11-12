@@ -144,7 +144,7 @@ export async function saveRoutineManager(draft: ManagerDraft): Promise<SaveResul
   for (const s of draft.steps) {
     const at = position.get(s.routine_id) ?? 0;
     position.set(s.routine_id, at + 1);
-    const row = { text: s.text.trim(), icon: s.icon || null, habit: s.habit, daily_list: s.daily_list, position: at, target_time: null };
+    const row = { text: s.text.trim(), icon: s.icon || null, habit_since: s.habit_since, daily_list: s.daily_list, position: at, target_time: null };
     let id = s.id;
     if (isNewId(s.id)) {
       const { data, error } = await supabase

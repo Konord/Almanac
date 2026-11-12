@@ -439,6 +439,90 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"habit_logs": {
+                  Row: {
+                    "amount": number,"habit_id": string,"household_id": string,"id": string,"log_date": string,"member_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"habit_id": string,"household_id": string,"id"?: string,"log_date": string,"member_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"habit_id"?: string,"household_id"?: string,"id"?: string,"log_date"?: string,"member_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "habit_logs_habit_id_household_id_fkey"
+      columns: ["habit_id","household_id"]
+isOneToOne: false
+      referencedRelation: "habits"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "habit_logs_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "habit_logs_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"habit_members": {
+                  Row: {
+                    "habit_id": string,"household_id": string,"member_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "habit_id": string,"household_id": string,"member_id": string
+                  }
+                  Update: {
+                    "habit_id"?: string,"household_id"?: string,"member_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "habit_members_habit_id_household_id_fkey"
+      columns: ["habit_id","household_id"]
+isOneToOne: false
+      referencedRelation: "habits"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "habit_members_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "habit_members_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"habits": {
+                  Row: {
+                    "created_at": string,"frequency": string,"goal": number,"household_id": string,"icon": string | null,"id": string,"measure": string,"name": string,"since": string,"sort_order": number,"step": number,"times": number,"unit": string | null,"updated_at": string,"weekdays": (number)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"frequency"?: string,"goal"?: number,"household_id": string,"icon"?: string | null,"id"?: string,"measure"?: string,"name": string,"since"?: string,"sort_order"?: number,"step"?: number,"times"?: number,"unit"?: string | null,"updated_at"?: string,"weekdays"?: (number)[]
+                  }
+                  Update: {
+                    "created_at"?: string,"frequency"?: string,"goal"?: number,"household_id"?: string,"icon"?: string | null,"id"?: string,"measure"?: string,"name"?: string,"since"?: string,"sort_order"?: number,"step"?: number,"times"?: number,"unit"?: string | null,"updated_at"?: string,"weekdays"?: (number)[]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "habits_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"heads_ups": {
                   Row: {
                     "assignee_id": string | null,"chore_id": string | null,"created_at": string,"day_kind": string | null,"event_id": string | null,"household_id": string,"id": string,"label": string,"last_grocery_for": string | null,"makes": string,"minutes_before": number,"sort_order": number,"updated_at": string
@@ -471,6 +555,154 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     },{
       foreignKeyName: "heads_ups_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"health_choice_amounts": {
+                  Row: {
+                    "amount": string,"choice_id": string,"household_id": string,"member_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": string,"choice_id": string,"household_id": string,"member_id": string
+                  }
+                  Update: {
+                    "amount"?: string,"choice_id"?: string,"household_id"?: string,"member_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "health_choice_amounts_choice_id_household_id_fkey"
+      columns: ["choice_id","household_id"]
+isOneToOne: false
+      referencedRelation: "health_choices"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "health_choice_amounts_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "health_choice_amounts_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"health_choices": {
+                  Row: {
+                    "created_at": string,"household_id": string,"icon": string | null,"id": string,"max_per_day": number | null,"name": string,"sort_order": number,"tracker_id": string,"updated_at": string,"wait_minutes": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"max_per_day"?: number | null,"name": string,"sort_order"?: number,"tracker_id": string,"updated_at"?: string,"wait_minutes"?: number | null
+                  }
+                  Update: {
+                    "created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"max_per_day"?: number | null,"name"?: string,"sort_order"?: number,"tracker_id"?: string,"updated_at"?: string,"wait_minutes"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "health_choices_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "health_choices_tracker_id_household_id_fkey"
+      columns: ["tracker_id","household_id"]
+isOneToOne: false
+      referencedRelation: "health_trackers"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"health_logs": {
+                  Row: {
+                    "amount": string | null,"choice_id": string | null,"choice_name": string | null,"created_at": string,"household_id": string,"id": string,"logged_at": string,"member_id": string,"note": string | null,"tracker_id": string,"updated_at": string,"value": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount"?: string | null,"choice_id"?: string | null,"choice_name"?: string | null,"created_at"?: string,"household_id": string,"id"?: string,"logged_at"?: string,"member_id": string,"note"?: string | null,"tracker_id": string,"updated_at"?: string,"value"?: number | null
+                  }
+                  Update: {
+                    "amount"?: string | null,"choice_id"?: string | null,"choice_name"?: string | null,"created_at"?: string,"household_id"?: string,"id"?: string,"logged_at"?: string,"member_id"?: string,"note"?: string | null,"tracker_id"?: string,"updated_at"?: string,"value"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "health_logs_choice_id_fkey"
+      columns: ["choice_id"]
+isOneToOne: false
+      referencedRelation: "health_choices"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "health_logs_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "health_logs_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "health_logs_tracker_id_household_id_fkey"
+      columns: ["tracker_id","household_id"]
+isOneToOne: false
+      referencedRelation: "health_trackers"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"health_tracker_members": {
+                  Row: {
+                    "household_id": string,"member_id": string,"tracker_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "household_id": string,"member_id": string,"tracker_id": string
+                  }
+                  Update: {
+                    "household_id"?: string,"member_id"?: string,"tracker_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "health_tracker_members_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "health_tracker_members_member_id_household_id_fkey"
+      columns: ["member_id","household_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","household_id"]
+    },{
+      foreignKeyName: "health_tracker_members_tracker_id_household_id_fkey"
+      columns: ["tracker_id","household_id"]
+isOneToOne: false
+      referencedRelation: "health_trackers"
+      referencedColumns: ["id","household_id"]
+    }
+                  ]
+                },"health_trackers": {
+                  Row: {
+                    "alert_above": number | null,"created_at": string,"household_id": string,"icon": string | null,"id": string,"kind": string,"name": string,"sort_order": number,"unit": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "alert_above"?: number | null,"created_at"?: string,"household_id": string,"icon"?: string | null,"id"?: string,"kind": string,"name": string,"sort_order"?: number,"unit"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "alert_above"?: number | null,"created_at"?: string,"household_id"?: string,"icon"?: string | null,"id"?: string,"kind"?: string,"name"?: string,"sort_order"?: number,"unit"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "health_trackers_household_id_fkey"
       columns: ["household_id"]
 isOneToOne: false
       referencedRelation: "households"
@@ -1279,14 +1511,14 @@ isOneToOne: false
                   ]
                 },"routine_steps": {
                   Row: {
-                    "created_at": string,"daily_list": boolean,"essential": boolean,"habit": boolean,"household_id": string,"icon": string | null,"id": string,"position": number,"target_time": string | null,"template_id": string,"text": string,"updated_at": string
+                    "created_at": string,"daily_list": boolean,"essential": boolean,"habit_since": string | null,"household_id": string,"icon": string | null,"id": string,"position": number,"target_time": string | null,"template_id": string,"text": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"daily_list"?: boolean,"essential"?: boolean,"habit"?: boolean,"household_id": string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id": string,"text": string,"updated_at"?: string
+                    "created_at"?: string,"daily_list"?: boolean,"essential"?: boolean,"habit_since"?: string | null,"household_id": string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id": string,"text": string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"daily_list"?: boolean,"essential"?: boolean,"habit"?: boolean,"household_id"?: string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id"?: string,"text"?: string,"updated_at"?: string
+                    "created_at"?: string,"daily_list"?: boolean,"essential"?: boolean,"habit_since"?: string | null,"household_id"?: string,"icon"?: string | null,"id"?: string,"position"?: number,"target_time"?: string | null,"template_id"?: string,"text"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {

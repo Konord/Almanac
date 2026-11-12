@@ -23,6 +23,11 @@
   --color-now: var(--color-now, #e5533d);
   --color-meal: var(--color-meal, #fbedb5);
   --color-meal-ink: var(--color-meal-ink, #5e4806);
+  --color-met: var(--color-met, #3d8b37);
+  --color-met-soft: var(--color-met-soft, #d8f0d2);
+  --color-missed: var(--color-missed, #d9533f);
+  --color-missed-soft: var(--color-missed-soft, #f2a79a);
+  --color-alert-soft: var(--color-alert-soft, #fdece8);
 
   /* Fonts: one clear sans for everything, handwriting for family-written things. */
   --font-sans: "Figtree Variable", "Figtree", system-ui, sans-serif;

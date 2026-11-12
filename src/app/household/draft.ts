@@ -1,4 +1,5 @@
 import { appsProblem, type AppDraft } from "../../lib/launcher.ts";
+import { BOX_ID } from "../../lib/panel-boxes.ts";
 
 /*
  * The Settings screen keeps every change here until its one Save (Connor,
@@ -28,6 +29,7 @@ export type SettingsDraft = {
   currency: string;
   weekStartsOn: 0 | 1;
   monthStyle: "rolling" | "calendar";
+  habitsView: "lines" | "rings";
   units: "metric" | "imperial";
   temperatureUnit: "celsius" | "fahrenheit";
   measures: "canadian" | "us";
@@ -49,7 +51,7 @@ export function draftProblem(d: SettingsDraft): string | null {
   if (!(Number.isInteger(d.reviewWeekday) && d.reviewWeekday >= 0 && d.reviewWeekday <= 6) || !/^\d{2}:\d{2}$/.test(d.reviewTime)) {
     return "Pick a day and a time for the Planner.";
   }
-  if (!d.panelBoxes.every((v) => /^(today|upnext|routines|bucket|[0-9a-f-]{36})$/.test(v))) return "Something went wrong with the Today panel boxes.";
+  if (!d.panelBoxes.every((v) => BOX_ID.test(v))) return "Something went wrong with the Today panel boxes.";
   for (const m of d.members) {
     if (m.removed) continue;
     if (!m.name.trim()) return "Everyone needs a name.";

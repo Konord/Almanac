@@ -8,6 +8,7 @@ const base: SettingsDraft = {
   currency: "CAD",
   weekStartsOn: 0,
   monthStyle: "rolling",
+  habitsView: "lines",
   units: "metric",
   temperatureUnit: "celsius",
   measures: "canadian",

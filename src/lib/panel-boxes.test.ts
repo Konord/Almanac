@@ -11,7 +11,7 @@ const lists = [
 test("by default every box shows except the Chores list", () => {
   assert.deepEqual(
     panelBoxes(null, lists, false).map((b) => b.id),
-    ["today", "upnext", "todo", "groc", "routines", "bucket"],
+    ["today", "upnext", "todo", "groc", "routines", "habits", "health", "bucket"],
   );
 });
 

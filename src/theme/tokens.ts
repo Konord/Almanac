@@ -42,6 +42,14 @@ export type ThemeTokens = {
     /** Meal chips and the dinner card */
     meal: string;
     mealInk: string;
+    /** Habits: a met day (green tick), and the short bars on a count chart */
+    met: string;
+    metSoft: string;
+    /** Habits: a missed day (red cross), and bars short of the goal */
+    missed: string;
+    missedSoft: string;
+    /** Health: the shaded band on a reading above its line (a fever) */
+    alertSoft: string;
     /** One strong + one pastel colour per person (see src/lib/colours.ts) */
     personBlue: string;
     personBlueSoft: string;
@@ -93,6 +101,11 @@ export const brightTheme: Theme = {
       now: "#E5533D",
       meal: "#FBEDB5",
       mealInk: "#5E4806",
+      met: "#3D8B37",
+      metSoft: "#D8F0D2",
+      missed: "#D9533F",
+      missedSoft: "#F2A79A",
+      alertSoft: "#FDECE8",
       personBlue: "#2F74C0",
       personBlueSoft: "#CFE3F8",
       personPink: "#CC4A78",

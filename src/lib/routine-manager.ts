@@ -37,7 +37,8 @@ export type DraftStep = {
   routine_id: string;
   text: string;
   icon: string | null;
-  habit: boolean;
+  /** When this step started being tracked as a habit; null when it isn't. */
+  habit_since: string | null;
   /** Who does this step. Empty: everyone who has the routine. */
   member_ids: string[];
   /** Also shows on the daily list in the Today panel. */
@@ -196,7 +197,7 @@ export function copyRoutine(
   const id = newId();
   return {
     routine: { ...from, id, is_template: asTemplate, habit_since: asTemplate ? null : from.habit_since },
-    steps: draft.steps.filter((s) => s.routine_id === routineId).map((s) => ({ ...s, id: newId(), routine_id: id, member_ids: [] })),
+    steps: draft.steps.filter((s) => s.routine_id === routineId).map((s) => ({ ...s, id: newId(), routine_id: id, member_ids: [], habit_since: asTemplate ? null : s.habit_since })),
   };
 }
 

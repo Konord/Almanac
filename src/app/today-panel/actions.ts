@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
+import { BOX_ID } from "@/lib/panel-boxes";
 import { PANEL_OPEN_COOKIE, PANEL_TAB_COOKIE } from "./prefs";
 
 /**
@@ -37,7 +38,7 @@ export async function pickPanelTab(formData: FormData) {
   await requireHousehold();
   const tab = String(formData.get("tab") ?? "");
   const store = await cookies();
-  if (/^(upnext|today|routines|bucket|[0-9a-f-]{36})$/.test(tab)) {
+  if (BOX_ID.test(tab)) {
     store.set(PANEL_TAB_COOKIE, tab, {
       path: "/",
       maxAge: YEAR,

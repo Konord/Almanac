@@ -42,8 +42,8 @@ export type RoutineStep = {
   position: number;
   target_time: string | null;
   essential: boolean;
-  /** Tracked as a habit when the routine is tracked. */
-  habit: boolean;
+  /** When this step started being tracked as a habit on its own; null when it isn't. */
+  habit_since: string | null;
   /** Also shows on the daily list in the Today panel. */
   daily_list: boolean;
   /** Who does this step. Empty: everyone who has the routine. */
@@ -85,7 +85,7 @@ export async function loadRoutines(date: LocalDate): Promise<RoutineData> {
       .order("name"),
     supabase
       .from("routine_steps")
-      .select("id, template_id, text, icon, position, target_time, essential, habit, daily_list, routine_step_members (member_id)")
+      .select("id, template_id, text, icon, position, target_time, essential, habit_since, daily_list, routine_step_members (member_id)")
       .order("position"),
     supabase.from("routine_assignments").select("id, template_id, member_id, day_type_id, on_date, active").order("created_at"),
     supabase.from("routine_checks").select("member_id, step_id").eq("check_date", date),

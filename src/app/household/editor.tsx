@@ -246,6 +246,7 @@ export function SettingsEditor({ initial, boxes }: { initial: SettingsDraft; box
                 <div className="grid grid-cols-2 gap-4">
                   <Choice label="Week starts on" value={draft.weekStartsOn} onChange={(weekStartsOn) => set({ weekStartsOn })} options={[{ value: 0, label: "Sunday" }, { value: 1, label: "Monday" }]} />
                   <Choice label="Month shows" value={draft.monthStyle} onChange={(monthStyle) => set({ monthStyle })} options={[{ value: "rolling", label: "Next 5 weeks" }, { value: "calendar", label: "The month" }]} />
+                  <Choice label="Habits show as" value={draft.habitsView} onChange={(habitsView) => set({ habitsView })} options={[{ value: "lines", label: "Lines" }, { value: "rings", label: "Rings" }]} />
                 </div>
                 <div className="flex items-end gap-4">
                   <div className="min-w-0 flex-1">
