@@ -35,11 +35,11 @@ export async function saveMenu(changes: MenuChanges, kindChanges: KindChanges = 
       continue;
     }
     const name = kind.name.trim().replace(/\s+/g, " ").slice(0, 40);
-    if (!name) return { ok: false, error: "Every kind of meal needs a name, like Tacos." };
+    if (!name) return { ok: false, error: "Give it a name, like Tacos." };
     const row = { name, icon: kind.icon && kind.icon.length <= 16 ? kind.icon : null };
     if (isNew(id)) {
       const { data, error } = await supabase.from("meal_categories").insert({ ...row, household_id: household.id, sort_order: 100 }).select("id").single();
-      if (error) return { ok: false, error: error.message.includes("meal_categories") ? `There's already a kind called ${name}.` : error.message };
+      if (error) return { ok: false, error: error.message.includes("meal_categories") ? `There's already a ${name}.` : error.message };
       ids[id] = data.id;
     } else {
       const { error } = await supabase.from("meal_categories").update(row).eq("id", id);

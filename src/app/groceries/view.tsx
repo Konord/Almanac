@@ -238,7 +238,6 @@ export function GroceryView({
             </div>
           ))}
           {openLine.parts.length > 6 ? <span className="text-base text-ink-muted">and {openLine.parts.length - 6} more</span> : null}
-          <span className="text-sm text-ink-muted">Take a meal off the menu and this goes down by itself.</span>
         </div>
       ) : null}
     </div>

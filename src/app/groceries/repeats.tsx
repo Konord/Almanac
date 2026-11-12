@@ -67,7 +67,6 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
           <X size="1.125rem" weight="bold" aria-hidden />
         </button>
       </div>
-      <p className="text-base text-ink-muted">These go on the list by themselves when they come round.</p>
       <form
         className="flex items-center gap-2"
         onSubmit={(e) => {

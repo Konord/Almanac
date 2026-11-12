@@ -12,7 +12,7 @@ export const FIXED_BOXES = {
   today: "Daily list",
   upnext: "Up next",
   routines: "Routines",
-  bucket: "Chore bucket",
+  bucket: "Chores",
 } as const;
 
 type ListLike = { id: string; name: string; is_chores: boolean };
@@ -22,7 +22,8 @@ export function allBoxes(lists: ListLike[]): PanelBox[] {
   return [
     { id: "today", name: FIXED_BOXES.today },
     { id: "upnext", name: FIXED_BOXES.upnext },
-    ...lists.map((l) => ({ id: l.id, name: l.name })),
+    // The Chores list isn't a box of its own: the Chores box shows it (Connor, 2026-11-11: one "Chores").
+    ...lists.filter((l) => !l.is_chores).map((l) => ({ id: l.id, name: l.name })),
     { id: "routines", name: FIXED_BOXES.routines },
     { id: "bucket", name: FIXED_BOXES.bucket },
   ];
