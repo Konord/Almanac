@@ -3,6 +3,7 @@ import { dayFor } from "@/lib/day-types";
 import {
   combineDays,
   datesBetween,
+  dayMet,
   habitDay,
   habitPeriods,
   habitStats,
@@ -36,7 +37,8 @@ import { loadBreaks, loadEventDays, loadRoutines, type RoutineMember } from "../
 
 export type HabitMember = Pick<RoutineMember, "id" | "name" | "colour" | "icon">;
 
-export type HabitCell = { day: HabitDay | "future"; amount: number };
+/** "blank": a day of a week or month habit that wasn't done (no one day is missed). */
+export type HabitCell = { day: HabitDay | "future" | "blank"; amount: number };
 
 export type HabitRowData = {
   /** "r:<routine>:<person>", "s:<step name>:<person>" or "h:<habit>:<person>". */
@@ -170,10 +172,13 @@ export async function loadHabitRows(from: LocalDate, to: LocalDate, today: Local
       const key = habitKey("h", h.id, link.member_id);
       if (!member || !keep(key)) continue;
       const amount = (date: LocalDate) => amountOf.get(`${h.id}:${member.id}:${date}`) ?? 0;
-      const cells = new Map<LocalDate, HabitCell>(
-        shown.map((date) => [date, { day: date > today ? "future" : ruleDay(rule, date, amount(date), today), amount: amount(date) }]),
-      );
       const periodic = rule.frequency === "week" || rule.frequency === "month";
+      const dayOf = (date: LocalDate): HabitCell["day"] => {
+        if (date > today) return "future";
+        if (!periodic) return ruleDay(rule, date, amount(date), today);
+        return dayMet(rule, amount(date)) ? "done" : date === today ? "open" : date < rule.since ? "off" : "blank";
+      };
+      const cells = new Map<LocalDate, HabitCell>(shown.map((date) => [date, { day: dayOf(date), amount: amount(date) }]));
       const allPeriods = periodic ? habitPeriods(rule, start, end, amount, today) : [];
       rows.push({
         key,

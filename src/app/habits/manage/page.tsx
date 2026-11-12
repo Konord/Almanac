@@ -96,7 +96,7 @@ async function Manager({ searchParams }: { searchParams: PageProps<"/habits/mana
     g.routines = g.templates.size;
     steps.set(k, g);
   }
-  fromRoutines.push(...[...steps.values()].map(({ templates: _t, ...rest }) => rest));
+  fromRoutines.push(...[...steps.values()].map((g) => ({ key: g.key, name: g.name, icon: g.icon, people: g.people, routines: g.routines })));
 
   return (
     <HabitManager
