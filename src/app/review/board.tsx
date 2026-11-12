@@ -10,6 +10,7 @@ import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved
 import { eventEmoji } from "@/lib/emoji";
 import { mainDish } from "@/lib/menu";
 import { addDays } from "@/lib/time";
+import { newId } from "@/lib/ids";
 import { useFitRows } from "@/components/use-fit-rows";
 import {
   addChoreDay,
@@ -137,7 +138,9 @@ export function ReviewBoard({
     const r = main ? dish.get(main) : undefined;
     const c = m.categoryId ? category.get(m.categoryId) : undefined;
     return {
-      title: r?.name ?? c?.name ?? mm?.name ?? blockName,
+      title: r?.name ?? c?.name ?? mm?.name ?? m.name ?? blockName,
+      // Nothing picked yet: the tile stays dashed (Connor, 2026-11-12).
+      picked: Boolean(r || c || mm),
       icon: r?.icon ?? c?.icon ?? mm?.icon ?? "🍽️",
     };
   };
@@ -211,20 +214,36 @@ export function ReviewBoard({
     });
   };
 
-  /** The + beside Meals: pick a meal block, then the meal picker opens on it. */
-  const addMeal = (col: ReviewColumn) =>
-    setPicker({
-      title: `Add a meal on ${col.name}`,
-      options: data.mealTimes.map((t) => ({
-        key: t.id,
-        label: t.name,
-        icon: t.icon ?? "🍽️",
-        pick: () => {
-          setPicker(null);
-          setMealAt({ mealId: null, date: col.date, mealTimeId: t.id });
-        },
-      })),
-    });
+  /**
+   * The + beside Meals adds a new meal tile on the day, named there and then
+   * ("Snack"), Connor 2026-11-12. It sits in the day's last meal block for
+   * its time (drag it on the calendar to move it); tap it to pick the meal.
+   */
+  const [naming, setNaming] = useState<string | null>(null);
+  const addMeal = (col: ReviewColumn) => {
+    const slots = slotsOn(col.date);
+    const time = slots.at(-1)?.time ?? data.mealTimes.at(-1);
+    if (!time) return;
+    const eaters = blocksOn(data.mealTimeUses, draft.dayTypes[col.date] ?? {}).get(time.id) ?? [];
+    const meal: DraftMeal = {
+      id: `new-${newId()}`,
+      date: col.date,
+      mealTimeId: time.id,
+      categoryId: null,
+      menuMealId: null,
+      dishes: [],
+      memberIds: storedEaters(eaters, data.members.map((m) => m.id)),
+      name: "",
+    };
+    change((d) => setMeal(d, meal.id, meal));
+    setNaming(meal.id);
+  };
+  /** Done naming a new tile: keep the name, or take the tile off if it has none. */
+  const nameMeal = (m: DraftMeal, name: string) => {
+    setNaming(null);
+    const clean = name.trim().slice(0, 60);
+    change((d) => setMeal(d, m.id, clean ? { ...m, name: clean } : null));
+  };
 
   const addChore = (col: ReviewColumn) =>
     setPicker({
@@ -257,7 +276,7 @@ export function ReviewBoard({
       meal,
       date: mealAt.date,
       mealTimeId: mealAt.mealTimeId,
-      where: `${time?.name ?? "Meal"} · ${col?.label ?? ""}`,
+      where: `${meal?.name || time?.name || "Meal"} · ${col?.label ?? ""}`,
       eaters: storedEaters(eaters, data.members.map((m) => m.id)),
     };
   })();
@@ -306,9 +325,10 @@ export function ReviewBoard({
           const groups = groupsOn(col.date);
           const chores = choresOn(col.date);
           const slots = slotsOn(col.date);
-          const tiles = slots.reduce((n, s) => n + Math.max(1, s.meals.length), 0);
-          // Two tiles or fewer get the big look (picture over the name); more sit in rows.
-          const big = tiles <= 2;
+          // A block whose only meals are named extras ("Snack") still shows its own tile.
+          const tiles = slots.reduce((n, s) => n + s.meals.length + (s.meals.some((m) => !m.name) ? 0 : 1), 0);
+          // Three tiles or fewer get the big look (picture over the name); more sit in rows.
+          const big = tiles <= 3;
           const can = !col.past;
           return (
             <section
@@ -369,9 +389,10 @@ export function ReviewBoard({
                 {/* Meals: one tile per meal block; dashed only while nothing is picked. */}
                 <SectionTitle title="Meals" onAdd={can ? () => addMeal(col) : undefined} addLabel={`Add a meal on ${col.name}`} />
                 <div className="flex min-h-0 shrink flex-col gap-1.5">
-                  {slots.flatMap(({ time, meals }) =>
-                    meals.length === 0
-                      ? [
+                  {slots.flatMap(({ time, meals }) => [
+                    ...(meals.some((m) => !m.name)
+                      ? []
+                      : [
                           <button
                             key={time.id}
                             type="button"
@@ -384,9 +405,13 @@ export function ReviewBoard({
                             <Emoji emoji={time.icon ?? "🍽️"} className={`${big ? "size-14" : "size-9"} opacity-60`} />
                             <span className="min-w-0 truncate">{time.name}</span>
                           </button>,
-                        ]
-                      : meals.map((m) => {
+                        ]),
+                    ...meals.map((m) => {
                           const look = mealLook(m, time.name);
+                          if (naming === m.id)
+                            return (
+                              <NameTile key={m.id} big={big} onDone={(name) => nameMeal(m, name)} />
+                            );
                           return (
                             <button
                               key={m.id}
@@ -394,9 +419,15 @@ export function ReviewBoard({
                               disabled={!can}
                               onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
                               title={`${time.name}: ${look.title}`}
-                              className={`relative flex min-h-12 min-w-0 shrink rounded-[1.375rem] border-2 bg-meal px-2.5 font-extrabold text-meal-ink ${
+                              className={`relative flex min-h-12 min-w-0 shrink rounded-[1.375rem] border-2 px-2.5 font-extrabold ${look.picked ? "bg-meal text-meal-ink" : ""} ${
                                 big ? "basis-[8.5rem] flex-col items-center justify-center gap-1 text-center text-xl" : "basis-[4rem] items-center gap-2.5 text-left text-lg"
-                              } ${mealChanged(m.id) ? "border-accent" : "border-[color-mix(in_srgb,var(--color-meal-ink)_16%,var(--color-meal))]"}`}
+                              } ${
+                                !look.picked
+                                  ? `border-dashed ${mealChanged(m.id) ? "border-accent" : "border-[color-mix(in_srgb,var(--color-meal-ink)_32%,var(--color-meal))]"} text-[color-mix(in_srgb,var(--color-meal-ink)_72%,white)]`
+                                  : mealChanged(m.id)
+                                    ? "border-accent"
+                                    : "border-[color-mix(in_srgb,var(--color-meal-ink)_16%,var(--color-meal))]"
+                              }`}
                             >
                               {m.memberIds.length > 0 ? (
                                 <span className={`flex ${big ? "absolute top-2 right-2" : "order-last ml-auto"}`}>
@@ -412,7 +443,7 @@ export function ReviewBoard({
                             </button>
                           );
                         }),
-                  )}
+                  ])}
                 </div>
 
                 {/* Chores: the chore days on this day. */}
@@ -509,7 +540,7 @@ function Plans({ plans, moreHref }: { plans: ReviewColumn["events"]; moreHref: s
   const [ref, fit] = useFitRows<HTMLUListElement>(4);
   const shown = plans.length > fit ? plans.slice(0, Math.max(0, fit - 1)) : plans;
   return (
-    <ul ref={ref} className="flex min-h-10 flex-1 flex-col gap-0.5 overflow-hidden">
+    <ul ref={ref} className="flex min-h-[7.5rem] flex-1 flex-col gap-0.5 overflow-hidden">
       {shown.map((e) => (
         <li key={e.id} className="flex min-h-9 min-w-0 shrink-0 items-center gap-2 px-1 text-base font-bold text-ink">
           <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
@@ -537,6 +568,31 @@ function Row({ children, onClick, changed = false, muted = false }: { children: 
     </button>
   ) : (
     <span className={className}>{children}</span>
+  );
+}
+
+/** A new meal tile being named: type its name, then Done (or Enter). */
+function NameTile({ big, onDone }: { big: boolean; onDone: (name: string) => void }) {
+  const [name, setName] = useState("");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onDone(name);
+      }}
+      className={`flex min-h-12 min-w-0 shrink flex-col justify-center gap-1.5 rounded-[1.375rem] border-2 border-dashed border-accent p-2 ${big ? "basis-[8.5rem]" : "basis-[4rem]"}`}
+    >
+      <input
+        autoFocus
+        value={name}
+        maxLength={60}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => onDone(name)}
+        placeholder="Name it"
+        aria-label="Meal name"
+        className="min-h-11 w-full min-w-0 rounded-xl border-2 border-frame bg-board px-2.5 text-lg font-extrabold text-ink outline-none focus:border-accent"
+      />
+    </form>
   );
 }
 

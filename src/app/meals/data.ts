@@ -74,6 +74,8 @@ export type Meal = {
   dishes: MealDish[];
   /** Moved on the calendar for this day only ("18:30"); null: the block's usual time. */
   eat_at: string | null;
+  /** Its own name, for an extra meal added on the Planner ("Snack"). */
+  name?: string | null;
 };
 /** "Tuesday dinner is Tacos": a kind of meal, or one meal, on a weekday of a meal block. */
 export type Preset = { id: string; weekday: number; meal_time_id: string; category_id: string | null; menu_meal_id: string | null };
@@ -170,7 +172,7 @@ export async function loadMeals(from: LocalDate, to: LocalDate): Promise<Meal[]>
   const { data, error } = await supabase
     .from("meals")
     .select(
-      "id, date, meal_time_id, category_id, recipe_id, servings, status, swapped_for_id, from_preset, sort_order, cook_id, menu_meal_id, eat_at, meal_members(member_id), menu_meals(name, icon), meal_dishes(id, position, kind_id, recipe_id, batches, spot_position)",
+      "id, date, meal_time_id, category_id, recipe_id, servings, status, swapped_for_id, from_preset, sort_order, cook_id, menu_meal_id, eat_at, name, meal_members(member_id), menu_meals(name, icon), meal_dishes(id, position, kind_id, recipe_id, batches, spot_position)",
     )
     .gte("date", from)
     .lte("date", to)
@@ -194,6 +196,7 @@ export async function loadMeals(from: LocalDate, to: LocalDate): Promise<Meal[]>
     menu_icon: (m.menu_meals as { icon: string | null } | null)?.icon ?? null,
     dishes: (m.meal_dishes ?? []).toSorted((a, b) => a.position - b.position),
     eat_at: m.eat_at ? m.eat_at.slice(0, 5) : null,
+    name: m.name,
   }));
 }
 
@@ -269,8 +272,8 @@ export async function energyModes(from: LocalDate, days: number): Promise<Map<Lo
 /** What a meal is called: the menu meal's own name, else its first dish, else its kind while it's undecided. */
 export function mealName(meal: Meal, recipes: Map<string, Recipe>, categories: Map<string, MealCategory>): string {
   if (meal.menu_name) return meal.menu_name;
-  if (meal.recipe_id) return recipes.get(meal.recipe_id)?.name ?? "Meal";
-  return categories.get(meal.category_id ?? "")?.name ?? "Meal";
+  if (meal.recipe_id) return recipes.get(meal.recipe_id)?.name ?? meal.name ?? "Meal";
+  return categories.get(meal.category_id ?? "")?.name ?? meal.name ?? "Meal";
 }
 
 /** Its picture: the menu meal's, the first dish's, else the category's. */

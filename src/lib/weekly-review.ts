@@ -59,6 +59,8 @@ export type DraftMeal = {
   dishes: DraftDish[];
   /** Who it's for; empty means everyone. */
   memberIds: string[];
+  /** Its own name, for an extra meal added with the + ("Snack"). */
+  name?: string | null;
 };
 
 /** A meal added on the review, not yet saved. */

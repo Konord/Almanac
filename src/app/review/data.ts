@@ -229,6 +229,7 @@ export async function loadReview(household: Household, week: LocalDate, today: L
         menuMealId: m.menu_meal_id,
         dishes: m.dishes.map((d) => ({ kindId: d.kind_id, recipeId: d.recipe_id, batches: d.batches, spot: d.spot_position })),
         memberIds: m.member_ids,
+        ...(m.name ? { name: m.name } : {}),
       })),
     hardChores: schedule.chores.filter((c) => schedule.hard.has(c.id)).map((c) => ({ id: c.id, name: c.name })),
     chorePlan: schedule.input,
