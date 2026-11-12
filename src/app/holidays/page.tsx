@@ -4,6 +4,7 @@ import { requireHousehold } from "@/lib/household";
 import { localDateOf } from "@/lib/time";
 import { loadHolidays } from "./data";
 import { HolidayManager } from "./manager";
+import { listArt } from "@/lib/art-folder";
 
 /**
  * Holidays and birthdays (2026-11-09): special all-day days that come back
@@ -23,12 +24,13 @@ export default function HolidaysPage() {
 async function Holidays() {
   const household = await requireHousehold();
   const { locale, timeZone } = household.settings;
-  const initial = await loadHolidays();
+  const [initial, art] = await Promise.all([loadHolidays(), listArt()]);
   return (
     <HolidayManager
       initial={initial}
       today={localDateOf(new Date(), timeZone)}
       locale={locale}
+      art={art.root && !art.problem ? art.folders : null}
     />
   );
 }

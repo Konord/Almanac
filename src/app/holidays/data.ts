@@ -6,7 +6,7 @@ import type { LocalDate } from "@/lib/time";
 export async function loadHolidays(): Promise<{ holidays: Holiday[]; birthdays: Birthday[] }> {
   const supabase = await createClient();
   const [h, b] = await Promise.all([
-    supabase.from("holidays").select("id, name, icon, rule, public_key").order("sort_order").order("name"),
+    supabase.from("holidays").select("id, name, icon, rule, public_key, art_only_days, art_mix_days").order("sort_order").order("name"),
     supabase.from("birthdays").select("id, name, icon, month, day, birth_year").order("month").order("day"),
   ]);
   if (h.error) throw h.error;

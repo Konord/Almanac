@@ -21,7 +21,8 @@ export type HolidayRule =
   /** Days from Easter Sunday (Good Friday is -2). */
   | { kind: "easter"; offset: number };
 
-export type Holiday = { id: string; name: string; icon: string | null; rule: HolidayRule; public_key: string | null };
+/** art_only_days and art_mix_days: the art screen saver's days before the holiday (src/lib/screen-saver.ts). */
+export type Holiday = { id: string; name: string; icon: string | null; rule: HolidayRule; public_key: string | null; art_only_days: number; art_mix_days: number };
 export type Birthday = { id: string; name: string; icon: string | null; month: number; day: number; birth_year: number | null };
 
 /** One holiday or birthday on one date. */

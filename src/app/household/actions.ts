@@ -7,6 +7,7 @@ import { isLocalTime } from "@/lib/time";
 import { isPersonColour } from "@/lib/colours";
 import { panelBoxes } from "@/lib/panel-boxes";
 import { cleanAddress } from "@/lib/launcher";
+import { parseScreenSaver } from "@/lib/screen-saver";
 import { draftProblem, isNewId, type SettingsDraft } from "./draft";
 
 /*
@@ -50,6 +51,7 @@ export async function saveHousehold(draft: SettingsDraft): Promise<Result> {
     handwriting: Boolean(draft.handwriting),
     weeklyReview: { weekday: draft.reviewWeekday, time: draft.reviewTime },
     panelBoxes: boxesChanged ? draft.panelBoxes : household.settings.panelBoxes,
+    screenSaver: parseScreenSaver(draft.screenSaver),
   };
   const name = draft.name.trim().slice(0, 80);
   if (name !== household.name || JSON.stringify(settings) !== JSON.stringify({ ...DEFAULT_SETTINGS, ...household.settings })) {

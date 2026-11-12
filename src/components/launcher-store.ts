@@ -19,7 +19,7 @@ export type HelperProgram = { key: string; name: string };
 
 type State = {
   /** Null until the first look; false when there's no helper here. */
-  helper: false | null | { programs: HelperProgram[] };
+  helper: false | null | { programs: HelperProgram[]; open: string | null };
   apps: LauncherApp[];
   locale: string;
   timeZone: string;
@@ -51,7 +51,8 @@ async function findHelper(): Promise<State["helper"]> {
             (p): p is HelperProgram => !!p && typeof (p as HelperProgram).key === "string" && typeof (p as HelperProgram).name === "string",
           ) as HelperProgram[])
         : [];
-    return { programs };
+    const open = body && typeof body === "object" && typeof (body as { open?: unknown }).open === "string" ? (body as { open: string }).open : null;
+    return { programs, open };
   } catch {
     return false;
   }

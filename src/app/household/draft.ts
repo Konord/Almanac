@@ -1,5 +1,6 @@
 import { appsProblem, type AppDraft } from "../../lib/launcher.ts";
 import { BOX_ID } from "../../lib/panel-boxes.ts";
+import { screenSaverProblem, type ScreenSaverSettings } from "../../lib/screen-saver.ts";
 
 /*
  * The Settings screen keeps every change here until its one Save (Connor,
@@ -40,6 +41,8 @@ export type SettingsDraft = {
   members: MemberDraft[];
   /** The kitchen screen's apps (Apps tab), in tray order. */
   apps: AppDraft[];
+  /** The art screen saver (Screen saver tab). */
+  screenSaver: ScreenSaverSettings;
 };
 
 export const isNewId = (id: string) => id.startsWith("new-");
@@ -64,5 +67,5 @@ export function draftProblem(d: SettingsDraft): string | null {
       if (m.pin !== m.pinAgain) return `${m.name}'s two PINs don't match.`;
     }
   }
-  return appsProblem(d.apps);
+  return appsProblem(d.apps) ?? screenSaverProblem(d.screenSaver);
 }

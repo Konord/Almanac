@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { isHolidayRule, type Birthday, type Holiday } from "@/lib/holidays";
+import { cleanArtDays } from "@/lib/screen-saver";
 
 /** Everything on the Holidays and birthdays screen, saved with its one Save. */
 export type HolidayDraft = { holidays: Holiday[]; birthdays: Birthday[] };
@@ -51,7 +52,8 @@ export async function saveHolidays(draft: HolidayDraft): Promise<{ ok: true } | 
 
   // Add the new ones and save the rest.
   for (const [i, h] of draft.holidays.entries()) {
-    const row = { name: h.name.trim(), icon: h.icon || null, rule: h.rule, public_key: h.public_key, sort_order: i };
+    const art = cleanArtDays(h.art_only_days, h.art_mix_days);
+    const row = { name: h.name.trim(), icon: h.icon || null, rule: h.rule, public_key: h.public_key, sort_order: i, art_only_days: art.only, art_mix_days: art.mix };
     const { error } = h.id.startsWith(NEW)
       ? await supabase.from("holidays").insert({ ...row, household_id: household.id })
       : await supabase.from("holidays").update(row).eq("id", h.id);

@@ -37,8 +37,8 @@ test("birthdays show with the age they turn", () => {
 });
 
 test("a range over New Year finds both years", () => {
-  const xmas = { id: "x", name: "Christmas", icon: "🎄", rule: rule("christmas"), public_key: "christmas" };
-  const ny = { id: "n", name: "New Year", icon: null, rule: rule("new-year"), public_key: "new-year" };
+  const xmas = { id: "x", name: "Christmas", icon: "🎄", rule: rule("christmas"), public_key: "christmas", art_only_days: 0, art_mix_days: 14 };
+  const ny = { id: "n", name: "New Year", icon: null, rule: rule("new-year"), public_key: "new-year", art_only_days: 0, art_mix_days: 14 };
   const days = specialDays([xmas, ny], [], "2026-12-20", "2027-01-05");
   assert.deepEqual(days.map((d) => d.date), ["2026-12-25", "2027-01-01"]);
 });

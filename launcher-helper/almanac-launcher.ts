@@ -12,7 +12,8 @@
  *   Only a finger on the touchscreen shows it (a controller, mouse or
  *   keyboard don't), and it hides again after a few seconds. Tapping it
  *   closes the app and brings Almanac back;
- * - brings Almanac back by itself when an app is closed the normal way.
+ * - brings Almanac back by itself when an app is closed the normal way;
+ * - turns the screen off overnight when the art screen saver asks (xset).
  *
  * Run it with: node almanac-launcher.ts [path/to/launcher.config.json]
  * (Node 22.18 or newer runs TypeScript files directly.)
@@ -249,6 +250,16 @@ const server = createServer(async (req, res) => {
     } catch (e) {
       return send(res, 500, cors, `Couldn't open ${plan.label}: ${(e as Error).message}`);
     }
+  }
+  if (req.method === "POST" && path === "/screen") {
+    // The art screen saver's "Screen off" overnight: the monitor sleeps (DPMS)
+    // and wakes when touched or when Almanac asks. Never while an app is open.
+    const body = await readBody(req);
+    const on = Boolean(body && typeof body === "object" && (body as { on?: unknown }).on === true);
+    if (!on && current) return send(res, 409, cors, "An app is open.");
+    fireAndForget(on ? ["xset", "dpms", "force", "on"] : ["sh", "-c", "xset +dpms && xset dpms force off"]);
+    log(on ? "Screen on" : "Screen off for the night");
+    return send(res, 200, cors, { ok: true });
   }
   if (req.method === "POST" && path === "/home") {
     goHome();
