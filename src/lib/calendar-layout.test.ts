@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addMonths, dayOfWeek, fiveRowMonth, layoutBars, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
+import { addMonths, dayOfWeek, firstOfMonth, fiveRowMonth, layoutBars, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
 
 test("finds the day of the week", () => {
   assert.equal(dayOfWeek("2026-11-04"), 3); // Wednesday
@@ -48,6 +48,15 @@ test("adding months clamps to the end of shorter months", () => {
   assert.equal(addMonths("2026-01-31", 1), "2026-02-28");
   assert.equal(addMonths("2026-12-15", 1), "2027-01-15");
   assert.equal(addMonths("2026-03-31", -1), "2026-02-28");
+});
+
+test("the rolling view's arrows jump to the 1st of a month", () => {
+  assert.equal(firstOfMonth("2026-11-12", 1), "2026-12-01");
+  assert.equal(firstOfMonth("2026-12-01", 1), "2027-01-01");
+  assert.equal(firstOfMonth("2026-11-12", -1), "2026-10-01");
+  assert.equal(firstOfMonth("2026-01-31", 1), "2026-02-01");
+  // The 1st is always in the top row of the rolling 5 weeks.
+  assert.equal(rollingWeekDays(firstOfMonth("2026-11-12", 1), 1).slice(0, 7).includes("2026-12-01"), true);
 });
 
 test("events that don't overlap each get the full width", () => {

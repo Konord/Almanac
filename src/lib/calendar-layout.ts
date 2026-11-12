@@ -77,6 +77,15 @@ export function addMonths(date: LocalDate, months: number): LocalDate {
   return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/**
+ * The 1st of the month `months` away. The rolling 5 weeks steps with this, so
+ * the first press of an arrow puts the 1st of the next (or last) month in the
+ * top row, and each press after moves a whole month.
+ */
+export function firstOfMonth(date: LocalDate, months = 0): LocalDate {
+  return `${addMonths(date, months).slice(0, 8)}01`;
+}
+
 export type TimedBlock = { id: string; startMin: number; endMin: number };
 export type PlacedBlock = TimedBlock & { lane: number; lanes: number };
 

@@ -6,7 +6,7 @@ import { HeaderClock } from "@/components/header-clock";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
-import { addMonths, dayOfWeek, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
+import { addMonths, dayOfWeek, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
@@ -130,9 +130,11 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Open the edit card on the side away from the event, so it stays in view.
   const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
   const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
-  // Week and the rolling 5 weeks move a week at a time; the calendar month moves a month.
-  const byMonth = view === "month" && !rolling;
-  const step = (n: number) => (byMonth ? addMonths(anchor, n) : addDays(anchor, 7 * n));
+  // Week moves a week at a time. Month moves a month: the calendar month keeps
+  // the day, and the rolling 5 weeks jumps to the 1st so it sits in the top row.
+  const byMonth = view === "month";
+  const step = (n: number) =>
+    view === "week" ? addDays(anchor, 7 * n) : rolling ? firstOfMonth(anchor, n) : addMonths(anchor, n);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
 
