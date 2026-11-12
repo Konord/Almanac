@@ -437,7 +437,7 @@ function EditEventPanel({
         />
       </form>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Button form="edit-event">{event.recurrence_rule ? "Save every date" : "Save"}</Button>
+        <Button form="edit-event" variant="save">Save</Button>
         <Button form="edit-event" formAction={saveEventAsTemplate} variant="secondary">
           Save as a template
         </Button>
@@ -737,7 +737,7 @@ function TemplateCard({
         </Field>
       </form>
       <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Button form="edit-template">Save</Button>
+        <Button form="edit-template" variant="save">Save</Button>
         <CloseLink href={backHref} />
         <form action={removeTemplate} className="ml-auto">
           <input type="hidden" name="id" value={template.id} />

@@ -254,9 +254,11 @@ export function Button({
   variant = "primary",
   className = "",
   ...props
-}: ComponentProps<"button"> & { variant?: "primary" | "secondary" | "danger" }) {
+}: ComponentProps<"button"> & { variant?: "primary" | "secondary" | "danger" | "save" }) {
   const look = {
     primary: "bg-ink text-board",
+    // The blue of the screen-wide Save (unsaved-changes.tsx), so every Save looks the same.
+    save: "bg-accent text-white",
     secondary: "bg-rail text-ink hover:bg-panel",
     danger: "border-2 border-danger bg-board text-danger",
   }[variant];

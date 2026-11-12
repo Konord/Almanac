@@ -62,7 +62,7 @@ export function PartsEditor({ recipeId, name, icon, initial, returnTo }: { recip
           Part
         </button>
         <p className="text-lg text-ink-muted">Using the meal counts each part down. Below &quot;keep at least&quot;, it&apos;s suggested for the grocery list.</p>
-        <button className="ml-auto inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-6 text-lg font-bold text-board">Save</button>
+        <button className="ml-auto inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-accent px-6 text-lg font-bold text-white">Save</button>
       </div>
     </form>
   );

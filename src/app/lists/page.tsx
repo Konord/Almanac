@@ -248,7 +248,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
             <TodoFields members={members} lists={lists.filter((l) => !l.is_chores && !l.is_groceries)} choreDays={choreDays} todo={editing} showList chore={editing.is_chore} />
           </form>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button form="edit-todo">Save</Button>
+            <Button form="edit-todo" variant="save">Save</Button>
             <form action={removeTodo} className="ml-auto">
               <input type="hidden" name="id" value={editing.id} />
               <input type="hidden" name="returnTo" value={returnTo} />
@@ -265,7 +265,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
             <input type="hidden" name="returnTo" value={returnTo} />
             <ListFields name={list.name} icon={list.icon} />
             <div className="sm:col-span-2">
-              <Button>Save list</Button>
+              <Button variant="save">Save</Button>
             </div>
           </form>
           {list.is_groceries ? (

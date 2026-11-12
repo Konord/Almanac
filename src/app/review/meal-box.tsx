@@ -713,7 +713,7 @@ function SaveAsMeal({
           Not now
         </button>
         <button type="button" disabled={!name.trim() || pending} onClick={save} className="min-h-[var(--touch-target)] flex-1 rounded-2xl bg-accent text-lg font-bold text-board disabled:opacity-50">
-          {pending ? "Saving…" : "Save meal"}
+          {pending ? "Saving…" : "Save"}
         </button>
       </div>
     </div>
