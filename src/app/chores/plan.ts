@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { isChoreTag, placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan } from "@/lib/chore-days";
+import { isChoreTag, placeable, planChoreDays, stretchStart, type ChoreDay, type ChoreDayMove, type ChorePlan, type OneOffChore, type PlannableChore } from "@/lib/chore-days";
 import { spreadSlack } from "@/lib/chores";
 import type { Household } from "@/lib/household";
 import { addDays, type LocalDate } from "@/lib/time";
@@ -30,6 +30,20 @@ export type ChoreSchedule = {
   plan: ChorePlan;
   /** Chores that are hard to schedule: no chore day takes them, or no room this week. */
   hard: Set<string>;
+  /** What the plan was made from, so the Planner can plan again as things are moved (plain data, no Sets). */
+  input: PlanInput;
+};
+
+/** The generator's input as plain data, plus each one-off's name and picture. */
+export type PlanInput = {
+  today: LocalDate;
+  choreDays: ChoreDay[];
+  chores: PlannableChore[];
+  oneOffs: (OneOffChore & { title: string; icon: string | null })[];
+  away: LocalDate[];
+  keptToday: string[];
+  moves: ChoreDayMove[];
+  errandDates: LocalDate[];
 };
 
 /** Days marked away (a break marked "away") from today through the plan. */
@@ -90,12 +104,15 @@ export async function choreSchedule(household: Household, today: LocalDate, time
   const chorePending = open.filter((t) => t.template_id);
   // One-offs: undated or placed on an earlier day (back in the bucket), or already on today.
   const oneOffs = open.filter((t) => !t.template_id && !t.heads_up_id && (t.due_date === null || t.due_date <= today));
+  // One-offs put off to a later day (on the Planner) wait for it.
+  const later = open.filter((t) => !t.template_id && !t.heads_up_id && t.due_date !== null && t.due_date > today);
   const keptToday = new Set([
     ...chorePending.filter((t) => t.due_date === today).map((t) => t.template_id as string),
     ...oneOffs.filter((t) => t.due_date === today).map((t) => t.id),
   ]);
 
-  const plan = planChoreDays({
+  const input: PlanInput = {
+    today,
     choreDays,
     chores: chores.map((c) => ({
       id: c.id,
@@ -108,17 +125,20 @@ export async function choreSchedule(household: Household, today: LocalDate, time
       active: c.active,
       slackDays: c.kind === "generated" ? spreadSlack(c) : 0,
     })),
-    oneOffs: oneOffs.map((t) => ({
+    oneOffs: [...oneOffs, ...later].map((t) => ({
       id: t.id,
       chore_day_id: t.chore_day_id,
       tags: t.tags.filter(isChoreTag),
+      not_before: t.due_date !== null && t.due_date > today ? t.due_date : null,
+      title: t.title ?? "Chore",
+      icon: t.icon,
     })),
-    today,
-    away,
-    keptToday,
+    away: [...away],
+    keptToday: [...keptToday],
     moves,
-    errandDates,
-  });
+    errandDates: [...errandDates],
+  };
+  const plan = planChoreDays({ ...input, away, keptToday, errandDates });
 
   const hard = new Set(plan.unplaced);
   for (const c of chores) if (c.active && !placeable(choreDays, c.chore_day_ids)) hard.add(c.id);
@@ -133,7 +153,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
       oneOffs.map((t) => t.id),
       moves,
     );
-  return { chores, rounds, members, choreDays, plan, hard };
+  return { chores, rounds, members, choreDays, plan, hard, input };
 }
 
 /** Tasks chores made, and one-off chores on the Chores list. */
@@ -141,7 +161,7 @@ async function choreTasks(supabase: Awaited<ReturnType<typeof createClient>>, to
   const { data: choresList } = await supabase.from("task_lists").select("id").eq("is_chores", true).maybeSingle();
   return supabase
     .from("task_instances")
-    .select("id, template_id, heads_up_id, chore_day_id, tags, status, due_date, list_id")
+    .select("id, template_id, heads_up_id, chore_day_id, tags, status, due_date, list_id, title, icon")
     .not("list_id", "is", null)
     .or(choresList ? `template_id.not.is.null,list_id.eq.${choresList.id}` : "template_id.not.is.null")
     .or(`status.eq.open,due_date.gte.${addDays(today, -7)}`);

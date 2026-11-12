@@ -30,7 +30,7 @@ export function readAdding(
   settings: HouseholdSettings,
   members: Member[],
   templates: EventTemplate[],
-  path: "/" | "/calendar",
+  path: "/" | "/calendar" | "/review",
 ): { placing: boolean; pending: Pending | null; templateHref: (id: string) => string } {
   // The same address with a template picked (everything else kept).
   const templateHref = (id: string) => {
@@ -131,7 +131,7 @@ export function QuickAddSheet({
   closeHref: string;
   /** e.g. "view=week&date=2026-11-05", so saving goes back to the same place. */
   returnTo: string;
-  returnPath: "/" | "/calendar";
+  returnPath: "/" | "/calendar" | "/review";
 }) {
   return (
     <Sheet title="Add an event" closeHref={closeHref} narrow side={side}>

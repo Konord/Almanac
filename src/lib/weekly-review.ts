@@ -28,7 +28,23 @@ export type ReviewDraft = {
   meals: Record<string, DraftMeal | null>;
   /** Problems someone chose to leave as they are. */
   dismissed: string[];
+  /**
+   * Chores put off on the Planner's chore view: chore or one-off id → the
+   * first day it may go on. Occasional chores wait (not_before); one-off
+   * chores get that date.
+   */
+  choreDelays?: Record<string, ChoreDelay>;
 };
+
+export type ChoreDelay = { kind: "generated" | "one-off"; date: LocalDate };
+
+/** Puts a chore off until a day (or back where the planner had it, with null). */
+export function delayChore(draft: ReviewDraft, id: string, delay: ChoreDelay | null): ReviewDraft {
+  const next = { ...(draft.choreDelays ?? {}) };
+  if (delay) next[id] = delay;
+  else delete next[id];
+  return { ...draft, choreDelays: next };
+}
 
 /** A meal as the review plans it (the weekly review is where all planning happens). */
 export type DraftMeal = {

@@ -21,13 +21,14 @@ import { PEOPLE_COOKIE } from "./data";
 function back(formData: FormData, kind: "error" | "message", text: string): never {
   const from = new URLSearchParams(String(formData.get("returnTo") ?? ""));
   const params = new URLSearchParams();
-  for (const key of ["view", "date", "panel", "tpl"]) {
+  for (const key of ["view", "date", "panel", "tpl", "week"]) {
     const value = from.get(key);
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
   params.set(kind, text);
-  // The Today screen sends returnPath "/"; everything else is the calendar.
-  const path = formData.get("returnPath") === "/" ? "/" : "/calendar";
+  // The Today screen sends returnPath "/" and the Planner "/review"; everything else is the calendar.
+  const sent = formData.get("returnPath");
+  const path = sent === "/" || sent === "/review" ? sent : "/calendar";
   redirect(`${path}?${params.toString()}`);
 }
 

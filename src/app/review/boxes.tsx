@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Sparkle } from "@phosphor-icons/react";
+import { CaretDown, CheckCircle, WarningCircle } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import type { Problem } from "@/lib/weekly-review";
 import { Box, CloseButton, Face, Pager, Tile, type Person } from "./parts";
 
 /*
- * The smaller boxes on the weekly review: a list of choices, adding or
- * changing a kind of day, and the things to check.
+ * The smaller boxes on the Planner: a list of choices, adding or changing a
+ * kind of day, and the things to check (a drop-down from the header).
  */
 
 /** A list of choices (move a chore day, take it off…). */
@@ -22,7 +22,7 @@ export function PickerBox({ picker, onClose }: { picker: Picker; onClose: () => 
   const pages = Math.max(1, Math.ceil(picker.options.length / PICKS_SHOWN));
   const shown = picker.options.slice(page * PICKS_SHOWN, (page + 1) * PICKS_SHOWN);
   return (
-    <Box label={picker.title} width="w-[46rem]" onClose={onClose}>
+    <Box label={picker.title} width="w-[58rem]" onClose={onClose}>
       <div className="flex items-center gap-3">
         <h2 className="min-w-0 flex-1 truncate text-2xl font-extrabold text-ink">{picker.title}</h2>
         <CloseButton onClick={onClose} />
@@ -163,44 +163,69 @@ export function KindBox({
   );
 }
 
-const CHECKS_SHOWN = 5;
+const CHECKS_SHOWN = 4;
 
-/** Things worth a second look, each with a fix to approve. */
-export function ChecksBox({ problems, onFix, onLeave, onClose }: { problems: Problem[]; onFix: (p: Problem) => void; onLeave: (p: Problem) => void; onClose: () => void }) {
+/**
+ * The things to check, in the header (Connor, 2026-11-12): one problem shows
+ * its own words; more show "3 things to check". Tapping drops a panel down
+ * with each one and its fix to approve.
+ */
+export function ChecksMenu({ problems, onFix, onLeave }: { problems: Problem[]; onFix: (p: Problem) => void; onLeave: (p: Problem) => void }) {
+  const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   const pages = Math.max(1, Math.ceil(problems.length / CHECKS_SHOWN));
   const at = Math.min(page, pages - 1);
+  if (problems.length === 0) {
+    return (
+      <span className="flex min-h-13 items-center gap-2 px-3 text-lg font-bold whitespace-nowrap text-ink-muted">
+        <CheckCircle size="1.375rem" weight="fill" aria-hidden />
+        All clear
+      </span>
+    );
+  }
+  const isOpen = open;
   return (
-    <Box label="Things to check" width="w-[64rem]" onClose={onClose}>
-      <div className="flex items-center gap-3">
-        <Sparkle size="1.75rem" weight="fill" className="text-accent" aria-hidden />
-        <h2 className="min-w-0 flex-1 text-3xl font-extrabold text-ink">{problems.length === 0 ? "All clear" : `Things to check (${problems.length})`}</h2>
-        <CloseButton onClick={onClose} />
-      </div>
-      
-      <div className="flex flex-col gap-2">
-        {problems.slice(at * CHECKS_SHOWN, (at + 1) * CHECKS_SHOWN).map((p) => (
-          <div key={p.id} className="flex min-h-[var(--touch-target)] items-center gap-3 rounded-2xl bg-rail px-4 py-2">
-            <p className="min-w-0 flex-1 text-lg text-ink">{p.text}</p>
-            {p.fix ? (
-              <button type="button" onClick={() => onFix(p)} className="flex min-h-12 shrink-0 items-center rounded-xl bg-ink px-4 text-base font-bold text-board">
-                {p.fix.label}
-              </button>
+    <div className="relative min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={isOpen}
+        className="flex min-h-13 max-w-full min-w-0 items-center gap-2 rounded-2xl bg-[color-mix(in_srgb,var(--color-accent)_11%,white)] px-4 text-lg font-bold text-accent"
+      >
+        <WarningCircle size="1.375rem" weight="fill" className="shrink-0" aria-hidden />
+        <span className="min-w-0 truncate">{problems.length === 1 ? problems[0].text : `${problems.length} things to check`}</span>
+        <CaretDown size="1.125rem" weight="bold" className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden />
+      </button>
+      {isOpen ? (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
+          <div role="dialog" aria-label="Things to check" className="absolute top-full left-0 z-40 mt-2 flex w-[60rem] max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-[1.5rem] bg-board p-4 shadow-[0_0_0_2px_var(--color-frame),0_18px_40px_rgba(20,30,50,0.16)]">
+            {problems.slice(at * CHECKS_SHOWN, (at + 1) * CHECKS_SHOWN).map((p) => (
+              <div key={p.id} className="flex min-h-[var(--touch-target)] items-center gap-3 rounded-2xl bg-rail px-4 py-2">
+                <p className="min-w-0 flex-1 text-lg text-ink">{p.text}</p>
+                {p.fix ? (
+                  <button type="button" onClick={() => onFix(p)} className="flex min-h-12 shrink-0 items-center rounded-xl bg-ink px-4 text-base font-bold text-board">
+                    {p.fix.label}
+                  </button>
+                ) : null}
+                {p.link ? (
+                  <Link href={p.link.href} className="flex min-h-12 shrink-0 items-center rounded-xl bg-board px-4 text-base font-bold text-ink">
+                    {p.link.label}
+                  </Link>
+                ) : null}
+                <button type="button" onClick={() => onLeave(p)} className="flex min-h-12 shrink-0 items-center rounded-xl px-3 text-base font-bold text-ink-muted hover:bg-board">
+                  Leave it
+                </button>
+              </div>
+            ))}
+            {pages > 1 ? (
+              <div className="flex justify-end">
+                <Pager page={at} pages={pages} setPage={setPage} />
+              </div>
             ) : null}
-            {p.link ? (
-              <Link href={p.link.href} className="flex min-h-12 shrink-0 items-center rounded-xl bg-board px-4 text-base font-bold text-ink">
-                {p.link.label}
-              </Link>
-            ) : null}
-            <button type="button" onClick={() => onLeave(p)} className="flex min-h-12 shrink-0 items-center rounded-xl px-3 text-base font-bold text-ink-muted hover:bg-board">
-              Leave it
-            </button>
           </div>
-        ))}
-      </div>
-      <div className="flex justify-end">
-        <Pager page={at} pages={pages} setPage={setPage} />
-      </div>
-    </Box>
+        </>
+      ) : null}
+    </div>
   );
 }

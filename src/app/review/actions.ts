@@ -85,6 +85,21 @@ export async function saveReview(week: string, draft: ReviewDraft): Promise<Save
     if (bad3) return { ok: false, error: bad3 };
   }
 
+  // 5. Chores put off on the chore view.
+  for (const [id, delay] of Object.entries(draft.choreDelays ?? {})) {
+    if (!isLocalDate(delay.date) || delay.date <= today) continue;
+    if (delay.kind === "generated") {
+      const bad =
+        fail((await supabase.from("task_templates").update({ not_before: delay.date }).eq("id", id).eq("kind", "generated")).error) ??
+        // Off today's list too, if it was on it.
+        fail((await supabase.from("task_instances").delete().eq("template_id", id).eq("status", "open")).error);
+      if (bad) return bad;
+    } else {
+      const bad = fail((await supabase.from("task_instances").update({ due_date: delay.date, date_kind: "start" }).eq("id", id).eq("status", "open").is("template_id", null)).error);
+      if (bad) return bad;
+    }
+  }
+
   // 4. The week is reviewed.
   const done = fail(
     (await supabase.from("weekly_reviews").upsert({ household_id: household.id, week_start: week, reviewed_at: new Date().toISOString(), dismissed: draft.dismissed.slice(0, 100) }, { onConflict: "household_id,week_start" })).error,

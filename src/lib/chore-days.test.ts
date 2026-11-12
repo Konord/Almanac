@@ -255,6 +255,20 @@ test("an essential one-off chore goes on today, room or not", () => {
   assert.equal(where(plan, "furnace"), MON);
 });
 
+test("a one-off chore put off waits for its day, even an essential one", () => {
+  const plan = planChoreDays({
+    choreDays: [free],
+    chores: [],
+    oneOffs: [
+      { id: "gutters", chore_day_id: null, not_before: WED },
+      { id: "furnace", chore_day_id: null, tags: ["essential"], not_before: WED },
+    ],
+    today: MON,
+  });
+  assert.equal(where(plan, "gutters"), WED);
+  assert.equal(where(plan, "furnace"), WED);
+});
+
 test("a chore with no room anywhere this week is hard to schedule", () => {
   const plan = planChoreDays({
     choreDays: [free, laundry],
