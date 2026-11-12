@@ -66,7 +66,11 @@ test("New Year's art shows on Dec 31 from last year's December", () => {
 
 test("no General folder means only seasonal art; no seasonal art means only General", () => {
   const noGeneral = folders.filter((f) => f.name !== "General");
-  assert.deepEqual(artChoices("2026-07-01", noGeneral, [], [], "half"), []);
+  // Nothing for a July day: any painting not kept for a holiday or birthday.
+  const july = artChoices("2026-07-01", noGeneral, holidays, birthdays, "half");
+  assert.deepEqual(july.map((x) => x.label), ["All paintings"]);
+  assert.ok(july[0].files.includes("Autumn/leaves.jpg") && !july[0].files.includes("Halloween/witch.jpg") && !july[0].files.includes("Ava/cake.jpg"));
+  assert.deepEqual(artChoices("2026-07-01", [], [], [], "half"), []);
   assert.deepEqual(artChoices("2026-01-15", noGeneral, [], [], "rarely").map((x) => [x.label, x.weight]), [["Winter", 1]]);
   assert.deepEqual(artChoices("2026-07-01", folders, [], [], "half").map((x) => [x.label, x.weight]), [["General", 1]]);
 });

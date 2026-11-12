@@ -61,6 +61,7 @@ export function ScreenSaverTab({
   const meals = value.duringMeals ?? dinnerBlocks(mealTimes);
   const setTime = (i: number, c: Partial<SetTime>) => set({ times: value.times.map((t, k) => (k === i ? { ...t, ...c } : t)) });
 
+  const paintings = art.folders.reduce((n, f) => n + f.count, 0);
   const pages = Math.max(1, Math.ceil(art.folders.length / FOLDERS_PER_PAGE));
   const p = Math.min(page, pages - 1);
 
@@ -88,11 +89,11 @@ export function ScreenSaverTab({
         </nav>
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new Event(PREVIEW_EVENT))}
+          onClick={() => (paintings > 0 ? window.dispatchEvent(new Event(PREVIEW_EVENT)) : setView("folders"))}
           className="ml-auto flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-5 text-lg font-bold text-ink hover:bg-panel"
         >
           <Play size="1.25rem" weight="fill" aria-hidden />
-          Try it
+          {paintings > 0 ? "Try it" : "No paintings found"}
         </button>
       </div>
 
