@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Alarm, Broom, CalendarBlank, CalendarCheck, CaretDown, CaretUp, ForkKnife, GearSix, ListChecks } from "@phosphor-icons/react";
+import { Alarm, Broom, CalendarBlank, CalendarCheck, CaretDown, CaretUp, ChartLineUp, ForkKnife, GearSix, ListChecks } from "@phosphor-icons/react";
 import { lastDisplayHref } from "./remember-display";
 import { clearLaunchProblem, launchApp, useLauncher } from "./launcher-store";
 import { soft } from "@/lib/colours";
@@ -28,7 +28,7 @@ import type { Icon } from "@phosphor-icons/react";
  * helper, so only it gets the second tier (see launcher-store.ts).
  */
 
-export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "meals" | "review" | "settings";
+export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "habits" | "meals" | "review" | "settings";
 
 const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   // Calendar goes back to whichever display (Agenda, Week, Month) this screen
@@ -40,6 +40,8 @@ const ITEMS: { section: Section; href: string; label: string; icon: Icon }[] = [
   { section: "lists", href: "/lists", label: "Lists", icon: ListChecks },
   { section: "chores", href: "/chores", label: "Chores", icon: Broom },
   { section: "meals", href: "/meals/menu", label: "Meals", icon: ForkKnife },
+  // Habits and health tracking have their own page (Connor, 2026-11-12).
+  { section: "habits", href: "/habits", label: "Habits", icon: ChartLineUp },
   { section: "settings", href: "/household", label: "Settings", icon: GearSix },
 ];
 
