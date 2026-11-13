@@ -149,8 +149,12 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
    so it comes back to Almanac after a power cut.
 2. Switch the desktop to Xorg for good (the launcher's pill needs it, and
    with automatic sign-in you never see the sign-in screen's gear). On the
-   kitchen PC: `sudo nano /etc/gdm3/custom.conf`, remove the `#` in front of
-   `WaylandEnable=false`, save, and restart.
+   kitchen PC (the installer may have removed the usual commented line):
+   ```
+   grep -q '^\[daemon\]' /etc/gdm3/custom.conf || echo '[daemon]' | sudo tee -a /etc/gdm3/custom.conf
+   sudo sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm3/custom.conf
+   ```
+   Restart, then `echo $XDG_SESSION_TYPE` should say `x11`.
 3. Turn off the screen blanking Ubuntu does by itself (Settings › Power ›
    Screen Blank: Never); Almanac's art screen saver handles that.
 4. In BIOS (F1 at power on) set **After Power Loss: Power On**. Do the same on
