@@ -147,8 +147,10 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
    newer: those dropped the Xorg desktop, which the launcher pill needs. Make
    a user that signs in automatically (Settings › Users › Automatic Login),
    so it comes back to Almanac after a power cut.
-2. On the sign-in screen choose **Ubuntu on Xorg** (the gear, bottom right)
-   once; the launcher's pill needs Xorg.
+2. Switch the desktop to Xorg for good (the launcher's pill needs it, and
+   with automatic sign-in you never see the sign-in screen's gear). On the
+   kitchen PC: `sudo nano /etc/gdm3/custom.conf`, remove the `#` in front of
+   `WaylandEnable=false`, save, and restart.
 3. Turn off the screen blanking Ubuntu does by itself (Settings › Power ›
    Screen Blank: Never); Almanac's art screen saver handles that.
 4. In BIOS (F1 at power on) set **After Power Loss: Power On**. Do the same on
