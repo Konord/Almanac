@@ -100,7 +100,15 @@ Test a reboot once: `sudo reboot`, wait two minutes, open the address.
 
 `deploy/backup.sh` saves one file of all the data each night to
 `/mnt/storage/backups/almanac/almanac-YYYY-MM-DD.sql.gz` and keeps 30 days.
-On the server, `crontab -e` and add:
+The backups folder is owned by root, so on the server first make Almanac's
+folder yours:
+
+```
+sudo mkdir -p /mnt/storage/backups/almanac
+sudo chown doherty:doherty /mnt/storage/backups/almanac
+```
+
+Then `crontab -e` and add:
 
 ```
 45 3 * * * /opt/almanac/deploy/backup.sh >> /mnt/storage/backups/almanac/backup.log 2>&1
