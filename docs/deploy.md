@@ -64,15 +64,17 @@ It asks you to type `yes`, wipes the server's (empty) database and loads the
 PC's rows in one go. If anything fails, nothing changes. Devices will need to
 sign in again once, with the same email and password as on the PC.
 
-**Art for the screen saver** lives on the server's big drive. In PowerShell on
-the PC (M: is the server's media share):
+**Art for the screen saver** lives on the server's big drive, and you add
+paintings whenever you like. On the server:
 
 ```
-robocopy "$HOME\OneDrive\Desktop\Art Screensaver" "M:\almanac-art" /E
+mkdir -p /mnt/storage/media/almanac-art/{General,Spring,Summer,Autumn,Winter}
 ```
 
-Then on the server, add `ART_FOLDER=/mnt/storage/media/almanac-art` to
-`/opt/almanac/.env.local`.
+Add `ART_FOLDER=/mnt/storage/media/almanac-art` to `/opt/almanac/.env.local`.
+Holiday and birthday folders are named to match them in Almanac (like
+`Halloween`). On the PC the folder is `M:\almanac-art` (pin it to Quick
+access); drag paintings in and they show up without a restart.
 
 ## Stage 3: run it and start on boot
 
