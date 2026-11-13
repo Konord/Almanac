@@ -143,23 +143,18 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
 
 ## Stage 5: the kitchen screen
 
-1. Install **Ubuntu Desktop 24.04 LTS** on the second M920q. Not 25.10 or
-   newer: those dropped the Xorg desktop, which the launcher pill needs. Make
-   a user that signs in automatically (Settings › Users › Automatic Login),
-   so it comes back to Almanac after a power cut.
-2. Switch the desktop to Xorg for good (the launcher's pill needs it, and
-   with automatic sign-in you never see the sign-in screen's gear). On the
-   kitchen PC (the installer may have removed the usual commented line):
-   ```
-   grep -q '^\[daemon\]' /etc/gdm3/custom.conf || echo '[daemon]' | sudo tee -a /etc/gdm3/custom.conf
-   sudo sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm3/custom.conf
-   ```
-   Restart, then `echo $XDG_SESSION_TYPE` should say `x11`.
+1. Install **Ubuntu Desktop** (the kitchen PC runs 26.04 LTS, which is
+   Wayland only). Make a user that signs in automatically (Settings › Users ›
+   Automatic Login), so it comes back to Almanac after a power cut.
+2. On Wayland the launcher needs its GNOME Shell extension (step 2b of
+   `launcher-helper/README.md`). On Ubuntu 24.04 or older it can use Xorg
+   instead: add `WaylandEnable=false` under `[daemon]` in
+   `/etc/gdm3/custom.conf` and restart.
 3. Turn off the screen blanking Ubuntu does by itself (Settings › Power ›
    Screen Blank: Never); Almanac's art screen saver handles that.
 4. In BIOS (F1 at power on) set **After Power Loss: Power On**. Do the same on
    the server.
-5. Install the tools: `sudo apt install -y curl wmctrl python3-gi gir1.2-gtk-3.0`,
+5. Install the tools: `sudo apt install -y curl` (plus `wmctrl python3-gi gir1.2-gtk-3.0` on Xorg),
    `sudo snap install chromium`, Node 24 (same two NodeSource lines as the
    server), `sudo usermod -aG input $USER`, and stop Ubuntu blanking the screen:
    `gsettings set org.gnome.desktop.session idle-delay 0` and
