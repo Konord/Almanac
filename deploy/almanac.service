@@ -1,0 +1,22 @@
+# Runs Almanac on the Home Hub server and starts it again after a reboot.
+# Install: see docs/deploy.md, Stage 3.
+[Unit]
+Description=Almanac (family calendar)
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=simple
+User=doherty
+WorkingDirectory=/opt/almanac
+Environment=NODE_ENV=production
+# Make sure the database is up first. Docker usually restarts it by itself,
+# so this just says "already running" (the - means: carry on even if it fails).
+ExecStartPre=-/usr/bin/npx supabase start
+ExecStart=/usr/bin/npm start -- -p 3001
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

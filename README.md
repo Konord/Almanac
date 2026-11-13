@@ -78,8 +78,12 @@ When you're done: press `Ctrl+C` to stop the app, and run
 npm run lint         # spots common mistakes
 npm test             # checks the tricky logic (time zones so far)
 npm run test:db      # checks the database security rules
-npm run build        # builds the production version; if this passes, it will deploy
+npm run build        # builds the production version; if this passes, it will run on the Home Hub
 ```
+
+## Running it on the Home Hub
+
+The household copy runs on the Home Hub server and the kitchen screen. [docs/deploy.md](docs/deploy.md) has the setup, data move, backups and updates; `deploy/` has the scripts.
 
 ## Rules of the road
 

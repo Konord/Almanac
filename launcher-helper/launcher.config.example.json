@@ -1,5 +1,5 @@
 {
-  "almanacOrigins": ["http://192.168.2.23:3001"],
+  "almanacOrigins": ["http://192.168.2.42:3001"],
   "browser": ["chromium"],
   "profiles": "~/almanac-launcher/profiles",
   "almanacWindowClass": "almanac",
