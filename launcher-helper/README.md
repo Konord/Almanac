@@ -1,4 +1,4 @@
-# Almanac launcher (kitchen PC)
+# Almanac launcher (kitchen screen PC)
 
 This little program lets the kitchen screen open apps from Almanac's menu
 tray, like a phone's home screen. Tap **Jellyfin** and it opens full screen;
@@ -55,7 +55,7 @@ The up checks and the "isn't answering" heads-up are done by Almanac itself
    `launcher.config.example.json` to `launcher.config.json` and change:
    - `almanacOrigins`: the address you open Almanac at on this PC, exactly as
      in the address bar but without anything after the port, e.g.
-     `"http://192.168.2.23:3001"`. Only pages from these addresses can ask the
+     `"http://192.168.2.42:3001"` (the Home Hub server). Only pages from these addresses can ask the
      helper to do anything.
    - `browser`: `["chromium"]`, or `["google-chrome"]` if you use Chrome.
    - `programs`: one entry for each program on this PC. The name before the
@@ -83,7 +83,7 @@ The up checks and the "isn't answering" heads-up are done by Almanac itself
    already in full-screen kiosk mode and can't see the question, open Almanac
    once in a normal window first, allow it there, then go back to kiosk mode.
 8. **Add the apps in Almanac.** On the kitchen screen: Settings › Apps ›
-   Add an app. Web apps need their address (like `http://192.168.2.10:8096`);
+   Add an app. Web apps need their address (like `http://192.168.2.42:8096` for Jellyfin);
    programs are picked from the helper's list.
 
 ## Changing things later
