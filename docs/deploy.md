@@ -143,7 +143,8 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
 
 ## Stage 5: the kitchen screen
 
-1. Install **Ubuntu Desktop** (24.04 LTS or newer) on the second M920q. Make
+1. Install **Ubuntu Desktop 24.04 LTS** on the second M920q. Not 25.10 or
+   newer: those dropped the Xorg desktop, which the launcher pill needs. Make
    a user that signs in automatically (Settings › Users › Automatic Login),
    so it comes back to Almanac after a power cut.
 2. On the sign-in screen choose **Ubuntu on Xorg** (the gear, bottom right)
