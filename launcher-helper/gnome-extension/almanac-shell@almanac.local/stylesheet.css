@@ -1,0 +1,19 @@
+/* The Almanac pill: white, rounded, a soft shadow, a big touch target. */
+.almanac-pill {
+  background-color: rgba(255, 255, 255, 0.96);
+  border-radius: 999px;
+  padding: 18px 34px 18px 26px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+}
+.almanac-pill-box {
+  spacing: 14px;
+}
+.almanac-pill-icon {
+  icon-size: 34px;
+  color: #23262b;
+}
+.almanac-pill-label {
+  color: #23262b;
+  font-size: 26px;
+  font-weight: bold;
+}

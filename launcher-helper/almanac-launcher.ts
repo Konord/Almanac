@@ -13,7 +13,12 @@
  *   keyboard don't), and it hides again after a few seconds. Tapping it
  *   closes the app and brings Almanac back;
  * - brings Almanac back by itself when an app is closed the normal way;
- * - turns the screen off overnight when the art screen saver asks (xset).
+ * - turns the screen off overnight when the art screen saver asks.
+ *
+ * It works on both of Ubuntu's desktops. On Xorg it uses wmctrl, xset and
+ * pill.py. On Wayland (Ubuntu 25.10 and newer have nothing else) a program
+ * can't do those things, so the small GNOME Shell extension in
+ * gnome-extension/ does them when asked over D-Bus (see README.md).
  *
  * Run it with: node almanac-launcher.ts [path/to/launcher.config.json]
  * (Node 22.18 or newer runs TypeScript files directly.)
@@ -51,6 +56,11 @@ function loadConfig(): Config {
 const config = loadConfig();
 const log = (...parts: unknown[]) => console.log(new Date().toISOString(), ...parts);
 
+/** Ubuntu's Wayland desktop: the GNOME Shell extension does the desktop's part. */
+// (A service started by systemd may not see XDG_SESSION_TYPE, but GNOME always shares WAYLAND_DISPLAY.)
+const wayland = process.env.XDG_SESSION_TYPE === "wayland" || Boolean(process.env.WAYLAND_DISPLAY);
+const SHELL = { name: "org.almanac.Shell", path: "/org/almanac/Shell" };
+
 // ---------------------------------------------------------------------------
 // Starting and closing apps
 // ---------------------------------------------------------------------------
@@ -74,9 +84,15 @@ function fireAndForget(command: string[]) {
     .catch((e: Error) => log(`Couldn't run ${command[0]}: ${e.message}`));
 }
 
+/** Asks the GNOME Shell extension to do something (Wayland only). Arguments are GVariant text: 'a string', true. */
+function shell(method: string, ...args: string[]) {
+  fireAndForget(["gdbus", "call", "--session", "--dest", SHELL.name, "--object-path", SHELL.path, "--method", `${SHELL.name}.${method}`, ...args]);
+}
+
 function bringBackAlmanac() {
+  if (wayland) shell("Raise", `'${config.almanacWindowClass}'`);
   // wmctrl raises the window whose class is "almanac" (Almanac's own kiosk window).
-  fireAndForget(["wmctrl", "-x", "-a", config.almanacWindowClass]);
+  else fireAndForget(["wmctrl", "-x", "-a", config.almanacWindowClass]);
 }
 
 function closeCurrent() {
@@ -117,12 +133,29 @@ function goHome() {
 }
 
 // ---------------------------------------------------------------------------
-// The Almanac pill (drawn by pill.py, a tiny GTK window)
+// The Almanac pill: pill.py (a tiny GTK window) on Xorg, the extension on Wayland
 // ---------------------------------------------------------------------------
 
-const pill = (() => {
-  let proc: ChildProcess | null = null;
+type Pill = { start(): void; show(): void; hide(): void };
+
+/** Shows the pill, then hides it again after a few seconds. */
+function timedPill(showNow: () => void, hideNow: () => void): Pick<Pill, "show" | "hide"> {
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
+  return {
+    show() {
+      showNow();
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideNow, config.pill.hideAfterSeconds * 1000);
+    },
+    hide() {
+      if (hideTimer) clearTimeout(hideTimer);
+      hideNow();
+    },
+  };
+}
+
+function xorgPill(): Pill {
+  let proc: ChildProcess | null = null;
   // If the pill keeps failing to start (no GTK, no display), stop trying after a few goes.
   let failures = 0;
 
@@ -145,20 +178,28 @@ const pill = (() => {
     return p;
   }
   const send = (word: "show" | "hide") => ensure()?.stdin?.write(`${word}\n`);
+  return { start: () => void ensure(), ...timedPill(() => send("show"), () => send("hide")) };
+}
 
+function waylandPill(): Pill {
+  // The extension draws the pill; a tap arrives as its HomeTapped signal,
+  // which "gdbus monitor" prints as a line of text.
+  function listen() {
+    const p = spawn("gdbus", ["monitor", "--session", "--dest", SHELL.name, "--object-path", SHELL.path], { stdio: ["ignore", "pipe", "ignore"] });
+    p.on("error", (e) => log(`Couldn't listen for the pill: ${e.message}`));
+    createInterface({ input: p.stdout! }).on("line", (line) => {
+      if (line.includes(`${SHELL.name}.HomeTapped`)) goHome();
+    });
+    // If it stops (the desktop restarted), listen again shortly.
+    p.on("exit", () => setTimeout(listen, 5000));
+  }
   return {
-    start: ensure,
-    show() {
-      send("show");
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => send("hide"), config.pill.hideAfterSeconds * 1000);
-    },
-    hide() {
-      if (hideTimer) clearTimeout(hideTimer);
-      send("hide");
-    },
+    start: listen,
+    ...timedPill(() => shell("ShowPill", `'${config.pill.corner}'`), () => shell("HidePill")),
   };
-})();
+}
+
+const pill: Pill = wayland ? waylandPill() : xorgPill();
 
 // ---------------------------------------------------------------------------
 // The touchscreen: a finger shows the pill while an app is open
@@ -184,7 +225,9 @@ function watchTouchscreens() {
       bytes.set(chunk as Buffer, leftover.length);
       const whole = bytes.length - (bytes.length % EVENT_SIZE);
       leftover = bytes.slice(whole);
-      if (current && touchDowns(bytes.subarray(0, whole)) > 0) pill.show();
+      if (touchDowns(bytes.subarray(0, whole)) === 0) return;
+      if (screenOff) setScreen(true);
+      else if (current) pill.show();
     });
     stream.on("error", (e: NodeJS.ErrnoException) => {
       watching.delete(path);
@@ -193,6 +236,19 @@ function watchTouchscreens() {
     stream.on("close", () => watching.delete(path));
     log(`Watching the touchscreen at ${path}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// The screen: off overnight when the art screen saver asks
+// ---------------------------------------------------------------------------
+
+let screenOff = false;
+
+function setScreen(on: boolean) {
+  screenOff = !on;
+  if (wayland) shell("Screen", on ? "true" : "false");
+  else fireAndForget(on ? ["xset", "dpms", "force", "on"] : ["sh", "-c", "xset +dpms && xset dpms force off"]);
+  log(on ? "Screen on" : "Screen off for the night");
 }
 
 // ---------------------------------------------------------------------------
@@ -257,8 +313,7 @@ const server = createServer(async (req, res) => {
     const body = await readBody(req);
     const on = Boolean(body && typeof body === "object" && (body as { on?: unknown }).on === true);
     if (!on && current) return send(res, 409, cors, "An app is open.");
-    fireAndForget(on ? ["xset", "dpms", "force", "on"] : ["sh", "-c", "xset +dpms && xset dpms force off"]);
-    log(on ? "Screen on" : "Screen off for the night");
+    setScreen(on);
     return send(res, 200, cors, { ok: true });
   }
   if (req.method === "POST" && path === "/home") {
@@ -270,7 +325,7 @@ const server = createServer(async (req, res) => {
 
 // Only this PC can reach it (127.0.0.1), never the rest of the network.
 server.listen(config.port, "127.0.0.1", () => {
-  log(`Almanac launcher listening on http://127.0.0.1:${config.port} for ${config.almanacOrigins.join(", ")}`);
+  log(`Almanac launcher listening on http://127.0.0.1:${config.port} for ${config.almanacOrigins.join(", ")} (${wayland ? "Wayland: using the GNOME Shell extension" : "Xorg"})`);
   pill.start();
   watchTouchscreens();
   // A touchscreen plugged in later (or after a sleep) is picked up too.
