@@ -155,8 +155,26 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
    Screen Blank: Never); Almanac's art screen saver handles that.
 4. In BIOS (F1 at power on) set **After Power Loss: Power On**. Do the same on
    the server.
-5. Install Chromium and set up the launcher: follow `launcher-helper/README.md`.
-   Almanac's address there is `http://192.168.2.42:3001`.
+5. Install the tools: `sudo apt install -y curl wmctrl python3-gi gir1.2-gtk-3.0`,
+   `sudo snap install chromium`, Node 24 (same two NodeSource lines as the
+   server), `sudo usermod -aG input $USER`, and stop Ubuntu blanking the screen:
+   `gsettings set org.gnome.desktop.session idle-delay 0` and
+   `gsettings set org.gnome.desktop.screensaver lock-enabled false`.
+6. Copy the launcher from the server (the repository is private, so no
+   `git clone` here). On the server:
+   `cd /opt/almanac && tar czf /tmp/launcher-helper.tgz launcher-helper && cd /tmp && python3 -m http.server 8765`
+   and on the kitchen PC:
+   `mkdir -p ~/almanac && cd ~/almanac && curl -O http://192.168.2.42:8765/launcher-helper.tgz && tar xzf launcher-helper.tgz`.
+   Ctrl+C on the server when done. Reboot the kitchen PC.
+7. Follow `launcher-helper/README.md` from step 3 (the example config already
+   points at `http://192.168.2.42:3001`). Before turning on kiosk mode, open
+   Almanac once in a normal window with the kiosk's profile, sign in and
+   allow local network access:
+   `chromium --class=almanac --user-data-dir=$HOME/almanac-launcher/profiles/almanac http://192.168.2.42:3001`
+
+The kitchen PC must stay on **Wi-Fi**: the router reserves 192.168.2.42 for
+its Ethernet port (the boxes swapped drives), and the server answers on .42 as
+an extra fixed address in its netplan file.
 
 ## Good to know
 
@@ -167,3 +185,5 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
   `http://192.168.2.42:54323` for anyone on the home network. Look, but don't
   edit tables there: every change is a migration.
 - Never run `npm run db:reset` on the server. It wipes all the data.
+- Secure Boot is off on the server box: its firmware didn't trust Ubuntu
+  26.04's newer signature after the drive swap.
