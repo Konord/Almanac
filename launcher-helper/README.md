@@ -21,36 +21,54 @@ never show the apps.
   brought back to the front.
 - **Screen off overnight.** When the art screen saver is set to "Screen off"
   overnight (Settings › Screen saver), Almanac asks the helper to put the
-  monitor to sleep (`xset dpms force off`). A touch wakes it. It never does
-  this while an app is open. `xset` comes with Ubuntu's Xorg desktop.
+  monitor to sleep. A touch wakes it. It never does this while an app is
+  open.
 
 The up checks and the "isn't answering" heads-up are done by Almanac itself
 (Settings › Apps), not by this helper.
 
 ## What it needs
 
-- Ubuntu with the **Xorg** desktop. On the sign-in screen, click your name,
-  then the gear in the bottom-right corner, and pick **Ubuntu on Xorg**. (The
-  newer Wayland desktop doesn't let a window float above full-screen games,
-  so the pill wouldn't show.) You only do this once.
-- **Node.js 22.18 or newer** (it runs this TypeScript file directly):
-  `sudo apt install nodejs` gives an older one on some Ubuntu versions; if
-  `node -v` says less than 22.18, install Node 24 from https://nodejs.org.
-- `wmctrl`, to bring Almanac's window back to the front:
-  `sudo apt install wmctrl`
-- Chromium (or Google Chrome) for Almanac itself and for the web apps.
-- GTK for Python, which draws the pill. It comes with Ubuntu's desktop; if the
-  log says the pill won't start, run `sudo apt install python3-gi gir1.2-gtk-3.0`.
+It works on either of Ubuntu's desktops, and picks the right way by itself:
+
+- **Wayland** (the only desktop on Ubuntu 25.10 and newer, including the
+  kitchen PC's 26.04). Programs can't float above other windows there, so a
+  small add-on for the desktop, the **Almanac GNOME Shell extension** in
+  `gnome-extension/`, draws the pill, brings Almanac's window back and turns
+  the screen off when the helper asks. Setting-up step 2b installs it.
+- **Xorg** (Ubuntu 24.04 and older, "Ubuntu on Xorg" at sign-in). The helper
+  uses `pill.py` (GTK), `wmctrl` and `xset` instead:
+  `sudo apt install wmctrl python3-gi gir1.2-gtk-3.0`.
+
+Either way it needs:
+
+- **Node.js 22.18 or newer** (it runs this TypeScript file directly). On
+  Ubuntu, install Node 24 from NodeSource:
+  `curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -` then
+  `sudo apt install -y nodejs`.
+- Chromium (`sudo snap install chromium`) for Almanac itself and for the web
+  apps.
 
 ## Setting it up
 
-1. **Copy the code to the kitchen PC.** The easiest way is to clone the whole
-   Almanac repository into your home folder, so this folder ends up at
-   `~/almanac/launcher-helper`:
-   `git clone https://github.com/Konord/Almanac.git ~/almanac`
+1. **Copy the code to the kitchen PC**, so this folder ends up at
+   `~/almanac/launcher-helper`. The repository is private, so copy it from
+   the server (see docs/deploy.md, Stage 5).
 2. **Let it see the touchscreen.** `sudo usermod -aG input $USER`, then sign
    out and back in. (Without this, the pill can't tell when you touch the
    screen.)
+2b. **Wayland only: add the desktop extension.**
+   ```
+   mkdir -p ~/.local/share/gnome-shell/extensions
+   cp -r ~/almanac/launcher-helper/gnome-extension/almanac-shell@almanac.local ~/.local/share/gnome-shell/extensions/
+   ```
+   Sign out and back in (or restart), then:
+   `gnome-extensions enable almanac-shell@almanac.local`
+   Check it: `gnome-extensions info almanac-shell@almanac.local` should say
+   `State: ACTIVE`. To see the pill by hand:
+   `gdbus call --session --dest org.almanac.Shell --object-path /org/almanac/Shell --method org.almanac.Shell.ShowPill "'bottom-left'"`
+   (and `...HidePill` to hide it). After changing the extension's files, sign
+   out and in again: Wayland only reloads extensions at sign-in.
 3. **Fill in the settings.** In `~/almanac/launcher-helper`, copy
    `launcher.config.example.json` to `launcher.config.json` and change:
    - `almanacOrigins`: the address you open Almanac at on this PC, exactly as
@@ -76,7 +94,8 @@ The up checks and the "isn't answering" heads-up are done by Almanac itself
 6. **Open Almanac full screen at sign-in.** Edit `almanac-kiosk.desktop`:
    put your user name in place of `USER` and Almanac's address at the end, then
    `cp ~/almanac/launcher-helper/almanac-kiosk.desktop ~/.config/autostart/`.
-   The `--class=almanac` part is how the helper finds Almanac's window again.
+   The `--class=almanac` part is how the helper finds Almanac's window again
+   (on Wayland the extension also finds it by its "Almanac" title).
 7. **Allow the connection once.** The first time Almanac talks to the helper,
    Chrome may ask whether Almanac can "access other apps and services on this
    device" (or "devices on your local network"). Say **Allow**. If you're
@@ -100,6 +119,8 @@ The up checks and the "isn't answering" heads-up are done by Almanac itself
 
 - `almanac-launcher.ts`: the helper.
 - `lib.ts` and `lib.test.ts`: its rules and their tests (`npm test` runs them).
-- `pill.py`: draws the pill.
+- `pill.py`: draws the pill on Xorg.
+- `gnome-extension/`: draws the pill, switches windows and turns the screen
+  off on Wayland.
 - `launcher.config.example.json`: settings to copy.
 - `almanac-launcher.service`, `almanac-kiosk.desktop`: start-at-sign-in files.

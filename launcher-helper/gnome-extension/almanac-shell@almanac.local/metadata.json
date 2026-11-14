@@ -1,0 +1,7 @@
+{
+  "uuid": "almanac-shell@almanac.local",
+  "name": "Almanac kitchen screen",
+  "description": "Lets Almanac's launcher helper show the Almanac pill above full-screen apps, bring Almanac's window back, and turn the screen off overnight. For the kitchen PC only; see launcher-helper/README.md.",
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
+  "url": "https://github.com/Konord/Almanac"
+}

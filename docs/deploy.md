@@ -64,15 +64,17 @@ It asks you to type `yes`, wipes the server's (empty) database and loads the
 PC's rows in one go. If anything fails, nothing changes. Devices will need to
 sign in again once, with the same email and password as on the PC.
 
-**Art for the screen saver** lives on the server's big drive. In PowerShell on
-the PC (M: is the server's media share):
+**Art for the screen saver** lives on the server's big drive, and you add
+paintings whenever you like. On the server:
 
 ```
-robocopy "$HOME\OneDrive\Desktop\Art Screensaver" "M:\almanac-art" /E
+mkdir -p /mnt/storage/media/almanac-art/{General,Spring,Summer,Autumn,Winter}
 ```
 
-Then on the server, add `ART_FOLDER=/mnt/storage/media/almanac-art` to
-`/opt/almanac/.env.local`.
+Add `ART_FOLDER=/mnt/storage/media/almanac-art` to `/opt/almanac/.env.local`.
+Holiday and birthday folders are named to match them in Almanac (like
+`Halloween`). On the PC the folder is `M:\almanac-art` (pin it to Quick
+access); drag paintings in and they show up without a restart.
 
 ## Stage 3: run it and start on boot
 
@@ -98,7 +100,15 @@ Test a reboot once: `sudo reboot`, wait two minutes, open the address.
 
 `deploy/backup.sh` saves one file of all the data each night to
 `/mnt/storage/backups/almanac/almanac-YYYY-MM-DD.sql.gz` and keeps 30 days.
-On the server, `crontab -e` and add:
+The backups folder is owned by root, so on the server first make Almanac's
+folder yours:
+
+```
+sudo mkdir -p /mnt/storage/backups/almanac
+sudo chown doherty:doherty /mnt/storage/backups/almanac
+```
+
+Then `crontab -e` and add:
 
 ```
 45 3 * * * /opt/almanac/deploy/backup.sh >> /mnt/storage/backups/almanac/backup.log 2>&1
@@ -133,17 +143,37 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
 
 ## Stage 5: the kitchen screen
 
-1. Install **Ubuntu Desktop** (24.04 LTS or newer) on the second M920q. Make
-   a user that signs in automatically (Settings › Users › Automatic Login),
-   so it comes back to Almanac after a power cut.
-2. On the sign-in screen choose **Ubuntu on Xorg** (the gear, bottom right)
-   once; the launcher's pill needs Xorg.
+1. Install **Ubuntu Desktop** (the kitchen PC runs 26.04 LTS, which is
+   Wayland only). Make a user that signs in automatically (Settings › Users ›
+   Automatic Login), so it comes back to Almanac after a power cut.
+2. On Wayland the launcher needs its GNOME Shell extension (step 2b of
+   `launcher-helper/README.md`). On Ubuntu 24.04 or older it can use Xorg
+   instead: add `WaylandEnable=false` under `[daemon]` in
+   `/etc/gdm3/custom.conf` and restart.
 3. Turn off the screen blanking Ubuntu does by itself (Settings › Power ›
    Screen Blank: Never); Almanac's art screen saver handles that.
 4. In BIOS (F1 at power on) set **After Power Loss: Power On**. Do the same on
    the server.
-5. Install Chromium and set up the launcher: follow `launcher-helper/README.md`.
-   Almanac's address there is `http://192.168.2.42:3001`.
+5. Install the tools: `sudo apt install -y curl` (plus `wmctrl python3-gi gir1.2-gtk-3.0` on Xorg),
+   `sudo snap install chromium`, Node 24 (same two NodeSource lines as the
+   server), `sudo usermod -aG input $USER`, and stop Ubuntu blanking the screen:
+   `gsettings set org.gnome.desktop.session idle-delay 0` and
+   `gsettings set org.gnome.desktop.screensaver lock-enabled false`.
+6. Copy the launcher from the server (the repository is private, so no
+   `git clone` here). On the server:
+   `cd /opt/almanac && tar czf /tmp/launcher-helper.tgz launcher-helper && cd /tmp && python3 -m http.server 8765`
+   and on the kitchen PC:
+   `mkdir -p ~/almanac && cd ~/almanac && curl -O http://192.168.2.42:8765/launcher-helper.tgz && tar xzf launcher-helper.tgz`.
+   Ctrl+C on the server when done. Reboot the kitchen PC.
+7. Follow `launcher-helper/README.md` from step 3 (the example config already
+   points at `http://192.168.2.42:3001`). Before turning on kiosk mode, open
+   Almanac once in a normal window with the kiosk's profile, sign in and
+   allow local network access:
+   `chromium --class=almanac --user-data-dir=$HOME/almanac-launcher/profiles/almanac http://192.168.2.42:3001`
+
+The kitchen PC must stay on **Wi-Fi**: the router reserves 192.168.2.42 for
+its Ethernet port (the boxes swapped drives), and the server answers on .42 as
+an extra fixed address in its netplan file.
 
 ## Good to know
 
@@ -154,3 +184,5 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
   `http://192.168.2.42:54323` for anyone on the home network. Look, but don't
   edit tables there: every change is a migration.
 - Never run `npm run db:reset` on the server. It wipes all the data.
+- Secure Boot is off on the server box: its firmware didn't trust Ubuntu
+  26.04's newer signature after the drive swap.
