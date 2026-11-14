@@ -68,9 +68,10 @@ export default class AlmanacShell extends Extension {
             visible: false,
         });
         this._pill.connect('clicked', () => this._tapped());
-        // Top chrome sits above every window. trackFullscreen: false keeps it
-        // showing over full-screen games and videos too.
-        Main.layoutManager.addTopChrome(this._pill, {affectsInputRegion: true, trackFullscreen: false});
+        // Top chrome sits above every window, and by default it takes taps and
+        // stays showing over full-screen games and videos. (GNOME 50 refuses
+        // the old affectsInputRegion option, so pass no options.)
+        Main.layoutManager.addTopChrome(this._pill);
 
         this._dbus = Gio.DBusExportedObject.wrapJSObject(INTERFACE, this);
         this._dbus.export(Gio.DBus.session, OBJECT_PATH);
@@ -109,7 +110,9 @@ export default class AlmanacShell extends Extension {
 
     Raise(match) {
         const want = String(match).toLowerCase();
-        const windows = global.get_window_actors().map(a => a.get_meta_window()).filter(Boolean);
+        // GNOME 48+ keeps the window list on the compositor.
+        const actors = global.compositor?.get_window_actors?.() ?? global.get_window_actors();
+        const windows = actors.map(a => a.get_meta_window()).filter(Boolean);
         const byId = w => [w.get_wm_class(), w.get_wm_class_instance(), w.get_gtk_application_id(), w.get_sandboxed_app_id()]
             .some(v => v && v.toLowerCase() === want);
         const byTitle = w => (w.get_title() ?? '').toLowerCase().includes(want);
