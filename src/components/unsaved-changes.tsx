@@ -81,7 +81,22 @@ export function useUnsavedChanges(dirty: boolean, discard: () => void) {
  * along the bottom, 2026-11-09). With changes: Undo and a blue Save with a
  * dot. Without: a small green "Saved". A problem shows in red beside it.
  */
-export function SaveButton({ dirty, saving, error, onSave, onUndo }: { dirty: boolean; saving: boolean; error: string | null; onSave: () => void; onUndo: () => void }) {
+export function SaveButton({
+  dirty,
+  saving,
+  error,
+  onSave,
+  onUndo,
+  ready = false,
+}: {
+  dirty: boolean;
+  saving: boolean;
+  error: string | null;
+  onSave: () => void;
+  onUndo: () => void;
+  /** Offer Save even with no changes (the Planner's week not yet sent to the grocery list). */
+  ready?: boolean;
+}) {
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-2" role="group" aria-label="Save">
       {error ? (
@@ -89,14 +104,16 @@ export function SaveButton({ dirty, saving, error, onSave, onUndo }: { dirty: bo
           {error}
         </span>
       ) : null}
-      {dirty ? (
+      {dirty || ready ? (
         <>
+          {dirty ? (
           <button type="button" onClick={onUndo} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink">
             Undo
           </button>
+          ) : null}
           {/* The page's one Save: the black main action, with a dot while there are changes. */}
           <button type="button" onClick={onSave} disabled={saving} className={`${primaryActionClass} disabled:opacity-70`}>
-            <span aria-hidden className="size-2.5 rounded-full bg-primary-ink" />
+            {dirty ? <span aria-hidden className="size-2.5 rounded-full bg-primary-ink" /> : null}
             {saving ? "Saving…" : "Save"}
           </button>
         </>

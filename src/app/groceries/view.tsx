@@ -24,13 +24,13 @@ import { RepeatsCard } from "./repeats";
  * amount on the right. Ticked lines stay, muted, until Clear ticked.
  */
 
-type Part = { aisle: string; first: boolean; lines: GroceryLine[] };
-type Column = Part[];
+type Part<T> = { aisle: string; first: boolean; lines: T[] };
+type Column<T> = Part<T>[];
 
 /** Fills columns aisle by aisle (an aisle heading takes a row); columns beyond the page go on the next one. */
-export function groceryPages(lines: GroceryLine[], rows: number, columns: number): Column[][] {
-  const cols: Column[] = [];
-  let col: Column = [];
+export function groceryPages<T extends { aisle: string }>(lines: T[], rows: number, columns: number): Column<T>[][] {
+  const cols: Column<T>[] = [];
+  let col: Column<T> = [];
   let used = 0;
   const aisles = [...new Set(lines.map((l) => l.aisle))];
   for (const aisle of aisles) {
@@ -50,7 +50,7 @@ export function groceryPages(lines: GroceryLine[], rows: number, columns: number
     }
   }
   if (col.length) cols.push(col);
-  const pages: Column[][] = [];
+  const pages: Column<T>[][] = [];
   for (let i = 0; i < cols.length; i += columns) pages.push(cols.slice(i, i + columns));
   return pages.length ? pages : [[]];
 }

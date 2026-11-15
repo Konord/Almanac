@@ -134,7 +134,7 @@ export function KindBox({
                     on ? "border-ink bg-rail text-ink" : "border-frame text-ink"
                   } ${!can ? "opacity-40" : ""}`}
                 >
-                  <Face person={m} size="size-10 text-base" />
+                  <Face person={m} size="size-5" />
                   {m.name}
                   {on ? " ✓" : ""}
                 </button>
