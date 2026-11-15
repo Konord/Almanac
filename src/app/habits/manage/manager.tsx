@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CaretLeft, Plus, Trash, X } from "@phosphor-icons/react";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Pager } from "@/components/pager";
-import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
+import { Avatar, EmptyState, Emoji, ScreenHeader, segItemClass, segTrackClass } from "@/components/ui";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { useFitRows } from "@/components/use-fit-rows";
 import { soft, strong } from "@/lib/colours";
@@ -103,11 +103,17 @@ export function HabitManager({
 
   return (
     <>
-      <ScreenHeader title="Habit Manager">
-        <Link href="/habits" aria-label="Back to Habits" className="-order-1 flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink">
-          <CaretLeft size="1.75rem" weight="bold" aria-hidden />
-        </Link>
-        <div role="tablist" aria-label="Habits or health" className="flex gap-1 rounded-2xl bg-panel p-1.25">
+      <ScreenHeader
+        title="Habits"
+        sub="Manage"
+        nav={
+          <Link href="/habits" aria-label="Back to Habits" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink">
+            <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+          </Link>
+        }
+        action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />}
+        tabs={
+        <div role="tablist" aria-label="Habits or health" className={segTrackClass}>
           {(["habits", "health"] as const).map((t) => (
             <button
               key={t}
@@ -115,14 +121,14 @@ export function HabitManager({
               role="tab"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
-              className={`flex min-h-[var(--touch-target)] min-w-28 items-center justify-center rounded-xl px-5 text-lg font-bold ${tab === t ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
+              className={segItemClass(tab === t)}
             >
               {t === "habits" ? "Habits" : "Health"}
             </button>
           ))}
         </div>
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </ScreenHeader>
+        }
+      />
 
       {tab === "habits" ? (
         <HabitsTab draft={draft} update={update} members={members} fromRoutines={fromRoutines} selected={habitId} select={setHabitId} today={today} weekdayName={weekdayName} />

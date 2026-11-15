@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Broom, CalendarDots, CaretLeft, CaretRight, ShoppingCart, Suitcase } from "@phosphor-icons/react";
-import { Emoji } from "@/components/ui";
+import { Emoji, ScreenHeader, segItemClass, segTrackClass } from "@/components/ui";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { eventEmoji } from "@/lib/emoji";
 import { mainDish } from "@/lib/menu";
@@ -285,40 +285,49 @@ export function ReviewBoard({
 
   return (
     <>
-      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Planner</h1>
-        <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25">
-          <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
-          <span className="px-2 text-lg font-bold whitespace-nowrap text-ink">{range}</span>
-          <WeekButton label="Week after" onClick={() => go(weekHref.next)} icon="next" />
-        </div>
+      <ScreenHeader
+        title="Planner"
+        sub={range}
+        nav={
+          <>
+            <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
+            <WeekButton label="Week after" onClick={() => go(weekHref.next)} icon="next" />
+          </>
+        }
+        tabs={
+          <div className={segTrackClass} role="group" aria-label="Show">
+            <ViewButton on={view === "week"} onClick={() => setView("week")} icon={<CalendarDots size="1.5rem" weight="bold" aria-hidden />} label="Week" />
+            <ViewButton on={view === "chores"} onClick={() => setView("chores")} icon={<Broom size="1.5rem" weight="bold" aria-hidden />} label="Chores" />
+          </div>
+        }
+        action={
+          <>
+            <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] shrink-0 items-center gap-2.5 rounded-[var(--radius)] bg-meal px-5 text-lg font-bold whitespace-nowrap text-meal-ink">
+              <ShoppingCart size="1.5rem" weight="bold" aria-hidden />
+              Grocery list
+            </button>
+            <SaveButton
+              dirty={dirty}
+              saving={saving}
+              error={error}
+              onSave={() => save()}
+              onUndo={() => {
+                setDraft(data.initial);
+                setError(null);
+              }}
+            />
+          </>
+        }
+      >
         {weekHref.isComing ? null : (
           <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl px-3 text-base font-bold whitespace-nowrap text-accent">
             The coming week
           </button>
         )}
-        <div className="flex min-w-0 flex-1">
+        <div className="flex min-w-0">
           <ChecksMenu problems={problems} onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))} onLeave={(p) => change((d) => dismiss(d, p.id))} />
         </div>
-        <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25" role="group" aria-label="Show">
-          <ViewButton on={view === "week"} onClick={() => setView("week")} icon={<CalendarDots size="1.5rem" weight="bold" aria-hidden />} label="Week" />
-          <ViewButton on={view === "chores"} onClick={() => setView("chores")} icon={<Broom size="1.5rem" weight="bold" aria-hidden />} label="Chores" />
-        </div>
-        <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-meal px-5 text-lg font-bold whitespace-nowrap text-meal-ink">
-          <ShoppingCart size="1.625rem" weight="bold" aria-hidden />
-          Grocery list
-        </button>
-        <SaveButton
-          dirty={dirty}
-          saving={saving}
-          error={error}
-          onSave={() => save()}
-          onUndo={() => {
-            setDraft(data.initial);
-            setError(null);
-          }}
-        />
-      </header>
+      </ScreenHeader>
 
       <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-grid sm:grid-cols-4 lg:grid-cols-7">
         {data.columns.map((col, i) => {
@@ -602,7 +611,7 @@ function ViewButton({ on, onClick, icon, label }: { on: boolean; onClick: () => 
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl px-3.5 text-lg font-bold whitespace-nowrap ${on ? "bg-board text-ink shadow-sm" : "text-ink-soft hover:bg-board"}`}
+      className={segItemClass(on)}
     >
       {icon}
       {label}
@@ -613,7 +622,7 @@ function ViewButton({ on, onClick, icon, label }: { on: boolean; onClick: () => 
 function WeekButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: "prev" | "next" }) {
   const Icon = icon === "prev" ? CaretLeft : CaretRight;
   return (
-    <button type="button" onClick={onClick} aria-label={label} className="flex size-[var(--touch-target)] items-center justify-center rounded-xl text-ink hover:bg-board">
+    <button type="button" onClick={onClick} aria-label={label} className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-panel text-ink">
       <Icon size="1.5rem" weight="bold" aria-hidden />
     </button>
   );

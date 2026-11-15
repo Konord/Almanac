@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { FitList } from "@/components/fit-list";
 import Link from "next/link";
-import { BookOpen, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { BookOpen, Trash } from "@phosphor-icons/react/dist/ssr";
+import { ActionLink, AppFrame, Button, Card, Emoji, Field, Input, Select, firstParam, LoadingOutline } from "@/components/ui";
 import { BATCHES, batchAmount } from "@/lib/meals";
 import { clampBatches, menuMealName } from "@/lib/menu";
 import { measureText, type Measures } from "@/lib/units";
@@ -69,10 +69,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   return (
     <>
       <MealsHeader title="Meals" tab="library" error={p("error")} message={p("message")}>
-        <SoftLink href={here({ add: "type" })}>
-          <Plus size="1.5rem" weight="bold" aria-hidden />
-          Add a dish
-        </SoftLink>
+        <ActionLink href={here({ add: "type" })}>Add a dish</ActionLink>
       </MealsHeader>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">

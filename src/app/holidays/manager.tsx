@@ -125,9 +125,7 @@ export function HolidayManager({
 
   return (
     <>
-      <ScreenHeader title="Holidays and birthdays">
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </ScreenHeader>
+      <ScreenHeader title="Holidays" sub="and birthdays" action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />} />
 
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,24fr)_minmax(0,56fr)]">
         {/* Left: the two tabs and their lists */}

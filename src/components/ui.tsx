@@ -1,14 +1,15 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
+import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { emojiImage } from "@/lib/emoji";
-import { soft, strong } from "@/lib/colours";
+import { hand, soft, strong } from "@/lib/colours";
 import { TimerPill } from "./timer-pill";
 import { MenuTray, type Section } from "./menu-tray";
 
 /**
- * Small building blocks shared by every screen, in the locked "bright"
- * style. They only use theme colours (bg-board, text-ink, accent …), and
+ * Small building blocks shared by every screen, in the Glance A style
+ * (docs/glance/SPEC.md): a light grey rail behind white rounded panels. They only use theme colours (bg-board, text-ink, accent …), and
  * every tappable thing is at least the theme's touch-target size so it
  * works on the wall screen.
  *
@@ -30,8 +31,9 @@ export type { Section };
  */
 export function AppFrame({ section, children }: { section: Section; children: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-1 flex-col lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
-      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 pb-12 sm:p-6 sm:pb-12 lg:min-h-0 lg:px-8.5 lg:pt-5.5 lg:pb-9">
+    <div className="flex min-h-dvh flex-1 flex-col bg-rail lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
+      {/* 3.15rem at the bottom is the tray handle's strip (no dock, no side rail). */}
+      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 pb-12 sm:p-6 sm:pb-12 lg:min-h-0 lg:gap-5 lg:px-8 lg:pt-6 lg:pb-[3.15rem]">
         {children}
       </main>
       <MenuTray section={section} />
@@ -40,33 +42,139 @@ export function AppFrame({ section, children }: { section: Section; children: Re
   );
 }
 
-/** The 72px header row: big title, then whatever the screen adds (clock, switch). */
-export function ScreenHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
-  return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-5.5 gap-y-2 lg:h-18 lg:flex-nowrap">
-      <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">{title}</h1>
-      {children}
+/**
+ * The Glance header, the same 7rem band on every screen (SPEC "Global
+ * header rule"). From left to right:
+ *
+ *   - a big printed title (6.75rem, weight 800), with optional secondary
+ *     text (the date, the year) sitting on the title's baseline, and on a
+ *     holiday a big picture before it;
+ *   - `children`: any other live controls the screen still needs, if they
+ *     fit beside the title (they move into the screen bodies as each
+ *     screen is redesigned);
+ *   - `nav`: prev / next arrows, just left of the tab slot;
+ *   - the weather (calendar pages only; empty until there is a weather source);
+ *   - the tab slot, a fixed width so the right-hand end never shifts:
+ *     Today | Week | Month on the calendar pages, the page's own sub-tabs
+ *     elsewhere, or empty;
+ *   - `action`: the black Add (or Save, or "New list") at the far right.
+ *
+ * Nothing goes under the title (no chips). A screen with more live
+ * controls than fit (Today, Week, Month for now) passes them as `toolbar`:
+ * a slim row just below the header band, so the band itself is the same
+ * 7rem everywhere.
+ */
+export function ScreenHeader({
+  title,
+  sub,
+  hero,
+  nav,
+  tabs,
+  weather = false,
+  action,
+  toolbar,
+  children,
+}: {
+  title: ReactNode;
+  sub?: ReactNode;
+  /** A holiday's big picture, before the title. */
+  hero?: string | null;
+  nav?: ReactNode;
+  tabs?: ReactNode;
+  /** Calendar pages keep a place for the weather. */
+  weather?: boolean;
+  action?: ReactNode;
+  toolbar?: ReactNode;
+  children?: ReactNode;
+}) {
+  const band = (
+    <header className="flex shrink-0 flex-wrap items-center gap-x-[1.15rem] gap-y-2 lg:h-28 lg:max-h-28 lg:flex-nowrap">
+      <div className="mr-auto flex min-w-0 items-baseline gap-[0.8rem] overflow-hidden">
+        {hero ? <Emoji emoji={hero} className="size-14 self-center drop-shadow-[0_0.15rem_0.4rem_rgba(0,0,0,0.3)] lg:size-24" /> : null}
+        <h1 className="shrink-0 pb-[0.06em] text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
+        {sub && sub !== title ? <span className="tabular min-w-0 truncate text-2xl leading-none font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">{sub}</span> : null}
+      </div>
+      {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
+      <div className="flex shrink-0 items-center gap-[0.6rem]">
+        {nav ? <div className="flex items-center gap-[0.35rem]">{nav}</div> : null}
+        {weather ? <WeatherSlot /> : null}
+        <div className="flex justify-end lg:min-w-[22.5rem]">{tabs}</div>
+        {action}
+      </div>
     </header>
+  );
+  if (!toolbar) return band;
+  return (
+    <>
+      {band}
+      <div className="-mt-2 flex min-h-[var(--touch-target)] shrink-0 flex-wrap items-center gap-[0.6rem]">{toolbar}</div>
+    </>
   );
 }
 
-/** A segmented switch, like Day / Week / Month. */
+/**
+ * Where the weather (icon + temperature, tap for the forecast) goes on the
+ * calendar pages. There is no weather source yet (it needs Connor's OK for
+ * an outside service), so it shows nothing.
+ */
+function WeatherSlot() {
+  return null;
+}
+
+/** The track of a segmented switch, and one of its options (for switches made of buttons). */
+export const segTrackClass = "flex gap-1 rounded-[calc(var(--radius)+0.3rem)] bg-panel p-[0.3rem]";
+export function segItemClass(active: boolean): string {
+  return `flex min-h-[var(--touch-target)] min-w-[6.75rem] items-center justify-center gap-2 rounded-[var(--radius)] px-4 text-lg whitespace-nowrap ${
+    active ? "bg-tab-on font-bold text-tab-on-ink shadow-raised" : "font-semibold text-ink-muted"
+  }`;
+}
+
+/** A segmented switch, like Today / Week / Month. */
 export function Segmented({ options, label }: { options: { href: string; label: string; active: boolean }[]; label: string }) {
   return (
-    <nav aria-label={label} className="flex gap-1 rounded-2xl bg-panel p-1.25">
+    <nav aria-label={label} className={segTrackClass}>
       {options.map((o) => (
-        <Link
-          key={o.label}
-          href={o.href}
-          aria-current={o.active ? "page" : undefined}
-          className={`flex min-h-[var(--touch-target)] min-w-24 items-center justify-center rounded-xl px-4 text-base font-bold ${
-            o.active ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"
-          }`}
-        >
+        <Link key={o.label} href={o.href} aria-current={o.active ? "page" : undefined} className={segItemClass(o.active)}>
           {o.label}
         </Link>
       ))}
     </nav>
+  );
+}
+
+/** The look of the main action (Add, Save, New list): ink black, or the holiday colour. */
+export const primaryActionClass =
+  "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-primary px-[1.35rem] text-lg font-bold whitespace-nowrap text-primary-ink";
+
+/** The header's main action as a link, e.g. "+ Add" or "+ New list". */
+export function ActionLink({
+  href,
+  children,
+  label,
+  icon: IconComponent = Plus,
+  scroll,
+}: {
+  href: string;
+  children: ReactNode;
+  /** For screen readers when the words alone aren't enough. */
+  label?: string;
+  icon?: Icon | null;
+  scroll?: boolean;
+}) {
+  return (
+    <Link href={href} aria-label={label} title={label} scroll={scroll} className={primaryActionClass}>
+      {IconComponent ? <IconComponent size="1.25rem" weight="bold" aria-hidden /> : null}
+      {children}
+    </Link>
+  );
+}
+
+/** Text someone in the family wrote: handwriting in their ink (dark ink if it isn't anyone's). */
+export function HandText({ colour, className = "", children }: { colour?: string | null; className?: string; children: ReactNode }) {
+  return (
+    <span className={`font-hand ${className}`} style={{ color: hand(colour) }}>
+      {children}
+    </span>
   );
 }
 
@@ -77,9 +185,9 @@ export function IconLink({ href, label, icon: IconComponent }: { href: string; l
       href={href}
       aria-label={label}
       title={label}
-      className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink hover:bg-panel"
+      className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
     >
-      <IconComponent size="1.75rem" weight="bold" aria-hidden />
+      <IconComponent size="1.5rem" weight="bold" aria-hidden />
     </Link>
   );
 }
@@ -89,7 +197,7 @@ export function SoftLink({ href, children, className = "" }: { href: string; chi
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel ${className}`}
+      className={`inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink ${className}`}
     >
       {children}
     </Link>
@@ -100,7 +208,7 @@ export function SoftLink({ href, children, className = "" }: { href: string; chi
 // Cards, people and pictures
 // ---------------------------------------------------------------------------
 
-/** A white card with a hairline edge and a title row with a tinted icon chip. */
+/** A white rounded panel lifted off the rail, with a title row and a tinted icon chip. */
 export function Card({
   title,
   icon: IconComponent,
@@ -119,7 +227,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`flex min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4.5 lg:min-h-0 ${className}`}>
+    <section className={`flex min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised lg:min-h-0 ${className}`}>
       {title === undefined && !IconComponent && !aside ? null : (
       <div className="mb-1 flex items-center gap-3">
         {IconComponent ? (
@@ -232,7 +340,7 @@ export function ProgressBar({ done, total, colour, thick = false }: { done: numb
 export function PageShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-6 sm:p-10">
-      <h1 className="text-5xl font-extrabold tracking-tight text-ink">{title}</h1>
+      <h1 className="text-[3.5rem] leading-[0.95] font-extrabold tracking-[-0.045em] text-title lg:text-[5rem]">{title}</h1>
       {children}
     </main>
   );
@@ -240,7 +348,7 @@ export function PageShell({ title, children }: { title: string; children: ReactN
 
 export function Panel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4.5">
+    <section className="rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
       {title ? <h2 className="mb-4 text-2xl font-bold text-ink">{title}</h2> : null}
       {children}
     </section>
@@ -256,10 +364,10 @@ export function Button({
   ...props
 }: ComponentProps<"button"> & { variant?: "primary" | "secondary" | "danger" | "save" }) {
   const look = {
-    primary: "bg-ink text-board",
+    primary: "bg-primary text-primary-ink",
     // The blue of the screen-wide Save (unsaved-changes.tsx), so every Save looks the same.
     save: "bg-accent text-white",
-    secondary: "bg-rail text-ink hover:bg-panel",
+    secondary: "bg-panel text-ink",
     danger: "border-2 border-danger bg-board text-danger",
   }[variant];
   return <button className={`${buttonBase} ${look} ${className}`} {...props} />;
@@ -357,14 +465,14 @@ export function Chips({
 export function LoadingOutline() {
   return (
     <div className="flex min-h-0 flex-1 animate-pulse flex-col gap-5" role="status" aria-label="Loading">
-      <div className="flex h-18 shrink-0 items-center gap-5">
+      <div className="flex h-28 shrink-0 items-center gap-5">
         <span className="h-12 w-72 rounded-2xl bg-rail" />
         <span className="h-12 w-56 rounded-2xl bg-rail" />
         <span className="ml-auto h-12 w-44 rounded-2xl bg-rail" />
       </div>
       <div className="grid min-h-[20rem] flex-1 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
-        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
-        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
+        <span className="rounded-[var(--radius-card)] bg-board/70" />
+        <span className="rounded-[var(--radius-card)] bg-board/70" />
       </div>
     </div>
   );

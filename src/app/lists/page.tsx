@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { FitList } from "@/components/fit-list";
 import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { ActionLink, AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
@@ -70,7 +70,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
   return (
     <>
-      <ScreenHeader title="Lists" />
+      <ScreenHeader title="Lists" action={<ActionLink href={here("&newList=1")}>New list</ActionLink>} />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}

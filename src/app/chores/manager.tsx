@@ -225,9 +225,7 @@ export function ChoreManager({
 
   return (
     <>
-      <ScreenHeader title="Chores">
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </ScreenHeader>
+      <ScreenHeader title="Chores" sub="Setup" action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />} />
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">
       {/* Left: Occasional chores on top, then the chore days */}
       <section className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame bg-board p-4 lg:min-h-0">

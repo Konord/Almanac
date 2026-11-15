@@ -39,12 +39,15 @@ async function HouseholdsContent({ searchParams }: { searchParams: PageProps<"/h
 
   return (
     <>
-      <ScreenHeader title="Households">
-        <SoftLink href="/household" className="lg:ml-auto">
-          <ArrowLeft size="1.5rem" aria-hidden />
-          Back to settings
-        </SoftLink>
-      </ScreenHeader>
+      <ScreenHeader
+        title="Households"
+        action={
+          <SoftLink href="/household">
+            <ArrowLeft size="1.5rem" aria-hidden />
+            Back to settings
+          </SoftLink>
+        }
+      />
 
       {error_ ? <Notice tone="error">{error_}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}

@@ -4,7 +4,7 @@ import { Pager } from "@/components/pager";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
-import { Avatar, EmptyState, Emoji } from "@/components/ui";
+import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -459,8 +459,18 @@ export function RoutineManager({
   return (
     <>
       {/* Title, which kind of day, and Set days */}
-      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routines</h1>
+      <ScreenHeader
+        title="Routines"
+        action={
+          <>
+            <Link href="/routines/manage" className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink">
+              <GearSix size="1.5rem" aria-hidden />
+              Set days
+            </Link>
+            <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
+          </>
+        }
+      >
         <div role="group" aria-label="Which day" className="flex min-w-0 flex-wrap items-center gap-2">
           {dayNames.map((name) => (
             <Chip key={name} active={view === name} onClick={() => pickView(name)}>
@@ -468,15 +478,7 @@ export function RoutineManager({
             </Chip>
           ))}
         </div>
-        <Link
-          href="/routines/manage"
-          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
-        >
-          <GearSix size="1.5rem" aria-hidden />
-          Set days
-        </Link>
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </header>
+      </ScreenHeader>
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)]">
         {/* The time grid */}

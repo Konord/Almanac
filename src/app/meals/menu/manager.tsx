@@ -186,12 +186,12 @@ export function MenuManager({
 
   return (
     <>
-      <ScreenHeader title="Meals">
-        <Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />
-        <div className="flex items-center gap-4 lg:ml-auto">
-          <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-        </div>
-      </ScreenHeader>
+      <ScreenHeader
+        title="Meals"
+        sub={MENU_TABS.find((t) => t.tab === "menu")?.label}
+        tabs={<Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />}
+        action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />}
+      />
       {problem ? <Notice tone="error">{problem}</Notice> : message ? <Notice tone="success">{message}</Notice> : null}
 
       <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,22fr)_minmax(0,30fr)_minmax(0,50fr)]">

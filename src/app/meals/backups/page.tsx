@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Minus, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Emoji, Field, Input, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { ActionLink, AppFrame, Button, Emoji, Field, Input, firstParam, LoadingOutline } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
 import { addRecipe, adjustOnHand } from "../actions";
 import { loadBackupParts, loadItems, loadMealBasics, readyCount } from "../data";
@@ -40,11 +40,8 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
 
   return (
     <>
-      <MealsHeader title="Backup meals" tab="backups" error={firstParam(params.error)} message={firstParam(params.message)}>
-        <SoftLink href={here({ new: "1" })}>
-          <Plus size="1.5rem" weight="bold" aria-hidden />
-          Backup meal
-        </SoftLink>
+      <MealsHeader title="Meals" tab="backups" error={firstParam(params.error)} message={firstParam(params.message)}>
+        <ActionLink href={here({ new: "1" })}>Backup meal</ActionLink>
       </MealsHeader>
 
       {backups.length === 0 ? (

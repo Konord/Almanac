@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, Copy, Plus, Trash, X } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
+import { ActionLink, AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
@@ -61,7 +60,7 @@ export default function CalendarPage(props: PageProps<"/calendar">) {
 
 async function CalendarContent({ searchParams }: { searchParams: PageProps<"/calendar">["searchParams"] }) {
   const household = await requireHousehold();
-  const { timeZone, weekStartsOn, locale } = household.settings;
+  const { timeZone, weekStartsOn } = household.settings;
   const params = await searchParams;
   const supabase = await createClient();
 
@@ -194,14 +193,43 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
         <OpenPanelTab returnTo={panelReturn} />
       )}
       <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
-      <ScreenHeader title={rangeTitle(view, days, anchor, household)}>
-        {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
-        <div className="flex items-center gap-2">
-          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={byMonth ? "Previous month" : "Previous week"} icon={CaretLeft} />
-          <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>Today</SoftLink>
-          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+      <ScreenHeader
+        {...headerTitle(view, days, anchor, household)}
+        weather
+        nav={
+          <>
+            <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={byMonth ? "Previous month" : "Previous week"} icon={CaretLeft} />
+            <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
+          </>
+        }
+        tabs={
+          <Segmented
+            label="View"
+            options={[
+              { href: "/", label: "Today", active: false },
+              { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
+              { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
+            ]}
+          />
+        }
+        action={
+          // Add starts adding mode (tap a day or time to place it), or cancels it.
+          <ActionLink
+            href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
+            scroll={false}
+            icon={placing ? X : Plus}
+            label={placing ? "Stop adding" : "Add an event"}
+          >
+            {placing ? "Stop" : "Add"}
+          </ActionLink>
+        }
+        toolbar={
+          <>
+        {/* Away from this week or month: a way straight back. */}
+        {days.includes(today) ? null : (
+          <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>{byMonth ? "This month" : "This week"}</SoftLink>
+        )}
+        <div className="flex items-center gap-3">
           <SoftLink href="/holidays" className="px-3.5">
             <Emoji emoji="🎉" className="size-7" />
             Holidays
@@ -211,16 +239,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             Templates
           </SoftLink>
           <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
-          <Segmented
-            label="View"
-            options={[
-              { href: "/", label: "Agenda", active: false },
-              { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
-              { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
-            ]}
-          />
         </div>
-      </ScreenHeader>
+          </>
+        }
+      />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -265,18 +287,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       </div>
       </div>
 
-      {/* Add button, bottom right: starts adding mode, or cancels it. */}
-      <Link
-        href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
-        scroll={false}
-        aria-label={placing ? "Stop adding" : "Add an event"}
-        title={placing ? "Stop adding" : "Add an event"}
-        className={`fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)] ${
-          placing ? "bg-accent" : "bg-ink"
-        }`}
-      >
-        {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
-      </Link>
 
       {editing ? (
         <Sheet title={editing.title} closeHref={closeHref} narrow side={editSide}>
@@ -598,25 +608,18 @@ async function mealsFor(days: LocalDate[], events: CalendarItem[], members: Memb
   return result;
 }
 
-function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household: Household): string {
+/**
+ * The header for Week and Month: the month's name, with the year on its
+ * baseline (Glance: no date-range text). A week that runs over two months
+ * is named for the month most of its days are in.
+ */
+function headerTitle(view: View, days: LocalDate[], anchor: LocalDate, household: Household): { title: string; sub: string } {
   const { locale, timeZone } = household.settings;
-  const noon = (d: LocalDate) => zonedToUtc(d, "12:00", timeZone);
-  // Month is titled with the month either way (today's, unless you've moved).
-  // The year only shows when it isn't this year, so the header fits on one line.
-  const thisYear = localDateOf(new Date(), timeZone).slice(0, 4);
-  if (view !== "week") {
-    return anchor.slice(0, 4) === thisYear
-      ? new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(noon(anchor))
-      : new Intl.DateTimeFormat(locale, { timeZone, month: "short", year: "numeric" }).format(noon(anchor));
-  }
-  const first = days[0];
-  const last = days[6];
-  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
-  const fmt = new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" });
-  const year = last.slice(0, 4) === thisYear ? "" : `, ${last.slice(0, 4)}`;
-  return sameMonth
-    ? `${fmt.format(noon(first))}–${Number(last.slice(8))}${year}`
-    : `${fmt.format(noon(first))} – ${fmt.format(noon(last))}${year}`;
+  const date = view === "week" ? days[3] : anchor;
+  return {
+    title: new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(zonedToUtc(date, "12:00", timeZone)),
+    sub: date.slice(0, 4),
+  };
 }
 
 /**

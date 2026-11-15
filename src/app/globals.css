@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* Local font files (public/fonts, SIL Open Font License; the licences sit beside them). */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+/* Figtree's figures, used for the digits only (Atkinson's zero is slashed). */
+@font-face {
+  font-family: "Almanac Digits";
+  src: url("/fonts/figtree-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039;
+  size-adjust: 98%;
+}
+@font-face {
+  font-family: "Shantell Sans";
+  src: url("/fonts/shantell-sans-latin-full-normal.woff2") format("woff2-variations");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /*
  * The actual colour values come from src/theme/tokens.ts and are set on
  * <html> by the root layout (and then the household's own theme). The
@@ -10,17 +36,24 @@
 @theme inline {
   --color-board: var(--color-board, #ffffff);
   --color-rail: var(--color-rail, #f6f7f9);
-  --color-panel: var(--color-panel, #f1f2f5);
-  --color-frame: var(--color-frame, #eceef1);
-  --color-grid: var(--color-grid, #eef0f3);
+  --color-panel: var(--color-panel, #eef0f3);
+  --color-frame: var(--color-frame, #e3e6ea);
+  --color-grid: var(--color-grid, #e3e6ea);
   --color-ink: var(--color-ink, #23262b);
-  --color-ink-muted: var(--color-ink-muted, #6b7078);
+  --color-ink-muted: var(--color-ink-muted, #565b63);
   --color-ink-soft: var(--color-ink-soft, #4e535b);
-  --color-check-border: var(--color-check-border, #b9bec6);
-  --color-accent: var(--color-accent, #2f74c0);
+  --color-check-border: var(--color-check-border, #8a9099);
+  --color-title: var(--color-title, #23262b);
+  --color-title-soft: var(--color-title-soft, #4e535b);
+  --color-primary: var(--color-primary, #23262b);
+  --color-primary-ink: var(--color-primary-ink, #ffffff);
+  --color-tab-on: var(--color-tab-on, #ffffff);
+  --color-tab-on-ink: var(--color-tab-on-ink, #23262b);
+  --color-accent: var(--color-accent, #2f6fb8);
   --color-danger: var(--color-danger, #c23b2b);
-  --color-success: var(--color-success, #1b8790);
-  --color-now: var(--color-now, #e5533d);
+  --color-success: var(--color-success, #166f77);
+  --color-now: var(--color-now, #cf3f29);
+  --color-now-on-tint: var(--color-now-on-tint, #a3261a);
   --color-meal: var(--color-meal, #fbedb5);
   --color-meal-ink: var(--color-meal-ink, #5e4806);
   --color-met: var(--color-met, #3d8b37);
@@ -28,12 +61,22 @@
   --color-missed: var(--color-missed, #d9533f);
   --color-missed-soft: var(--color-missed-soft, #f2a79a);
   --color-alert-soft: var(--color-alert-soft, #fdece8);
+  --color-handle: var(--color-handle, #c5c8ce);
   --color-mat-white: var(--color-mat-white, #f7f6f2);
   --color-mat-cream: var(--color-mat-cream, #ece5d6);
   --color-mat-charcoal: var(--color-mat-charcoal, #36383c);
 
-  /* Fonts: one clear sans for everything, handwriting for family-written things. */
-  --font-sans: "Figtree Variable", "Figtree", system-ui, sans-serif;
+  /* Corners and shadows (values from src/theme/tokens.ts). */
+  --shadow-raised: var(--shadow-raised, 0 1px 3px rgba(30, 35, 45, 0.1));
+  --shadow-dialog: var(--shadow-dialog, 0 0 2.5rem rgba(30, 35, 45, 0.25));
+
+  /*
+   * Fonts (Glance spec, "Font rule for the final build"): printed text is
+   * Atkinson Hyperlegible Next, except digits 0-9, which come from Figtree
+   * ("Almanac Digits", listed first so it wins for digits only). Things the
+   * family wrote are Shantell Sans, in the writer's ink.
+   */
+  --font-sans: "Almanac Digits", "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --font-hand: var(--almanac-font-hand);
 
   /*
@@ -63,29 +106,44 @@
 
 :root {
   /* Turned off by the household's "handwriting" setting (HouseholdTheme). */
-  --almanac-font-hand: "Kalam", "Comic Sans MS", cursive;
+  --almanac-font-hand: "Shantell Sans", cursive;
 }
 
 /*
  * On a landscape screen the whole layout scales with the screen, like a
- * picture: the style guide is drawn at 1920×1080, and a 1280×720 screen
- * shows the same layout at two thirds of the size. Phones and portrait
- * screens keep normal sizes and scroll instead.
+ * picture, exactly as in the Glance mockups: 1rem = 16px at 1920×1080 and
+ * 21.3px on the 2560×1440 kitchen screen. Phones and portrait screens keep
+ * normal sizes and scroll instead.
  */
 @media (min-width: 1024px) and (orientation: landscape) {
   html {
-    font-size: clamp(10px, min(0.8333vw, 1.4815vh), 24px);
+    font-size: min(0.8333vw, 1.4815vh);
   }
 }
 
 body {
-  background: var(--color-board);
+  background: var(--color-rail);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-weight: 500;
 }
 
+/*
+ * Handwriting: Shantell Sans with a little bounce. The writer's ink comes
+ * from hand() in src/lib/colours.ts (dark ink when nobody is assigned).
+ * With handwriting off, --almanac-font-hand is the printed font and the
+ * Shantell axes are simply ignored.
+ */
 .font-hand {
   font-family: var(--font-hand);
+  font-variation-settings: "BNCE" 18, "INFM" 30, "SPAC" 0;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+/* Times and dates line up in columns. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /*

@@ -2,8 +2,8 @@
 
 import { Pager } from "@/components/pager";
 import { useEffect, useState, type ReactNode } from "react";
-import { AppWindow, FrameCorners, GearSix, HouseLine, MusicNotes, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
-import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
+import { GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { Avatar, Card, EmptyState, ScreenHeader, SoftLink, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -129,31 +129,20 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
 
   return (
     <>
-      <ScreenHeader title="Settings">
-        <nav aria-label="Settings" className="flex gap-1 rounded-2xl bg-panel p-1.25">
-          {(
-            [
-              { tab: "people", label: "People", icon: UsersThree },
-              { tab: "household", label: "Household", icon: GearSix },
-              { tab: "apps", label: "Apps", icon: AppWindow },
-              { tab: "screen", label: "Screen saver", icon: FrameCorners },
-              { tab: "spotify", label: "Spotify", icon: MusicNotes },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.tab}
-              type="button"
-              onClick={() => setTab(t.tab)}
-              aria-pressed={tab === t.tab}
-              className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl px-5 text-lg font-bold ${tab === t.tab ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
-            >
-              <t.icon size="1.375rem" aria-hidden />
-              {t.label}
-            </button>
-          ))}
-        </nav>
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </ScreenHeader>
+      <ScreenHeader
+        title="Settings"
+        sub={SETTINGS_TABS.find((t) => t.tab === tab)?.label}
+        tabs={
+          <nav aria-label="Settings" className={segTrackClass}>
+            {SETTINGS_TABS.map((t) => (
+              <button key={t.tab} type="button" onClick={() => setTab(t.tab)} aria-pressed={tab === t.tab} className={`${segItemClass(tab === t.tab)} !min-w-[5.75rem]`}>
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        }
+        action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />}
+      />
 
       {tab === "spotify" ? (
         <SpotifyTab info={spotify} />
@@ -371,3 +360,12 @@ function PersonEditor({ member, onChange }: { member: MemberDraft; onChange: (c:
     </div>
   );
 }
+
+/** The Settings tabs, in order (Spotify is live, so it stays beside the four in the mock). */
+const SETTINGS_TABS = [
+  { tab: "people", label: "People" },
+  { tab: "household", label: "Household" },
+  { tab: "apps", label: "Apps" },
+  { tab: "screen", label: "Screen saver" },
+  { tab: "spotify", label: "Spotify" },
+] as const;

@@ -8,11 +8,12 @@ import {
   Notice,
   ProgressBar,
   ScreenHeader,
+  ActionLink,
   Segmented,
   firstParam,
   LoadingOutline,
 } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
+import { holidayHero } from "@/lib/holiday-theme";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { EVERYONE_COLOUR, soft } from "@/lib/colours";
@@ -104,12 +105,12 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const shown = itemsForPeople(items, people);
   const shownMembers = people.length === 0 ? members : members.filter((m) => people.includes(m.id));
 
-  const longDate = new Intl.DateTimeFormat(locale, {
-    timeZone,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(now);
+  // The header: "Sunday" with "November 15" on its baseline; on a holiday
+  // (holiday themes on) the holiday's name and picture instead of the weekday.
+  const weekday = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long" }).format(now);
+  const monthDay = new Intl.DateTimeFormat(locale, { timeZone, month: "long", day: "numeric" }).format(now);
+  const hero = holidayHero(todaySpecials, household.settings.holidayThemes);
+  const ribbons = hero ? todaySpecials.filter((s) => !(s.kind === "holiday" && s.name === hero.title)) : todaySpecials;
   const todayItems = sortForDay(eventsOnDay(shown, today, timeZone), timeZone);
   const error = firstParam(params.error);
   const message = firstParam(params.message);
@@ -156,12 +157,33 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         <OpenPanelTab returnTo="/" />
       )}
       <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
-      <ScreenHeader title={panelPrefs.open ? "Agenda" : longDate}>
-        {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
-        {/* A holiday or birthday today: a big ribbon right by the title. */}
-        {todaySpecials.length > 0 ? (
+      <ScreenHeader
+        title={hero ? hero.title : weekday}
+        sub={hero ? `${weekday}, ${monthDay}` : monthDay}
+        hero={hero?.emoji}
+        weather
+        tabs={
+          <Segmented
+            label="View"
+            options={[
+              { href: "/", label: "Today", active: true },
+              { href: `/calendar?view=week&date=${today}`, label: "Week", active: false },
+              { href: `/calendar?view=month&date=${today}`, label: "Month", active: false },
+            ]}
+          />
+        }
+        action={
+          // Add starts adding mode (tap a time to place it), or cancels it.
+          <ActionLink href={placing ? "/" : "/?placing=1"} scroll={false} icon={placing ? X : Plus} label={placing ? "Stop adding" : "Add an event"}>
+            {placing ? "Stop" : "Add"}
+          </ActionLink>
+        }
+        toolbar={
+          <>
+        {/* Birthdays (and a holiday when holiday themes are off): a ribbon, until the all-day strip arrives. */}
+        {ribbons.length > 0 ? (
           <div className="flex max-w-[28rem] min-w-0 shrink">
-            <Ribbon special={todaySpecials[0]} more={todaySpecials.length - 1} big />
+            <Ribbon special={ribbons[0]} more={ribbons.length - 1} big />
           </div>
         ) : null}
         <DayPill data={routineData} today={today} />
@@ -188,26 +210,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             Planner
           </Link>
         ) : null}
-        <div className="flex items-center gap-3 lg:ml-auto">
-          <PeopleButton members={members} shown={people} href="/?panel=people" />
-          <Segmented
-            label="View"
-            options={[
-              { href: "/", label: "Agenda", active: true },
-              {
-                href: `/calendar?view=week&date=${today}`,
-                label: "Week",
-                active: false,
-              },
-              {
-                href: `/calendar?view=month&date=${today}`,
-                label: "Month",
-                active: false,
-              },
-            ]}
-          />
-        </div>
-      </ScreenHeader>
+        <PeopleButton members={members} shown={people} href="/?panel=people" />
+          </>
+        }
+      />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -235,18 +241,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       </div>
       </div>
 
-      {/* Add button, bottom right: starts adding mode, or cancels it. */}
-      <Link
-        href={placing ? "/" : "/?placing=1"}
-        scroll={false}
-        aria-label={placing ? "Stop adding" : "Add an event"}
-        title={placing ? "Stop adding" : "Add an event"}
-        className={`fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)] ${
-          placing ? "bg-accent" : "bg-ink"
-        }`}
-      >
-        {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
-      </Link>
 
 
       {firstParam(params.panel) === "people" ? (

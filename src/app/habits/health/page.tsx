@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, PencilSimple, X } from "@phosphor-icons/react/dist/ssr";
 import { FitList } from "@/components/fit-list";
-import { AppFrame, EmptyState, Emoji, firstParam, LoadingOutline, ScreenHeader, Segmented } from "@/components/ui";
+import { AppFrame, EmptyState, Emoji, firstParam, LoadingOutline, ScreenHeader, Segmented, SoftLink } from "@/components/ui";
 import { strong } from "@/lib/colours";
 import { emojiImage, eventEmoji } from "@/lib/emoji";
 import { readingText } from "@/lib/health";
@@ -61,33 +61,45 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
     start.slice(0, 7) === end.slice(0, 7)
       ? `${fmtDay(start, { month: "short", day: "numeric" })} – ${fmtDay(end, { day: "numeric" })}`
       : `${fmtDay(start, { month: "short", day: "numeric" })} – ${fmtDay(end, { month: "short", day: "numeric" })}`;
-  const arrow = "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink";
+  const arrow = "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink";
 
   const header = (
-    <ScreenHeader title="Habits">
-      <Segmented
-        label="Habits or health"
-        options={[
-          { href: "/habits", label: "Habits", active: false },
-          { href: "/habits/health", label: "Health", active: true },
-        ]}
-      />
-      <div className="flex items-center gap-2">
-        <Link href={href({ end: addDays(end, -DAYS), entry: null })} aria-label="Earlier" className={arrow}>
-          <CaretLeft size="1.5rem" weight="bold" aria-hidden />
-        </Link>
-        <span className="min-w-48 text-center text-2xl font-extrabold text-ink">{rangeTitle}</span>
-        {end < today ? (
-          <Link href={href({ end: addDays(end, DAYS) >= today ? null : addDays(end, DAYS), entry: null })} aria-label="Later" className={arrow}>
-            <CaretRight size="1.5rem" weight="bold" aria-hidden />
+    <ScreenHeader
+      title="Habits"
+      sub={member?.name}
+      nav={
+        <>
+          <Link href={href({ end: addDays(end, -DAYS), entry: null })} aria-label="Earlier" className={arrow}>
+            <CaretLeft size="1.5rem" weight="bold" aria-hidden />
           </Link>
-        ) : (
-          <span className={`${arrow} opacity-30`} aria-hidden>
-            <CaretRight size="1.5rem" weight="bold" />
-          </span>
-        )}
-      </div>
-      <span className="flex-1" />
+          <span className="tabular min-w-48 text-center text-2xl font-extrabold text-ink">{rangeTitle}</span>
+          {end < today ? (
+            <Link href={href({ end: addDays(end, DAYS) >= today ? null : addDays(end, DAYS), entry: null })} aria-label="Later" className={arrow}>
+              <CaretRight size="1.5rem" weight="bold" aria-hidden />
+            </Link>
+          ) : (
+            <span className={`${arrow} opacity-30`} aria-hidden>
+              <CaretRight size="1.5rem" weight="bold" />
+            </span>
+          )}
+        </>
+      }
+      tabs={
+        <Segmented
+          label="Habits or health"
+          options={[
+            { href: "/habits", label: "Habits", active: false },
+            { href: "/habits/health", label: "Health", active: true },
+          ]}
+        />
+      }
+      action={
+        <SoftLink href="/habits/manage?tab=health" className="gap-2">
+          <PencilSimple size="1.375rem" weight="bold" aria-hidden />
+          Manage
+        </SoftLink>
+      }
+    >
       <nav aria-label="Person" className="flex gap-2">
         {members.map((m) => (
           <Link
@@ -101,9 +113,6 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
           </Link>
         ))}
       </nav>
-      <Link href="/habits/manage?tab=health" aria-label="Habit Manager, health" title="Habit Manager" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-2xl bg-rail text-ink">
-        <PencilSimple size="1.625rem" weight="bold" aria-hidden />
-      </Link>
     </ScreenHeader>
   );
 

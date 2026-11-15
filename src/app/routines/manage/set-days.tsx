@@ -3,8 +3,8 @@
 import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Bell, CalendarCheck, Car, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
-import { Avatar, Emoji } from "@/components/ui";
+import { ArrowLeft, Bell, Car, Check, Plus, Trash, X } from "@phosphor-icons/react";
+import { Avatar, Emoji, ScreenHeader, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -114,16 +114,24 @@ export function SetDays({
 
   return (
     <>
-      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Set days</h1>
-        <nav aria-label="What to set" className="flex gap-1 rounded-2xl bg-panel p-1.25">
+      <ScreenHeader
+        title="Set days"
+        nav={
+          <Link href="/routines" className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink">
+            <ArrowLeft size="1.5rem" aria-hidden />
+            Routines
+          </Link>
+        }
+        action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />}
+        tabs={
+        <nav aria-label="What to set" className={segTrackClass}>
           {(
             [
-              ["week", "Week", CalendarCheck],
-              ["kinds", "Days", SunHorizon],
-              ["breaks", "Days off", Umbrella],
+              ["week", "Week"],
+              ["kinds", "Days"],
+              ["breaks", "Days off"],
             ] as const
-          ).map(([value, label, Icon]) => (
+          ).map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -133,24 +141,14 @@ export function SetDays({
                 // Keep the tab in the address, so it stays after Save.
                 window.history.replaceState(null, "", `?tab=${value}`);
               }}
-              className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl px-4 text-base font-bold ${
-                tab === value ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"
-              }`}
+              className={segItemClass(tab === value)}
             >
-              <Icon size="1.375rem" aria-hidden />
               {label}
             </button>
           ))}
         </nav>
-        <Link
-          href="/routines"
-          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
-        >
-          <ArrowLeft size="1.5rem" aria-hidden />
-          Routines
-        </Link>
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </header>
+        }
+      />
 
       <div className="flex min-h-0 flex-1 flex-col">
         {tab === "week" ? <WeekTab draft={draft} update={update} members={members} weekdays={weekdays} today={today} /> : null}

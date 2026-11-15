@@ -4,6 +4,7 @@ import type { Json } from "@/lib/database.types";
 import { isLocalTime } from "@/lib/time";
 import { BOX_ID } from "@/lib/panel-boxes";
 import { DEFAULT_SCREEN_SAVER, parseScreenSaver, type ScreenSaverSettings } from "@/lib/screen-saver";
+import { DEFAULT_SOUNDS, parseSounds, type SoundSettings } from "@/lib/sounds";
 
 /**
  * Household settings live in the database (households.settings), not in
@@ -36,6 +37,10 @@ export type HouseholdSettings = {
   panelBoxes: string[] | null;
   /** The art screen saver on the kitchen screen (see src/lib/screen-saver.ts). */
   screenSaver: ScreenSaverSettings;
+  /** Christmas, Halloween and other holidays change the Today title (and some colours). See src/lib/holiday-theme.ts. */
+  holidayThemes: boolean;
+  /** Sounds on the kitchen screen: mute, quiet hours, where they play (src/lib/sounds.ts). */
+  sounds: SoundSettings;
 };
 
 /** Used if a setting is ever missing. Matches the database default. */
@@ -56,6 +61,8 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   weeklyReview: { weekday: 6, time: "09:00" },
   panelBoxes: null,
   screenSaver: DEFAULT_SCREEN_SAVER,
+  holidayThemes: true,
+  sounds: DEFAULT_SOUNDS,
 };
 
 /** Reads settings JSON from the database, filling any gaps with defaults. */
@@ -88,6 +95,8 @@ export function parseSettings(raw: Json): HouseholdSettings {
     }),
     panelBoxes: pick("panelBoxes", (v) => Array.isArray(v) && v.length <= 40 && v.every((x) => typeof x === "string" && BOX_ID.test(x))),
     screenSaver: parseScreenSaver(value.screenSaver),
+    holidayThemes: pick("holidayThemes", (v) => typeof v === "boolean"),
+    sounds: parseSounds(value.sounds),
   };
 }
 

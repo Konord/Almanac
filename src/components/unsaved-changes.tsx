@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "@phosphor-icons/react";
+import { primaryActionClass } from "./ui";
 
 /*
  * One Save for a whole screen (Connor, 2026-11-07: "there are way too many
@@ -82,7 +83,7 @@ export function useUnsavedChanges(dirty: boolean, discard: () => void) {
  */
 export function SaveButton({ dirty, saving, error, onSave, onUndo }: { dirty: boolean; saving: boolean; error: string | null; onSave: () => void; onUndo: () => void }) {
   return (
-    <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2" role="group" aria-label="Save">
+    <div className="flex min-w-0 shrink-0 items-center gap-2" role="group" aria-label="Save">
       {error ? (
         <span className="line-clamp-2 max-w-[28rem] text-right text-base leading-tight font-bold text-danger" role="alert" title={error}>
           {error}
@@ -90,21 +91,17 @@ export function SaveButton({ dirty, saving, error, onSave, onUndo }: { dirty: bo
       ) : null}
       {dirty ? (
         <>
-          <button type="button" onClick={onUndo} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-2xl px-4 text-base font-bold text-ink-soft hover:bg-rail">
+          <button type="button" onClick={onUndo} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink">
             Undo
           </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-accent px-6 text-lg font-bold text-white shadow-[0_2px_8px_color-mix(in_srgb,var(--color-accent)_35%,transparent)] disabled:opacity-70"
-          >
-            <span aria-hidden className="size-2.5 rounded-full bg-white" />
+          {/* The page's one Save: the black main action, with a dot while there are changes. */}
+          <button type="button" onClick={onSave} disabled={saving} className={`${primaryActionClass} disabled:opacity-70`}>
+            <span aria-hidden className="size-2.5 rounded-full bg-primary-ink" />
             {saving ? "Saving…" : "Save"}
           </button>
         </>
       ) : (
-        <span className="flex min-h-[var(--touch-target)] items-center gap-1.5 px-2 text-base font-bold text-success" role="status">
+        <span className="flex min-h-[var(--touch-target)] items-center gap-1.5 px-2 text-lg font-bold text-success" role="status">
           <Check size="1.25rem" weight="bold" aria-hidden />
           Saved
         </span>
