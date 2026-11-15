@@ -1,0 +1,12 @@
+/* Shared Glance refinements (G1–G5). Still the original A structure, bright-2, Figtree. */
+.cb{width:3rem;height:3rem;border-radius:50%;border:.2rem solid var(--check);flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem}
+.cb.on{background:var(--success);border-color:var(--success)}
+.ev > img{width:3.25rem;height:3.25rem}
+.dinner > img{width:4.5rem;height:4.5rem}
+.card.wx{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"icon temp" "icon cond" "icon hl" "sun sun";align-items:center}
+.card.wx img.big{grid-area:icon;grid-row:auto}
+.card.wx .tp{grid-area:temp}
+.card.wx .c{grid-area:cond}
+.card.wx .hl{grid-area:hl}
+.card.wx .sun{grid-area:sun}
+.clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:normal;word-break:keep-all}

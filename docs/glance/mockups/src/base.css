@@ -1,0 +1,18 @@
+@font-face{font-family:"Figtree";src:url(../fonts/figtree-latin-wght-normal.woff2) format("woff2");font-weight:300 900}
+@font-face{font-family:"Inter";src:url(../fonts/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900}
+@font-face{font-family:"Manrope";src:url(../fonts/manrope-latin-wght-normal.woff2) format("woff2");font-weight:200 800}
+@font-face{font-family:"Fraunces";src:url(../fonts/fraunces-latin-full-normal.woff2) format("woff2");font-weight:100 900}
+@font-face{font-family:"Source Serif";src:url(../fonts/source-serif-4-latin-wght-normal.woff2) format("woff2");font-weight:200 900}
+@font-face{font-family:"Kalam";src:url(../fonts/kalam-latin-700-normal.woff2) format("woff2");font-weight:700}
+/* Same scaling rule as the app (with the audit fix: no 10px floor): 1rem = 16px at 1920x1080, 10.67px at 1280x720 */
+html{font-size:min(0.8333vw,1.4815vh)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100vw;height:100vh}
+body{-webkit-font-smoothing:antialiased;line-height:1.25}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+img.e{width:1em;height:1em;object-fit:contain;flex:none}
+.truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:normal;word-break:keep-all}
+svg.i{width:1em;height:1em;flex:none}
+/* Shared touch-target tokens from the audit */
+:root{--tt-s:3rem;--tt:3.625rem;--tt-l:4.5rem}

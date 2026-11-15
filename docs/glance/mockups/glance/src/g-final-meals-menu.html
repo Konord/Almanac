@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Meals · Menu</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.mwrap{flex:1;min-height:0;display:grid;grid-template-columns:18rem 22rem minmax(0,1fr);gap:1.25rem}
+.krow,.mrow,.srow{display:flex;align-items:center;gap:.65rem;min-height:4rem;padding:0 .75rem;border-radius:var(--r);border:0;background:transparent;width:100%;text-align:left;cursor:pointer;font:inherit}
+.krow.on,.mrow.on{background:var(--rail);box-shadow:inset 0 0 0 2px var(--ink)}
+.krow img,.mrow img,.srow img{width:2.15rem;height:2.15rem}
+.krow .nm,.mrow .nm{font-size:1.5rem;font-weight:800;flex:1;min-width:0}
+.krow .ct{font-size:1.35rem;font-weight:800;color:var(--muted)}
+.srow{border-bottom:1px solid var(--frame);border-radius:0;min-height:4.25rem}
+.srow .kind{font-size:1.15rem;font-weight:700;color:var(--muted);min-width:6.5rem}
+.srow .nm{font-size:1.5rem;font-weight:800;flex:1}
+.batches{display:flex;gap:.25rem;background:var(--panel);border-radius:var(--r);padding:.25rem}
+.batches button{min-height:3rem;min-width:3.4rem;border:0;border-radius:calc(var(--r) - .1rem);background:transparent;font:inherit;font-size:1.35rem;font-weight:800;cursor:pointer;color:var(--muted)}
+.batches button.on{background:var(--board);color:var(--ink);box-shadow:var(--sh-raised)}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Meals Menu">
+    <span class="mon">Meals</span>
+    <div class="mo-side"><span class="sub">Menu</span></div>
+  </div>
+  <div class="tools">
+    
+    <span class="seg" role="tablist"><button class="on" aria-current="page">Menu</button><button>Dishes</button><button>Backups</button></span>
+    <button class="btn primary" data-tap>Save</button><button class="btn primary add" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a meal</button>
+  </div>
+</header>
+<div class="body">
+  <div class="mwrap">
+    <section class="card">
+      <div class="h2">Kinds of meal</div>
+      <button class="krow"><img class="e" src="../assets/fork_and_knife_with_plate.png" alt=""><span class="nm truncate">Every meal</span><span class="ct">12</span></button><button class="krow on"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Tacos</span><span class="ct">3</span></button><button class="krow"><img class="e" src="../assets/shallow_pan_of_food.webp" alt=""><span class="nm truncate">Meat & veggies</span><span class="ct">4</span></button><button class="krow"><img class="e" src="../assets/spaghetti.webp" alt=""><span class="nm truncate">Pasta</span><span class="ct">3</span></button><button class="krow"><img class="e" src="../assets/pot_of_food.webp" alt=""><span class="nm truncate">Breakfast</span><span class="ct">2</span></button><button class="krow"><img class="e" src="../assets/pie.webp" alt=""><span class="nm truncate">Leftovers</span><span class="ct">1</span></button>
+      <button class="btn secondary" data-tap style="margin-top:auto"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a kind</button>
+    </section>
+    <section class="card">
+      <div class="h2">Tacos <button class="btn icon" aria-label="Rename Tacos" style="margin-left:auto"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4.2-1.1L19 8.1 15.9 5 5.1 15.8 4 20z"/><path d="M13.8 6.1l3.1 3.1"/></svg></button></div>
+      <button class="mrow on"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Beef tacos</span></button><button class="mrow"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Fish tacos</span></button><button class="mrow"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Chicken tacos</span></button>
+    </section>
+    <section class="card">
+      <div class="h2"><img class="e" src="../assets/taco.png" alt=""> Beef tacos</div>
+      <p style="margin:0 0 .3rem;font-size:1.25rem;font-weight:700;color:var(--muted)">Spots in this meal. A set dish, or one you pick on the day.</p>
+      <div class="srow">
+          <span class="kind">Main</span>
+          <img class="e" src="../assets/taco.png" alt="">
+          <span class="nm truncate">Beef taco filling</span>
+          <div class="batches" role="group" aria-label="Batches">
+            <button class="on">×1</button>
+            <button class="">×2</button>
+            <button class="">×3</button>
+          </div>
+          <button class="btn icon" aria-label="Remove this spot"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+        </div>
+      <div class="srow">
+          <span class="kind">Starch</span>
+          <img class="e" src="../assets/taco.png" alt="">
+          <span class="nm truncate">Tortillas</span>
+          <div class="batches" role="group" aria-label="Batches">
+            <button class="on">×1</button>
+            <button class="">×2</button>
+            <button class="">×3</button>
+          </div>
+          <button class="btn icon" aria-label="Remove this spot"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+        </div>
+      <div class="srow">
+          <span class="kind">Veggie</span>
+          <img class="e" src="../assets/leafy_green.webp" alt="">
+          <span class="nm truncate">any Veggie</span>
+          <div class="batches" role="group" aria-label="Batches">
+            <button class="on">×1</button>
+            <button class="">×2</button>
+            <button class="">×3</button>
+          </div>
+          <button class="btn icon" aria-label="Remove this spot"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+        </div>
+      <div class="srow">
+          <span class="kind">Side</span>
+          <img class="e" src="../assets/shallow_pan_of_food.webp" alt="">
+          <span class="nm truncate">Salsa and sour cream</span>
+          <div class="batches" role="group" aria-label="Batches">
+            <button class="on">×1</button>
+            <button class="">×2</button>
+            <button class="">×3</button>
+          </div>
+          <button class="btn icon" aria-label="Remove this spot"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+        </div>
+      <button class="btn secondary" data-tap style="margin-top:.7rem;align-self:flex-start"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a spot</button>
+    </section>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

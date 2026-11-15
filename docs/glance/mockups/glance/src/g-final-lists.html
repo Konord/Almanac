@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Lists</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.lwrap{flex:1;min-height:0;display:grid;grid-template-columns:22rem minmax(0,1fr);gap:1.25rem}
+.lists{gap:.25rem}
+.litem{display:flex;align-items:center;gap:.7rem;min-height:4rem;padding:0 .75rem;border-radius:var(--r);text-decoration:none;color:inherit;border:0;background:transparent;width:100%;text-align:left;cursor:pointer;font:inherit}
+.litem.on{background:var(--rail);box-shadow:inset 0 0 0 2px var(--ink)}
+.litem img{width:2.15rem;height:2.15rem}
+.litem .nm{font-size:1.5rem;font-weight:800;flex:1;min-width:0}
+.litem .ct{font-size:1.35rem;font-weight:800;color:var(--muted)}
+.ghead{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem}
+.ghead h2{font-size:1.85rem;font-weight:800;margin:0;flex:1}
+.aisles{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.15rem}
+.addline{display:flex;gap:.6rem;flex:none;margin-top:.6rem;align-items:center}
+.meta{display:flex;align-items:center;gap:.7rem;font-size:1.25rem;font-weight:700;color:var(--muted);margin:.2rem 0 .3rem}
+.mark{display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:.35rem;background:var(--meal);color:var(--meal-ink)}
+.mark svg{width:1rem;height:1rem}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Lists">
+    <span class="mon">Lists</span>
+    
+  </div>
+  <div class="tools">
+    
+    <span class="seg-slot" aria-hidden="true"></span>
+    <button class="btn primary add" aria-label="New list"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New list</button>
+  </div>
+</header>
+<div class="body">
+  <div class="lwrap">
+    <section class="card lists">
+      <div class="h2">Lists</div>
+      <button class="litem on" aria-current="page"><img class="e" src="../assets/shopping_cart.png" alt=""><span class="nm truncate">Groceries</span><span class="ct">11</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/broom.png" alt=""><span class="nm truncate">Chores</span><span class="ct">6</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/memo.png" alt=""><span class="nm truncate">To-dos</span><span class="ct">4</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/gear.webp" alt=""><span class="nm truncate">Hardware</span><span class="ct">5</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/coat.png" alt=""><span class="nm truncate">Packing</span><span class="ct">8</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/birthday_cake.png" alt=""><span class="nm truncate">Birthday</span><span class="ct">3</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/christmas_tree.png" alt=""><span class="nm truncate">Christmas</span><span class="ct">7</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/school.png" alt=""><span class="nm truncate">School trips</span><span class="ct">2</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Party food</span><span class="ct">6</span></button><button class="litem" aria-current="false"><img class="e" src="../assets/books.png" alt=""><span class="nm truncate">Library holds</span><span class="ct">1</span></button>
+      <button class="btn secondary" data-tap style="margin-top:auto"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New list</button>
+    </section>
+    <section class="card">
+      <div class="ghead">
+        <h2>Groceries</h2>
+        <button class="btn icon" aria-label="Rename or remove this list" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4.2-1.1L19 8.1 15.9 5 5.1 15.8 4 20z"/><path d="M13.8 6.1l3.1 3.1"/></svg></button>
+      </div>
+      <div class="addline">
+        <input class="inp" placeholder="Add something" aria-label="Something to buy" style="max-width:36rem">
+        <button class="btn primary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
+        <span style="flex:1"></span>
+        <span class="mark"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5L12 20l8-3.5M4 12.5L12 16l8-3.5M4 8.5L12 12l8-3.5L12 5 4 8.5z"/></svg></span>
+        <span style="font-size:1.15rem;font-weight:700;color:var(--muted)">from more than one meal</span>
+      </div>
+      <div class="meta">
+        <span>11 to get · 2 got</span>
+        <span style="flex:1"></span>
+        <button class="btn secondary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.9 7.2l1.9 1.1M17.2 15.7l1.9 1.1M4.9 16.8l1.9-1.1M17.2 8.3l1.9-1.1"/></svg> Repeats</button>
+        <button class="btn secondary" data-tap>Clear ticked</button>
+      </div>
+      <div class="aisles"><div><div class="k">Produce</div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Bell peppers</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">2</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Onions</span>
+          <span class="mark" title="From more than one meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5L12 20l8-3.5M4 12.5L12 16l8-3.5M4 8.5L12 12l8-3.5L12 5 4 8.5z"/></svg></span>
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 bag</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Cilantro</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 bunch</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Limes</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">3</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Spinach</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 bag</span>
+        </div></div><div><div class="k">Meat and fish</div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Chicken thighs</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 pack</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">White fish</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">400 g</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Mince</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 pack</span>
+        </div></div><div><div class="k">Dairy</div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--hand-pink)">Sour cream</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--hand-pink)">Cheddar</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 pack</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Milk</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">2 L</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Yogurt</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1</span>
+        </div></div><div><div class="k">Bakery / Household</div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--ink)">Tortillas</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">12</span>
+        </div><div class="row">
+          <button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button>
+          <span class="tx hand" style="--hc:var(--hand-purple)">Bin bags</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1</span>
+        </div><div class="row done">
+          <button class="cb on" aria-pressed="true" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+          <span class="tx hand" style="--hc:var(--ink)">Lasagne</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1</span>
+        </div><div class="row done">
+          <button class="cb on" aria-pressed="true" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+          <span class="tx hand" style="--hc:var(--ink)">Garlic bread</span>
+          
+          <span style="font-size:1.25rem;font-weight:700;color:var(--muted);flex:none">1 loaf</span>
+        </div></div></div>
+    </section>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Cook</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.app.flush{background:var(--board);padding:1.5rem 2rem 1.5rem}
+.cook-top{display:flex;align-items:center;gap:1rem;flex:none}
+.cook-top h1{font-size:3.5rem;font-weight:800;letter-spacing:-.03em;margin:0;line-height:1;flex:1;min-width:0}
+.cook-top img.hero{width:4.5rem;height:4.5rem}
+.batches{display:flex;gap:.3rem;background:var(--meal);color:var(--meal-ink);border-radius:var(--r);padding:.3rem}
+.batches button{min-height:3rem;min-width:3.6rem;border:0;border-radius:calc(var(--r) - .1rem);background:transparent;font:inherit;font-size:1.5rem;font-weight:800;cursor:pointer;color:inherit}
+.batches button.on{background:var(--board);color:var(--ink)}
+.cook-grid{flex:1;min-height:0;display:grid;grid-template-columns:24rem minmax(0,1fr) 24rem;gap:1.25rem;margin-top:1.15rem}
+.ing{display:flex;align-items:center;gap:.7rem;min-height:3.5rem}
+.ing .nm{font-size:1.5rem;font-weight:700}
+.ing .amt{font-size:1.25rem;font-weight:700;color:var(--muted);margin-right:.2rem}
+.step-card{flex:1;background:var(--meal);color:var(--ink);border-radius:var(--r-dialog);padding:1.75rem 2rem;display:flex;flex-direction:column;gap:.8rem;min-height:0}
+.step-card .k{color:var(--meal-ink)}
+.step-card p{font-size:3rem;font-weight:800;line-height:1.2;margin:0;letter-spacing:-.02em}
+.coming h2{font-size:1.25rem;font-weight:700;color:var(--muted);margin:0 0 .4rem}
+.coming .up{display:flex;gap:.7rem;align-items:flex-start;background:var(--rail);border-radius:var(--r);padding:.8rem 1rem;min-height:4.5rem;margin-bottom:.5rem}
+.coming .num{width:2.5rem;height:2.5rem;border-radius:50%;background:var(--board);display:grid;place-items:center;font-weight:800;flex:none;font-size:1.25rem}
+.coming p{margin:0;font-size:1.5rem;font-weight:700;line-height:1.2}
+.navbtns{display:flex;gap:.8rem;flex:none;margin-top:.2rem}
+.navbtns .btn{min-height:4.5rem;font-size:1.75rem;flex:1}
+.navbtns .next{flex:2;background:var(--ink);color:#fff}
+.timer{display:flex;flex-direction:column;gap:.5rem}
+
+</style>
+</head>
+<body>
+<div class="app flush" id="app">
+
+<div class="cook-top">
+  <button class="btn icon" aria-label="Leave cooking mode" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <img class="hero" src="../assets/taco.png" alt="">
+  <h1>Sheet-pan chicken fajitas</h1>
+  <div class="batches" role="group" aria-label="Batches"><button class="on">x1</button><button>x2</button><button>x3</button></div>
+</div>
+<div class="cook-grid">
+  <section class="card">
+    <div class="h2">Ingredients</div>
+    <div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">8</span><span class="nm" >Chicken thighs</span></div><div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">3</span><span class="nm" >Bell peppers, sliced</span></div><div class="ing"><button class="cb on" aria-pressed="true" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button><span class="amt">1</span><span class="nm" style="text-decoration:line-through;color:var(--muted)">Onion, sliced</span></div><div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">2 tbsp</span><span class="nm" >Fajita spice</span></div><div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">12</span><span class="nm" >Tortillas</span></div><div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">1</span><span class="nm" >Sour cream</span></div><div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">1</span><span class="nm" >Salsa</span></div><div class="ing"><button class="cb" aria-pressed="false" data-tap><span class="disc"></span></button><span class="amt">2</span><span class="nm" >Limes</span></div>
+  </section>
+  <div style="display:flex;flex-direction:column;min-height:0;gap:.8rem">
+    <div class="step-card">
+      <div class="k">Step 2 of 6</div>
+      <p>Toss the chicken and peppers with the spice and a little oil. Spread them out on the tray.</p>
+    </div>
+    <div class="coming">
+      <h2>Coming up</h2>
+      <div class="up"><span class="num">3</span><p>Roast at 425°F / 220°C for 20 minutes, until the chicken is cooked through.</p></div>
+      <div class="up"><span class="num">4</span><p>Warm the tortillas and put the toppings on the table.</p></div>
+    </div>
+    <div class="navbtns">
+      <button class="btn" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg> Back</button>
+      <button class="btn next" data-tap>Next step <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+  </div>
+  <aside class="card timer">
+    <div class="h2">Timers</div>
+    <p style="font-size:1.25rem;color:var(--muted);margin:0">None running. A timer starts when a step needs one.</p>
+    <button class="btn meal" data-tap>Start 20 min · roast</button>
+    <div class="h2" style="margin-top:.6rem">Oven</div>
+    <p style="font-size:1.75rem;font-weight:800;margin:0">425°F / 220°C</p>
+    <div class="h2" style="margin-top:.6rem">Safe inside</div>
+    <p style="font-size:1.5rem;font-weight:700;margin:0">Chicken 165°F / 74°C</p>
+  </aside>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

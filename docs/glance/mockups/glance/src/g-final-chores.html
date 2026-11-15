@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Chores</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.cwrap{flex:1;min-height:0;display:grid;grid-template-columns:22rem minmax(0,1fr);gap:1.25rem}
+.occ{display:flex;flex-direction:column;gap:.2rem;padding:.85rem 1rem;border-radius:var(--r-card);background:var(--p-orange-soft);text-align:left;border:0;width:100%;cursor:pointer;font:inherit;box-shadow:none}
+.occ .nm{font-size:1.75rem;font-weight:800}
+.occ .nx{font-size:1.25rem;font-weight:700;color:var(--hand-orange)}
+.drow{display:flex;align-items:center;gap:.65rem;min-height:4rem;padding:0 .7rem;border-radius:var(--r);width:100%;border:0;background:transparent;text-align:left;cursor:pointer;font:inherit}
+.drow.on{background:var(--rail);box-shadow:inset 0 0 0 2px var(--ink)}
+.drow img{width:2.15rem;height:2.15rem}
+.drow .nm{font-size:1.5rem;font-weight:800;display:block;line-height:1.1}
+.drow .meta{font-size:1.15rem;font-weight:700;color:var(--muted)}
+.dayhead{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
+.dayhead input.inp{width:16rem;font-size:1.75rem}
+.chips{display:flex;gap:.4rem;margin-left:auto;flex-wrap:wrap}
+.chips button{min-height:3rem;min-width:3.4rem;padding:0 .7rem;border-radius:99px;border:2px solid var(--frame);background:var(--board);font:inherit;font-size:1.25rem;font-weight:700;cursor:pointer}
+.chips button.on{border-color:var(--ink);background:var(--rail)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:1rem;margin-top:.7rem}
+.rules{background:var(--rail);border-radius:var(--r-card);padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.7rem;min-height:0}
+.stepper{display:flex;align-items:center;gap:.6rem}
+.stepper .btn.icon{background:var(--board)}
+.stepper .n{font-size:1.75rem;font-weight:800;min-width:2rem;text-align:center}
+.tog{display:flex;align-items:center;justify-content:space-between;gap:.7rem;min-height:3rem;font-size:1.25rem;font-weight:700}
+.tog .sw{width:3.4rem;height:2rem;border-radius:99px;background:var(--panel);position:relative;flex:none}
+.tog .sw.on{background:var(--p-blue)}
+.tog .sw::after{content:"";position:absolute;top:.22rem;left:.22rem;width:1.55rem;height:1.55rem;border-radius:50%;background:#fff}
+.tog .sw.on::after{left:1.6rem}
+.crow{display:flex;align-items:center;gap:.6rem;min-height:3.6rem;border-bottom:1px solid var(--frame);width:100%;border-left:0;border-right:0;border-top:0;background:transparent;text-align:left;cursor:pointer;font:inherit;padding:0}
+.crow img{width:2rem;height:2rem}
+.crow.open-edit{display:flex;flex-direction:column;align-items:stretch;background:var(--rail);border-radius:var(--r);padding:.7rem;border:0;margin:.3rem 0;gap:.5rem;min-height:auto}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Chores Setup">
+    <span class="mon">Chores</span>
+    <div class="mo-side"><span class="sub">Setup</span></div>
+  </div>
+  <div class="tools">
+    
+    <span class="seg-slot" aria-hidden="true"></span>
+    <button class="btn primary" data-tap>Save</button>
+  </div>
+</header>
+<div class="body">
+  <div class="cwrap">
+    <section class="card">
+      <button class="occ" type="button">
+        <div style="display:flex;align-items:center;gap:.7rem">
+          <span style="font-size:2rem">🔁</span>
+          <span class="nm">Occasional chores</span>
+          <span style="margin-left:auto;font-size:1.75rem;font-weight:800;color:var(--hand-orange)">3</span>
+        </div>
+        <div class="nx">Next: Oil change, Fri 20</div>
+      </button>
+      <div class="h2" style="margin-top:.8rem">Chore days <span class="sub">4</span></div>
+      <button class="drow on" aria-pressed="true"><img class="e" src="../assets/recycling_symbol.webp" alt=""><span><span class="nm">Friday recycling</span><span class="meta">Fri · 3 chores</span></span></button><button class="drow" aria-pressed="false"><img class="e" src="../assets/broom.png" alt=""><span><span class="nm">Midweek house</span><span class="meta">Tue, Wed · 4 chores</span></span></button><button class="drow" aria-pressed="false"><img class="e" src="../assets/gear.webp" alt=""><span><span class="nm">Saturday jobs</span><span class="meta">Sat · 3 chores</span></span></button><button class="drow" aria-pressed="false"><img class="e" src="../assets/sun.webp" alt=""><span><span class="nm">Free day</span><span class="meta">2 chores</span></span></button>
+      <button class="btn secondary" data-tap style="margin-top:auto"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New chore day</button>
+    </section>
+    <section class="card">
+      <div class="dayhead">
+        <img class="e" src="../assets/recycling_symbol.webp" alt="">
+        <input class="inp" value="Friday recycling" aria-label="Chore day name">
+        <div class="chips" role="group" aria-label="Days of the week">
+          <button>Sun</button><button>Mon</button><button>Tue</button><button>Wed</button><button>Thu</button><button class="on">Fri</button><button>Sat</button>
+        </div>
+      </div>
+      <div class="split">
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <div class="k">Regular chores · every Friday recycling day</div>
+          <form style="display:flex;gap:.45rem;margin:.4rem 0 .5rem;align-items:center" onsubmit="return false">
+            <input class="inp" placeholder="New regular chore" aria-label="New regular chore" style="flex:1">
+            <select class="inp" aria-label="Who does it" style="width:11rem">
+              <option>Anyone</option><option selected>Connor</option><option>Alexandra</option>
+            </select>
+            <input class="inp" type="time" value="08:00" aria-label="Due by" style="width:9rem">
+            <button class="btn primary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
+          </form>
+          <div class="crow open-edit">
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <img class="e" src="../assets/package.png" alt="">
+              <input class="inp" value="Put the bins out" aria-label="Chore name" style="flex:1">
+              <button class="who-chip on" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="true"><span class="dot"></span>Connor</button>
+              <input class="inp" value="8:00 am" aria-label="Due by" style="width:8.5rem">
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <input class="inp" placeholder="Notes" value="Blue bin week" aria-label="Notes" style="flex:1">
+              <button class="btn icon" aria-label="Move up"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+              <button class="btn icon" aria-label="Move down"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+              <button class="btn icon" aria-label="Remove Put the bins out"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+              <button class="btn secondary" data-tap>Done</button>
+            </div>
+          </div>
+          <button class="crow" type="button"><img class="e" src="../assets/broom.png" alt=""><span style="flex:1;font-size:1.35rem;font-weight:700">Bring the bins in</span><span class="who-chip" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="false"><span class="dot"></span>Connor</span><span style="font-size:1.15rem;font-weight:800;background:var(--p-blue-soft);color:var(--hand-blue);border-radius:99px;padding:.15rem .7rem;flex:none">by 6:00 pm</span></button>
+          <button class="crow" type="button"><img class="e" src="../assets/basket.png" alt=""><span style="flex:1;font-size:1.35rem;font-weight:700">Wash the recycling caddy</span><span class="who-chip" style="--pc:var(--p-pink);--ps:var(--p-pink-soft);--hc:var(--hand-pink)" aria-pressed="false"><span class="dot"></span>Alexandra</span></button>
+        </div>
+        <aside class="rules">
+          <div class="k">Room for occasional chores</div>
+          <div class="stepper"><span style="flex:1;font-size:1.25rem;font-weight:700">How many</span>
+            <button class="btn icon" aria-label="Fewer"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg></button><span class="n">2</span><button class="btn icon" aria-label="More"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="stepper"><span style="flex:1;font-size:1.25rem;font-weight:700">Of those, Big</span>
+            <button class="btn icon" aria-label="Fewer"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg></button><span class="n">1</span><button class="btn icon" aria-label="More"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tog">Only chores meant for Friday recycling <span class="sw on" aria-pressed="true"></span></div>
+          <div class="tog">Next-door days are one stretch <span class="sw" aria-pressed="false"></span></div>
+          <div class="tog">Good for errands <span class="sw on" aria-pressed="true"></span></div>
+          <div style="height:1px;background:var(--frame);margin:.1rem 0"></div>
+          <div class="k">Next Friday recycling · Fri 20</div>
+          <div style="font-size:1.25rem;font-weight:700;display:flex;flex-direction:column;gap:.25rem">
+            <span>Put the bins out</span>
+            <span>Bring the bins in</span>
+            <span>Wash the recycling caddy</span>
+            <span style="color:var(--p-orange)">🔁 Oil change</span>
+          </div>
+          <button class="btn ghost" style="margin-top:auto;color:#A3261A;justify-content:flex-start;padding-left:0"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg> Remove this chore day</button>
+        </aside>
+      </div>
+    </section>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Routines</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.rwrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 34rem;gap:1.25rem}
+.gridcard{background:var(--board);border-radius:var(--r-card);box-shadow:var(--sh-raised);padding:.8rem 1rem 1rem;min-height:0;display:flex;flex-direction:column}
+.heads{display:grid;grid-template-columns:4.5rem repeat(4,1fr);gap:.5rem;flex:none;padding-bottom:.45rem}
+.heads .p{display:flex;align-items:center;gap:.45rem;border-bottom:.2rem solid var(--pc);padding-bottom:.4rem;min-width:0}
+.heads .sw{width:.35rem;height:1.6rem;border-radius:99px;background:var(--pc);flex:none}
+.heads .nm{font-size:1.5rem;font-weight:800;flex:1;min-width:0}
+.heads .add{width:3rem;height:3rem;min-height:3rem;border-radius:var(--r);background:var(--rail);border:0;display:grid;place-items:center;cursor:pointer}
+.tline{flex:1;min-height:0;display:grid;grid-template-columns:4.5rem repeat(4,1fr);gap:.5rem;position:relative}
+.hours{position:relative}
+.hour{position:absolute;left:0;right:0;font-size:1.15rem;font-weight:700;color:var(--muted);transform:translateY(-50%);font-variant-numeric:tabular-nums}
+.col{position:relative;background:linear-gradient(var(--frame),var(--frame)) 0 0 / 100% 1px repeat-y;background-size:100% calc(100% / 15)}
+.blk{position:absolute;left:.15rem;right:.15rem;border-radius:.7rem;padding:.2rem .45rem;overflow:hidden;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.blk{min-height:3rem}
+.blk .nm{font-size:1.25rem;font-weight:800;line-height:1.15}
+.blk .tm{display:none}
+.blk.meal{background:var(--meal);color:var(--meal-ink)}
+.blk.on{box-shadow:inset 0 0 0 2px var(--ink)}
+.ed .title{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem}
+.ed .title img{width:2.5rem;height:2.5rem}
+.ed .title h2{font-size:1.85rem;font-weight:800;margin:0;flex:1;letter-spacing:-.02em}
+.st{display:flex;align-items:center;gap:.5rem;min-height:3.15rem;border-bottom:1px solid var(--frame)}
+.st .num{width:1.85rem;height:1.85rem;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-weight:800;flex:none;font-size:1.15rem}
+.st .tx{flex:1;font-size:1.35rem;font-weight:700;min-width:0}
+.st.on-list .tx{color:var(--p-blue)}
+.st .ico{display:flex;gap:.2rem}
+.st .ico button{width:3rem;height:3rem;min-height:3rem;border:0;border-radius:var(--r);background:transparent;color:var(--soft);display:grid;place-items:center;cursor:pointer}
+.hint{font-size:1.15rem;font-weight:700;color:var(--p-blue);display:flex;align-items:center;gap:.4rem;margin-top:.4rem}
+.hint svg{width:1.25rem;height:1.25rem;flex:none}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Routines School day">
+    <span class="mon">Routines</span>
+    <div class="mo-side"><span class="sub">School day</span></div>
+  </div>
+  <div class="tools">
+    
+    <span class="seg" role="tablist"><button class="on" aria-current="page">School day</button><button>Family day</button><button>Free day</button></span>
+    <button class="btn secondary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.9 7.2l1.9 1.1M17.2 15.7l1.9 1.1M4.9 16.8l1.9-1.1M17.2 8.3l1.9-1.1"/></svg> Set days</button><button class="btn primary" data-tap>Save</button>
+  </div>
+</header>
+<div class="body">
+  <div class="rwrap">
+    <section class="gridcard" aria-label="Routines">
+      <div class="heads"><div></div><div class="p" style="--pc:var(--p-blue)"><span class="sw"></span><span class="nm truncate">Connor</span><button class="add" aria-label="Add a routine for Connor"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="p" style="--pc:var(--p-pink)"><span class="sw"></span><span class="nm truncate">Alexandra</span><button class="add" aria-label="Add a routine for Alexandra"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="p" style="--pc:var(--p-teal)"><span class="sw"></span><span class="nm truncate">Sam</span><button class="add" aria-label="Add a routine for Sam"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="p" style="--pc:var(--p-purple)"><span class="sw"></span><span class="nm truncate">Christopher</span><button class="add" aria-label="Add a routine for Christopher"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
+      <div class="tline">
+        <div class="hours"><div class="hour" style="top:0.000%">6:00</div><div class="hour" style="top:13.333%">8:00</div><div class="hour" style="top:26.667%">10:00</div><div class="hour" style="top:40.000%">12:00</div><div class="hour" style="top:53.333%">14:00</div><div class="hour" style="top:66.667%">16:00</div><div class="hour" style="top:80.000%">18:00</div><div class="hour" style="top:93.333%">20:00</div></div>
+        <div class="col"><div class="blk on" style="top:5.000%;height:5.000%;background:var(--p-blue-soft);color:var(--hand-blue);"><span class="nm truncate">Get ready</span><span class="tm">6:45</span></div><div class="blk meal" style="top:10.000%;height:5.000%;"><span class="nm truncate">Breakfast</span><span class="tm">7:30</span></div><div class="blk" style="top:15.000%;height:3.333%;background:var(--p-blue-soft);color:var(--hand-blue);"><span class="nm truncate">School run</span><span class="tm">8:15</span></div><div class="blk meal" style="top:80.000%;height:5.000%;"><span class="nm truncate">Dinner</span><span class="tm">6:00</span></div><div class="blk" style="top:90.000%;height:5.000%;background:var(--p-blue-soft);color:var(--hand-blue);"><span class="nm truncate">Kitchen close</span><span class="tm">7:30</span></div></div><div class="col"><div class="blk" style="top:5.000%;height:5.000%;background:var(--p-pink-soft);color:var(--hand-pink);"><span class="nm truncate">Get ready</span><span class="tm">6:45</span></div><div class="blk meal" style="top:10.000%;height:5.000%;"><span class="nm truncate">Breakfast</span><span class="tm">7:30</span></div><div class="blk meal" style="top:80.000%;height:5.000%;"><span class="nm truncate">Dinner</span><span class="tm">6:00</span></div><div class="blk" style="top:93.333%;height:5.000%;background:var(--p-pink-soft);color:var(--hand-pink);"><span class="nm truncate">Wind down</span><span class="tm">8:00</span></div></div><div class="col"><div class="blk" style="top:6.667%;height:5.000%;background:var(--p-teal-soft);color:var(--hand-teal);"><span class="nm truncate">Get ready</span><span class="tm">7:00</span></div><div class="blk meal" style="top:11.667%;height:3.333%;"><span class="nm truncate">Breakfast</span><span class="tm">7:45</span></div><div class="blk" style="top:63.333%;height:5.000%;background:var(--p-teal-soft);color:var(--hand-teal);"><span class="nm truncate">After school</span><span class="tm">3:30</span></div><div class="blk meal" style="top:80.000%;height:5.000%;"><span class="nm truncate">Dinner</span><span class="tm">6:00</span></div><div class="blk" style="top:91.667%;height:5.000%;background:var(--p-teal-soft);color:var(--hand-teal);"><span class="nm truncate">Bedtime</span><span class="tm">7:45</span></div></div><div class="col"><div class="blk" style="top:6.667%;height:5.000%;background:var(--p-purple-soft);color:var(--hand-purple);"><span class="nm truncate">Get ready</span><span class="tm">7:00</span></div><div class="blk meal" style="top:11.667%;height:3.333%;"><span class="nm truncate">Breakfast</span><span class="tm">7:45</span></div><div class="blk" style="top:63.333%;height:5.000%;background:var(--p-purple-soft);color:var(--hand-purple);"><span class="nm truncate">After school</span><span class="tm">3:30</span></div><div class="blk meal" style="top:80.000%;height:5.000%;"><span class="nm truncate">Dinner</span><span class="tm">6:00</span></div><div class="blk" style="top:91.667%;height:5.000%;background:var(--p-purple-soft);color:var(--hand-purple);"><span class="nm truncate">Bedtime</span><span class="tm">7:45</span></div></div>
+      </div>
+    </section>
+    <aside class="card ed">
+      <div class="title"><img class="e" src="../assets/alarm_clock.webp" alt=""><h2>Get ready</h2></div>
+      <div class="st on-list">
+          <span class="num">1</span><span class="tx">Shower</span>
+          <button class="who-chip on" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="true"><span class="dot"></span>Connor</button>
+          <div class="ico">
+            <button aria-label="Move up"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+            <button aria-label="Move down"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+            <button aria-label="Delete"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+          </div>
+        </div>
+      <div class="st on-list">
+          <span class="num">2</span><span class="tx">Get dressed</span>
+          <button class="who-chip on" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="true"><span class="dot"></span>Connor</button>
+          <div class="ico">
+            <button aria-label="Move up"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+            <button aria-label="Move down"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+            <button aria-label="Delete"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+          </div>
+        </div>
+      <div class="st on-list">
+          <span class="num">3</span><span class="tx">Pack lunches</span>
+          <button class="who-chip on" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="true"><span class="dot"></span>Connor</button>
+          <div class="ico">
+            <button aria-label="Move up"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+            <button aria-label="Move down"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+            <button aria-label="Delete"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+          </div>
+        </div>
+      <div class="st">
+          <span class="num">4</span><span class="tx">Keys and bag</span>
+          <button class="who-chip on" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="true"><span class="dot"></span>Connor</button>
+          <div class="ico">
+            <button aria-label="Move up"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15l7-7 7 7"/></svg></button>
+            <button aria-label="Move down"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+            <button aria-label="Delete"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M8 7l.8 12h6.4L16 7"/></svg></button>
+          </div>
+        </div>
+      <div class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h11M9 12h11M9 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/></svg> Blue = on the Daily list</div>
+      <form style="display:flex;gap:.5rem;margin-top:.7rem" onsubmit="return false">
+        <input class="inp" placeholder="Add a step" aria-label="Add a step">
+        <button class="btn primary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
+      </form>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:.7rem;padding-top:.9rem;border-top:1px solid var(--frame)">
+        <div class="field"><span class="fl">When</span>
+          <div class="toggle" role="group">
+            <button class="on">After wake-up</button>
+            <button>Ends by bedtime</button>
+            <button>After a meal</button>
+            <button>At a set time</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:.8rem;align-items:end">
+          <div class="field" style="width:9rem"><label>Minutes</label><input class="inp" value="25"></div>
+          <div class="field" style="flex:1"><span class="fl">On the Daily list</span>
+            <div class="toggle"><button class="on">On</button><button>Off</button></div>
+          </div>
+        </div>
+        <div class="field"><span class="fl">Who can see it</span>
+          <div class="toggle"><button class="on">Everyone</button><button>Adults only</button><button>Just me</button></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

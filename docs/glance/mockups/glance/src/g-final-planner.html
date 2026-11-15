@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Planner</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.body.edge{padding-top:0}
+.plan{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);background:var(--board);border-top:1px solid var(--frame)}
+.pcol{border-right:1px solid var(--frame);display:flex;flex-direction:column;min-width:0;padding:.55rem .5rem .6rem;gap:.45rem}
+.pcol:last-child{border-right:0}
+.pcol .d{font-size:1.15rem;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.pcol .n{font-size:2.25rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.sec{font-size:1.15rem;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;margin-top:.2rem}
+.sec .plus{width:3rem;height:3rem;min-height:3rem;border-radius:50%;background:var(--panel);border:0;display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.sec .plus svg{width:1.25rem;height:1.25rem}
+.tile{display:flex;align-items:center;gap:.45rem;min-height:3.15rem;padding:.25rem .55rem .25rem .7rem;border-radius:var(--r);background:var(--es,var(--panel));position:relative;overflow:hidden;min-width:0}
+.tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--ec,var(--check))}
+.tile img{width:1.6rem;height:1.6rem}
+.tile .t{font-size:1.25rem;font-weight:700;line-height:1.15;min-width:0}
+.tile.meal{background:var(--meal);color:var(--meal-ink)}
+.tile.meal::before{background:var(--meal-ink)}
+.kind{display:inline-flex;align-items:center;gap:.3rem;min-height:2.5rem;font-size:1.15rem;font-weight:700;color:var(--soft)}
+.empty{border:2px dashed var(--frame);background:transparent;color:var(--muted);justify-content:center;font-weight:700;font-size:1.25rem}
+.empty::before{display:none}
+.review{position:fixed;inset:2.2rem 3.5rem 3.4rem;z-index:21;background:var(--board);border-radius:var(--r-dialog);box-shadow:var(--sh-dialog);display:flex;flex-direction:column;padding:1.35rem 1.6rem 1.25rem;gap:.85rem}
+.review h2{font-size:2.25rem;font-weight:800;letter-spacing:-.03em;margin:0;line-height:1}
+.review .lead{font-size:1.35rem;font-weight:700;color:var(--soft);margin:0}
+.rev-cols{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.4rem}
+.rev-item{display:flex;align-items:center;gap:.65rem;min-height:3.6rem;border-bottom:1px solid var(--frame)}
+.rev-item .tx{font-size:1.5rem;font-weight:700;flex:1;min-width:0;line-height:1.1}
+.rev-item .src{font-size:1.15rem;font-weight:700;color:var(--muted);display:block}
+.rev-item.skip .tx{color:var(--muted);text-decoration:line-through}
+.rev-item .need{font-size:1.25rem;font-weight:700;color:var(--muted);flex:none}
+.rev-foot{display:flex;align-items:center;gap:.8rem;flex:none}
+.mark{display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:.35rem;background:var(--meal);color:var(--meal-ink);flex:none}
+.mark svg{width:1rem;height:1rem}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Planner Coming week">
+    <span class="mon">Planner</span>
+    <div class="mo-side"><span class="sub">Coming week</span></div>
+  </div>
+  <div class="tools">
+    <div class="navm"><button class="btn icon" aria-label="Week before"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><span class="week-range">Nov 15-21</span><button class="btn icon" aria-label="Week after"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button></div>
+    <span class="seg" role="tablist"><button class="on" aria-current="page">Week</button><button>Chores</button></span>
+    <button class="btn secondary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/><path d="M3 4h2l2.2 11.2A1.8 1.8 0 0 0 9 16.5h9.2a1.8 1.8 0 0 0 1.8-1.5L22 8H6.2"/></svg> Grocery list</button><button class="btn primary" data-tap>Save</button>
+  </div>
+</header>
+<div class="body edge" style="padding-bottom:0">
+  <div class="plan"><section class="pcol">
+          <div class="d">SUN</div><div class="n">15</div>
+          <div class="kind">School day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile meal"><img class="e" src="../assets/spaghetti.webp" alt=""><span class="t truncate">Spaghetti and meatballs</span></div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile" style="--es:var(--p-purple-soft);--ec:var(--p-purple)"><img class="e" src="../assets/ice_hockey.png" alt=""><span class="t truncate">Hockey practice 7 am</span></div>
+        </section><section class="pcol">
+          <div class="d">MON</div><div class="n">16</div>
+          <div class="kind">Family day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile meal"><img class="e" src="../assets/birthday_cake.png" alt=""><span class="t truncate">Grandma's birthday dinner</span></div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile" style="--es:var(--p-orange-soft);--ec:var(--p-orange)"><img class="e" src="../assets/birthday_cake.png" alt=""><span class="t truncate">Grandma's dinner 5 pm</span></div>
+        </section><section class="pcol">
+          <div class="d">TUE</div><div class="n">17</div>
+          <div class="kind">School day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile meal"><img class="e" src="../assets/pot_of_food.webp" alt=""><span class="t truncate">Slow-cooker beef stew</span></div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile" style="--es:var(--p-teal-soft);--ec:var(--p-teal)"><img class="e" src="../assets/musical_note.png" alt=""><span class="t truncate">Piano 3 pm</span></div>
+        </section><section class="pcol">
+          <div class="d">WED</div><div class="n">18</div>
+          <div class="kind">School day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile meal"><img class="e" src="../assets/taco.png" alt=""><span class="t truncate">Beef tacos</span></div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile" style="--es:var(--p-teal-soft);--ec:var(--p-teal)"><img class="e" src="../assets/books.png" alt=""><span class="t truncate">Library books due</span></div>
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+        </section><section class="pcol">
+          <div class="d">THU</div><div class="n">19</div>
+          <div class="kind">School day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile meal"><img class="e" src="../assets/shallow_pan_of_food.webp" alt=""><span class="t truncate">Leftovers night</span></div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+        </section><section class="pcol">
+          <div class="d">FRI</div><div class="n">20</div>
+          <div class="kind">School day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile meal"><img class="e" src="../assets/shallow_pan_of_food.webp" alt=""><span class="t truncate">Homemade pizza</span></div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile" style="--es:var(--p-purple-soft);--ec:var(--p-purple)"><img class="e" src="../assets/ice_hockey.png" alt=""><span class="t truncate">Hockey tournament</span></div><div class="tile" style="--es:var(--p-blue-soft);--ec:var(--p-blue)"><img class="e" src="../assets/shopping_cart.png" alt=""><span class="t truncate">Costco run</span></div><div class="tile" style="--es:var(--p-blue-soft);--ec:var(--p-blue)"><img class="e" src="../assets/package.png" alt=""><span class="t truncate">Oil change</span></div><div class="tile" style="--es:var(--p-pink-soft);--ec:var(--p-pink)"><img class="e" src="../assets/books.png" alt=""><span class="t truncate">Book club 7 pm</span></div>
+        </section><section class="pcol">
+          <div class="d">SAT</div><div class="n">21</div>
+          <div class="kind">Free day</div>
+          <div class="sec">Meals <button class="plus" aria-label="Add a meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile empty">Dinner</div>
+          <div class="sec">Chores <button class="plus" aria-label="Add a chore day"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div class="tile" style="--es:var(--p-blue-soft);--ec:var(--p-blue)"><img class="e" src="../assets/broom.png" alt=""><span class="t truncate">Saturday jobs</span></div>
+          <div class="sec">Plans <button class="plus" aria-label="Add an event"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          
+        </section></div>
+</div>
+<button class="scrim" aria-label="Close the review"></button>
+<aside class="review" role="dialog" aria-label="Review what to buy">
+  <div style="display:flex;align-items:flex-start;gap:1rem">
+    <div style="flex:1;min-width:0">
+      <h2>Review what to buy</h2>
+      <p class="lead">From this week's meals. Tap anything you already have — it won't go on the grocery list.</p>
+    </div>
+    <button class="btn icon" aria-label="Close"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="rev-cols">
+    <div>
+      <div class="k">Produce</div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Onions, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Onions<span class="src">Spaghetti · Beef stew · Tacos</span></div>
+          <span class="mark" title="From more than one meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5L12 20l8-3.5M4 12.5L12 16l8-3.5M4 8.5L12 12l8-3.5L12 5 4 8.5z"/></svg></span>
+          <span class="need">3</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Bell peppers, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Bell peppers<span class="src">Beef tacos</span></div>
+          
+          <span class="need">2</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Limes, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Limes<span class="src">Beef tacos</span></div>
+          
+          <span class="need">2</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Cilantro, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Cilantro<span class="src">Beef tacos</span></div>
+          
+          <span class="need">1 bunch</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Carrots, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Carrots<span class="src">Beef stew</span></div>
+          
+          <span class="need">4</span>
+        </div>
+    </div>
+    <div>
+      <div class="k">Meat</div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Mince, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Mince<span class="src">Spaghetti · Beef tacos</span></div>
+          <span class="mark" title="From more than one meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5L12 20l8-3.5M4 12.5L12 16l8-3.5M4 8.5L12 12l8-3.5L12 5 4 8.5z"/></svg></span>
+          <span class="need">2 packs</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Stewing beef, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Stewing beef<span class="src">Beef stew</span></div>
+          
+          <span class="need">800 g</span>
+        </div>
+      <div class="k" style="margin-top:.8rem">Bakery</div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Tortillas, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Tortillas<span class="src">Beef tacos</span></div>
+          
+          <span class="need">12</span>
+        </div>
+    </div>
+    <div>
+      <div class="k">Dairy</div>
+      <div class="rev-item skip">
+          <button class="cb on" aria-pressed="true" aria-label="Already have — skip" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+          <div class="tx hand">Cheddar<span class="src">Beef tacos · Wed</span></div>
+          
+          <span class="need">1 pack</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Mozzarella, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Mozzarella<span class="src">Homemade pizza</span></div>
+          
+          <span class="need">1 pack</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Sour cream, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Sour cream<span class="src">Beef tacos</span></div>
+          
+          <span class="need">1</span>
+        </div>
+    </div>
+    <div>
+      <div class="k">Cupboard</div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Spaghetti, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Spaghetti<span class="src">Spaghetti and meatballs</span></div>
+          
+          <span class="need">1 box</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Tomatoes, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Tomatoes<span class="src">Spaghetti · Beef stew</span></div>
+          <span class="mark" title="From more than one meal"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5L12 20l8-3.5M4 12.5L12 16l8-3.5M4 8.5L12 12l8-3.5L12 5 4 8.5z"/></svg></span>
+          <span class="need">2 tins</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Salsa, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Salsa<span class="src">Beef tacos</span></div>
+          
+          <span class="need">1 jar</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Pizza sauce, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Pizza sauce<span class="src">Homemade pizza</span></div>
+          
+          <span class="need">1 jar</span>
+        </div>
+      <div class="rev-item">
+          <button class="cb" aria-pressed="false" aria-label="Skip Flour, already have" data-tap><span class="disc"></span></button>
+          <div class="tx hand">Flour<span class="src">Homemade pizza</span></div>
+          
+          <span class="need">1 kg</span>
+        </div>
+    </div>
+  </div>
+  <div class="rev-foot">
+    <span style="font-size:1.5rem;font-weight:800">15 to add · 1 already have</span>
+    <span class="mark"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5L12 20l8-3.5M4 12.5L12 16l8-3.5M4 8.5L12 12l8-3.5L12 5 4 8.5z"/></svg></span>
+    <span style="font-size:1.15rem;font-weight:700;color:var(--muted)">from more than one meal</span>
+    <span style="flex:1"></span>
+    <button class="btn secondary" data-tap>Not now</button>
+    <button class="btn primary" data-tap>Put the rest on the grocery list</button>
+  </div>
+</aside>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

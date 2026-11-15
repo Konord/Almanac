@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Habits</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.habits{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--board);border-radius:var(--r-card);box-shadow:var(--sh-raised);padding:1rem 1.2rem 1.1rem;overflow:hidden}
+.hd{display:grid;grid-template-columns:22rem 1fr 5.5rem;align-items:end;gap:.4rem;padding-bottom:.4rem;border-bottom:1px solid var(--frame);flex:none}
+.hd .days{display:grid;grid-template-columns:repeat(30,1fr);gap:.25rem}
+.hd .d{text-align:center;font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}
+.hd .d.sun{color:var(--muted)}
+.hd .d.today{color:var(--now)}
+.hd .lab{font-size:1.15rem;font-weight:700;color:var(--muted)}
+.hd .st{text-align:right;font-size:1.15rem;font-weight:700;color:var(--muted)}
+.hrow{display:grid;grid-template-columns:22rem 1fr 5.5rem;align-items:center;gap:.4rem;flex:1;min-height:3.5rem;border-bottom:1px solid var(--frame)}
+.hrow:last-child{border-bottom:0}
+.hwho{display:flex;align-items:center;gap:.6rem;min-width:0;text-decoration:none;color:inherit}
+.hwho .bar{width:.35rem;height:2.2rem;border-radius:99px;background:var(--pc);flex:none}
+.hwho img{width:2rem;height:2rem}
+.hwho .txt{display:flex;flex-direction:column;min-width:0;line-height:1.15}
+.hwho .nm{font-size:1.5rem;font-weight:800;line-height:1.1}
+.hwho .sub{font-size:1.15rem;font-weight:700;color:var(--muted)}
+.dots{display:grid;grid-template-columns:repeat(30,1fr);gap:.25rem}
+.dot{width:100%;aspect-ratio:1;border-radius:50%;border:2px solid var(--frame);background:var(--board);box-sizing:border-box}
+.dot.on{background:var(--pc);border-color:var(--pc)}
+.dot.miss{background:transparent;border-color:var(--check)}
+.dot.today{border-color:var(--now)}
+.dot.future{border-style:dashed;background:transparent}
+.streak{font-size:2.15rem;font-weight:800;color:var(--pc);text-align:right;font-variant-numeric:tabular-nums}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Habits November">
+    <span class="mon">Habits</span>
+    <div class="mo-side"><span class="sub">November</span></div>
+  </div>
+  <div class="tools">
+    <div class="navm"><button class="btn icon" aria-label="Previous month"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><button class="btn icon" aria-label="Next month"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button></div>
+    <span class="seg" role="tablist"><button class="on" aria-current="page">Habits</button><button>Health</button></span>
+    <button class="btn secondary" data-tap aria-label="Habit Manager"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.9 7.2l1.9 1.1M17.2 15.7l1.9 1.1M4.9 16.8l1.9-1.1M17.2 8.3l1.9-1.1"/></svg> Manage</button>
+  </div>
+</header>
+<div class="body">
+  <div class="habits">
+    <div class="hd"><div class="lab">Habit</div><div class="days"><span class="d sun">1</span><span class="d">2</span><span class="d">3</span><span class="d">4</span><span class="d">5</span><span class="d">6</span><span class="d sun">7</span><span class="d sun">8</span><span class="d">9</span><span class="d">10</span><span class="d">11</span><span class="d">12</span><span class="d">13</span><span class="d today sun">14</span><span class="d sun">15</span><span class="d">16</span><span class="d">17</span><span class="d">18</span><span class="d">19</span><span class="d">20</span><span class="d sun">21</span><span class="d sun">22</span><span class="d">23</span><span class="d">24</span><span class="d">25</span><span class="d">26</span><span class="d">27</span><span class="d sun">28</span><span class="d sun">29</span><span class="d">30</span></div><div class="st">In a row</div></div>
+    <div class="hrow" style="--pc:var(--p-blue)">
+          <a class="hwho" href="#" data-tap aria-label="No phone after 9, Connor · daily, streak 4">
+            <span class="bar"></span><img class="e" src="../assets/flashlight.webp" alt="">
+            <span class="txt"><span class="nm">No phone after 9</span><span class="sub">Connor · daily</span></span>
+          </a>
+          <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot today on"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span></div>
+          <div class="streak">4</div>
+        </div><div class="hrow" style="--pc:var(--p-pink)">
+          <a class="hwho" href="#" data-tap aria-label="Evening walk, Alexandra · daily, streak 1">
+            <span class="bar"></span><img class="e" src="../assets/person_walking.webp" alt="">
+            <span class="txt"><span class="nm">Evening walk</span><span class="sub">Alexandra · daily</span></span>
+          </a>
+          <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot today on"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span></div>
+          <div class="streak">1</div>
+        </div><div class="hrow" style="--pc:var(--p-teal)">
+          <a class="hwho" href="#" data-tap aria-label="Brush teeth, Sam · morning and night, streak 14">
+            <span class="bar"></span><img class="e" src="../assets/toothbrush.png" alt="">
+            <span class="txt"><span class="nm">Brush teeth</span><span class="sub">Sam · morning and night</span></span>
+          </a>
+          <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot today on"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span></div>
+          <div class="streak">14</div>
+        </div><div class="hrow" style="--pc:var(--p-teal)">
+          <a class="hwho" href="#" data-tap aria-label="Pack the school bag, Sam · school days, streak 5">
+            <span class="bar"></span><img class="e" src="../assets/school.png" alt="">
+            <span class="txt"><span class="nm">Pack the school bag</span><span class="sub">Sam · school days</span></span>
+          </a>
+          <div class="dots"><span class="dot miss"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot today miss"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span></div>
+          <div class="streak">5</div>
+        </div><div class="hrow" style="--pc:var(--p-purple)">
+          <a class="hwho" href="#" data-tap aria-label="Make the bed, Christopher · daily, streak 2">
+            <span class="bar"></span><img class="e" src="../assets/house_with_garden.png" alt="">
+            <span class="txt"><span class="nm">Make the bed</span><span class="sub">Christopher · daily</span></span>
+          </a>
+          <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot today on"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span></div>
+          <div class="streak">2</div>
+        </div><div class="hrow" style="--pc:var(--p-purple)">
+          <a class="hwho" href="#" data-tap aria-label="Hockey gear ready, Christopher · practice days, streak 0">
+            <span class="bar"></span><img class="e" src="../assets/ice_hockey.png" alt="">
+            <span class="txt"><span class="nm">Hockey gear ready</span><span class="sub">Christopher · practice days</span></span>
+          </a>
+          <div class="dots"><span class="dot miss"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot miss"></span><span class="dot on"></span><span class="dot miss"></span><span class="dot today miss"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span><span class="dot future"></span></div>
+          <div class="streak">0</div>
+        </div>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Set days</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.weekwrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 24rem;gap:1.25rem}
+.week{background:var(--board);border-radius:var(--r-card);box-shadow:var(--sh-raised);padding:1rem 1.2rem;min-height:0;display:flex;flex-direction:column}
+.wgrid{display:grid;grid-template-columns:13rem repeat(7,minmax(0,1fr));gap:.4rem}
+.wd{text-align:center;font-size:1.35rem;font-weight:800;padding-bottom:.3rem}
+.plan-who{display:flex;align-items:center;gap:.55rem;min-height:4.5rem;padding:0 .5rem;border-radius:var(--r);border:0;background:transparent;text-align:left;cursor:pointer}
+.plan-who.on{background:var(--rail);box-shadow:inset 0 0 0 2px var(--ink)}
+.plan-who .sw{width:1.5rem;height:1.5rem;border-radius:50%;background:var(--pc);flex:none}
+.plan-who .nm{font-size:1.5rem;font-weight:800;display:block;line-height:1.1}
+.plan-who .pl{font-size:1.15rem;font-weight:700;color:var(--muted)}
+.week{overflow:visible}.cell{position:relative;min-height:4.5rem}
+.cell > button{width:100%;height:100%;min-height:4.5rem;border-radius:var(--r);border:2px solid transparent;background:var(--ps);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15rem;cursor:pointer;font:inherit;font-weight:800;font-size:1.25rem;color:var(--ink)}
+.cell > button.open{border-color:var(--ink)}
+.cell img{width:1.85rem;height:1.85rem}
+.pick{position:absolute;top:calc(100% + .25rem);left:0;z-index:5;width:16rem;background:var(--board);border-radius:var(--r-card);box-shadow:var(--sh-dialog);padding:.5rem;display:flex;flex-direction:column;gap:.2rem}
+.pick .lab{font-size:1.15rem;font-weight:700;color:var(--muted);padding:.2rem .4rem}
+.pick button{min-height:3rem;border:0;border-radius:var(--r);background:transparent;display:flex;align-items:center;gap:.5rem;padding:0 .6rem;font:inherit;font-size:1.25rem;font-weight:700;cursor:pointer;text-align:left}
+.pick button.on{background:var(--rail)}
+.side .h2{margin-bottom:.3rem}
+.planrow{display:flex;align-items:center;gap:.6rem;min-height:3.6rem;padding:.2rem .3rem;border-radius:var(--r)}
+.planrow.on{background:var(--rail);box-shadow:inset 0 0 0 2px var(--ink)}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Set days">
+    <span class="mon">Set days</span>
+    
+  </div>
+  <div class="tools">
+    
+    <span class="seg" role="tablist"><button class="on" aria-current="page">Week</button><button>Days</button><button>Days off</button></span>
+    <button class="btn secondary" data-tap><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg> Routines</button><button class="btn primary" data-tap>Save</button>
+  </div>
+</header>
+<div class="body">
+  <div class="weekwrap">
+    <section class="week" aria-label="The week">
+      <div class="wgrid"><div></div><div class="wd">Sun</div><div class="wd">Mon</div><div class="wd">Tue</div><div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div><div class="wd">Sat</div><button class="plan-who on" style="--pc:var(--p-blue)" aria-pressed="true"><span class="sw"></span><span><span class="nm">Connor</span><span class="pl">Usual week · in use</span></span></button><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Sun: Family day. Change"><img class="e" src="../assets/people_hugging.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Family</span></button></div><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Mon: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Tue: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Wed: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Thu: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Fri: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-blue-soft)" aria-label="Connor, Sat: Free day. Change"><img class="e" src="../assets/sun.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Free</span></button></div><button class="plan-who" style="--pc:var(--p-pink)" aria-pressed="false"><span class="sw"></span><span><span class="nm">Alexandra</span><span class="pl">Usual week · in use</span></span></button><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Sun: Family day. Change"><img class="e" src="../assets/people_hugging.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Family</span></button></div><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Mon: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Tue: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Wed: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Thu: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Fri: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-pink-soft)" aria-label="Alexandra, Sat: Free day. Change"><img class="e" src="../assets/sun.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Free</span></button></div><button class="plan-who" style="--pc:var(--p-teal)" aria-pressed="false"><span class="sw"></span><span><span class="nm">Sam</span><span class="pl">Usual week · in use</span></span></button><div class="cell"><button class="" style="--ps:var(--p-teal-soft)" aria-label="Sam, Sun: Family day. Change"><img class="e" src="../assets/people_hugging.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Family</span></button></div><div class="cell"><button class="" style="--ps:var(--p-teal-soft)" aria-label="Sam, Mon: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-teal-soft)" aria-label="Sam, Tue: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="open" style="--ps:var(--p-teal-soft)" aria-label="Sam, Wed: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button><div class="pick" role="listbox"><div class="lab">Sam’s Wednesday</div><button class="on" type="button"><img class="e" src="../assets/school.png" alt=""> School day <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button><button class="" type="button"><img class="e" src="../assets/people_hugging.webp" alt=""> Family day </button><button class="" type="button"><img class="e" src="../assets/sun.webp" alt=""> Free day </button><button class="" type="button"><img class="e" src="../assets/calendar.png" alt=""> PA day </button></div></div><div class="cell"><button class="" style="--ps:var(--p-teal-soft)" aria-label="Sam, Thu: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-teal-soft)" aria-label="Sam, Fri: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-teal-soft)" aria-label="Sam, Sat: Free day. Change"><img class="e" src="../assets/sun.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Free</span></button></div><button class="plan-who" style="--pc:var(--p-purple)" aria-pressed="false"><span class="sw"></span><span><span class="nm">Christopher</span><span class="pl">Usual week · in use</span></span></button><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Sun: Family day. Change"><img class="e" src="../assets/people_hugging.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Family</span></button></div><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Mon: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Tue: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Wed: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Thu: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Fri: School day. Change"><img class="e" src="../assets/school.png" alt=""><span class="truncate" style="width:100%;text-align:center">School</span></button></div><div class="cell"><button class="" style="--ps:var(--p-purple-soft)" aria-label="Christopher, Sat: Free day. Change"><img class="e" src="../assets/sun.webp" alt=""><span class="truncate" style="width:100%;text-align:center">Free</span></button></div></div>
+    </section>
+    <aside class="card side">
+      <div class="h2"><span class="sw" style="display:inline-block;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--p-blue);margin-right:.4rem;vertical-align:middle"></span>Connor’s weeks</div>
+      <div class="planrow on"><span style="flex:1;font-size:1.5rem;font-weight:800">Usual week</span><span style="font-size:1.15rem;font-weight:700;color:var(--muted)">In use</span></div>
+      <div class="field" style="margin-top:1rem"><span class="fl">If there is more than one week</span>
+        <div class="toggle"><button>Take turns</button><button class="on">Use one</button></div>
+      </div>
+      <button class="btn secondary" data-tap style="margin-top:auto"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a week</button>
+    </aside>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

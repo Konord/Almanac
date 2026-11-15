@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Week</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<style>
+@font-face{font-family:"Atkinson Hyperlegible Next";src:url("../../fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");font-weight:200 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Almanac Digits";src:url("../../fonts/figtree-latin-wght-normal.woff2") format("woff2");font-weight:300 900;font-style:normal;font-display:swap;unicode-range:U+0030-0039;size-adjust:98%}
+@font-face{font-family:"Shantell Sans";src:url("../../fonts/shantell-sans-latin-full-normal.woff2") format("woff2-variations");font-weight:300 800;font-style:normal;font-display:swap}
+
+body{font-family:"Almanac Digits","Atkinson Hyperlegible Next",system-ui,sans-serif}
+:root{
+  --now:#A3261A;
+  --hand-blue:#2963A6;--hand-pink:#A6375E;--hand-teal:#157179;--hand-purple:#7D42A8;--hand-orange:#9C4B0C;
+}
+
+.app{height:100%;display:flex;flex-direction:column;gap:0;padding:0 0 3.15rem;min-height:0;background:var(--rail)}
+
+/* Locked header: 7rem, title + year on a shared baseline, weather, arrows, tabs, Add. No chips, no date range. */
+.top{display:flex;align-items:center;gap:1.15rem;min-height:7rem;max-height:7rem;padding:0 2rem;flex:none;background:var(--rail)}
+.mo{display:flex;align-items:baseline;gap:.8rem;min-width:0;margin-right:auto}
+.mo .mon{font-size:6.75rem;font-weight:800;letter-spacing:-.045em;line-height:.9}
+.mo-side{display:contents}
+.mo .sub{font-size:2rem;font-weight:700;letter-spacing:-.02em;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1}
+.tools{display:flex;align-items:center;gap:.6rem;flex:none}
+.wx{display:flex;align-items:center;gap:.35rem;min-height:var(--tt);padding:0 .4rem;border-radius:var(--r);background:transparent;border:0;color:inherit;cursor:pointer}
+.wx img{width:2.15rem;height:2.15rem}
+.wx .tp{font-size:2.15rem;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.top .seg button{min-width:6.75rem}
+.top .btn.add{min-height:var(--tt);padding:0 1.35rem}
+.top .btn.icon{width:var(--tt);height:var(--tt);min-height:var(--tt);padding:0;border-radius:50%;background:var(--panel);color:var(--ink)}
+.top .btn.icon svg{width:1.5rem;height:1.5rem}
+.navm{display:flex;align-items:center;gap:.35rem}
+
+/* 7 edge-to-edge day columns. */
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);background:var(--board)}
+.col{position:relative;display:flex;flex-direction:column;gap:.35rem;padding:0 0 .3rem;border-right:1px solid var(--frame);background:var(--board);overflow:hidden;min-width:0;min-height:0;cursor:pointer}
+.col:last-child{border-right:0}
+.col.today{background:#FFFCFB}
+.col.past{background:#F7F8F9}
+
+.head{display:flex;flex-direction:column;align-items:flex-start;gap:.2rem;padding:.5rem .55rem .3rem;flex:none;border:0;background:transparent;width:100%;text-align:left;cursor:pointer;min-height:3.25rem;color:inherit;font:inherit;position:relative;z-index:1}
+.wd{font-size:1.15rem;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;line-height:1}
+.n{font-size:2.25rem;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;flex:none}
+.col.today .n{width:2.85rem;height:2.85rem;border:2px solid var(--now);border-radius:50%;color:var(--now);background:transparent;display:inline-flex;align-items:center;justify-content:center}
+.col.past .n,.col.past .wd{color:var(--muted)}
+
+.stickers{display:flex;align-items:center;gap:.35rem;min-width:0;padding-top:.1rem}
+.sticker{width:1.75rem;height:1.75rem;flex:none;pointer-events:none;background:transparent;border:0;padding:0}
+.sticker img,.sticker img.e{width:1.75rem;height:1.75rem;object-fit:contain}
+
+/* Holiday emoji fills the area below the day header. Fade only the img, only when events sit on top. */
+.hol-bg{position:absolute;top:4.6rem;left:0;right:0;bottom:0;display:grid;place-items:center;pointer-events:none;z-index:0;background:transparent;overflow:hidden;filter:none;opacity:1}
+.hol-bg img,
+.hol-bg img.e{width:auto;height:auto;max-width:100%;max-height:100%;min-width:0;min-height:0;object-fit:contain;object-position:center;background:transparent;border:0;box-shadow:none;filter:none}
+.col.holiday.has-ev .hol-bg img{opacity:.18}
+.col.holiday:not(.has-ev) .hol-bg img{opacity:1}
+
+.evs{display:flex;flex-direction:column;gap:.35rem;min-width:0;flex:1;padding:0 .4rem;position:relative;z-index:1;overflow:visible}
+.ev{display:grid;grid-template-columns:auto 2.15rem 1fr;align-items:center;gap:.4rem;padding:.4rem .5rem .4rem .85rem;border-radius:var(--r);background:var(--es,var(--panel));min-height:5rem;position:relative;overflow:hidden;cursor:pointer;flex:none;min-width:0}
+.ev:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.35rem;background:var(--ec,var(--check))}
+.ev.split::before{background:linear-gradient(to bottom,var(--ec) 50%,var(--ec2) 50%)}
+.ev .tm{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;color:var(--ink)}
+.ev img,.ev img.e{width:2.15rem;height:2.15rem;object-fit:contain}
+.ev .ti{font-size:1.25rem;font-weight:700;line-height:1.15;min-width:0;color:var(--hc,var(--ink))}
+.ev[hidden]{display:none!important}
+.ev.user .ti{
+  font-family:"Shantell Sans",cursive;
+  -webkit-font-smoothing:auto;
+  font-variation-settings:"BNCE" 18,"INFM" 30,"SPAC" 0,"wght" 650;
+  font-weight:700;
+  letter-spacing:0;
+}
+
+/* Past days (and finished events today): muted like the agenda, no strikethrough. */
+.col.past .ev{background:var(--panel)}
+.col.past .ev .ti,.col.past .ev .tm,.ev.past .ti,.ev.past .tm{color:var(--muted)}
+.col.past .ev::before,.ev.past::before{opacity:.4}
+.col.past .ev img,.ev.past img{opacity:.65}
+
+.nowline{display:flex;align-items:center;gap:.45rem;color:var(--now);font-weight:800;font-size:1.25rem;margin:.05rem 0;flex:none;width:100%;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.nowline::after{content:"";flex:1;height:.2rem;background:var(--now);border-radius:1rem;min-width:1.25rem}
+
+.more{display:flex;align-items:center;min-height:0;padding:.1rem .15rem .15rem;font-size:1.15rem;font-weight:700;color:var(--soft);font-variant-numeric:tabular-nums;flex:none;border:0;background:transparent;text-align:left;line-height:1.2;position:relative;z-index:1}
+.more[hidden]{display:none!important}
+
+.tray{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:12rem;height:3.15rem;border:0;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding-bottom:.55rem;cursor:pointer;z-index:5}
+.tray .bar{width:7.5rem;height:.45rem;border-radius:99px;background:#C5C8CE}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="../../src/common.js"></script>
+<script src="g.js"></script>
+<script>
+const TODAY = new Date(2026, 10, 14);
+const nowMin = D.nowMin;
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const sameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+
+/* Same made-up family data as the locked month / agenda, for Sun Nov 8 – Sat Nov 14.
+   Saturday includes the two extra timed events from month 5a so today matches that grid. */
+const EVENTS = {
+  "2026-11-08": [
+    { t: "Family breakfast", s: 9*60, e: 10*60+30, who: ["c","a","s","x"], icon: "fork_and_knife_with_plate.png" },
+  ],
+  "2026-11-10": [
+    { t: "Swim lessons", s: 16*60, e: 17*60, who: ["s","x"], icon: "person_swimming.webp" },
+  ],
+  "2026-11-11": [
+    { t: "Remembrance Day", all: true, kind: "holiday", holiday: "remembrance", icon: "maple_leaf.png" },
+  ],
+  "2026-11-13": [
+    { t: "Recycling pickup", all: true, kind: "user", who: ["c"], icon: "recycling_symbol.webp" },
+    { t: "Piano", s: 16*60, e: 16*60+45, who: ["s"], icon: "musical_note.png" },
+  ],
+  "2026-11-14": [
+    { t: "PA day", all: true, kind: "printed", who: [], icon: "school.png" },
+    { t: "Leo's birthday", all: true, kind: "user", who: [], icon: "birthday_cake.png" },
+    { t: "Dentist", s: 9*60, e: 10*60, who: ["c"], icon: "tooth.png" },
+    { t: "Team standup", s: 9*60, e: 9*60+30, who: ["a"], icon: "calendar.png" },
+    { t: "Pick up the coats", s: 12*60+30, e: 13*60, who: ["c"], icon: "coat.png" },
+    { t: "Swim lessons", s: 16*60, e: 17*60, who: ["s","x"], icon: "person_swimming.webp" },
+    { t: "Parent–teacher", s: 18*60, e: 19*60, who: ["c","a"], icon: "teacher.webp" },
+    { t: "Evening walk", s: 19*60+15, e: 20*60, who: ["a"], icon: "person_walking.webp" },
+  ],
+};
+
+const DAYS = Array.from({length: 7}, (_, i) => {
+  const d = new Date(2026, 10, 8 + i);
+  return d;
+});
+const WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+const evStyle = (e) => {
+  const who = e.who || [];
+  if (!who.length) return `--es:var(--panel);--ec:var(--check);--hc:var(--ink)`;
+  if (who.length === 2) {
+    const c0 = P(who[0]).col, c1 = P(who[1]).col;
+    return `--es:var(--p-${c0}-soft);--ec:var(--p-${c0});--ec2:var(--p-${c1});--hc:var(--hand-${c0})`;
+  }
+  const col = who.length > 2 ? "orange" : P(who[0]).col;
+  return `--es:var(--p-${col}-soft);--ec:var(--p-${col});--hc:var(--hand-${col})`;
+};
+const evClass = (e) => {
+  const who = e.who || [];
+  const parts = ["ev"];
+  if (who.length || e.kind === "user") parts.push("user");
+  if (who.length === 2) parts.push("split");
+  return parts.join(" ");
+};
+
+const evCard = (e, isToday) => {
+  const past = (isToday && e.e <= nowMin) ? " past" : "";
+  return `<div class="${evClass(e)}${past}" style="${evStyle(e)}" role="button" tabindex="0" data-tap aria-label="Edit event: ${e.t}">
+    <div class="tm">${hm(e.s)} ${ap(e.s)}</div>${img(e.icon)}
+    <div class="ti clamp2">${e.t}</div>
+  </div>`;
+};
+
+const renderCol = (d) => {
+  const key = iso(d);
+  const isToday = sameDay(d, TODAY);
+  const isPast = d < TODAY && !isToday;
+  const items = EVENTS[key] || [];
+  const holiday = items.find(e => e.kind === "holiday");
+  const stickers = items.filter(e => e.all && e.kind !== "holiday").slice(0, 3);
+  const timed = items.filter(e => !e.all).sort((a, b) => a.s - b.s);
+  const stickerHtml = stickers.length
+    ? `<div class="stickers">${stickers.map(s => `<span class="sticker">${img(s.icon)}</span>`).join("")}</div>`
+    : "";
+  const holBg = holiday ? `<div class="hol-bg" data-decor>${img(holiday.icon)}</div>` : "";
+  const finished = timed.filter(e => isToday && e.e <= nowMin);
+  const rest = timed.filter(e => !(isToday && e.e <= nowMin));
+  const nowline = isToday ? `<div class="nowline">Now ${D.now}</div>` : "";
+  const evs = `${finished.map(e => evCard(e, isToday)).join("")}${nowline}${rest.map(e => evCard(e, isToday)).join("")}`;
+  const dayName = WD[d.getDay()];
+  const classes = ["col", isToday ? "today" : "", isPast ? "past" : "", holiday ? "holiday" : "", timed.length ? "has-ev" : ""].filter(Boolean).join(" ");
+  return `<section class="${classes}" data-date="${key}">
+    ${holBg}
+    <button class="head" type="button" aria-label="Open ${dayName}'s agenda, November ${d.getDate()}">
+      <div class="wd">${dayName}</div>
+      <div class="n">${d.getDate()}</div>
+      ${stickerHtml}
+    </button>
+    <div class="evs">${evs}</div>
+  </section>`;
+};
+
+render("#app", `
+<header class="top">
+  <div class="mo" aria-label="November 2026">
+    <span class="mon">November</span>
+    <div class="mo-side"><span class="sub">2026</span></div>
+  </div>
+  <div class="tools">
+    <button class="wx" aria-label="Weather, ${D.weather.temp} degrees">${img(D.weather.icon)}<div class="tp">${D.weather.temp}°</div></button>
+    <div class="navm">
+      <button class="btn icon" aria-label="Previous week">${I.left}</button>
+      <button class="btn icon" aria-label="Next week">${I.right}</button>
+    </div>
+    <span class="seg"><button>Today</button><button class="on">Week</button><button>Month</button></span>
+    <button class="btn primary add" aria-label="Add an event">${I.plus} Add</button>
+  </div>
+</header>
+<div class="grid">${DAYS.map(renderCol).join("")}</div>
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+`);
+
+const sizeHolidayEmoji = () => {
+  for (const col of document.querySelectorAll(".col.holiday")) {
+    const head = col.querySelector(".head");
+    const imgEl = col.querySelector(".hol-bg img");
+    if (!imgEl) continue;
+    const below = Math.max(0, col.clientHeight - (head ? head.offsetHeight : 0));
+    const side = Math.floor(0.88 * Math.min(col.clientWidth, below));
+    imgEl.style.width = `${side}px`;
+    imgEl.style.height = `${side}px`;
+  }
+};
+
+const fit = () => {
+  sizeHolidayEmoji();
+  for (const col of document.querySelectorAll(".grid .col")) {
+    const evs = [...col.querySelectorAll(".evs > .ev")];
+    evs.forEach(e => { e.hidden = false; });
+    col.querySelector(".more")?.remove();
+    const box = col.querySelector(".evs");
+    const hidden = [];
+    const hideOne = () => {
+      const vis = evs.filter(e => !e.hidden);
+      if (!vis.length) return false;
+      vis.at(-1).hidden = true;
+      hidden.push(vis.at(-1));
+      return true;
+    };
+    const overflows = () => col.scrollHeight > col.clientHeight + 1;
+    const paintMore = () => {
+      if (!hidden.length) { col.querySelector(".more")?.remove(); return; }
+      let more = col.querySelector(".more");
+      if (!more) {
+        more = document.createElement("div");
+        more.className = "more";
+        more.setAttribute("aria-label", `Show ${hidden.length} more events`);
+        box.append(more);
+      }
+      more.textContent = `+ ${hidden.length} more`;
+      more.setAttribute("aria-label", `Show ${hidden.length} more events`);
+    };
+    while (overflows() && hideOne()) paintMore();
+    if (!hidden.length) col.querySelector(".more")?.remove();
+  }
+};
+
+document.querySelector(".grid")?.addEventListener("click", (e) => {
+  const ev = e.target.closest(".ev");
+  if (ev) { e.stopPropagation(); return; }
+});
+document.querySelector(".grid")?.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const ev = e.target.closest(".ev");
+  if (ev) { e.preventDefault(); e.stopPropagation(); }
+});
+
+const afterLayout = () => requestAnimationFrame(() => requestAnimationFrame(fit));
+document.fonts.ready.then(afterLayout);
+addEventListener("load", afterLayout);
+addEventListener("resize", afterLayout);
+</script>
+</body>
+</html>

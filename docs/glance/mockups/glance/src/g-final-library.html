@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Meals · Dishes</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.lwrap{flex:1;min-height:0;display:grid;grid-template-columns:16rem 22rem minmax(0,1fr);gap:1.25rem}
+.krow,.drow{display:flex;align-items:center;gap:.65rem;min-height:4rem;padding:0 .75rem;border-radius:var(--r);border:0;background:transparent;width:100%;text-align:left;cursor:pointer;font:inherit}
+.krow.on,.drow.on{background:var(--rail);box-shadow:inset 0 0 0 2px var(--ink)}
+.krow .nm,.drow .nm{font-size:1.5rem;font-weight:800;flex:1}
+.krow .ct{font-size:1.35rem;font-weight:800;color:var(--muted)}
+.drow img{width:2.15rem;height:2.15rem}
+.ing{display:flex;align-items:center;min-height:3.4rem;border-bottom:1px solid var(--frame);font-size:1.5rem;font-weight:700;gap:.7rem}
+.ing .amt{margin-left:auto;font-variant-numeric:tabular-nums}
+.batches{display:flex;gap:.25rem;background:var(--panel);border-radius:var(--r);padding:.25rem}
+.batches button{min-height:3rem;min-width:3.4rem;border:0;border-radius:calc(var(--r) - .1rem);background:transparent;font:inherit;font-size:1.35rem;font-weight:800;cursor:pointer;color:var(--muted)}
+.batches button.on{background:var(--board);color:var(--ink);box-shadow:var(--sh-raised)}
+.addways{display:flex;gap:.5rem;flex-wrap:wrap}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Meals Dishes">
+    <span class="mon">Meals</span>
+    <div class="mo-side"><span class="sub">Dishes</span></div>
+  </div>
+  <div class="tools">
+    
+    <span class="seg" role="tablist"><button>Menu</button><button class="on" aria-current="page">Dishes</button><button>Backups</button></span>
+    <button class="btn primary add" aria-label="Add a dish"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a dish</button>
+  </div>
+</header>
+<div class="body">
+  <div class="lwrap">
+    <section class="card">
+      <div class="h2">In a meal</div>
+      <button class="krow"><span class="nm">All dishes</span><span class="ct">12</span></button><button class="krow on"><span class="nm">Mains</span><span class="ct">5</span></button><button class="krow"><span class="nm">Sides</span><span class="ct">4</span></button><button class="krow"><span class="nm">Veggies</span><span class="ct">3</span></button>
+    </section>
+    <section class="card">
+      <div class="h2">Mains</div>
+      <button class="drow on"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Sheet-pan chicken fajitas</span></button><button class="drow"><img class="e" src="../assets/spaghetti.webp" alt=""><span class="nm truncate">Spaghetti and meatballs</span></button><button class="drow"><img class="e" src="../assets/pot_of_food.webp" alt=""><span class="nm truncate">Slow-cooker beef stew</span></button><button class="drow"><img class="e" src="../assets/taco.png" alt=""><span class="nm truncate">Fish tacos</span></button><button class="drow"><img class="e" src="../assets/shallow_pan_of_food.webp" alt=""><span class="nm truncate">Homemade pizza</span></button>
+    </section>
+    <section class="card">
+      <div style="display:flex;align-items:center;gap:.7rem">
+        <img class="e" src="../assets/taco.png" alt="">
+        <div class="h2" style="flex:1;margin:0">Sheet-pan chicken fajitas</div>
+        <div class="batches" role="group" aria-label="Batches"><button class="on">×1</button><button>×2</button><button>×3</button></div>
+      </div>
+      <div class="seg" role="tablist" style="align-self:flex-start;margin:.7rem 0 .5rem">
+        <button class="on">Recipe</button><button>Basics</button><button>Ingredients</button><button>Steps</button><button>Notes</button>
+      </div>
+      <div class="k">Ingredients · serves 4</div>
+      <div class="ing"><span>Chicken thighs</span><span class="amt">8</span></div><div class="ing"><span>Bell peppers, sliced</span><span class="amt">3</span></div><div class="ing"><span>Onion, sliced</span><span class="amt">1</span></div><div class="ing"><span>Fajita spice</span><span class="amt">2 tbsp</span></div><div class="ing"><span>Tortillas</span><span class="amt">12</span></div><div class="ing"><span>Sour cream, to serve</span><span class="amt">1</span></div><div class="ing"><span>Salsa, to serve</span><span class="amt">1</span></div><div class="ing"><span>Limes</span><span class="amt">2</span></div>
+      <div class="addways" style="margin-top:auto;padding-top:.8rem">
+        <span style="font-size:1.15rem;font-weight:700;color:var(--muted);align-self:center">Add a dish:</span>
+        <button class="btn secondary" data-tap>Type it in</button>
+        <button class="btn secondary" data-tap>Paste a recipe</button>
+        <button class="btn secondary" data-tap>From a web page</button>
+        <button class="btn meal" data-tap style="margin-left:auto">Cook this</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

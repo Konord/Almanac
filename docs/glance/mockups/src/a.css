@@ -1,0 +1,24 @@
+/* Direction A — "Glance": bright, cleaned up. Tokens = bright-2 theme. */
+:root{--board:#FFFFFF;--rail:#F6F7F9;--panel:#EEF0F3;--frame:#E3E6EA;--ink:#23262B;--muted:#565B63;--soft:#4E535B;--accent:#2F6FB8;--now:#CF3F29;--meal:#FBEDB5;--meal-ink:#5E4806;--success:#166F77;--check:#8A9099;
+--p-blue:#2F6FB8;--p-blue-soft:#CFE3F8;--p-pink:#B83D69;--p-pink-soft:#F9D3DF;--p-teal:#16757D;--p-teal-soft:#C8EEF0;--p-purple:#8A4BBA;--p-purple-soft:#E8D3F5;--p-orange:#AD540F;--p-orange-soft:#FCDDBE;
+--r-sm:.75rem;--r:1.125rem;--r-card:1.375rem;--r-dialog:1.875rem;--sh-raised:0 1px 3px rgb(30 35 45/.10);--sh-dialog:0 0 2.5rem rgb(30 35 45/.25);--scrim:rgb(30 35 45/.32)}
+body{font-family:Figtree,system-ui,sans-serif;background:var(--rail);color:var(--ink);font-weight:500}
+.app{height:100vh;display:grid;grid-template-rows:auto 1fr 6.75rem;gap:1.25rem;padding:1.5rem 2rem 0}
+.card{background:var(--board);border-radius:var(--r-card);box-shadow:var(--sh-raised);padding:1.375rem 1.5rem;min-height:0}
+.h2{font-size:1.75rem;font-weight:700;display:flex;align-items:center;gap:.75rem}
+.h2 .sub{font-size:1.25rem;font-weight:600;color:var(--muted)}
+.av{--pc:#888;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--pc);color:#fff;font-weight:800;width:2.75rem;height:2.75rem;font-size:1.25rem;flex:none}
+.av-pic{background:var(--ps);border:.15rem solid var(--pc)} .av-pic img{width:70%;height:70%}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:var(--tt);padding:0 1.5rem;border-radius:var(--r);font-size:1.25rem;font-weight:700}
+.btn.l{min-height:var(--tt-l);padding:0 2rem;font-size:1.5rem}
+.btn.primary{background:var(--ink);color:#fff} .btn.secondary{background:var(--panel);color:var(--ink)}
+.btn.icon{width:var(--tt);padding:0;border-radius:50%;background:var(--panel);font-size:1.5rem}
+.seg{display:flex;background:var(--panel);border-radius:calc(var(--r) + .3rem);padding:.3rem;gap:.25rem}
+.seg button{min-height:var(--tt);min-width:8rem;border-radius:var(--r);font-size:1.25rem;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--board);color:var(--ink);box-shadow:var(--sh-raised);font-weight:700}
+/* Dock: persistent navigation (replaces the hidden tray) */
+.dock{display:flex;align-items:center;gap:.5rem;background:var(--board);margin:0 -2rem;padding:0 2rem;border-top:1px solid var(--frame)}
+.dock .nav{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;min-height:5.5rem;border-radius:var(--r);font-size:1.125rem;font-weight:600;color:var(--soft)}
+.dock .nav img{width:2.25rem;height:2.25rem}
+.dock .nav.on{background:var(--panel);color:var(--ink);font-weight:800}
+.dock .add{margin-left:1rem}
