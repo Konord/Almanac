@@ -8,6 +8,8 @@ import { SettingsEditor } from "./editor";
 import { listArt } from "@/lib/art-folder";
 import { folderUse } from "@/lib/screen-saver";
 import type { ArtOverview } from "./screen-saver-tab";
+import type { SpotifyInfo } from "./spotify-tab";
+import { spotifyApp } from "@/lib/spotify";
 
 /**
  * Settings: the people in the household and the household's settings.
@@ -44,12 +46,17 @@ async function HouseholdContent() {
     .select("id, name, icon, colour, kind, address, local_key, check_up")
     .order("sort_order")
     .order("name");
-  const [{ data: mealTimes }, { data: holidays }, { data: birthdays }, art] = await Promise.all([
+  const [{ data: mealTimes }, { data: holidays }, { data: birthdays }, art, { data: spotifyRow }] = await Promise.all([
     supabase.from("meal_times").select("id, name").order("sort_order").order("name"),
     supabase.from("holidays").select("id, name"),
     supabase.from("birthdays").select("id, name"),
     listArt(),
+    supabase.from("spotify_connections").select("display_name, spotify_user_id, connected_at").maybeSingle(),
   ]);
+  const spotify: SpotifyInfo = {
+    setUp: spotifyApp() !== null,
+    account: spotifyRow ? { name: spotifyRow.display_name ?? spotifyRow.spotify_user_id, connectedAt: spotifyRow.connected_at } : null,
+  };
   const SEASON_LABEL = { spring: "Spring", summer: "Summer", fall: "Autumn", winter: "Winter" } as const;
   const overview: ArtOverview = {
     root: art.root,
@@ -110,5 +117,5 @@ async function HouseholdContent() {
     screenSaver: settings.screenSaver,
   };
 
-  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} mealTimes={mealTimes ?? []} art={overview} />;
+  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} mealTimes={mealTimes ?? []} art={overview} spotify={spotify} />;
 }

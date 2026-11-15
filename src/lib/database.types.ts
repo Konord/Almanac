@@ -1619,6 +1619,26 @@ isOneToOne: false
       referencedColumns: ["id","household_id"]
     }
                   ]
+                },"spotify_connections": {
+                  Row: {
+                    "access_token": string,"connected_at": string,"display_name": string | null,"expires_at": string,"household_id": string,"refresh_token": string,"scopes": string,"spotify_user_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "access_token": string,"connected_at"?: string,"display_name"?: string | null,"expires_at": string,"household_id": string,"refresh_token": string,"scopes"?: string,"spotify_user_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "access_token"?: string,"connected_at"?: string,"display_name"?: string | null,"expires_at"?: string,"household_id"?: string,"refresh_token"?: string,"scopes"?: string,"spotify_user_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "spotify_connections_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: true
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"step_helpers": {
                   Row: {
                     "household_id": string,"id": string,"kind": string,"label": string | null,"minutes": number | null,"step_id": string,"temperature": number | null
