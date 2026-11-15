@@ -668,3 +668,17 @@ Week view stays locked. These mocks cover every remaining kitchen screen in the 
 
 ### Planner review: skipped items (Nov 15 2026)
 An item marked as already have shows a red X (not a green check), with the name struck through and muted. Tap again to undo.
+
+### Connor's decisions — Nov 15 2026 (override anything above)
+**Weather.** The header weather slot on the calendar pages (Today / Week / Month) stays built but is rendered **empty** for now (reserved width, nothing shown, no placeholder icon or text, no fake data). Connor will pick the weather source later. Weather still never appears on utility pages.
+
+**Hour grid returns on Week only.** Today / Agenda stays exactly as mocked (stacked cards, no hour grid). Week keeps its locked look — 7 edge-to-edge day columns, compact Glance agenda cards, past days fade (~55%) but keep their colours, every column reserves the sticker row, holiday emoji behind, red Now line in today's column — but the cards now sit on an **hour grid** (positioned by start time, height by duration with a minimum of one compact card; overlapping events share the column width side by side).
+- Drag gestures on the grid **scroll the view** (vertical hours) — that is the only thing dragging does.
+- Hour labels sit **inline on the grid lines** inside the columns (small printed digits at the left of each hour line), not in a separate gutter, so the columns stay edge-to-edge and nothing moves or resizes.
+- **No dragging or resizing of events anywhere in the app** (Week, Today, Month). Events are edited by tapping the card, which opens the edit sheet.
+- Initial scroll puts the current time (or the first event of the week) near the top; the header, tabs, weekday row and sticker row stay fixed while the hours scroll.
+- Daily List open on Week: drop two day columns (past days first, oldest first; if fewer than two past days remain, drop the last days of the week), leaving five full-width days; closing the list restores all seven. Header and tabs stay put. Tap the list button again to close.
+
+**Theme.** Migration `20261120200000_glance_theme.sql` is approved as is. **No theme customization UI** (no colour/theme picker or editor) until the default look is settled. The Holiday themes on/off toggle in Settings is not theme customization and stays.
+
+**Fonts.** Figtree is still used for digits ("Almanac Digits") via the bundled `public/fonts/figtree-latin-wght-normal.woff2` — keep that file. The npm packages `@fontsource-variable/figtree` and `@fontsource/kalam` are unused (nothing imports them) and are removed.
