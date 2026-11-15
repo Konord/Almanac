@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Minus, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
-import { ActionLink, AppFrame, Button, Emoji, Field, Input, firstParam, LoadingOutline } from "@/components/ui";
+import { Minus, PencilSimple, Plus, ShoppingCart } from "@phosphor-icons/react/dist/ssr";
+import { ActionLink, AppFrame, Button, Emoji, Field, Input, firstParam, LoadingOutline, secondaryActionClass } from "@/components/ui";
 import { requireHousehold } from "@/lib/household";
-import { addRecipe, adjustOnHand } from "../actions";
+import { addRecipe, adjustOnHand, putLowPartsOnList } from "../actions";
 import { loadBackupParts, loadItems, loadMealBasics, readyCount } from "../data";
 import { MealsHeader, Modal, Pager, linker, pageOf } from "../parts";
 import { PartsEditor } from "./parts-editor";
@@ -12,8 +12,23 @@ import { PartsEditor } from "./parts-editor";
  * Backup meals: the ones you keep ready for a survival day (a frozen
  * lasagne and garlic bread, chicken and a packet of rice). Only their
  * parts are counted: using one counts them down, and a part below its
- * minimum is suggested for the grocery list.
+ * minimum is suggested for the grocery list (or put there with "Put low
+ * parts on the grocery list").
  */
+/** One − or + on a part's count (a little form, so it works without the browser's help). */
+function Step({ id, delta, returnTo }: { id: string; delta: 1 | -1; returnTo: string }) {
+  return (
+    <form action={adjustOnHand}>
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="delta" value={delta} />
+      <button aria-label={delta === 1 ? "One more" : "One fewer"} className="flex size-12 items-center justify-center rounded-full bg-panel text-ink">
+        {delta === 1 ? <Plus size="1.25rem" weight="bold" aria-hidden /> : <Minus size="1.25rem" weight="bold" aria-hidden />}
+      </button>
+    </form>
+  );
+}
+
 export default function BackupsPage(props: PageProps<"/meals/backups">) {
   return (
     <AppFrame section="meals">
@@ -38,62 +53,82 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
   const editId = firstParam(params.edit);
   const editing = editId ? backups.find((b) => b.id === editId) : undefined;
 
+  const low = parts.filter((p) => p.on_hand < p.keep_at_least);
+  // One row of tall cards when they fit (the mock), two rows when there are more.
+  const oneRow = shown.items.length <= 3;
+  const partsShown = oneRow ? 10 : 4;
+
   return (
     <>
-      <MealsHeader title="Meals" tab="backups" error={firstParam(params.error)} message={firstParam(params.message)}>
-        <ActionLink href={here({ new: "1" })}>Backup meal</ActionLink>
+      <MealsHeader tab="backups" error={firstParam(params.error)} message={firstParam(params.message)}>
+        {low.length ? (
+          // Parts below their minimum, onto the grocery list (the same restock lines a swap makes).
+          <form action={putLowPartsOnList}>
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <button className={secondaryActionClass}>
+              <ShoppingCart size="1.25rem" weight="bold" aria-hidden />
+              Put low parts on the grocery list
+            </button>
+          </form>
+        ) : null}
+        <ActionLink href={here({ new: "1" })} scroll={false}>
+          New backup
+        </ActionLink>
       </MealsHeader>
 
       {backups.length === 0 ? (
-        null
+        <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] bg-board shadow-raised">
+          <Emoji emoji="🛟" className="size-16" />
+          <p className="text-2xl font-bold text-ink">No backup meals yet</p>
+          <p className="text-lg text-ink-muted">Meals you keep ready for a tired night: a frozen lasagne, chicken and a packet of rice.</p>
+        </section>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-3 gap-5" style={{ gridTemplateRows: "repeat(2, minmax(0, 1fr))" }}>
+        <div className="grid min-h-0 flex-1 grid-cols-3 gap-5" style={{ gridTemplateRows: oneRow ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))" }}>
           {shown.items.map((b) => {
             const mine = parts.filter((p) => p.recipe_id === b.id);
             const ready = readyCount(mine);
             return (
-              <section key={b.id} className="flex min-h-0 flex-col gap-2 overflow-hidden rounded-[var(--radius-card)] border border-frame bg-board p-4">
-                <div className="flex items-center gap-3">
+              <section key={b.id} className="flex min-h-0 flex-col gap-[0.7rem] overflow-hidden rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
+                <div className="flex shrink-0 items-center gap-3">
                   <Emoji emoji={b.icon ?? "🧊"} className="size-16" />
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-2xl font-bold text-ink">{b.name}</h2>
-                    <p className={`text-lg font-bold ${ready > 0 ? "text-success" : "text-danger"}`}>{ready > 0 ? `Ready ${ready} time${ready === 1 ? "" : "s"}` : "Not ready: restock"}</p>
+                  <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                    <h2 className="max-w-full truncate text-[2rem] leading-tight font-extrabold tracking-[-0.02em] text-ink">{b.name}</h2>
+                    <span
+                      className={`tabular inline-flex min-h-10 items-center rounded-full px-[0.8rem] text-[1.15rem] font-extrabold ${
+                        ready > 0 ? "bg-[color-mix(in_srgb,var(--color-success)_16%,white)] text-success" : "bg-alert-soft text-now-on-tint"
+                      }`}
+                    >
+                      {ready > 0 ? `Ready · ${ready}` : "Not ready: restock"}
+                    </span>
                   </div>
-                  <Link href={here({ edit: b.id })} scroll={false} aria-label={`Edit ${b.name}`} className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink">
-                    <PencilSimple size="1.375rem" aria-hidden />
+                  <Link href={here({ edit: b.id })} scroll={false} aria-label={`Edit ${b.name}`} className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink">
+                    <PencilSimple size="1.5rem" aria-hidden />
                   </Link>
                 </div>
-                <ul className="flex min-h-0 flex-1 flex-col gap-1">
-                  {mine.slice(0, 4).map((p) => {
-                    const low = p.on_hand < p.keep_at_least;
+                <ul className="flex min-h-0 flex-1 flex-col">
+                  {mine.slice(0, partsShown).map((p) => {
+                    const short = p.on_hand < p.keep_at_least;
                     return (
-                      <li key={p.id} className="flex min-h-14 items-center gap-2 rounded-xl bg-rail px-3">
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xl font-bold text-ink">{itemById.get(p.item_id)?.name ?? "Part"}</span>
-                          <span className={`text-base ${low ? "font-bold text-danger" : "text-ink-muted"}`}>
-                            Keep {p.keep_at_least}
-                            {p.uses !== 1 ? ` · uses ${p.uses}` : ""}
-                          </span>
+                      <li key={p.id} className="flex min-h-[3.6rem] shrink-0 items-center gap-[0.7rem] border-b border-frame last:border-b-0">
+                        <span className={`min-w-0 flex-1 truncate text-[1.5rem] font-bold ${short ? "text-now-on-tint" : "text-ink"}`}>{itemById.get(p.item_id)?.name ?? "Part"}</span>
+                        {/* How many to keep (and how many one meal uses), so "low" makes sense. */}
+                        <span className={`tabular shrink-0 text-[1.15rem] font-bold ${short ? "text-now-on-tint" : "text-ink-muted"}`}>
+                          keep {p.keep_at_least}
+                          {p.uses !== 1 ? ` · uses ${p.uses}` : ""}
                         </span>
-                        {[-1, 1].map((delta) => (
-                          <form key={delta} action={adjustOnHand} className={delta === 1 ? "order-last" : ""}>
-                            <input type="hidden" name="returnTo" value={returnTo} />
-                            <input type="hidden" name="id" value={p.id} />
-                            <input type="hidden" name="delta" value={delta} />
-                            <button aria-label={delta === 1 ? "One more" : "One fewer"} className="flex size-11 items-center justify-center rounded-full bg-board text-ink">
-                              {delta === 1 ? <Plus size="1.25rem" weight="bold" aria-hidden /> : <Minus size="1.25rem" weight="bold" aria-hidden />}
-                            </button>
-                          </form>
-                        ))}
-                        <span className={`min-w-10 text-center text-2xl font-extrabold tabular-nums ${low ? "text-danger" : "text-ink"}`}>{p.on_hand}</span>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Step id={p.id} delta={-1} returnTo={returnTo} />
+                          <span className={`tabular min-w-[2.2rem] text-center text-[1.75rem] font-extrabold ${short ? "text-now-on-tint" : "text-ink"}`}>{p.on_hand}</span>
+                          <Step id={p.id} delta={1} returnTo={returnTo} />
+                        </div>
                       </li>
                     );
                   })}
                   {mine.length === 0 ? <li className="text-lg text-ink-muted">No parts yet</li> : null}
-                  {mine.length > 4 ? (
+                  {mine.length > partsShown ? (
                     <li>
-                      <Link href={here({ edit: b.id })} scroll={false} className="text-lg font-bold text-accent">
-                        + {mine.length - 4} more parts
+                      <Link href={here({ edit: b.id })} scroll={false} className="flex min-h-12 items-center text-lg font-bold text-accent">
+                        + {mine.length - partsShown} more parts
                       </Link>
                     </li>
                   ) : null}

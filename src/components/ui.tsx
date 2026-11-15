@@ -148,6 +148,10 @@ export function Segmented({ options, label }: { options: { href: string; label: 
 export const primaryActionClass =
   "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-primary px-[1.35rem] text-lg font-bold whitespace-nowrap text-primary-ink";
 
+/** A grey second-rank button ("+ Add a kind", "Type it in"). */
+export const secondaryActionClass =
+  "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-6 text-lg font-bold whitespace-nowrap text-ink disabled:opacity-40";
+
 /** The header's main action as a link, e.g. "+ Add" or "+ New list". */
 export function ActionLink({
   href,

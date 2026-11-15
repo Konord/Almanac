@@ -46,6 +46,7 @@ async function Cook({ params }: { params: PageProps<"/meals/cook/[id]">["params"
   return (
     <CookingMode
       mealId={meal.id}
+      backHref="/"
       title={menuName || rows[0].recipes!.name}
       temperatureUnit={household.settings.temperatureUnit}
       measures={household.settings.measures}

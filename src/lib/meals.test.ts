@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { amountText, formatAmount, guessAisle, mealSlot, scaleAmount, weekDates, weekStartOf } from "./meals.ts";
-import { durations, helperText, NIGHT_BEFORE_MINUTES, spotHelpers } from "./meal-helpers.ts";
+import { bothTemperatures, durations, helperText, NIGHT_BEFORE_MINUTES, spotHelpers } from "./meal-helpers.ts";
 import { isoMinutes, parseIngredientLine, parseRecipeHtml, parseRecipeText } from "./recipe-import.ts";
 
 test("weeks start on Sunday or Monday", () => {
@@ -123,4 +123,11 @@ test("recipe web pages are read from their schema.org data", () => {
   assert.equal(r.ingredients[1].name, "ricotta");
   assert.equal(r.steps.length, 2);
   assert.equal(parseRecipeHtml("<html></html>"), null);
+});
+
+test("bothTemperatures shows the household's unit first, then the other", () => {
+  assert.equal(bothTemperatures(425, "fahrenheit", "oven"), "425°F / 220°C");
+  assert.equal(bothTemperatures(220, "celsius", "oven"), "220°C / 430°F");
+  assert.equal(bothTemperatures(165, "fahrenheit", "doneness"), "165°F / 74°C");
+  assert.equal(bothTemperatures(74, "celsius", "doneness"), "74°C / 165°F");
 });

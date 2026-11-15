@@ -3,41 +3,92 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { X } from "@phosphor-icons/react/dist/ssr";
 import { Notice, ScreenHeader, Segmented } from "@/components/ui";
+import { BATCHES } from "@/lib/meals";
 import { MENU_TABS, type MealsTab } from "./menu-tabs";
 
 /*
- * Pieces shared by the Meals screens: the header with the Meals tabs, a
- * pop-up card that never scrolls, and page arrows for long lists.
+ * Pieces shared by the Meals screens: the header with the Meals tabs, the
+ * picked-row look, the ×1/×2/×3 switch, a pop-up card that never scrolls,
+ * and page arrows for long lists.
  */
 
 export type { MealsTab } from "./menu-tabs";
-const TABS = MENU_TABS;
 
+/**
+ * The Meals header: the big printed "Meals" with the tab's name on its
+ * baseline, Menu | Dishes | Backups in the tab slot, no weather, and the
+ * page's Add/Save at the far right (`children`).
+ */
 export function MealsHeader({
-  title,
   tab,
   children,
   error,
   message,
 }: {
-  title: ReactNode;
   tab: MealsTab;
   children?: ReactNode;
-  error?: string;
-  message?: string;
+  error?: string | null;
+  message?: string | null;
 }) {
   return (
     <>
-      {/* The tabs sit straight after the title on every Menu Manager screen, so they never move. */}
       <ScreenHeader
-        title={title}
-        sub={TABS.find((t) => t.tab === tab)?.label ?? (tab === "backups" ? "Backups" : undefined)}
-        tabs={<Segmented label="Meals" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />}
+        title="Meals"
+        sub={MENU_TABS.find((t) => t.tab === tab)?.sub}
+        tabs={<Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />}
         action={children}
       />
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {message ? <Notice tone="success">{message}</Notice> : null}
+      {error ? <Notice tone="error">{error}</Notice> : message ? <Notice tone="success">{message}</Notice> : null}
     </>
+  );
+}
+
+/** A row you pick in a column (a kind of meal, a meal, a dish): the picked one is ringed in ink. */
+export function pickRowClass(active: boolean): string {
+  return `flex min-h-16 w-full min-w-0 items-center gap-[0.65rem] rounded-[var(--radius)] px-3 text-left ${
+    active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"
+  }`;
+}
+
+/** A round grey icon button (rename, remove). */
+export const roundIconClass =
+  "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink disabled:opacity-35";
+
+/**
+ * ×1 ×2 ×3. Links (`href`) on server pages, buttons (`onPick`) in the
+ * browser. `meal` is Cook mode's yellow track; the plain one is grey.
+ */
+export function BatchSwitch({
+  value,
+  href,
+  onPick,
+  tone = "plain",
+  big = false,
+}: {
+  value: number;
+  href?: (batches: number) => string;
+  onPick?: (batches: number) => void;
+  tone?: "plain" | "meal";
+  big?: boolean;
+}) {
+  const item = (on: boolean) =>
+    `flex h-12 min-w-[3.6rem] items-center justify-center rounded-[calc(var(--radius)-0.1rem)] px-2 font-extrabold tabular ${big ? "text-[1.5rem]" : "text-[1.35rem]"} ${
+      on ? "bg-board text-ink shadow-raised" : tone === "meal" ? "text-meal-ink" : "text-ink-muted"
+    }`;
+  return (
+    <div role="group" aria-label="Batches" className={`flex shrink-0 gap-1 rounded-[var(--radius)] p-1 ${tone === "meal" ? "bg-meal" : "bg-panel"}`}>
+      {BATCHES.map((b) =>
+        href ? (
+          <Link key={b} href={href(b)} scroll={false} aria-current={b === value ? "true" : undefined} aria-label={`${b} batch${b === 1 ? "" : "es"}`} className={item(b === value)}>
+            ×{b}
+          </Link>
+        ) : (
+          <button key={b} type="button" aria-pressed={b === value} aria-label={`${b} batch${b === 1 ? "" : "es"}`} onClick={() => onPick?.(b)} className={item(b === value)}>
+            ×{b}
+          </button>
+        ),
+      )}
+    </div>
   );
 }
 
