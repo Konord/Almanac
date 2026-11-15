@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
@@ -151,6 +151,66 @@ export const primaryActionClass =
 /** A grey second-rank button ("+ Add a kind", "Type it in"). */
 export const secondaryActionClass =
   "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-6 text-lg font-bold whitespace-nowrap text-ink disabled:opacity-40";
+
+/** A field's small label above it ("When", "Minutes"): the mock's `.fl`. */
+export const fieldLabelClass = "text-[1.15rem] font-bold text-ink-muted";
+
+/** A typed-in field in an editor card (big bold text, grey frame): the mock's `.inp`. */
+export const editorInputClass =
+  "min-h-[var(--touch-target)] w-full min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-[1.5rem] font-bold text-ink outline-none focus:border-ink disabled:opacity-40";
+
+/**
+ * A small switch of choices inside a card ("When", "Who can see it",
+ * On | Off): grey track, the picked one raised in white. For a page's
+ * own tabs use the header's segmented switch instead.
+ */
+export function Toggle<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  /** Nothing is raised when it's null (e.g. "some steps" of a routine). */
+  value: T | null;
+  options: { value: T; label: ReactNode }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex gap-[0.2rem] rounded-[var(--radius)] bg-panel p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={`flex min-h-[calc(var(--touch-target)-0.2rem)] min-w-0 flex-1 items-center justify-center rounded-[calc(var(--radius)-0.15rem)] px-3 text-center text-[1.25rem] leading-[1.15] font-bold disabled:opacity-60 ${
+            value === o.value ? "bg-board text-ink shadow-raised" : "text-ink-muted"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A person's colour as a round dot (instead of an avatar). */
+export function ColourDot({ colour, className = "size-[1.15rem]" }: { colour: string | null | undefined; className?: string }) {
+  return <span aria-hidden className={`inline-block shrink-0 rounded-full ${className}`} style={{ background: strong(colour) }} />;
+}
+
+/** The look of a person chip (dot + name): pastel with their ink when on, plain when off. The mock's `.who-chip`. */
+export function whoChipStyle(colour: string | null | undefined, on: boolean): { className: string; style: CSSProperties | undefined } {
+  return {
+    className: `inline-flex min-h-[var(--touch-target)] min-w-0 items-center gap-[0.4rem] rounded-full border-2 px-[1.1rem] text-[1.25rem] font-bold ${on ? "" : "border-frame bg-board text-ink"}`,
+    style: on ? { borderColor: strong(colour), background: soft(colour), color: hand(colour) } : undefined,
+  };
+}
 
 /** The header's main action as a link, e.g. "+ Add" or "+ New list". */
 export function ActionLink({
