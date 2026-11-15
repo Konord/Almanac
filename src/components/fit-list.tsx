@@ -26,6 +26,7 @@ export function FitList({
   heading,
   aside,
   paging = "pager",
+  focus,
 }: {
   rows: ReactNode[];
   /** How many rows to show before the list is measured. */
@@ -41,9 +42,13 @@ export function FitList({
   aside?: ReactNode;
   /** "pager": arrows and "1 of 4"; "more": a quiet "+ N more" row only when full. */
   paging?: "pager" | "more";
+  /** A row to start on: the list opens on the page that shows it (e.g. the list picked). */
+  focus?: number;
 }) {
   const [ref, perPage] = useFitRows<HTMLUListElement>(fallback);
-  const [page, setPage] = useState(0);
+  // Until someone pages, follow the row to focus on (its page changes as the list is measured).
+  const [picked, setPage] = useState<number | null>(null);
+  const page = picked ?? (focus && focus > 0 ? Math.floor(focus / perPage) : 0);
   const pages = Math.max(1, Math.ceil(rows.length / perPage));
   const p = Math.min(page, pages - 1);
   const quiet = paging === "more";

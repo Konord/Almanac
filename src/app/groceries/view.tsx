@@ -2,7 +2,9 @@
 
 import { Pager } from "@/components/pager";
 import { useEffect, useState, useTransition } from "react";
-import { ArrowsClockwise, Check, Plus, Stack, X } from "@phosphor-icons/react";
+import { ArrowsClockwise, Plus, Stack, X } from "@phosphor-icons/react";
+import { ListRow } from "@/components/list-row";
+import { hand } from "@/lib/colours";
 import { Emoji } from "@/components/ui";
 import { addGrocery, clearTickedGroceries, readGroceries, tickGrocery, type GroceriesResult } from "./actions";
 import type { GroceryLine } from "./data";
@@ -17,7 +19,9 @@ import { RepeatsCard } from "./repeats";
  *
  * Lines added together from more than one meal carry a small stacked
  * mark; tapping it shows which meals they're for. Nothing scrolls: aisles
- * fill columns, and further columns go on pages.
+ * fill columns, and further columns go on pages. Each line is the shared
+ * ListRow (like the Daily List): round tick, the name handwritten, the
+ * amount on the right. Ticked lines stay, muted, until Clear ticked.
  */
 
 type Part = { aisle: string; first: boolean; lines: GroceryLine[] };
@@ -126,17 +130,17 @@ export function GroceryView({
           placeholder={compact ? undefined : "Add something"}
           aria-label="Something to buy"
           maxLength={60}
-          className={`h-[var(--touch-target)] min-w-0 flex-1 rounded-2xl border-2 border-frame bg-rail px-4 text-lg text-ink outline-none focus:border-accent ${compact ? "" : "max-w-[44rem]"}`}
+          className={`h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-4 font-bold text-ink outline-none placeholder:text-ink-muted focus:border-accent ${compact ? "text-xl" : "max-w-[36rem] text-[1.5rem]"}`}
         />
-        <button type="submit" disabled={pending || !name.trim()} className="flex h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-ink px-5 text-lg font-bold text-board disabled:opacity-40">
+        <button type="submit" disabled={pending} className="flex h-[var(--touch-target)] shrink-0 items-center gap-[0.6rem] rounded-[var(--radius)] bg-primary px-6 text-[1.25rem] font-bold text-primary-ink disabled:opacity-60">
           <Plus size="1.25rem" weight="bold" aria-hidden />
           Add
         </button>
         {compact || !all.some((l) => l.parts.length > 1) ? null : (
           <>
             <div className="flex-1" />
-            <span className="inline-flex items-center gap-2 text-base text-ink-soft">
-              <CombinedMark count={2} />
+            <span className="inline-flex items-center gap-2 text-[1.15rem] font-bold text-ink-muted">
+              <CombinedMark />
               from more than one meal
             </span>
           </>
@@ -144,7 +148,7 @@ export function GroceryView({
       </form>
 
       <div className="flex shrink-0 items-center gap-3">
-        <span className="text-base font-bold text-ink-muted">{lines === null ? "Getting the list…" : `${toGet} to get${got ? ` · ${got} got` : ""}`}</span>
+        <span className="tabular text-[1.25rem] font-bold text-ink-muted">{lines === null ? "Getting the list…" : `${toGet} to get${got ? ` · ${got} got` : ""}`}</span>
         {note ? <span className="truncate text-base text-ink-muted">{note}</span> : null}
         <div className="flex-1" />
         <Pager page={p} pages={pages.length} onPage={setPage} />
@@ -153,14 +157,14 @@ export function GroceryView({
             type="button"
             onClick={() => setRepeatsOpen(!repeatsOpen)}
             aria-expanded={repeatsOpen}
-            className="flex min-h-12 items-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel"
+            className="flex min-h-[var(--touch-target)] items-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-6 text-[1.25rem] font-bold text-ink"
           >
             <ArrowsClockwise size="1.125rem" weight="bold" aria-hidden />
             Repeats
           </button>
         )}
         {got > 0 ? (
-          <button type="button" disabled={pending} onClick={() => run(clearTickedGroceries)} className="flex min-h-12 items-center rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel">
+          <button type="button" disabled={pending} onClick={() => run(clearTickedGroceries)} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-panel px-6 text-[1.25rem] font-bold text-ink">
             Clear ticked
           </button>
         ) : null}
@@ -171,39 +175,46 @@ export function GroceryView({
         </p>
       ) : null}
 
-      <div className={`grid min-h-0 flex-1 content-start gap-x-7 ${compact ? "grid-cols-1" : ""}`} style={compact ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {lines && lines.length === 0 ? <p className="col-span-full text-lg text-ink-muted">Nothing on the list.</p> : null}
+      <div className={`grid min-h-0 flex-1 content-start gap-x-[1.15rem] ${compact ? "grid-cols-1" : ""}`} style={compact ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        {lines && lines.length === 0 ? <p className="col-span-full text-xl text-ink-muted">Nothing on the list.</p> : null}
         {pages[p].map((col, i) => (
           <div key={i} className="flex min-w-0 flex-col">
             {col.map((part) => (
               <div key={`${part.aisle}-${part.first}`} className="flex flex-col">
-                <h3 className={`flex items-end border-b-2 border-frame pb-1 text-sm font-bold tracking-wide text-ink-muted uppercase ${compact ? "mt-1 min-h-8" : "mt-1.5 mb-1 min-h-9"}`}>
+                <h3 className={`flex items-end text-[1.15rem] font-bold tracking-[0.06em] text-ink-muted uppercase ${compact ? "mt-1 min-h-8" : "mt-1 min-h-9"}`}>
                   {part.first ? part.aisle : `${part.aisle} (more)`}
                 </h3>
-                {part.lines.map((l) => (
-                  <div key={l.id} className={`flex min-w-0 items-center gap-2 rounded-xl ${compact ? "min-h-[3.25rem]" : "min-h-[3.75rem]"} ${open === l.id ? "bg-[color-mix(in_srgb,var(--color-meal)_45%,white)]" : ""}`}>
-                    <button type="button" onClick={() => tick(l)} aria-pressed={l.checked} className="flex min-h-[inherit] min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1 text-left hover:bg-rail">
-                      <span
-                        className={`flex size-8 shrink-0 items-center justify-center rounded-lg border-[0.15rem] ${l.checked ? "border-success bg-success text-board" : "border-check-border bg-board"}`}
-                        aria-hidden
-                      >
-                        {l.checked ? <Check size="1.1rem" weight="bold" /> : null}
-                      </span>
-                      {l.icon && !compact ? <Emoji emoji={l.icon} className="size-7" /> : null}
-                      <span className="flex min-w-0 flex-col">
-                        <span className={`truncate font-hand text-[1.375rem] leading-tight ${l.checked ? "text-ink-muted line-through" : "text-ink"}`}>{l.name}</span>
-                        {l.need || l.detail ? (
-                          <span className="truncate text-sm font-bold text-ink-muted">{l.need || (l.source === "repeat" ? l.detail : "")}</span>
-                        ) : null}
-                      </span>
-                    </button>
-                    {l.parts.length > 1 ? (
-                      <button type="button" onClick={() => setOpen(open === l.id ? null : l.id)} aria-label={`What ${l.name} is for`} aria-expanded={open === l.id} className="flex min-h-11 shrink-0 items-center rounded-xl px-1">
-                        <CombinedMark count={l.parts.length} />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
+                <ul className="flex flex-col">
+                  {part.lines.map((l) => (
+                    <ListRow
+                      key={l.id}
+                      size={compact ? "panel" : "page"}
+                      title={l.name}
+                      // Grocery lines aren't anyone's: dark ink.
+                      ink={hand(null)}
+                      done={l.checked}
+                      tick={{ onTick: () => tick(l) }}
+                      highlight={open === l.id}
+                      sub={!l.need && l.source === "repeat" && l.detail ? l.detail : undefined}
+                      badge={
+                        l.parts.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => setOpen(open === l.id ? null : l.id)}
+                            aria-label={`What ${l.name} is for (${l.parts.length} meals)`}
+                            aria-expanded={open === l.id}
+                            className="-mx-1.5 flex size-12 shrink-0 items-center justify-center"
+                          >
+                            <CombinedMark />
+                          </button>
+                        ) : null
+                      }
+                      meta={l.need ? l.need.replace(/ needed for meals$/, "") : null}
+                      icon={l.icon ? <Emoji emoji={l.icon} className="size-8" faded={l.checked} /> : null}
+                      iconAt="start"
+                    />
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
@@ -245,11 +256,10 @@ export function GroceryView({
 }
 
 /** The small stacked mark on lines added together from more than one meal. */
-export function CombinedMark({ count }: { count: number }) {
+export function CombinedMark() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-lg bg-meal px-1.5 py-0.5 text-sm font-extrabold text-meal-ink">
-      <Stack size="0.9rem" weight="bold" aria-hidden />
-      {count}
+    <span className="inline-flex size-[1.5rem] shrink-0 items-center justify-center rounded-[0.35rem] bg-meal text-meal-ink" aria-hidden>
+      <Stack size="1rem" weight="bold" />
     </span>
   );
 }

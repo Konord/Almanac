@@ -308,11 +308,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         <TodayPanel
           household={household}
           today={today}
-          upNext={[]}
           tab={panelTab}
           returnTo={here}
           day
-          layout="side"
           routine={
             routineOpen ? (
               <RoutineChecklist

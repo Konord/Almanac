@@ -319,11 +319,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
               <TodayPanel
                 household={household}
                 today={today}
-                upNext={[]}
                 tab={panelPrefs.tab}
                 returnTo={panelReturn}
                 day
-                layout="side"
                 routine={
                   routineOpen ? (
                     <RoutineChecklist

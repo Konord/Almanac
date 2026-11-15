@@ -223,7 +223,7 @@ body {
 /*
  * Daily List check-off (Glance spec): a wobbly marker stroke across the
  * words (400 ms), then the row fades and folds away (300 ms). Reduced
- * motion: no stroke, a quick 160 ms fade. See today-panel/scratch-row.tsx.
+ * motion: no stroke, a quick 160 ms fade. See components/list-row.tsx.
  */
 .scratch-row {
   max-height: 6rem;
