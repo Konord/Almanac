@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authorizeUrl, expiresAt, isLoopbackHost, SPOTIFY_SCOPES, visitedOrigin } from "./spotify.ts";
+import { authorizeUrl, expiresAt, isLoopbackHost, pickImage, readPlayer, SPOTIFY_SCOPES, visitedOrigin } from "./spotify.ts";
 
 test("only 127.0.0.1 and ::1 count as this computer", () => {
   assert.equal(isLoopbackHost("127.0.0.1:3001"), true);
@@ -31,4 +31,42 @@ test("the visited address comes from the Host header, not Next's guess", () => {
   const fallback = new URL("http://localhost:3001/api/spotify/connect");
   assert.equal(visitedOrigin(new Headers({ host: "127.0.0.1:3001" }), fallback), "http://127.0.0.1:3001");
   assert.equal(visitedOrigin(new Headers(), fallback), "http://localhost:3001");
+});
+
+test("Spotify's answer becomes song, artists, cover and device", () => {
+  const now = readPlayer({
+    is_playing: true,
+    progress_ms: 61000,
+    device: { name: "Connor's iPhone" },
+    item: {
+      name: "Sunday Morning",
+      duration_ms: 240000,
+      artists: [{ name: "Maroon 5" }, { name: "Guest" }],
+      album: {
+        images: [
+          { url: "big", width: 640, height: 640 },
+          { url: "medium", width: 300, height: 300 },
+          { url: "small", width: 64, height: 64 },
+        ],
+      },
+    },
+  });
+  assert.deepEqual(now, { title: "Sunday Morning", artist: "Maroon 5, Guest", art: "medium", playing: true, device: "Connor's iPhone", progressMs: 61000, durationMs: 240000 });
+});
+
+test("a podcast shows the show's name instead of artists", () => {
+  const now = readPlayer({ is_playing: false, progress_ms: null, item: { name: "Episode 4", duration_ms: 100, show: { name: "The Show", images: [] } } });
+  assert.equal(now?.artist, "The Show");
+  assert.equal(now?.art, null);
+  assert.equal(now?.playing, false);
+});
+
+test("nothing loaded means nothing to show", () => {
+  assert.equal(readPlayer(null), null);
+  assert.equal(readPlayer({ is_playing: false, progress_ms: 0, item: null }), null);
+});
+
+test("picks the smallest cover that's big enough", () => {
+  assert.equal(pickImage([{ url: "a", width: 64, height: 64 }]), "a");
+  assert.equal(pickImage(undefined), null);
 });
