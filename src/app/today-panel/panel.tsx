@@ -471,17 +471,33 @@ export async function TodayPanel({
         <Plus size="1.5rem" weight="bold" aria-hidden />
       </label>
     ) : null;
+    // Flipping boxes: the boxes either side, by name ("‹ Chores", "Groceries ›"),
+    // so it's clear where a tap goes. No row of dots: there can be a dozen boxes.
+    const boxAt = Math.max(0, boxes.findIndex((b) => b.id === showing));
+    const neighbour = (by: 1 | -1) => {
+      const b = boxes[(boxAt + by + boxes.length) % boxes.length];
+      return (
+        <form action={pickPanelTab} className="min-w-0">
+          <input type="hidden" name="tab" value={b.id} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <button
+            aria-label={`Show ${b.name}`}
+            className="flex min-h-[var(--touch-target)] max-w-full min-w-[var(--touch-target)] items-center gap-1.5 rounded-full bg-panel px-4 text-[1.125rem] leading-none font-bold text-ink-soft"
+          >
+            {by === -1 ? <CaretLeft size="1.125rem" weight="bold" aria-hidden className="shrink-0" /> : null}
+            <span className="truncate">{b.name}</span>
+            {by === 1 ? <CaretRight size="1.125rem" weight="bold" aria-hidden className="shrink-0" /> : null}
+          </button>
+        </form>
+      );
+    };
     const switcher =
       boxes.length > 1 ? (
-        <div className="mt-2 flex shrink-0 items-center justify-center gap-3 border-t border-frame pt-2">
-          {arrowButton(-1)}
-          <span className="flex items-center gap-2" aria-label={`${box.name}, ${boxes.findIndex((b) => b.id === showing) + 1} of ${boxes.length}`}>
-            {boxes.map((b) => (
-              <span key={b.id} aria-hidden className={`size-2.5 rounded-full ${b.id === showing ? "bg-ink" : "bg-check-border"}`} />
-            ))}
-          </span>
-          {arrowButton(1)}
-        </div>
+        <nav aria-label={`Boxes: ${box.name}, ${boxAt + 1} of ${boxes.length}`} className="mt-3 grid shrink-0 grid-cols-2 items-center gap-3 [&>form:last-child]:justify-self-end">
+          {/* With two boxes, both ways lead to the same one: just "Next ›". */}
+          {boxes.length > 2 ? neighbour(-1) : <span />}
+          {neighbour(1)}
+        </nav>
       ) : null;
 
     return (
@@ -500,6 +516,7 @@ export async function TodayPanel({
                   aside={plus}
                   rows={sideRows}
                   fallback={7}
+                  paging="more"
                   className="mt-1"
                 />
               ) : (
@@ -554,9 +571,9 @@ export async function TodayPanel({
                   </div>
                 </>
               )}
-              {showing === "bucket" && choresList ? <AddRow id={addId} listId={choresList.id} returnTo={returnTo} label="Add a chore" /> : null}
+              {showing === "bucket" && choresList ? <AddRow id={addId} listId={choresList.id} returnTo={returnTo} label="Add a chore" tucked /> : null}
               {showing !== "bucket" && addListId ? (
-                <AddRow id={addId} listId={addListId} returnTo={returnTo} dueDate={showing === "today" ? today : undefined} label={showing === "today" ? "Add to the Daily List" : `Add to ${box.name}`} />
+                <AddRow id={addId} listId={addListId} returnTo={returnTo} dueDate={showing === "today" ? today : undefined} label={showing === "today" ? "Add to the Daily List" : `Add to ${box.name}`} tucked />
               ) : null}
               {switcher}
             </>
@@ -872,10 +889,21 @@ function weekdayShort(date: LocalDate, household: Household): string {
   );
 }
 
-/** The add box at the bottom of a Today panel list: a bare field and Add (Connor, 2026-11-11: no placeholder words). */
-function AddRow({ id, listId, returnTo, dueDate, label }: { id?: string; listId: string; returnTo: string; dueDate?: LocalDate; label: string }) {
+/**
+ * The add box at the bottom of a Today panel list: a bare field and Add
+ * (Connor, 2026-11-11: no placeholder words). `tucked` (the Glance panel):
+ * folded away until the round + in the title row puts the cursor in it.
+ */
+function AddRow({ id, listId, returnTo, dueDate, label, tucked = false }: { id?: string; listId: string; returnTo: string; dueDate?: LocalDate; label: string; tucked?: boolean }) {
   return (
-    <form action={addTodo} className="mt-2 flex shrink-0 items-center gap-2 border-t border-frame pt-2">
+    <form
+      action={addTodo}
+      className={`flex shrink-0 items-center gap-2 ${
+        tucked
+          ? "max-h-0 overflow-hidden focus-within:mt-2 focus-within:max-h-[calc(var(--touch-target)+1rem)] focus-within:border-t focus-within:border-frame focus-within:pt-2"
+          : "mt-2 border-t border-frame pt-2"
+      }`}
+    >
       <input type="hidden" name="listId" value={listId} />
       <input type="hidden" name="returnTo" value={returnTo} />
       {dueDate ? (

@@ -129,7 +129,9 @@ export type AllDayChip = {
 export function AllDayStrip({ chips }: { chips: AllDayChip[] }) {
   if (chips.length === 0) return null;
   return (
-    <div data-strip aria-label="All day" className="flex min-w-0 shrink-0 flex-nowrap items-center gap-[0.45rem] overflow-hidden py-[0.43rem]">
+    // The strip is the chips' height (46px at 1440, as mocked). It clips sideways
+    // only, so each chip's tap area can reach above and below it (48px+).
+    <div data-strip aria-label="All day" className="flex min-w-0 shrink-0 flex-nowrap items-center gap-[0.45rem] overflow-x-clip overflow-y-visible">
       {chips.map((c) => {
         const owned = c.colours.length > 0;
         const { tint, bar } = owned ? cardColours(c.colours) : { tint: "var(--color-panel)", bar: "" };
@@ -144,10 +146,13 @@ export function AllDayStrip({ chips }: { chips: AllDayChip[] }) {
           </>
         );
         const style = { background: tint, color: owned ? hand(c.colours[0]) : "var(--color-ink)" };
-        // The chip is small; its tap area reaches up and down into the strip's padding (48px).
+        // The chip is small (46px at 1440); a link's tap area reaches above
+        // and below it (64px) without making the strip any taller.
         return c.href ? (
-          <Link key={c.key} href={c.href} data-chip className={`${look} after:absolute after:inset-x-0 after:-inset-y-[0.43rem]`} style={style}>
-            {body}
+          <Link key={c.key} href={c.href} data-chip className="-my-[0.43rem] flex shrink-0 py-[0.43rem]">
+            <span className={look} style={style}>
+              {body}
+            </span>
           </Link>
         ) : (
           <span key={c.key} data-chip className={look} style={style}>
@@ -167,14 +172,14 @@ export function ComingUp({ items }: { items: ComingUpItem[] }) {
   if (items.length === 0) return null;
   return (
     <section data-coming aria-label="Coming up" className="mt-auto shrink-0">
-      <h2 className="mb-3 text-[1.25rem] font-bold text-ink-muted">Coming up</h2>
+      <h2 className="mb-3 text-[1.25rem] leading-[1.25] font-bold text-ink-muted">Coming up</h2>
       <div className="grid grid-cols-3 gap-4">
         {items.map((e) => (
           <Link key={e.key} href={e.href} className="flex min-h-18 min-w-0 items-center gap-[0.9rem] rounded-[var(--radius)] bg-panel px-[1.1rem] py-[0.9rem]">
             <Emoji emoji={e.emoji} className="size-10" />
             <span className="min-w-0">
-              <b className="block truncate font-hand text-[1.25rem] text-ink">{e.title}</b>
-              <span className="tabular block truncate text-[1.125rem] font-semibold text-ink-soft">{e.when}</span>
+              <b className="block truncate font-hand text-[1.25rem] leading-[1.25] text-ink">{e.title}</b>
+              <span className="tabular block truncate text-[1.125rem] leading-[1.25] font-semibold text-ink-soft">{e.when}</span>
             </span>
           </Link>
         ))}

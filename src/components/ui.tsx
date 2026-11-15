@@ -116,10 +116,11 @@ export function ScreenHeader({
 /**
  * Where the weather (icon + temperature, tap for the forecast) goes on the
  * calendar pages. There is no weather source yet (it needs Connor's OK for
- * an outside service), so it shows nothing.
+ * an outside service). Connor, Nov 15: keep the place but leave it empty
+ * (no icon, no text, no made-up numbers), so nothing moves when it arrives.
  */
 function WeatherSlot() {
-  return null;
+  return <div data-weather-slot aria-hidden className="hidden w-[5rem] shrink-0 lg:block" />;
 }
 
 /** The track of a segmented switch, and one of its options (for switches made of buttons). */

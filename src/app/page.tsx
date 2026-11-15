@@ -265,7 +265,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           <AllDayStrip chips={chips} />
           <section data-cards aria-label="Today" className="flex min-h-0 shrink-0 flex-col gap-4">
             {finished.map(drawCard)}
-            <div className="tabular flex shrink-0 items-center gap-3 py-[0.1rem] text-[1.25rem] font-extrabold text-now">
+            <div className="tabular flex shrink-0 items-center gap-3 py-[0.1rem] text-[1.25rem] leading-[1.25] font-extrabold text-now">
               <NowLabel locale={locale} timeZone={timeZone} initial={nowText(locale, timeZone, now)} />
               <span aria-hidden className="h-[0.2rem] min-w-8 flex-1 rounded-full bg-now" />
             </div>
