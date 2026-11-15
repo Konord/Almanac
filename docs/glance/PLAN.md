@@ -45,15 +45,15 @@ How each step works: port the mock's values (rem sizes, colours, spacing) into t
 
 ## 4. Week (`/calendar?view=week`)
 - **Mock and spec:** `g-final-week.html`, plus "LOCKED style: week view" and "Week view: LOCKED (spec fixes)".
-- **What the screen shows:**
-  - Seven columns of stacked compact cards (in time order, not an hour grid). Every column reserves a sticker row. Past days are faded to about 55%.
-  - Holiday emoji, "+ N more", and the Now line in today's column.
+- **What the screen shows (built; Connor's Nov 15 decisions override the stacked-cards mock):**
+  - Seven edge-to-edge columns on an **hour grid** that scrolls vertically (drag or swipe; that's all dragging does). Hour labels sit on the lines inside the columns. Compact agenda cards placed by start time, as tall as they last (at least one card), side by side when they overlap. Every column reserves a sticker row. Past days (and today's finished things) fade to 55%, keeping their colours.
+  - Holiday emoji behind the hours, and the Now line in today's column.
   - When the Daily List opens, two day columns are dropped: past days first.
-- **Parity at risk:**
-  - Week meal blocks: kept as meal cards in the stack.
-  - Timed list tasks (`TodoPoint`): kept as cards.
-  - `PeopleRow` routine progress and breaks: breaks shown as ribbons.
-  - Drag/stretch/resize (`draggable-event`, `stretch-bar`, `side-handles`): kept in edit mode only, since there's no hour grid now. **To confirm with Connor** if it's missed.
+- **Parity:**
+  - Week meal blocks: meal cards on the grid (tap: Cooking Mode).
+  - Timed list tasks (`TodoPoint`): task cards (tap: the list).
+  - Breaks and all-day/multi-day events: stickers on each day they cover. Routine progress (`PeopleRow`): in the Daily List panel (no progress bars on calendar pages).
+  - Drag/stretch/resize (`draggable-event`, `stretch-bar`, `side-handles` on Week): **removed** (Connor, Nov 15). Moves are done on the edit card.
 
 ## 5. Daily List panel and Lists (`/lists`)
 - **Mock:** `g-final-lists.html`, plus the spec's "Lists".

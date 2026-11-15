@@ -6,7 +6,7 @@ import { HeaderMenu, headerMenuItemClass } from "@/components/header-menu";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
-import { addMonths, dayOfWeek, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
+import { addMonths, dayOfWeek, daysWithPanel, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { describeRule, parseRule } from "@/lib/recurrence";
@@ -33,14 +33,14 @@ import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
 import { loadSpecialDays } from "../holidays/data";
-import { PeopleRow } from "../routines/people-row";
 import { RoutineChecklist } from "../routines/routine-checklist";
 import { loadTodos } from "../chores/data";
 import { onCalendar } from "@/lib/todos";
-import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime, type WeekMeal } from "./views";
+import { MonthView, eventsOnDay, isAllDayStyle, minutesIntoDay } from "./views";
+import { WeekView, type WeekMeal } from "./week";
 import { loadMealBasics, loadMeals } from "../meals/data";
 import { cookHref, placeTodayMeals } from "../meals/today";
-import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
+import { TodayPanel } from "../today-panel/panel";
 import { setPanelOpen } from "../today-panel/actions";
 import { readPanelPrefs } from "../today-panel/prefs";
 import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
@@ -145,24 +145,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const openRoutine = firstParam(params.routine) ?? "";
   const openMember = firstParam(params.member) ?? "";
   const routineOpen = Boolean(openRoutine && openMember) && !placing;
-  const now = new Date();
-  // Up next is always about today, even when the calendar shows another month.
-  let todayEvents = events;
-  if (view === "week" && !days.includes(today)) {
-    const todayRange = rangeOf([today], timeZone);
-    todayEvents = panelPrefs.open ? itemsForPeople((await loadCalendar(todayRange.rangeStart, todayRange.rangeEnd)).items, people) : [];
-  }
-  const upNext: UpNextItem[] = view !== "week" ? [] : eventsOnDay(todayEvents, today, timeZone)
-    .filter((e) => !isAllDayStyle(e, timeZone) && new Date(e.ends_at) > now)
-    .sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1))
-    .map((e) => ({
-      id: `${e.id}|${e.occurrence_date ?? ""}`,
-      title: e.title,
-      emoji: eventEmoji(e.icon, e.title),
-      time: new Date(e.starts_at) <= now ? "Now" : shortTime(new Date(e.starts_at), household),
-      colour: eventColour(e, memberById),
-    }));
-
   const sheets = (
     <>
       {editing ? (
@@ -221,75 +203,78 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
     </>
   );
 
-  if (view === "month") {
-    // Month (Glance 5a): the grid edge to edge under the header; the Daily
-    // List pushes in from the right (SPEC "Daily List panel — PUSH is locked").
-    const panelOpen = panelPrefs.open || routineOpen;
-    const away = !days.includes(today);
-    return (
-      <>
-        <RememberDisplay display={view} />
-        <WallRefresh timeZone={timeZone} />
-        {/* The grid is white and the header's words are on the rail, so Christmas and Halloween colours read fine. */}
-        <HolidayColoursHere />
-        <div className="flex min-h-0 flex-1 flex-col lg:-mx-8 lg:-mt-6">
-          <div className="lg:px-8">
-            <ScreenHeader
-              {...headerTitle(view, days, anchor, household)}
-              weather
-              nav={
-                <>
-                  <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label="Previous month" icon={CaretLeft} />
-                  <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label="Next month" icon={CaretRight} />
-                </>
-              }
-              tabs={
-                <Segmented
-                  label="View"
-                  options={[
-                    { href: "/", label: "Today", active: false },
-                    { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: false },
-                    { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: true },
-                  ]}
-                />
-              }
-              action={
-                // Add starts adding mode (tap a day to place it), or cancels it.
-                <ActionLink
-                  href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
-                  scroll={false}
-                  icon={placing ? X : Plus}
-                  label={placing ? "Stop adding" : "Add an event"}
-                >
-                  {placing ? "Stop" : "Add"}
-                </ActionLink>
-              }
-            >
-              {/* Away from this month: a way straight back. */}
-              {away ? <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>This month</SoftLink> : null}
-              <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
-              <DailyListToggle open={panelOpen} returnTo={panelReturn} />
-              <HeaderMenu label="More: holidays and templates">
-                <Link href="/holidays" className={headerMenuItemClass}>
-                  <Emoji emoji="🎉" className="size-7" />
-                  Holidays
-                </Link>
-                <Link href={href({ panel: "templates", edit: null, add: null })} scroll={false} className={headerMenuItemClass}>
-                  <Copy size="1.75rem" aria-hidden />
-                  Templates
-                </Link>
-              </HeaderMenu>
-            </ScreenHeader>
+  // Week and Month (Glance): the grid edge to edge under the header; the
+  // Daily List pushes in from the right (SPEC "Daily List panel — PUSH is
+  // locked"). On Month the grid narrows; on Week two days drop out instead
+  // (SPEC "Week view: LOCKED", REVISED), so five keep their full width.
+  const panelOpen = panelPrefs.open || routineOpen;
+  const away = !days.includes(today);
+  const unit = byMonth ? "month" : "week";
+  return (
+    <>
+      <RememberDisplay display={view} />
+      <WallRefresh timeZone={timeZone} />
+      {/* The grid is white and the header's words are on the rail, so Christmas and Halloween colours read fine. */}
+      <HolidayColoursHere />
+      <div className="flex min-h-0 flex-1 flex-col lg:-mx-8 lg:-mt-6">
+        <div className="lg:px-8">
+          <ScreenHeader
+            {...headerTitle(view, days, anchor, household)}
+            weather
+            nav={
+              <>
+                <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={`Previous ${unit}`} icon={CaretLeft} />
+                <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={`Next ${unit}`} icon={CaretRight} />
+              </>
+            }
+            tabs={
+              <Segmented
+                label="View"
+                options={[
+                  { href: "/", label: "Today", active: false },
+                  { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
+                  { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
+                ]}
+              />
+            }
+            action={
+              // Add starts adding mode (tap a day, or a time on Week, to place it), or cancels it.
+              <ActionLink
+                href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
+                scroll={false}
+                icon={placing ? X : Plus}
+                label={placing ? "Stop adding" : "Add an event"}
+              >
+                {placing ? "Stop" : "Add"}
+              </ActionLink>
+            }
+          >
+            {/* Away from this week or month: a way straight back. */}
+            {away ? <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>{`This ${unit}`}</SoftLink> : null}
+            <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
+            <DailyListToggle open={panelOpen} returnTo={panelReturn} />
+            <HeaderMenu label="More: holidays and templates">
+              <Link href="/holidays" className={headerMenuItemClass}>
+                <Emoji emoji="🎉" className="size-7" />
+                Holidays
+              </Link>
+              <Link href={href({ panel: "templates", edit: null, add: null })} scroll={false} className={headerMenuItemClass}>
+                <Copy size="1.75rem" aria-hidden />
+                Templates
+              </Link>
+            </HeaderMenu>
+          </ScreenHeader>
+        </div>
+        {error || message || placing ? (
+          <div className="flex shrink-0 flex-col gap-2 pb-3 lg:px-8">
+            {error ? <Notice tone="error">{error}</Notice> : null}
+            {message ? <Notice tone="success">{message}</Notice> : null}
+            {placing ? <PlacingBar hint={byMonth ? "Adding an event: tap a day" : "Adding an event: tap a time, or a day's top for all day"} cancelHref={closeHref} /> : null}
           </div>
-          {error || message || placing ? (
-            <div className="flex shrink-0 flex-col gap-2 pb-3 lg:px-8">
-              {error ? <Notice tone="error">{error}</Notice> : null}
-              {message ? <Notice tone="success">{message}</Notice> : null}
-              {placing ? <PlacingBar hint="Adding an event: tap a day" cancelHref={closeHref} /> : null}
-            </div>
-          ) : null}
-          <div className="flex min-h-0 flex-1">
-            <div className="relative flex min-w-0 flex-1 flex-col">
+        ) : null}
+        <div className="flex min-h-0 flex-1">
+          <div className="relative flex min-w-0 flex-1 flex-col">
+            {view === "month" ? (
               <MonthView
                 household={household}
                 days={days}
@@ -303,169 +288,68 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
                 specials={specials}
                 dayHref={(day) => (day === today ? "/" : `/?date=${day}`)}
               />
-              {panelOpen ? (
-                // With the Daily List open, a tap on the grid closes it (the mock's push panel).
-                <form action={setPanelOpen} className="absolute inset-0 z-20 max-lg:hidden">
-                  <input type="hidden" name="open" value="0" />
-                  <input type="hidden" name="returnTo" value={panelReturn} />
-                  <button aria-label="Close the Daily List" className="size-full cursor-default" />
-                </form>
-              ) : null}
-            </div>
-            {panelOpen ? (
-              <div className="flex w-[36rem] shrink-0 flex-col border-l border-frame bg-rail p-5 shadow-[-0.35rem_0_1.4rem_rgb(30_35_45/0.12)] max-lg:hidden [&>aside]:flex-1">
-                <TodayPanel
-                  household={household}
-                  today={today}
-                  upNext={[]}
-                  tab={panelPrefs.tab}
-                  returnTo={panelReturn}
-                  day
-                  layout="side"
-                  routine={
-                    routineOpen ? (
-                      <RoutineChecklist
-                        data={routineData}
-                        memberId={openMember}
-                        templateId={openRoutine}
-                        date={today}
-                        today={today}
-                        page={Number(firstParam(params.rpage) ?? 0) || 0}
-                        closeHref={panelReturn}
-                        hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
-                      />
-                    ) : undefined
-                  }
-                />
-              </div>
+            ) : (
+              <WeekView
+                household={household}
+                // The Daily List takes two days' room (desktop only; a phone shows the panel elsewhere).
+                days={panelOpen ? daysWithPanel(days, today) : days}
+                today={today}
+                events={events}
+                memberById={memberById}
+                href={href}
+                meals={weekMeals}
+                tasks={weekTasks}
+                adding={{ placing, pending, addHref }}
+                breaks={breaks}
+                specials={specials}
+              />
+            )}
+            {panelOpen && view === "month" ? (
+              // With the Daily List open, a tap on the month grid closes it (the mock's push panel).
+              // Week keeps its cards tappable; the list button closes it there.
+              <form action={setPanelOpen} className="absolute inset-0 z-20 max-lg:hidden">
+                <input type="hidden" name="open" value="0" />
+                <input type="hidden" name="returnTo" value={panelReturn} />
+                <button aria-label="Close the Daily List" className="size-full cursor-default" />
+              </form>
             ) : null}
           </div>
-        </div>
-        {sheets}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <RememberDisplay display={view} />
-      <WallRefresh timeZone={timeZone} />
-      <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
-      {panelPrefs.open || routineOpen ? (
-        <TodayPanel
-          household={household}
-          today={today}
-          upNext={upNext}
-          tab={panelPrefs.tab}
-          returnTo={panelReturn}
-          routine={
-            // A routine tapped in the Routines box takes over the panel until it's closed.
-            routineOpen ? (
-              <RoutineChecklist
-                data={routineData}
-                memberId={openMember}
-                templateId={openRoutine}
-                date={today}
+          {panelOpen ? (
+            <div className="flex w-[36rem] shrink-0 flex-col border-l border-frame bg-rail p-5 shadow-[-0.35rem_0_1.4rem_rgb(30_35_45/0.12)] max-lg:hidden [&>aside]:flex-1">
+              <TodayPanel
+                household={household}
                 today={today}
-                page={Number(firstParam(params.rpage) ?? 0) || 0}
-                closeHref={panelReturn}
-                hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
+                upNext={[]}
+                tab={panelPrefs.tab}
+                returnTo={panelReturn}
+                day
+                layout="side"
+                routine={
+                  routineOpen ? (
+                    <RoutineChecklist
+                      data={routineData}
+                      memberId={openMember}
+                      templateId={openRoutine}
+                      date={today}
+                      today={today}
+                      page={Number(firstParam(params.rpage) ?? 0) || 0}
+                      closeHref={panelReturn}
+                      hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
+                    />
+                  ) : undefined
+                }
               />
-            ) : undefined
-          }
-        />
-      ) : (
-        <OpenPanelTab returnTo={panelReturn} />
-      )}
-      <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
-      <ScreenHeader
-        {...headerTitle(view, days, anchor, household)}
-        weather
-        nav={
-          <>
-            <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={byMonth ? "Previous month" : "Previous week"} icon={CaretLeft} />
-            <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
-          </>
-        }
-        tabs={
-          <Segmented
-            label="View"
-            options={[
-              { href: "/", label: "Today", active: false },
-              { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
-              { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: false },
-            ]}
-          />
-        }
-        action={
-          // Add starts adding mode (tap a day or time to place it), or cancels it.
-          <ActionLink
-            href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
-            scroll={false}
-            icon={placing ? X : Plus}
-            label={placing ? "Stop adding" : "Add an event"}
-          >
-            {placing ? "Stop" : "Add"}
-          </ActionLink>
-        }
-        toolbar={
-          <>
-        {/* Away from this week or month: a way straight back. */}
-        {days.includes(today) ? null : (
-          <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>{byMonth ? "This month" : "This week"}</SoftLink>
-        )}
-        <div className="flex items-center gap-3">
-          <SoftLink href="/holidays" className="px-3.5">
-            <Emoji emoji="🎉" className="size-7" />
-            Holidays
-          </SoftLink>
-          <SoftLink href={href({ panel: "templates", edit: null, add: null })} className="px-3.5">
-            <Copy size="1.5rem" aria-hidden />
-            Templates
-          </SoftLink>
-          <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
+            </div>
+          ) : null}
         </div>
-          </>
-        }
-      />
-
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {placing ? (
-        <PlacingBar
-          hint="Adding an event"
-          cancelHref={closeHref}
-        />
-      ) : null}
-
-      {view === "week" ? <PeopleRow data={routineData} date={today} /> : null}
-
-      {view === "week" ? (
-        <WeekView
-          household={household}
-          days={days}
-          today={today}
-          events={events}
-          memberById={memberById}
-          href={href}
-          meals={weekMeals}
-          tasks={weekTasks}
-          adding={{ placing, pending, addHref }}
-          breaks={breaks}
-          specials={specials}
-        />
-      ) : null}
       </div>
-      </div>
-
-
       {sheets}
     </>
   );
 }
 
 /**
- * Opens or closes the Daily List on Month (it pushes the grid narrower).
+ * Opens or closes the Daily List on Week and Month (it pushes in from the right).
  * Each screen remembers it (a cookie), the same as the old Today panel.
  */
 function DailyListToggle({ open, returnTo }: { open: boolean; returnTo: string }) {

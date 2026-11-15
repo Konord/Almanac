@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addMonths, dayOfWeek, firstOfMonth, fiveRowMonth, layoutBars, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
+import { addMonths, dayOfWeek, daysWithPanel, firstOfMonth, fiveRowMonth, layoutBars, layoutDay, layoutSpans, memberRuns, monthGridDays, rollingWeekDays, startOfWeek, weekDays } from "./calendar-layout.ts";
 
 test("finds the day of the week", () => {
   assert.equal(dayOfWeek("2026-11-04"), 3); // Wednesday
@@ -121,4 +121,12 @@ test("bars over several days stack so they never overlap", () => {
   // The third thing on Thursday doesn't fit, so Thursday shows "+1".
   assert.equal(lane.party, undefined);
   assert.deepEqual(hidden, [0, 0, 0, 0, 1, 0, 0]);
+});
+
+test("with the Daily List open, the week drops two days: past ones first, else the last ones", () => {
+  const week = weekDays("2026-11-11", 0); // Sun 8 – Sat 14
+  assert.deepEqual(daysWithPanel(week, "2026-11-14"), ["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14"]);
+  assert.deepEqual(daysWithPanel(week, "2026-11-09"), ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"]);
+  assert.deepEqual(daysWithPanel(week, "2026-11-08"), ["2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12"]);
+  assert.deepEqual(daysWithPanel(week, "2026-12-01"), week.slice(2));
 });
