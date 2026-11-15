@@ -4,6 +4,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { emojiImage } from "@/lib/emoji";
 import { hand, soft, strong } from "@/lib/colours";
+import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
 import { TimerPill } from "./timer-pill";
 import { MenuTray, type Section } from "./menu-tray";
 
@@ -476,4 +477,13 @@ export function LoadingOutline() {
       </div>
     </div>
   );
+}
+
+/**
+ * An empty marker a screen draws when it's ready for holiday colours
+ * (Christmas, Halloween): its content sits on white panels, so a dark rail
+ * is fine. See src/lib/holiday-theme.ts.
+ */
+export function HolidayColoursHere() {
+  return <span hidden {...{ [HOLIDAY_READY_ATTR]: "" }} />;
 }

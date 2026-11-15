@@ -27,6 +27,8 @@ export type HolidayColours = {
   tabOnInk: string;
   now: string;
   nowOnTint: string;
+  /** The menu tray's handle bar, light on a dark rail. */
+  handle: string;
 };
 
 export type HolidayThemeName = "christmas" | "halloween";
@@ -47,6 +49,7 @@ export const HOLIDAY_THEMES: Record<HolidayThemeName, { emoji: string; colours: 
       tabOnInk: "#FFFFFF",
       now: "#A31D2B",
       nowOnTint: "#A31D2B",
+      handle: "#E8E0D0",
     },
   },
   halloween: {
@@ -65,9 +68,17 @@ export const HOLIDAY_THEMES: Record<HolidayThemeName, { emoji: string; colours: 
       // Darker than the button so the label still holds 4.5:1 on person tints.
       now: "#9B3A00",
       nowOnTint: "#9B3A00",
+      handle: "#E8D6B0",
     },
   },
 };
+
+/**
+ * The colours only go on screens that are ready for a dark rail: a screen
+ * opts in by drawing <HolidayColoursHere /> (an empty marker). Screens
+ * still being redesigned keep the normal colours on a holiday.
+ */
+export const HOLIDAY_READY_ATTR = "data-holiday-colours";
 
 /** A holiday on today's date, as the holidays list gives it. */
 export type HolidayToday = { kind: "holiday" | "birthday"; name: string; icon: string | null };

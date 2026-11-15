@@ -1,19 +1,9 @@
 import { getHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf } from "@/lib/time";
-import { HOLIDAY_THEMES, holidayHero } from "@/lib/holiday-theme";
+import { HOLIDAY_READY_ATTR, HOLIDAY_THEMES, holidayHero } from "@/lib/holiday-theme";
 import { loadSpecialDays } from "@/app/holidays/data";
 import { brightTheme, colorVariables, SIZE_TOKEN_KEYS, themeToCssVariables, type Theme, type ThemeTokens } from "./tokens";
-
-/**
- * Holiday colours repaint the page background (the rail) dark. Screens
- * whose content still sits straight on the rail (Today, Week, Month until
- * their Glance redesign) can't be read on it, so the colours stay off
- * until those screens put their content on white panels. The holiday
- * title and picture on Today already show.
- * TODO(glance): set to true once Agenda, Week and Month are redesigned.
- */
-const HOLIDAY_COLOURS_READY = false;
 
 /**
  * Applies the household's active theme by writing its tokens as CSS
@@ -41,12 +31,17 @@ export async function HouseholdTheme() {
   const today = localDateOf(new Date(), household.settings.timeZone);
   const specials = (await loadSpecialDays(today, today)).get(today) ?? [];
   const hero = holidayHero(specials, household.settings.holidayThemes);
-  if (HOLIDAY_COLOURS_READY && hero?.theme) rules.push(...cssRules(colorVariables(HOLIDAY_THEMES[hero.theme].colours)));
+  // Only on screens that opted in (see HOLIDAY_READY_ATTR): the others still have content straight on the rail.
+  const holiday = hero?.theme ? cssRules(colorVariables(HOLIDAY_THEMES[hero.theme].colours)) : [];
 
   // Handwriting off: family-written things use the normal font too.
   if (!household.settings.handwriting) rules.push("--almanac-font-hand: var(--font-sans);");
 
-  return rules.length ? <style>{`:root { ${rules.join(" ")} }`}</style> : null;
+  const css = [
+    rules.length ? `:root { ${rules.join(" ")} }` : "",
+    holiday.length ? `:root:has([${HOLIDAY_READY_ATTR}]) { ${holiday.join(" ")} }` : "",
+  ].join("\n");
+  return css.trim() ? <style>{css}</style> : null;
 }
 
 /** Plain colour/size values only, so a stored theme can't inject other CSS. */

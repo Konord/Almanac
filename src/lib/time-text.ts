@@ -48,3 +48,15 @@ export function minutesText(minutes: number, locale: string): string {
 export function hourText(hour: number, locale: string): string {
   return wallTime(`${String(hour % 24).padStart(2, "0")}:00`, locale);
 }
+
+/** The clock time without am/pm, like "8:40" (the agenda's "Now 8:40"). */
+export function nowText(locale: string, timeZone: string, at = new Date()): string {
+  return new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" })
+    .format(at)
+    .replace(/[\s  ]*[ap]\.?\s?m\.?/i, "");
+}
+
+/** "until 10" or "until 9:30": an end time without am/pm, the way the agenda's time column reads. */
+export function untilText(instant: Date, locale: string, timeZone: string): string {
+  return shortClockTime(instant, locale, timeZone).replace(/[\s  ]*[ap]m$/i, "");
+}

@@ -219,3 +219,61 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Daily List check-off (Glance spec): a wobbly marker stroke across the
+ * words (400 ms), then the row fades and folds away (300 ms). Reduced
+ * motion: no stroke, a quick 160 ms fade. See today-panel/scratch-row.tsx.
+ */
+.scratch-row {
+  max-height: 6rem;
+}
+.scratch-row .scratch-stroke {
+  position: absolute;
+  left: -0.15em;
+  top: 50%;
+  width: calc(100% + 0.3em);
+  height: 1.15em;
+  transform: translateY(-52%);
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+}
+.scratch-row .scratch-stroke path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.scratch-row.is-scratching .scratch-stroke {
+  opacity: 1;
+}
+.scratch-row.is-scratching .scratch-stroke path {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 400ms ease-out;
+}
+.scratch-row.is-leaving {
+  opacity: 0;
+  min-height: 0;
+  max-height: 0;
+  border-width: 0;
+  transition:
+    opacity 300ms ease,
+    max-height 300ms ease,
+    min-height 300ms ease,
+    border-width 300ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scratch-row .scratch-stroke {
+    display: none;
+  }
+  .scratch-row.is-leaving {
+    transition:
+      opacity 160ms ease,
+      max-height 160ms ease,
+      min-height 160ms ease;
+  }
+}

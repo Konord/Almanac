@@ -25,7 +25,7 @@ export function Pager({
   className?: string;
 }) {
   if (pages <= 1) return null;
-  const arrow = "flex size-12 shrink-0 items-center justify-center rounded-full bg-rail text-ink disabled:opacity-30";
+  const arrow = "flex size-12 shrink-0 items-center justify-center rounded-full bg-panel text-ink disabled:opacity-30";
   const side = (to: number, label: string, icon: React.ReactNode) => {
     const can = to >= 0 && to < pages;
     if (href) {

@@ -10,7 +10,7 @@ export type PanelBox = { id: string; name: string };
 
 /** The boxes that aren't lists. */
 export const FIXED_BOXES = {
-  today: "Daily list",
+  today: "Daily List",
   upnext: "Up next",
   routines: "Routines",
   habits: "Habits",

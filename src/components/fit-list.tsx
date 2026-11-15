@@ -19,6 +19,7 @@ export function FitList({
   footer,
   empty,
   heading,
+  aside,
 }: {
   rows: ReactNode[];
   /** How many rows to show before the list is measured. */
@@ -30,6 +31,8 @@ export function FitList({
   empty?: ReactNode;
   /** A title for the list; the page arrows go beside it. */
   heading?: ReactNode;
+  /** Something after the page arrows in the title row (an add button). */
+  aside?: ReactNode;
 }) {
   const [ref, perPage] = useFitRows<HTMLUListElement>(fallback);
   const [page, setPage] = useState(0);
@@ -43,6 +46,7 @@ export function FitList({
         <div className="mb-1 flex min-h-12 shrink-0 items-center gap-3">
           <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">{heading}</h2>
           {pager}
+          {aside}
         </div>
       ) : null}
       <ul ref={ref} className={`flex min-h-0 flex-1 flex-col overflow-hidden ${className}`}>

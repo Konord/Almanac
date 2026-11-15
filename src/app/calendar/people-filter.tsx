@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Check, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { Avatar } from "@/components/ui";
-import { soft } from "@/lib/colours";
+import { soft, strong } from "@/lib/colours";
 import { choosePeople } from "./actions";
 import type { Member } from "./types";
 
@@ -20,7 +20,8 @@ export function PeopleButton({ members, shown, href }: { members: Member[]; show
     <Link
       href={href}
       scroll={false}
-      className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel"
+      aria-label={people.length === 0 ? "Showing everyone: choose people" : `Showing ${people.map((m) => m.name).join(", ")}: choose people`}
+      className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-[var(--radius)] bg-panel px-4 text-lg font-bold text-ink"
     >
       {people.length === 0 ? (
         <>
@@ -29,9 +30,10 @@ export function PeopleButton({ members, shown, href }: { members: Member[]; show
         </>
       ) : (
         <>
-          <span className="flex -space-x-2">
-            {people.slice(0, 3).map((m) => (
-              <Avatar key={m.id} name={m.name} colour={m.colour} icon={m.icon} size="sm" />
+          {/* Glance: people are colour dots, not avatars. */}
+          <span className="flex gap-1" aria-hidden>
+            {people.slice(0, 4).map((m) => (
+              <span key={m.id} className="size-3.5 rounded-full" style={{ background: strong(m.colour) }} />
             ))}
           </span>
           <span className="max-w-[9rem] truncate">{people.length === 1 ? `Just ${people[0].name}` : `${people.length} people`}</span>
