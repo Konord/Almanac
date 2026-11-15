@@ -53,8 +53,8 @@ export function AppFrame({ section, children }: { section: Section; children: Re
  *   - `children`: any other live controls the screen still needs, if they
  *     fit beside the title (they move into the screen bodies as each
  *     screen is redesigned);
- *   - `nav`: prev / next arrows, just left of the tab slot;
  *   - the weather (calendar pages only; empty until there is a weather source);
+ *   - `nav`: prev / next arrows, just left of the tab slot;
  *   - the tab slot, a fixed width so the right-hand end never shifts:
  *     Today | Week | Month on the calendar pages, the page's own sub-tabs
  *     elsewhere, or empty;
@@ -97,8 +97,8 @@ export function ScreenHeader({
       </div>
       {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
       <div className="flex shrink-0 items-center gap-[0.6rem]">
-        {nav ? <div className="flex items-center gap-[0.35rem]">{nav}</div> : null}
         {weather ? <WeatherSlot /> : null}
+        {nav ? <div className="flex items-center gap-[0.35rem]">{nav}</div> : null}
         <div className="flex justify-end lg:min-w-[22.5rem]">{tabs}</div>
         {action}
       </div>

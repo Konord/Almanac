@@ -1,13 +1,13 @@
 import { Suspense } from "react";
-import { Plus } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, HolidayColoursHere, Notice, ScreenHeader, ActionLink, Segmented, firstParam, LoadingOutline } from "@/components/ui";
+import { CaretLeft, CaretRight, Plus } from "@phosphor-icons/react/dist/ssr";
+import { AppFrame, HolidayColoursHere, IconLink, Notice, ScreenHeader, ActionLink, Segmented, firstParam, LoadingOutline } from "@/components/ui";
 import { holidayHero } from "@/lib/holiday-theme";
 import { specialLabel } from "@/lib/holidays";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold } from "@/lib/household";
-import { addDays, localDateOf, zonedToUtc } from "@/lib/time";
+import { addDays, isLocalDate, localDateOf, zonedToUtc } from "@/lib/time";
 import { nowText, shortClockTime, untilText } from "@/lib/time-text";
 import { devicePeople, itemsForPeople, loadCalendar, rangeOf } from "./calendar/data";
 import { PeopleButton, PeopleChooser } from "./calendar/people-filter";
@@ -43,6 +43,11 @@ import { AllDayStrip, ComingUp, EventCard, RoutineCard, type AgendaEvent, type A
  *
  * Routines sit in the list at the time they start; tapping a person on one
  * opens their checklist on the right, where the steps are ticked.
+ *
+ * `?date=2026-11-20` shows another day the same way (tapping a day on
+ * Month opens it here): that day's events, kinds of day and routines, with
+ * no Now line; arrows step a day at a time. The right-hand column is
+ * always today's (tonight's dinner, today's Daily List).
  */
 export default function Home(props: PageProps<"/">) {
   return (
@@ -63,23 +68,31 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const { locale, timeZone } = household.settings;
   const now = new Date();
   const today = localDateOf(now, timeZone);
-  const nowMin = minutesIntoDay(now, timeZone);
+  const dateParam = firstParam(params.date);
+  // The day shown: today, or the one asked for.
+  const day = dateParam && isLocalDate(dateParam) ? dateParam : today;
+  const isToday = day === today;
+  // On another day nothing is "finished" or "next": there's no Now there.
+  const nowMin = isToday ? minutesIntoDay(now, timeZone) : -1;
+  // This page's address, for coming back to it after a tap.
+  const here = isToday ? "/" : `/?date=${day}`;
+  const withHere = (query: string) => (isToday ? `/?${query}` : `${here}&${query}`);
 
   // Heads-ups due soon become to-dos before the lists are read.
   await syncEventAndChoreHeadsUps(household);
   // Today and the next two weeks (for Coming up).
-  const { rangeStart } = rangeOf([today], timeZone);
-  const rangeEnd = zonedToUtc(addDays(today, COMING_DAYS + 1), "00:00", timeZone);
+  const { rangeStart } = rangeOf([day], timeZone);
+  const rangeEnd = zonedToUtc(addDays(day, COMING_DAYS + 1), "00:00", timeZone);
   // The chore generator puts today's chores on the daily list before the tasks are read.
   await choreSchedule(household, today, timeZone);
   const [{ members, templates, dayKinds, items }, routineData, mealBasics, todayMeals, reviewNow] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
-    loadRoutines(today),
+    loadRoutines(day),
     loadMealBasics(),
-    loadMeals(today, today),
+    loadMeals(day, day),
     reviewReminder(household, today, now),
   ]);
-  const todaySpecials = (await loadSpecialDays(today, today)).get(today) ?? [];
+  const todaySpecials = (await loadSpecialDays(day, day)).get(day) ?? [];
   // The person filter: just some people's things (and things for everyone).
   const people = await devicePeople(members);
   const shown = itemsForPeople(items, people);
@@ -89,13 +102,15 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   // The header: "Sunday" with "November 15" on its baseline; on a holiday
   // (holiday themes on) the holiday's name and picture, the weekday moving into the date.
-  const weekday = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long" }).format(now);
-  const monthDay = new Intl.DateTimeFormat(locale, { timeZone, month: "long", day: "numeric" }).format(now);
+  const dayNoon = zonedToUtc(day, "12:00", timeZone);
+  const weekday = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long" }).format(dayNoon);
+  const monthDay = new Intl.DateTimeFormat(locale, { timeZone, month: "long", day: "numeric", ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: "numeric" }) }).format(dayNoon);
   const hero = holidayHero(todaySpecials, household.settings.holidayThemes);
 
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const { pending, templateHref } = readAdding(params, household.settings, members, templates, "/");
+  const addReturn = isToday ? "" : `date=${day}`;
   const openRoutine = firstParam(params.routine) ?? "";
   const openMember = firstParam(params.member) ?? "";
   const routineOpen = Boolean(openRoutine && openMember) && !pending;
@@ -104,11 +119,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const time = (iso: string) => shortClockTime(new Date(iso), locale, timeZone);
 
   // --- Today's things --------------------------------------------------------
-  const todayItems = eventsOnDay(shown, today, timeZone);
+  const todayItems = eventsOnDay(shown, day, timeZone);
   const allDay = todayItems.filter((e) => isAllDayStyle(e, timeZone));
   const timed = todayItems.filter((e) => !isAllDayStyle(e, timeZone));
-  const startOf = (e: CalendarItem) => (localDateOf(new Date(e.starts_at), timeZone) < today ? 0 : minutesIntoDay(new Date(e.starts_at), timeZone));
-  const endOf = (e: CalendarItem) => (localDateOf(new Date(e.ends_at), timeZone) > today ? 24 * 60 : minutesIntoDay(new Date(e.ends_at), timeZone));
+  const startOf = (e: CalendarItem) => (localDateOf(new Date(e.starts_at), timeZone) < day ? 0 : minutesIntoDay(new Date(e.starts_at), timeZone));
+  const endOf = (e: CalendarItem) => (localDateOf(new Date(e.ends_at), timeZone) > day ? 24 * 60 : minutesIntoDay(new Date(e.ends_at), timeZone));
 
   // Routines float around each person's own plans and their meals, as before.
   const memberIds = new Set(shownMembers.map((m) => m.id));
@@ -119,11 +134,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     timed.filter((e) => !isPointEvent(e)).map((e) => ({ startMin: startOf(e), endMin: endOf(e), title: e.title, memberIds: e.member_ids.filter((id) => memberIds.has(id)) })),
   );
   const dayMeals = mealsForRoutines(placedMeals);
-  const routineHref = (templateId: string, memberId: string) => `/?routine=${templateId}&member=${memberId}`;
+  const routineHref = (templateId: string, memberId: string) => withHere(`routine=${templateId}&member=${memberId}`);
   const grouped = new Map<string, AgendaRoutine & { startMin: number }>();
   for (const m of shownMembers) {
     const mine = timed.filter((e) => !isPointEvent(e) && e.member_ids.includes(m.id));
-    const { routines } = floatingDay(routineData, m.id, today, [...mine, ...forEveryone], timeZone, household.settings.routineFlexMinutes, dayMeals);
+    const { routines } = floatingDay(routineData, m.id, day, [...mine, ...forEveryone], timeZone, household.settings.routineFlexMinutes, dayMeals);
     for (const r of routines) {
       if (routineData.ended.has(`${m.id}:${r.template.id}`)) continue;
       // The same routine at the same time for several people is one card.
@@ -134,8 +149,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           key,
           title: r.template.name,
           emoji: r.progress.next?.icon ?? r.steps[0]?.icon ?? "✨",
-          start: shortClockTime(zonedToUtc(today, hhmm(r.placement.startMin), timeZone), locale, timeZone),
-          past: r.placement.endMin <= nowMin,
+          start: shortClockTime(zonedToUtc(day, hhmm(r.placement.startMin), timeZone), locale, timeZone),
+          past: isToday && r.placement.endMin <= nowMin,
           people: [],
           startMin: r.placement.startMin,
         } satisfies AgendaRoutine & { startMin: number });
@@ -146,14 +161,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   // Events and routines in time order; the next event still to start gets "IN 20 MIN".
   const nextEvent = timed
-    .filter((e) => new Date(e.starts_at).getTime() > now.getTime())
+    .filter((e) => isToday && new Date(e.starts_at).getTime() > now.getTime())
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0];
   type Card = { kind: "event"; startMin: number; past: boolean; event: AgendaEvent } | { kind: "routine"; startMin: number; past: boolean; routine: AgendaRoutine };
   const cards: Card[] = [
     ...timed.map((e): Card => {
       const startMin = startOf(e);
       const point = isPointEvent(e);
-      const past = point ? startMin < nowMin : endOf(e) <= nowMin;
+      const past = isToday && (point ? startMin < nowMin : endOf(e) <= nowMin);
       const minutesAway = Math.ceil((new Date(e.starts_at).getTime() - now.getTime()) / 60_000);
       return {
         kind: "event",
@@ -185,14 +200,14 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   // handwritten in their colours: all-day events and birthdays.
   const kinds = new Map<string, { icon: string | null }>();
   for (const m of routineData.members.filter((m) => memberIds.has(m.id) || people.length === 0)) {
-    const type = personDay(routineData, m.id, today).dayType;
+    const type = personDay(routineData, m.id, day).dayType;
     if (type && !kinds.has(type.name)) kinds.set(type.name, { icon: type.icon });
   }
   const chips: AllDayChip[] = [
     ...(reviewNow ? [{ key: "review", label: "Plan the week", emoji: "📋", printed: true, colours: [], href: "/review" }] : []),
     ...[...kinds].map(([name, k]) => ({ key: `kind:${name}`, label: name, emoji: k.icon, printed: true, colours: [], href: "/routines/manage" })),
     ...routineData.breaks
-      .filter((b) => b.start_date <= today && today <= b.end_date)
+      .filter((b) => b.start_date <= day && day <= b.end_date)
       .map((b) => ({ key: `break:${b.id}`, label: b.name, emoji: eventEmoji(b.icon, b.name), printed: true, colours: [], href: "/routines/manage?tab=breaks" })),
     ...todaySpecials
       .filter((s) => s.kind === "holiday" && !(hero && s.name === hero.title))
@@ -208,7 +223,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
 
   // --- Coming up: the next few timed things after today ----------------------
   const coming: ComingUpItem[] = shown
-    .filter((e) => !isAllDayStyle(e, timeZone) && localDateOf(new Date(e.starts_at), timeZone) > today)
+    .filter((e) => !isAllDayStyle(e, timeZone) && localDateOf(new Date(e.starts_at), timeZone) > day)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     .slice(0, 3)
     .map((e) => ({
@@ -219,9 +234,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       href: editLink(e),
     }));
 
-  // Add opens the quick-add card for today, starting at the next half hour.
-  const nextSlot = Math.min(Math.ceil((nowMin + 1) / 30) * 30, 23 * 60);
-  const addHref = `/?add=${today}&start=${hhmm(nextSlot)}`;
+  // Add opens the quick-add card for the day, starting at the next half hour (9 am on another day).
+  const nextSlot = isToday ? Math.min(Math.ceil((nowMin + 1) / 30) * 30, 23 * 60) : 9 * 60;
+  const addHref = withHere(`add=${day}&start=${hhmm(nextSlot)}`);
   // Which box the right-hand card shows (each screen remembers the last one picked).
   const panelTab = (await readPanelPrefs()).tab;
   const drawCard = (c: Card) => (c.kind === "event" ? <EventCard key={c.event.key} event={c.event} /> : <RoutineCard key={c.routine.key} routine={c.routine} />);
@@ -237,13 +252,21 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         sub={hero ? `${weekday}, ${monthDay}` : monthDay}
         hero={hero?.emoji}
         weather
+        nav={
+          isToday ? undefined : (
+            <>
+              <IconLink href={addDays(day, -1) === today ? "/" : `/?date=${addDays(day, -1)}`} label="The day before" icon={CaretLeft} />
+              <IconLink href={addDays(day, 1) === today ? "/" : `/?date=${addDays(day, 1)}`} label="The day after" icon={CaretRight} />
+            </>
+          )
+        }
         tabs={
           <Segmented
             label="View"
             options={[
-              { href: "/", label: "Today", active: true },
-              { href: `/calendar?view=week&date=${today}`, label: "Week", active: false },
-              { href: `/calendar?view=month&date=${today}`, label: "Month", active: false },
+              { href: "/", label: "Today", active: isToday },
+              { href: `/calendar?view=week&date=${day}`, label: "Week", active: false },
+              { href: `/calendar?view=month&date=${day}`, label: "Month", active: false },
             ]}
           />
         }
@@ -254,7 +277,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         }
       >
         {/* Whose things this screen shows (each screen remembers its own). */}
-        <PeopleButton members={members} shown={people} href="/?panel=people" />
+        <PeopleButton members={members} shown={people} href={withHere("panel=people")} />
       </ScreenHeader>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -265,10 +288,12 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           <AllDayStrip chips={chips} />
           <section data-cards aria-label="Today" className="flex min-h-0 shrink-0 flex-col gap-4">
             {finished.map(drawCard)}
-            <div className="tabular flex shrink-0 items-center gap-3 py-[0.1rem] text-[1.25rem] leading-[1.25] font-extrabold text-now">
-              <NowLabel locale={locale} timeZone={timeZone} initial={nowText(locale, timeZone, now)} />
-              <span aria-hidden className="h-[0.2rem] min-w-8 flex-1 rounded-full bg-now" />
-            </div>
+            {isToday ? (
+              <div className="tabular flex shrink-0 items-center gap-3 py-[0.1rem] text-[1.25rem] leading-[1.25] font-extrabold text-now">
+                <NowLabel locale={locale} timeZone={timeZone} initial={nowText(locale, timeZone, now)} />
+                <span aria-hidden className="h-[0.2rem] min-w-8 flex-1 rounded-full bg-now" />
+              </div>
+            ) : null}
             {ahead.map(drawCard)}
           </section>
           <button
@@ -285,7 +310,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           today={today}
           upNext={[]}
           tab={panelTab}
-          returnTo="/"
+          returnTo={here}
           day
           layout="side"
           routine={
@@ -294,11 +319,11 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
                 data={routineData}
                 memberId={openMember}
                 templateId={openRoutine}
-                date={today}
+                date={day}
                 today={today}
                 page={Number(firstParam(params.rpage) ?? 0) || 0}
-                closeHref="/"
-                hereHref={(p) => `/?routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
+                closeHref={here}
+                hereHref={(p) => withHere(`routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`)}
               />
             ) : undefined
           }
@@ -306,13 +331,13 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       </div>
 
       {firstParam(params.panel) === "people" ? (
-        <Sheet title="Showing" closeHref="/" narrow>
-          <PeopleChooser members={members} shown={people} returnTo="panel=people" returnPath="/" />
+        <Sheet title="Showing" closeHref={here} narrow>
+          <PeopleChooser members={members} shown={people} returnTo={isToday ? "panel=people" : `date=${day}&panel=people`} returnPath="/" />
         </Sheet>
       ) : null}
 
       {pending ? (
-        <QuickAddSheet pending={pending} members={members} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref="/" returnTo="" returnPath="/" />
+        <QuickAddSheet pending={pending} members={members} dayKinds={dayKinds} templates={templates} templateHref={templateHref} closeHref={here} returnTo={addReturn} returnPath="/" />
       ) : null}
     </>
   );
