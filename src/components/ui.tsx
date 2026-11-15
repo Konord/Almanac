@@ -204,6 +204,27 @@ export function ColourDot({ colour, className = "size-[1.15rem]" }: { colour: st
   return <span aria-hidden className={`inline-block shrink-0 rounded-full ${className}`} style={{ background: strong(colour) }} />;
 }
 
+/**
+ * An on/off setting as a whole-row switch: the words on the left, the
+ * switch at the right (blue when on, grey when off). The mock's `.tog`.
+ */
+export function Switch({ on, onChange, children }: { on: boolean; onChange: (on: boolean) => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className="flex min-h-[var(--touch-target)] w-full items-center justify-between gap-[0.7rem] text-left text-[1.25rem] leading-tight font-bold text-ink"
+    >
+      <span className="min-w-0">{children}</span>
+      <span aria-hidden className="relative h-8 w-[3.4rem] shrink-0 rounded-full" style={{ background: on ? strong("blue") : "var(--color-check-border)" }}>
+        <span className={`absolute top-[0.22rem] size-[1.55rem] rounded-full bg-board shadow-raised transition-[left] ${on ? "left-[1.6rem]" : "left-[0.22rem]"}`} />
+      </span>
+    </button>
+  );
+}
+
 /** The look of a person chip (dot + name): pastel with their ink when on, plain when off. The mock's `.who-chip`. */
 export function whoChipStyle(colour: string | null | undefined, on: boolean): { className: string; style: CSSProperties | undefined } {
   return {
