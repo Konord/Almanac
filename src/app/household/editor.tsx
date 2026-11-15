@@ -2,7 +2,7 @@
 
 import { Pager } from "@/components/pager";
 import { useEffect, useState, type ReactNode } from "react";
-import { AppWindow, FrameCorners, GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { AppWindow, FrameCorners, GearSix, HouseLine, MusicNotes, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
 import { Avatar, Card, EmptyState, ScreenHeader, SoftLink } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
@@ -15,19 +15,20 @@ import { saveHousehold } from "./actions";
 import { AppsTab } from "./apps-tab";
 import { Choice } from "./fields";
 import { ScreenSaverTab, type ArtOverview, type ScreenSaverView } from "./screen-saver-tab";
+import { SpotifyTab, type SpotifyInfo } from "./spotify-tab";
 import { setScreenSaverHere, useScreenSaverHere } from "@/components/screen-saver-here";
 import { useLauncher } from "@/components/launcher-store";
 import type { MemberDraft, SettingsDraft } from "./draft";
 
 /*
  * Settings (rebuilt 2026-11-10 so nothing scrolls and there's one Save):
- * three tabs. People: everyone on the left, the one you tap on the right.
+ * tabs. People: everyone on the left, the one you tap on the right.
  * Household: the household's settings as big chips. Apps: the kitchen
  * screen's apps (2026-11-11, apps-tab.tsx). Every change waits
  * for Save in the header; leaving with changes asks first.
  */
 
-type Tab = "people" | "household" | "apps" | "screen";
+type Tab = "people" | "household" | "apps" | "screen" | "spotify";
 
 /*
  * Saving starts the editor afresh (its key is the saved data), so it would
@@ -54,7 +55,7 @@ function TextField({ label, hint, children }: { label: string; hint?: string; ch
   );
 }
 
-export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: SettingsDraft; boxes: PanelBox[]; mealTimes: { id: string; name: string }[]; art: ArtOverview }) {
+export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { initial: SettingsDraft; boxes: PanelBox[]; mealTimes: { id: string; name: string }[]; art: ArtOverview; spotify: SpotifyInfo }) {
   const [draft, setDraft] = useState<SettingsDraft>(initial);
   // The tray's "Settings › Apps" link opens straight on the Apps tab.
   const askedTab = useSearchParams().get("tab");
@@ -62,7 +63,7 @@ export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: Se
   useEffect(() => {
     placeAfterSave = null;
   }, []);
-  const [tab, setTab] = useState<Tab>(kept?.tab ?? (askedTab === "apps" || askedTab === "household" || askedTab === "screen" ? askedTab : "people"));
+  const [tab, setTab] = useState<Tab>(kept?.tab ?? (askedTab === "apps" || askedTab === "household" || askedTab === "screen" || askedTab === "spotify" ? askedTab : "people"));
   const [view, setView] = useState<ScreenSaverView>(kept?.view ?? "when");
   const [selected, setSelected] = useState<string | null>(kept && initial.members.some((m) => m.id === kept.selected) ? kept.selected : (initial.members[0]?.id ?? null));
   const [page, setPage] = useState(kept?.page ?? 0);
@@ -136,6 +137,7 @@ export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: Se
               { tab: "household", label: "Household", icon: GearSix },
               { tab: "apps", label: "Apps", icon: AppWindow },
               { tab: "screen", label: "Screen saver", icon: FrameCorners },
+              { tab: "spotify", label: "Spotify", icon: MusicNotes },
             ] as const
           ).map((t) => (
             <button
@@ -153,7 +155,9 @@ export function SettingsEditor({ initial, boxes, mealTimes, art }: { initial: Se
         <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
       </ScreenHeader>
 
-      {tab === "screen" ? (
+      {tab === "spotify" ? (
+        <SpotifyTab info={spotify} />
+      ) : tab === "screen" ? (
         <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} view={view} onView={setView} />
       ) : tab === "apps" ? (
         <AppsTab apps={draft.apps} onChange={(apps) => set({ apps })} />
