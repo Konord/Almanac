@@ -130,3 +130,78 @@ export async function spotifyAccessToken(supabase: Db, householdId: string, now 
   if (saveError) throw saveError;
   return fresh.access_token;
 }
+
+// ---------------------------------------------------------------------------
+// What's playing, and the buttons (step 2)
+// ---------------------------------------------------------------------------
+
+/** The song on Connor's account right now, ready to show. */
+export type NowPlaying = {
+  title: string;
+  /** The artists, joined with commas (or the show, for a podcast). */
+  artist: string;
+  /** The album cover (the smallest one Spotify has that's big enough), or null. */
+  art: string | null;
+  playing: boolean;
+  /** Where it's playing, e.g. "Connor's iPhone". */
+  device: string | null;
+  progressMs: number;
+  durationMs: number;
+};
+
+type Image = { url: string; width: number | null; height: number | null };
+type PlayerAnswer = {
+  is_playing: boolean;
+  progress_ms: number | null;
+  currently_playing_type?: string;
+  device?: { name?: string | null } | null;
+  item: {
+    name: string;
+    duration_ms: number;
+    artists?: { name: string }[];
+    album?: { images?: Image[] };
+    show?: { name: string; images?: Image[] };
+    images?: Image[];
+  } | null;
+};
+
+/** Picks a cover at least `min` pixels wide, as small as possible, so the box loads quickly. */
+export function pickImage(images: Image[] | undefined, min = 128): string | null {
+  if (!images?.length) return null;
+  const bigEnough = images.filter((i) => (i.width ?? 0) >= min).sort((a, b) => (a.width ?? 0) - (b.width ?? 0));
+  return (bigEnough[0] ?? images[0]).url;
+}
+
+/** Turns Spotify's long answer into the few things the box shows. Null when nothing is loaded. */
+export function readPlayer(answer: PlayerAnswer | null): NowPlaying | null {
+  const item = answer?.item;
+  if (!answer || !item) return null;
+  const artist = item.artists?.length ? item.artists.map((a) => a.name).join(", ") : (item.show?.name ?? "");
+  return {
+    title: item.name,
+    artist,
+    art: pickImage(item.album?.images ?? item.images ?? item.show?.images),
+    playing: answer.is_playing,
+    device: answer.device?.name ?? null,
+    progressMs: answer.progress_ms ?? 0,
+    durationMs: item.duration_ms,
+  };
+}
+
+/** Asks Spotify what's on. Null when nothing is playing or loaded anywhere. */
+export async function fetchNowPlaying(accessToken: string): Promise<NowPlaying | null> {
+  const res = await fetch(`${API}/me/player?additional_types=episode`, { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" });
+  if (res.status === 204) return null; // no device has Spotify open
+  if (!res.ok) throw new Error(`Spotify didn't say what's playing (${res.status}).`);
+  return readPlayer((await res.json()) as PlayerAnswer);
+}
+
+export type SpotifyButton = "play" | "pause" | "next";
+
+/** Presses play, pause or skip on whatever device is playing. */
+export async function pressButton(accessToken: string, button: SpotifyButton): Promise<void> {
+  const [method, path] = button === "next" ? ["POST", "/me/player/next"] : ["PUT", `/me/player/${button}`];
+  const res = await fetch(`${API}${path}`, { method, headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" });
+  // 204 (done) and 200 are fine. Anything else: tell the box so it can say so.
+  if (!res.ok) throw new Error(`Spotify didn't take the button (${res.status}).`);
+}

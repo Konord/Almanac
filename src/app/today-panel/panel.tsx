@@ -30,6 +30,7 @@ import { choreSchedule } from "../chores/plan";
 import { shortClockTime } from "@/lib/time-text";
 import { HabitsBox } from "./habits-box";
 import { HealthBox } from "./health-box";
+import { SpotifyBox } from "./spotify-box";
 import { loadHealthLogs, loadTrackers } from "../habits/health-data";
 
 /**
@@ -44,7 +45,8 @@ import { loadHealthLogs, loadTrackers } from "../habits/health-data";
  *    Routines switched to "Show on daily list" join it (tasks rework,
  *    step 3), and so does the cook's "Start dinner".
  *    A routine's checklist can take this part over for a while.
- * 3. The bottom box shows the next meal. (Spotify comes later.)
+ * 3. The bottom box shows the next meal, or the song playing on Spotify
+ *    while music plays (spotify-box.tsx, when Spotify is connected).
  *
  * The panel can be closed, leaving the calendar the whole width. Each screen
  * remembers whether it's open.
@@ -109,12 +111,13 @@ export async function TodayPanel({
 }) {
   const { locale, timeZone } = household.settings;
   const supabase = await createClient();
-  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData] = await Promise.all([
+  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData, { data: spotify }] = await Promise.all([
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, addDays(today, 1)),
     supabase.from("members").select("id, colour"),
     loadRoutines(today),
+    supabase.from("spotify_connections").select("household_id").maybeSingle(),
   ]);
   const colourOf = new Map((memberRows ?? []).map((m) => [m.id, m.colour]));
 
@@ -315,6 +318,41 @@ export async function TodayPanel({
           : showing === "today"
             ? "/lists"
             : `/lists?list=${showing}`;
+
+  const mealBox = (
+    <Link
+      href={
+        nextMeal
+          ? cookHref({ id: nextMeal.meal.id, canCook: Boolean(nextMeal.meal.recipe_id) || nextMeal.meal.dishes.some((d) => d.recipe_id) })
+          : `/review?week=${today}`
+      }
+      className="mt-4 flex min-h-22 items-center gap-4 rounded-[1.375rem] bg-meal px-5 py-3 text-meal-ink"
+    >
+      {nextMeal ? (
+        <>
+          <Emoji
+            emoji={mealIcon(nextMeal.meal, recipes, categories)}
+            className="size-14"
+          />
+          <span className="flex min-w-0 flex-col">
+            <span className="text-sm font-extrabold tracking-[0.08rem] uppercase opacity-75">
+              {nextMeal.timeName}
+              {nextMeal.meal.date > today ? " tomorrow" : ""} · {mealTime}
+            </span>
+            <span className="truncate text-2xl font-extrabold">
+              {mealName(nextMeal.meal, recipes, categories)}
+            </span>
+          </span>
+        </>
+      ) : (
+        <>
+          <Emoji emoji="🍽️" className="size-12" />
+          <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals</span>
+          <span className="shrink-0 rounded-full bg-board/70 px-4 py-2 text-base font-extrabold">Plan meals</span>
+        </>
+      )}
+    </Link>
+  );
 
   return (
     <aside
@@ -533,39 +571,8 @@ export async function TodayPanel({
       </>
       )}
 
-      {/* 3. The bottom box: the next meal. */}
-      <Link
-        href={
-          nextMeal
-            ? cookHref({ id: nextMeal.meal.id, canCook: Boolean(nextMeal.meal.recipe_id) || nextMeal.meal.dishes.some((d) => d.recipe_id) })
-            : `/review?week=${today}`
-        }
-        className="mt-4 flex min-h-22 items-center gap-4 rounded-[1.375rem] bg-meal px-5 py-3 text-meal-ink"
-      >
-        {nextMeal ? (
-          <>
-            <Emoji
-              emoji={mealIcon(nextMeal.meal, recipes, categories)}
-              className="size-14"
-            />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-sm font-extrabold tracking-[0.08rem] uppercase opacity-75">
-                {nextMeal.timeName}
-                {nextMeal.meal.date > today ? " tomorrow" : ""} · {mealTime}
-              </span>
-              <span className="truncate text-2xl font-extrabold">
-                {mealName(nextMeal.meal, recipes, categories)}
-              </span>
-            </span>
-          </>
-        ) : (
-          <>
-            <Emoji emoji="🍽️" className="size-12" />
-            <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals</span>
-            <span className="shrink-0 rounded-full bg-board/70 px-4 py-2 text-base font-extrabold">Plan meals</span>
-          </>
-        )}
-      </Link>
+      {/* 3. The bottom box: the next meal, or Spotify while music plays. */}
+      {spotify ? <SpotifyBox meal={mealBox} /> : mealBox}
 
       {/* Close: the calendar takes the whole width. */}
       <form
