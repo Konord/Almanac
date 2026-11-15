@@ -1,27 +1,46 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, PencilSimple, X } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, GearSix, X } from "@phosphor-icons/react/dist/ssr";
+import { Sheet } from "@/components/sheet";
 import { FitList } from "@/components/fit-list";
-import { AppFrame, EmptyState, Emoji, firstParam, LoadingOutline, ScreenHeader, Segmented, SoftLink } from "@/components/ui";
-import { strong } from "@/lib/colours";
-import { emojiImage, eventEmoji } from "@/lib/emoji";
+import {
+  ActionLink,
+  AppFrame,
+  EmptyState,
+  Emoji,
+  editorInputClass,
+  fieldLabelClass,
+  firstParam,
+  LoadingOutline,
+  primaryActionClass,
+  ScreenHeader,
+  Segmented,
+  secondaryActionClass,
+} from "@/components/ui";
+import { soft, strong } from "@/lib/colours";
+import { emojiImage } from "@/lib/emoji";
 import { readingText } from "@/lib/health";
 import { requireHousehold } from "@/lib/household";
 import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
 import { shortClockTime } from "@/lib/time-text";
 import { deleteHealthLog, updateHealthLog } from "../actions";
 import { choiceStatus, loadHealthLogs, loadLastDoses, loadTrackers, type HealthLog, type HealthTracker } from "../health-data";
+import { HealthLogSheet } from "./log-sheet";
+import { trackerEmoji } from "./tracker-emoji";
 
 /**
- * Health (2026-11-12): one person per page. A chart of the last three days
- * (a reading like temperature, with doses along the bottom and a dashed
- * ring where the next dose is allowed), each medicine's next time, and
- * today's entries. Tapping an entry fixes or removes it.
+ * Health (2026-11-12; Glance look 2026-11-15, g-final-health): one person
+ * per page, paged with the header arrows. Three cards: the last three days
+ * (a reading like temperature with its alert shading and the doses along
+ * the bottom, or a medicine's daily check-in), the medicines with "Log it",
+ * and today's entries (tap one to fix or remove it). Nothing here
+ * diagnoses: it only shows what was logged.
  *
  * ?member=<id>     whose page
  * ?end=YYYY-MM-DD  the last of the three days (today by default)
- * ?chart=<id>      which reading the chart shows, when there are several
+ * ?chart=<id>      what the chart shows: a reading tracker or a medicine choice
  * ?entry=<id>      fix or remove an entry
+ * ?log=new|<id>    the log sheet (new = pick a tracker first); &choice=<id>
  */
 export default function HealthPage(props: PageProps<"/habits/health">) {
   return (
@@ -35,7 +54,9 @@ export default function HealthPage(props: PageProps<"/habits/health">) {
 
 const DAYS = 3;
 
-export const trackerEmoji = (t: Pick<HealthTracker, "icon" | "kind" | "name">) => t.icon || eventEmoji(null, t.name, t.kind === "medicine" ? "💊" : t.kind === "number" ? "🌡" : "🤒");
+/** The mock's `.card` and `.h2`. */
+const cardClass = "flex min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised lg:min-h-0";
+const roundArrow = "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink";
 
 async function Health({ searchParams }: { searchParams: PageProps<"/habits/health">["searchParams"] }) {
   const household = await requireHousehold();
@@ -47,42 +68,54 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
   const end = isLocalDate(askedEnd) && askedEnd < today ? askedEnd : today;
   const start = addDays(end, -(DAYS - 1));
   const { trackers, members } = await loadTrackers();
-  const member = members.find((m) => m.id === firstParam(params.member)) ?? members[0];
+  const index = Math.max(
+    0,
+    members.findIndex((m) => m.id === firstParam(params.member)),
+  );
+  const member = members[index];
 
-  const state: Record<string, string | null> = { member: member && member.id !== members[0]?.id ? member.id : null, end: end === today ? null : end, chart: firstParam(params.chart) ?? null };
+  const state: Record<string, string | null> = {
+    member: member && index > 0 ? member.id : null,
+    end: end === today ? null : end,
+    chart: firstParam(params.chart) ?? null,
+  };
   const href = (changes: Record<string, string | null>) => {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries({ ...state, ...changes })) if (v) q.set(k, v);
     const s = q.toString();
     return s ? `/habits/health?${s}` : "/habits/health";
   };
-  const fmtDay = (d: LocalDate, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, { ...opts, timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
-  const rangeTitle =
-    start.slice(0, 7) === end.slice(0, 7)
-      ? `${fmtDay(start, { month: "short", day: "numeric" })} – ${fmtDay(end, { day: "numeric" })}`
-      : `${fmtDay(start, { month: "short", day: "numeric" })} – ${fmtDay(end, { month: "short", day: "numeric" })}`;
-  const arrow = "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink";
+  const personHref = (i: number) => href({ member: i > 0 ? members[i].id : null, chart: null });
+  const prev = members[index - 1];
+  const next = members[index + 1];
 
   const header = (
     <ScreenHeader
       title="Habits"
       sub={member?.name}
       nav={
-        <>
-          <Link href={href({ end: addDays(end, -DAYS), entry: null })} aria-label="Earlier" className={arrow}>
-            <CaretLeft size="1.5rem" weight="bold" aria-hidden />
-          </Link>
-          <span className="tabular min-w-48 text-center text-2xl font-extrabold text-ink">{rangeTitle}</span>
-          {end < today ? (
-            <Link href={href({ end: addDays(end, DAYS) >= today ? null : addDays(end, DAYS), entry: null })} aria-label="Later" className={arrow}>
-              <CaretRight size="1.5rem" weight="bold" aria-hidden />
-            </Link>
-          ) : (
-            <span className={`${arrow} opacity-30`} aria-hidden>
-              <CaretRight size="1.5rem" weight="bold" />
-            </span>
-          )}
-        </>
+        members.length > 1 ? (
+          <>
+            {prev ? (
+              <Link href={personHref(index - 1)} aria-label={`Previous person: ${prev.name}`} title={prev.name} className={roundArrow}>
+                <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+              </Link>
+            ) : (
+              <span className={`${roundArrow} opacity-30`} aria-hidden>
+                <CaretLeft size="1.5rem" weight="bold" />
+              </span>
+            )}
+            {next ? (
+              <Link href={personHref(index + 1)} aria-label={`Next person: ${next.name}`} title={next.name} className={roundArrow}>
+                <CaretRight size="1.5rem" weight="bold" aria-hidden />
+              </Link>
+            ) : (
+              <span className={`${roundArrow} opacity-30`} aria-hidden>
+                <CaretRight size="1.5rem" weight="bold" />
+              </span>
+            )}
+          </>
+        ) : null
       }
       tabs={
         <Segmented
@@ -94,26 +127,19 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
         />
       }
       action={
-        <SoftLink href="/habits/manage?tab=health" className="gap-2">
-          <PencilSimple size="1.375rem" weight="bold" aria-hidden />
-          Manage
-        </SoftLink>
-      }
-    >
-      <nav aria-label="Person" className="flex gap-2">
-        {members.map((m) => (
-          <Link
-            key={m.id}
-            href={href({ member: m.id === members[0].id ? null : m.id, chart: null, entry: null })}
-            aria-current={m.id === member?.id ? "page" : undefined}
-            className="flex min-h-[var(--touch-target)] items-center rounded-full px-5 text-lg font-bold"
-            style={m.id === member?.id ? { background: strong(m.colour), color: "white" } : { background: "var(--color-rail)", color: "var(--color-ink)" }}
-          >
-            {m.name}
+        <>
+          <Link href="/habits/manage?tab=health" aria-label="Habit Manager, health trackers" className={secondaryActionClass}>
+            <GearSix size="1.5rem" weight="bold" aria-hidden />
+            Manage
           </Link>
-        ))}
-      </nav>
-    </ScreenHeader>
+          {member ? (
+            <ActionLink href={href({ log: "new" })} scroll={false}>
+              Add an entry
+            </ActionLink>
+          ) : null}
+        </>
+      }
+    />
   );
 
   if (!member) {
@@ -138,20 +164,46 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
   const doses = [...logs, ...lastDoses.filter((l) => l.member_id === member.id && !logs.some((x) => x.id === l.id))];
   const time = (iso: string | Date) => shortClockTime(new Date(iso), locale, timeZone);
   const trackerOf = new Map(trackers.map((t) => [t.id, t]));
+  const inWindow = (l: HealthLog) => new Date(l.logged_at) >= windowStart && new Date(l.logged_at) < windowEnd;
+  const dayName = (d: LocalDate) =>
+    new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${d}T12:00:00Z`));
+  const whenText = (d: Date) => (localDateOf(d, timeZone) === today ? time(d) : `${new Intl.DateTimeFormat(locale, { weekday: "short", timeZone }).format(d)} ${time(d)}`);
 
-  // The chart: one reading tracker (the first, or the one picked).
+  // What the chart shows: a reading tracker, or one medicine's daily check-in.
+  // By default the first reading with entries in these days, then the first
+  // medicine taken in these days, then whatever there is.
   const numbers = mine.filter((t) => t.kind === "number");
-  const chartTracker = numbers.find((t) => t.id === state.chart) ?? numbers[0] ?? null;
-  const readings = chartTracker ? logs.filter((l) => l.tracker_id === chartTracker.id && l.value !== null && new Date(l.logged_at) >= windowStart && new Date(l.logged_at) < windowEnd) : [];
+  const options: { id: string; name: string; icon: string }[] = [
+    ...numbers.map((t) => ({ id: t.id, name: t.name, icon: trackerEmoji(t) })),
+    ...choices.map((c) => ({ id: c.id, name: c.name, icon: c.icon || "💊" })),
+  ];
+  const picked =
+    options.find((o) => o.id === state.chart)?.id ??
+    numbers.find((t) => logs.some((l) => l.tracker_id === t.id && l.value !== null && inWindow(l)))?.id ??
+    choices.find((c) => logs.some((l) => l.choice_id === c.id && inWindow(l)))?.id ??
+    options[0]?.id ??
+    null;
+  const chartTracker = numbers.find((t) => t.id === picked) ?? null;
+  const chartChoice = choices.find((c) => c.id === picked) ?? null;
+  const readings = chartTracker ? logs.filter((l) => l.tracker_id === chartTracker.id && l.value !== null && inWindow(l)) : [];
   const latest = chartTracker ? logs.find((l) => l.tracker_id === chartTracker.id && l.value !== null) : undefined;
-  const windowDoses = logs.filter((l) => l.choice_id !== null || trackerOf.get(l.tracker_id)?.kind === "medicine").filter((l) => new Date(l.logged_at) >= windowStart && new Date(l.logged_at) < windowEnd);
+  const windowDoses = logs.filter((l) => l.choice_id !== null || trackerOf.get(l.tracker_id)?.kind === "medicine").filter(inWindow);
+  const days = Array.from({ length: DAYS }, (_, i) => addDays(start, i));
 
-  // Each medicine choice: when the next dose is allowed.
+  // Each medicine choice: when it was last taken and when the next dose is allowed.
   const cards = choices.map((c) => {
     const s = choiceStatus(c, member.id, doses, now, dayStart);
-    const last = s.last ? (localDateOf(s.last, timeZone) === today ? time(s.last) : `${new Intl.DateTimeFormat(locale, { weekday: "short", timeZone }).format(s.last)} ${time(s.last)}`) : null;
-    const small = [last, `${s.today}${c.max_per_day ? ` of ${c.max_per_day}` : ""} today`].filter(Boolean).join(" · ");
-    return { choice: c, status: s, small };
+    const small = [s.last ? `last ${whenText(s.last)}` : "not taken yet", c.max_per_day ? `${s.today}/${c.max_per_day} today` : null].filter(Boolean).join(" · ");
+    return {
+      choice: c,
+      tracker: medicines.find((t) => t.choices.includes(c))!,
+      status: s,
+      small,
+    };
   });
   const nextRings = cards.filter((c) => c.status.next && c.status.next < windowEnd).map((c) => ({ at: c.status.next!, icon: c.choice.icon }));
 
@@ -159,100 +211,255 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
   const todayLogs = logs.filter((l) => new Date(l.logged_at) >= dayStart && new Date(l.logged_at) <= now);
   const editing = logs.find((l) => l.id === firstParam(params.entry)) ?? null;
   const here = href({});
+  const logParam = firstParam(params.log);
+
+  const rangeTitle =
+    start.slice(0, 7) === end.slice(0, 7)
+      ? `${fmt(start, locale, { month: "short", day: "numeric" })} – ${fmt(end, locale, { day: "numeric" })}`
+      : `${fmt(start, locale, { month: "short", day: "numeric" })} – ${fmt(end, locale, { month: "short", day: "numeric" })}`;
+  const laterEnd = addDays(end, DAYS) >= today ? null : addDays(end, DAYS);
 
   return (
     <>
       {header}
-      <div className="flex min-h-0 flex-1 gap-5">
-        <section aria-label={chartTracker?.name ?? "Doses"} className="flex min-w-0 flex-1 flex-col gap-1 rounded-[1.75rem] bg-rail px-7 py-5">
-          <div className="flex items-center gap-4">
-            {chartTracker ? <Emoji emoji={trackerEmoji(chartTracker)} className="size-12" /> : null}
-            <span className="flex-1 text-3xl font-extrabold text-ink">{chartTracker?.name ?? ""}</span>
-            {numbers.length > 1
-              ? numbers.map((t) => (
-                  <Link
-                    key={t.id}
-                    href={href({ chart: t.id })}
-                    aria-current={t.id === chartTracker?.id ? "true" : undefined}
-                    className={`flex min-h-11 items-center rounded-full px-4 text-base font-bold ${t.id === chartTracker?.id ? "bg-ink text-board" : "bg-board text-ink"}`}
-                  >
-                    {t.name}
-                  </Link>
-                ))
-              : null}
-            {latest && chartTracker ? (
-              <>
-                <span
-                  className="text-5xl font-extrabold tabular-nums"
-                  style={{ color: chartTracker.alert_above !== null && latest.value! > chartTracker.alert_above ? "var(--color-danger)" : "var(--color-ink)" }}
-                >
-                  {readingText(latest.value)}
-                  {chartTracker.unit?.startsWith("°") ? "°" : ""}
-                </span>
-                <span className="text-xl font-bold text-ink-muted">{time(latest.logged_at)}</span>
-              </>
-            ) : null}
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        {/* The last three days */}
+        <section aria-label="Last three days" className={`${cardClass} gap-3`}>
+          <div className="flex min-h-[var(--touch-target)] shrink-0 items-center gap-3">
+            <h2 className="flex min-w-0 flex-1 items-baseline gap-3 text-[1.75rem] font-bold text-ink">
+              <span className="shrink-0">{end === today ? "Last three days" : "Three days"}</span>
+              <span className="truncate text-[1.25rem] font-semibold text-ink-muted">{chartTracker ? chartTracker.name : chartChoice ? `${chartChoice.name} check-in` : ""}</span>
+            </h2>
           </div>
-          <div className="relative min-h-0 flex-1">
-            <HealthChart
-              start={windowStart}
-              end={windowEnd}
-              days={Array.from({ length: DAYS }, (_, i) => addDays(start, i))}
-              today={today}
-              now={now}
-              locale={locale}
-              timeZone={timeZone}
-              tracker={chartTracker}
-              readings={readings}
-              doses={windowDoses.map((l) => ({ at: new Date(l.logged_at), icon: choices.find((c) => c.id === l.choice_id)?.icon ?? trackerEmoji(trackerOf.get(l.tracker_id)!) }))}
-              nextRings={nextRings}
-              colour={strong(member.colour)}
-            />
+          <div className="flex shrink-0 items-center gap-2">
+            {options.length > 1 ? (
+              <nav aria-label="Show on the chart" className="flex min-w-0 flex-1 gap-2">
+                {options.slice(0, 6).map((o) => (
+                  <Link
+                    key={o.id}
+                    href={href({ chart: o.id })}
+                    scroll={false}
+                    aria-label={`Show ${o.name}`}
+                    title={o.name}
+                    aria-current={o.id === picked ? "true" : undefined}
+                    className={`flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full border-2 ${o.id === picked ? "border-ink bg-board" : "border-transparent bg-panel"}`}
+                  >
+                    <Emoji emoji={o.icon} className="size-[1.75rem]" />
+                  </Link>
+                ))}
+              </nav>
+            ) : (
+              <span className="flex-1" />
+            )}
+            <Link href={href({ end: addDays(end, -DAYS), entry: null })} scroll={false} aria-label="Three days earlier" className={roundArrow}>
+              <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+            </Link>
+            <span className="tabular min-w-[8.5rem] text-center text-[1.25rem] font-bold text-ink">{rangeTitle}</span>
+            {end < today ? (
+              <Link href={href({ end: laterEnd, entry: null })} scroll={false} aria-label="Three days later" className={roundArrow}>
+                <CaretRight size="1.5rem" weight="bold" aria-hidden />
+              </Link>
+            ) : (
+              <span className={`${roundArrow} opacity-30`} aria-hidden>
+                <CaretRight size="1.5rem" weight="bold" />
+              </span>
+            )}
+          </div>
+          {chartTracker && latest ? (
+            <p className="flex shrink-0 items-baseline gap-3">
+              <span
+                className="text-[2.5rem] leading-none font-extrabold tabular-nums"
+                style={{
+                  color: chartTracker.alert_above !== null && latest.value! > chartTracker.alert_above ? "var(--color-now-on-tint)" : "var(--color-ink)",
+                }}
+              >
+                {readingText(latest.value)}
+                {chartTracker.unit?.startsWith("°") ? "°" : chartTracker.unit ? ` ${chartTracker.unit}` : ""}
+              </span>
+              <span className="text-[1.25rem] font-bold text-ink-muted">latest, {whenText(new Date(latest.logged_at))}</span>
+            </p>
+          ) : null}
+          <div className="relative min-h-[20rem] flex-1">
+            {chartChoice ? (
+              <CheckIn
+                days={days}
+                today={today}
+                dayName={dayName}
+                count={(d) => windowDoses.filter((l) => l.choice_id === chartChoice.id && localDateOf(new Date(l.logged_at), timeZone) === d).length}
+                next={cards.find((c) => c.choice.id === chartChoice.id)?.status.next ?? null}
+                time={time}
+                colour={member.colour}
+              />
+            ) : options.length === 0 ? (
+              <p className="py-3 text-[1.25rem] font-bold text-ink-muted">Nothing to chart for {member.name} yet.</p>
+            ) : (
+              <HealthChart
+                start={windowStart}
+                end={windowEnd}
+                days={days}
+                today={today}
+                now={now}
+                locale={locale}
+                timeZone={timeZone}
+                tracker={chartTracker}
+                readings={readings}
+                doses={windowDoses.map((l) => ({
+                  at: new Date(l.logged_at),
+                  icon: l.choice_id ? choices.find((c) => c.id === l.choice_id)?.icon || "💊" : trackerEmoji(trackerOf.get(l.tracker_id)!),
+                }))}
+                nextRings={nextRings}
+                colour={strong(member.colour)}
+              />
+            )}
           </div>
         </section>
 
-        <aside className="flex w-[36rem] shrink-0 flex-col gap-3">
-          {cards.slice(0, 3).map(({ choice, status, small }) => (
-            <div key={choice.id} className={`flex items-center gap-4 rounded-[1.375rem] px-6 py-4 ${status.next ? "bg-rail" : "bg-[color-mix(in_srgb,var(--color-met)_12%,white)]"}`}>
-              <Emoji emoji={choice.icon || "💊"} className="size-14" />
-              <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                <span className="truncate text-2xl font-extrabold text-ink">{choice.name}</span>
-                <span className="truncate text-base font-bold text-ink-muted">{small}</span>
-              </span>
-              <span className={`text-4xl font-extrabold tabular-nums ${status.next ? "text-ink" : "text-met"}`}>{status.next ? time(status.next) : "Now"}</span>
-            </div>
-          ))}
-          <section aria-label="Today" className="flex min-h-0 flex-1 flex-col rounded-[1.375rem] bg-rail px-4 py-3">
-            <FitList
-              heading="Today"
-              fallback={5}
-              className="gap-2"
-              rows={todayLogs.map((l) => {
-                const t = trackerOf.get(l.tracker_id);
-                const what = l.choice_name ?? (l.value !== null ? `${readingText(l.value)}${t?.unit ? (t.unit.startsWith("°") ? "°" : ` ${t.unit}`) : ""}` : (l.note ?? ""));
-                const icon = l.choice_id ? (choices.find((c) => c.id === l.choice_id)?.icon ?? "💊") : t ? trackerEmoji(t) : "💊";
-                return (
-                  <li key={l.id}>
-                    <Link href={href({ entry: l.id })} scroll={false} className="flex min-h-16 items-center gap-3.5 rounded-2xl bg-board px-4">
-                      <span className="w-24 shrink-0 text-lg font-extrabold text-ink tabular-nums">{time(l.logged_at)}</span>
-                      <Emoji emoji={icon} className="size-9" />
-                      <span className="min-w-0 flex-1 truncate text-xl font-bold text-ink">{what}</span>
-                      {l.amount ? <span className="shrink-0 text-lg font-bold text-ink-muted">{l.amount}</span> : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            />
-          </section>
-        </aside>
+        {/* Medicines */}
+        <section aria-label="Medicines" className={cardClass}>
+          <FitList
+            heading={<span className="text-[1.75rem]">Medicines</span>}
+            fallback={5}
+            empty={
+              <li className="py-3 text-[1.25rem] font-bold text-ink-muted">
+                No medicines for {member.name}.{" "}
+                <Link href="/habits/manage?tab=health" className="text-ink underline">
+                  Add one
+                </Link>
+              </li>
+            }
+            rows={cards.map(({ choice, tracker, status, small }) => (
+              <li key={choice.id} className="flex min-h-[4.5rem] shrink-0 items-center gap-[0.7rem] border-b border-frame py-1 last:border-b-0">
+                <Emoji emoji={choice.icon || "💊"} className="size-[2.25rem]" />
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="flex min-w-0 items-baseline gap-[0.6rem]">
+                    <span className="truncate text-[1.5rem] font-extrabold text-ink">{choice.name}</span>
+                    {choice.amounts[member.id] ? <span className="shrink-0 text-[1.15rem] font-bold text-ink-muted">{choice.amounts[member.id]}</span> : null}
+                  </span>
+                  <span className="truncate text-[1.15rem] font-bold text-ink-muted">
+                    <span
+                      style={{
+                        color: status.next || status.atMost ? "var(--color-now-on-tint)" : "var(--color-success)",
+                      }}
+                    >
+                      {status.next ? `next ${whenText(status.next)}` : status.atMost ? "most for today" : "OK now"}
+                    </span>
+                    {` · ${small}`}
+                  </span>
+                </span>
+                <Link href={href({ log: tracker.id, choice: choice.id })} scroll={false} className={`${secondaryActionClass} px-[1.5rem]`}>
+                  Log it
+                </Link>
+              </li>
+            ))}
+          />
+        </section>
+
+        {/* Today */}
+        <section aria-label="Today" className={cardClass}>
+          <FitList
+            heading={<span className="text-[1.75rem]">Today</span>}
+            fallback={8}
+            empty={<li className="py-3 text-[1.25rem] font-bold text-ink-muted">Nothing logged yet today</li>}
+            rows={todayLogs.map((l) => {
+              const t = trackerOf.get(l.tracker_id);
+              const what = l.choice_name ?? (l.value !== null ? `${t?.name ?? ""} ${readingText(l.value)}${t?.unit ? (t.unit.startsWith("°") ? "°" : ` ${t.unit}`) : ""}` : (l.note ?? ""));
+              const icon = l.choice_id ? (choices.find((c) => c.id === l.choice_id)?.icon ?? "💊") : t ? trackerEmoji(t) : "💊";
+              return (
+                <li key={l.id} className="shrink-0 border-b border-frame">
+                  <Link href={href({ entry: l.id })} scroll={false} aria-label={`${time(l.logged_at)} ${what}. Fix or remove`} className="flex min-h-[3.6rem] items-center gap-[0.7rem]">
+                    <span className="min-w-[6.5rem] shrink-0 text-[1.25rem] font-extrabold text-ink-muted tabular-nums">{time(l.logged_at)}</span>
+                    <Emoji emoji={icon} className="size-8" />
+                    <span className="min-w-0 flex-1 truncate text-[1.35rem] font-bold text-ink">{what}</span>
+                    {l.amount ? <span className="shrink-0 text-[1.15rem] font-bold text-ink-muted">{l.amount}</span> : null}
+                  </Link>
+                </li>
+              );
+            })}
+          />
+        </section>
       </div>
+
       {editing ? <EntryDialog log={editing} tracker={trackerOf.get(editing.tracker_id)} closeHref={here} returnTo={here} timeValue={localTimeOf(new Date(editing.logged_at), timeZone)} /> : null}
+      {logParam && mine.length ? (
+        <Sheet title={logParam === "new" ? `Add an entry for ${member.name}` : `Log for ${member.name}`} closeHref={here}>
+          <HealthLogSheet
+            trackers={mine}
+            members={members}
+            memberId={member.id}
+            trackerId={logParam === "new" ? null : logParam}
+            choiceId={firstParam(params.choice) ?? null}
+            logs={doses}
+            now={now.toISOString()}
+            dayStart={dayStart.toISOString()}
+            locale={locale}
+            timeZone={timeZone}
+            closeHref={here}
+          />
+        </Sheet>
+      ) : null}
     </>
   );
 }
 
+const fmt = (d: LocalDate, locale: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(locale, { ...opts, timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
+
 // ---------------------------------------------------------------------------
-// The chart
+// A medicine's check-in: one bar a day (the mock's chart)
+// ---------------------------------------------------------------------------
+
+function CheckIn({
+  days,
+  today,
+  dayName,
+  count,
+  next,
+  time,
+  colour,
+}: {
+  days: LocalDate[];
+  today: LocalDate;
+  dayName: (d: LocalDate) => string;
+  count: (d: LocalDate) => number;
+  next: Date | null;
+  time: (d: Date) => string;
+  colour: string;
+}) {
+  return (
+    <div className="absolute inset-0 flex items-end gap-[0.8rem] pt-2" role="img" aria-label={days.map((d) => `${dayName(d)}: ${count(d) ? `taken ${count(d)}` : "not taken"}`).join(", ")}>
+      {days.map((d) => {
+        const n = count(d);
+        const isToday = d === today;
+        const label = n ? (n > 1 ? `Taken ×${n}` : "Taken") : isToday ? (next ? `Next ${time(next)}` : "Not yet") : "Not taken";
+        return (
+          <div key={d} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-[0.4rem]">
+            <span className="text-[1.5rem] font-extrabold text-ink">{label}</span>
+            <span
+              className="w-full rounded-t-[var(--radius)] rounded-b-[0.4rem] border-2"
+              style={
+                n
+                  ? {
+                      height: `${Math.min(100, 55 + 15 * n)}%`,
+                      background: soft(colour),
+                      borderColor: strong(colour),
+                    }
+                  : {
+                      height: "28%",
+                      background: "var(--color-board)",
+                      borderStyle: "dashed",
+                      borderColor: isToday ? "var(--color-now)" : "var(--color-check-border)",
+                    }
+              }
+            />
+            <span className={`text-[1.25rem] font-bold ${isToday ? "text-now-on-tint" : "text-ink-muted"}`}>{dayName(d)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A reading's chart (with the doses along the bottom)
 // ---------------------------------------------------------------------------
 
 function HealthChart({
@@ -282,13 +489,15 @@ function HealthChart({
   nextRings: { at: Date; icon: string | null }[];
   colour: string;
 }) {
+  // Font sizes are in chart units: the chart is drawn about 1.2× bigger on a
+  // 2560 screen, so 20 here stays above the 18px-at-1080 floor.
   const W = 780;
-  const H = 470;
-  const X0 = 44;
+  const H = 520;
+  const X0 = 56;
   const XW = W - X0;
-  const Y0 = 40;
-  const YH = 320;
-  const DOSE_Y = 410;
+  const Y0 = 48;
+  const YH = 340;
+  const DOSE_Y = 450;
   const span = end.getTime() - start.getTime();
   const x = (t: Date) => X0 + (XW * (t.getTime() - start.getTime())) / span;
   const values = readings.map((r) => r.value!).filter(Number.isFinite);
@@ -301,18 +510,35 @@ function HealthChart({
   const gridStep = Math.max(1, Math.ceil((top - lo) / 5));
   const grid: number[] = [];
   for (let v = top; v >= lo; v -= gridStep) grid.push(v);
-  const points = [...readings].reverse().map((r) => ({ x: x(new Date(r.logged_at)), y: y(r.value!), t: readingText(r.value) }));
-  const dayLabel = (d: LocalDate) => (d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`)));
+  const points = [...readings].reverse().map((r) => ({
+    x: x(new Date(r.logged_at)),
+    y: y(r.value!),
+    t: readingText(r.value),
+  }));
+  const dayLabel = (d: LocalDate) =>
+    d === today
+      ? "Today"
+      : new Intl.DateTimeFormat(locale, {
+          weekday: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        }).format(new Date(`${d}T12:00:00Z`));
   const short = (t: Date) => shortClockTime(t, locale, timeZone).replace(/\s?[ap]m$/, "");
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full" role="img" aria-label={tracker ? `${tracker.name} and doses` : "Doses"}>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMin meet" className="absolute inset-0 h-full w-full" role="img" aria-label={tracker ? `${tracker.name} and doses` : "Doses"}>
       {tracker && alert !== null && alert < top ? <rect x={X0} y={y(top)} width={XW} height={y(Math.max(alert, lo)) - y(top)} fill="var(--color-alert-soft)" /> : null}
+      {tracker && alert !== null && alert < top && alert > lo ? (
+        <text x={X0 + 8} y={y(alert) - 8} fontSize={18} fontWeight={700} fill="var(--color-now-on-tint)">
+          above {alert}
+          {tracker.unit?.startsWith("°") ? "°" : ""}
+        </text>
+      ) : null}
       {tracker
         ? grid.map((v) => (
             <g key={v}>
               <line x1={X0} y1={y(v)} x2={W} y2={y(v)} stroke="var(--color-frame)" strokeWidth={1.5} />
-              <text x={X0 - 10} y={y(v)} textAnchor="end" dominantBaseline="central" fontSize={14} fontWeight={700} fill="var(--color-ink-muted)">
+              <text x={X0 - 10} y={y(v)} textAnchor="end" dominantBaseline="central" fontSize={20} fontWeight={700} fill="var(--color-ink-muted)">
                 {v}
                 {tracker.unit?.startsWith("°") ? "°" : ""}
               </text>
@@ -324,7 +550,7 @@ function HealthChart({
         return (
           <g key={d}>
             <line x1={dx} y1={10} x2={dx} y2={H - 10} stroke="var(--color-check-border)" strokeOpacity={0.6} strokeWidth={1.5} />
-            <text x={dx + 8} y={22} fontSize={15} fontWeight={800} fill={d === today ? "var(--color-now)" : "var(--color-ink-soft)"}>
+            <text x={dx + 10} y={28} fontSize={20} fontWeight={800} fill={d === today ? "var(--color-now-on-tint)" : "var(--color-ink-soft)"}>
               {dayLabel(d)}
             </text>
           </g>
@@ -334,8 +560,8 @@ function HealthChart({
       {points.length > 1 ? <polyline points={points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")} fill="none" stroke={colour} strokeWidth={4} strokeLinejoin="round" /> : null}
       {points.map((p, i) => (
         <g key={i}>
-          <circle cx={p.x} cy={p.y} r={7} fill={colour} stroke="white" strokeWidth={2} />
-          <text x={p.x} y={p.y - 14} textAnchor="middle" fontSize={14} fontWeight={800} fill="var(--color-ink)">
+          <circle cx={p.x} cy={p.y} r={8} fill={colour} stroke="white" strokeWidth={2} />
+          <text x={p.x} y={p.y - 16} textAnchor="middle" fontSize={20} fontWeight={800} fill="var(--color-ink)">
             {p.t}
           </text>
         </g>
@@ -346,15 +572,15 @@ function HealthChart({
         const src = emojiImage(d.icon);
         return (
           <g key={i}>
-            {src ? <image href={src} x={cx - 15} y={DOSE_Y - 34} width={30} height={30} /> : null}
-            <text x={cx} y={DOSE_Y + 22} textAnchor="middle" fontSize={13} fontWeight={800} fill="var(--color-ink-soft)">
+            {src ? <image href={src} x={cx - 17} y={DOSE_Y - 38} width={34} height={34} /> : null}
+            <text x={cx} y={DOSE_Y + 26} textAnchor="middle" fontSize={18} fontWeight={800} fill="var(--color-ink-soft)">
               {short(d.at)}
             </text>
           </g>
         );
       })}
       {nextRings.map((n, i) => (
-        <circle key={i} cx={x(n.at)} cy={DOSE_Y - 19} r={16} fill="none" stroke={colour} strokeWidth={3} strokeDasharray="5 4" />
+        <circle key={i} cx={x(n.at)} cy={DOSE_Y - 21} r={18} fill="none" stroke={colour} strokeWidth={3} strokeDasharray="5 4" />
       ))}
     </svg>
   );
@@ -365,46 +591,46 @@ function HealthChart({
 // ---------------------------------------------------------------------------
 
 function EntryDialog({ log, tracker, closeHref, returnTo, timeValue }: { log: HealthLog; tracker: HealthTracker | undefined; closeHref: string; returnTo: string; timeValue: string }) {
-  const field = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-xl text-ink outline-none focus:border-accent";
   const title = log.choice_name ?? tracker?.name ?? "Entry";
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center">
-      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.35)]" />
-      <form action={updateHealthLog} role="dialog" aria-label={title} className="relative flex w-[38rem] max-w-[92vw] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-7 shadow-2xl">
+      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.28)]" />
+      <form action={updateHealthLog} role="dialog" aria-label={title} className="relative flex w-[44rem] max-w-[92vw] flex-col gap-5 rounded-[var(--radius-card)] bg-board px-8 py-7 shadow-raised">
         <input type="hidden" name="id" value={log.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <div className="flex items-center gap-3">
-          <h2 className="flex-1 truncate text-2xl font-extrabold text-ink">{title}</h2>
-          <Link href={closeHref} scroll={false} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
-            <X size="1.25rem" weight="bold" aria-hidden />
+          {tracker ? <Emoji emoji={trackerEmoji(tracker)} className="size-[2.5rem]" /> : null}
+          <h2 className="min-w-0 flex-1 truncate text-[1.75rem] font-bold text-ink">{title}</h2>
+          <Link href={closeHref} scroll={false} aria-label="Close" className={roundArrow}>
+            <X size="1.5rem" weight="bold" aria-hidden />
           </Link>
         </div>
         <div className="flex flex-wrap gap-4">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-bold text-ink-muted">When</span>
-            <input type="time" name="time" defaultValue={timeValue} className={`${field} w-44`} />
+          <label className="flex flex-col gap-1.5">
+            <span className={fieldLabelClass}>When</span>
+            <input type="time" name="time" defaultValue={timeValue} className={`${editorInputClass} w-52`} />
           </label>
           {log.choice_id !== null || log.amount !== null ? (
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-bold text-ink-muted">Amount</span>
-              <input name="amount" defaultValue={log.amount ?? ""} maxLength={20} className={`${field} w-40`} />
+            <label className="flex flex-col gap-1.5">
+              <span className={fieldLabelClass}>Amount</span>
+              <input name="amount" defaultValue={log.amount ?? ""} maxLength={20} className={`${editorInputClass} w-48`} />
             </label>
           ) : null}
           {log.value !== null ? (
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-bold text-ink-muted">{tracker?.name ?? "Reading"}</span>
-              <input name="value" type="number" inputMode="decimal" step="0.1" defaultValue={log.value} className={`${field} w-36`} />
+            <label className="flex flex-col gap-1.5">
+              <span className={fieldLabelClass}>{tracker?.name ?? "Reading"}</span>
+              <input name="value" type="number" inputMode="decimal" step="0.1" defaultValue={log.value} className={`${editorInputClass} w-40`} />
             </label>
           ) : null}
           {log.note !== null ? (
-            <label className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="text-sm font-bold text-ink-muted">Note</span>
-              <input name="note" defaultValue={log.note} maxLength={200} className={field} />
+            <label className="flex min-w-0 basis-full flex-col gap-1.5">
+              <span className={fieldLabelClass}>Note</span>
+              <input name="note" defaultValue={log.note} maxLength={200} className={editorInputClass} />
             </label>
           ) : null}
         </div>
         <div className="flex gap-2.5">
-          <button className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-accent px-6 text-lg font-bold text-white">Save</button>
+          <button className={primaryActionClass}>Save</button>
           <button formAction={deleteHealthLog} className="ml-auto flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-4 text-lg font-bold text-danger">
             Remove
           </button>
