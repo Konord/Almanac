@@ -15,6 +15,8 @@ export type EventTemplate = {
   notes: string | null;
   /** Events made from it make their dates this kind of day. */
   day_kind: string | null;
+  /** Where it usually is (plain text, no map). */
+  location: string | null;
 };
 
 export type CalendarEvent = {
@@ -33,6 +35,8 @@ export type CalendarEvent = {
   icon: string | null;
   /** Makes its dates this kind of day ("Office day") for the people on it. */
   day_kind: string | null;
+  /** Where it is: plain text like "Bloor St W" (no map, no lookup). */
+  location: string | null;
 };
 
 /** One occurrence on the calendar: a one-off event, or one date of a series. */

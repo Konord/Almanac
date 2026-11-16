@@ -9,7 +9,7 @@ import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member } from
  */
 
 export const EVENT_COLUMNS =
-  "id, title, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, day_kind, event_members(member_id)";
+  "id, title, starts_at, ends_at, all_day, visibility, notes, timezone, recurrence_rule, icon, day_kind, location, event_members(member_id)";
 
 type EventRow = Omit<CalendarEvent, "member_ids"> & {
   event_members: { member_id: string }[];
@@ -50,7 +50,7 @@ export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<Ca
     supabase.from("events").select(EVENT_COLUMNS).not("recurrence_rule", "is", null).lt("starts_at", rangeEnd.toISOString()),
     supabase
       .from("event_templates")
-      .select("id, title, icon, start_time, minutes, all_day, member_ids, notes, day_kind")
+      .select("id, title, icon, start_time, minutes, all_day, member_ids, notes, day_kind, location")
       .order("sort_order")
       .order("title"),
     supabase.from("day_types").select("name, icon").order("sort_order").order("name"),

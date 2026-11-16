@@ -22,6 +22,7 @@ import { readPanelPrefs } from "./today-panel/prefs";
 import { floatingDay } from "./routines/floating";
 import { RoutineChecklist } from "./routines/routine-checklist";
 import { QuickAddSheet, readAdding } from "./calendar/adding";
+import { EditEventSheet, readEditing } from "./calendar/edit-event";
 import { syncEventAndChoreHeadsUps } from "./heads-ups/sync";
 import { choreSchedule } from "./chores/plan";
 import { reviewReminder } from "./review/data";
@@ -115,7 +116,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const openMember = firstParam(params.member) ?? "";
   const routineOpen = Boolean(openRoutine && openMember) && !pending;
 
-  const editLink = (e: CalendarItem) => `/calendar?view=week&date=${localDateOf(new Date(e.starts_at), timeZone)}&edit=${e.series_id}${e.occurrence_date ? `&occ=${e.occurrence_date}` : ""}`;
+  // Tapping an event opens its edit sheet right here, over the agenda (g-final-event.html).
+  const editLink = (e: CalendarItem) => withHere(`edit=${e.series_id}${e.occurrence_date ? `&occ=${e.occurrence_date}` : ""}`);
+  const editing = readEditing(params);
   const time = (iso: string) => shortClockTime(new Date(iso), locale, timeZone);
 
   // --- Today's things --------------------------------------------------------
@@ -180,8 +183,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           emoji: eventEmoji(e.icon, e.title),
           start: time(e.starts_at),
           until: point ? null : untilText(new Date(e.ends_at), locale, timeZone),
-          // Events have no place field yet (it comes with the event editor); nothing to show.
-          place: null,
+          // Where it is (plain text from the event sheet), as a small line under the name.
+          place: e.location,
           colours: coloursOf(e.member_ids),
           href: editLink(e),
           past,
@@ -332,6 +335,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         <Sheet title="Showing" closeHref={here} narrow>
           <PeopleChooser members={members} shown={people} returnTo={isToday ? "panel=people" : `date=${day}&panel=people`} returnPath="/" />
         </Sheet>
+      ) : null}
+
+      {editing && !pending ? (
+        <EditEventSheet editing={editing} household={household} members={members} dayKinds={dayKinds} here={here} returnTo={addReturn} returnPath="/" />
       ) : null}
 
       {pending ? (

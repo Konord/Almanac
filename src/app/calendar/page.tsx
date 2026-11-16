@@ -8,26 +8,16 @@ import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
 import { addMonths, dayOfWeek, daysWithPanel, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
-import { createClient } from "@/lib/supabase/server";
-import { describeRule, parseRule } from "@/lib/recurrence";
-import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import {
-  moveOccurrence,
-  removeEvent,
-  saveEventAsTemplate,
-  removeTemplate,
-  resetOccurrence,
-  skipOccurrence,
-  updateEvent,
-  updateTemplate,
-} from "./actions";
-import { DayKindChips, EventCardFields } from "./forms";
+import { addDays, isLocalDate, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { removeTemplate, updateTemplate } from "./actions";
+import { DayKindChips, LocationField } from "./forms";
+import { CloseLink, EditEventSheet, readEditing } from "./edit-event";
 import { LengthInput } from "./when-fields";
 import { Stickers } from "./stickers";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { PeopleButton, PeopleChooser } from "./people-filter";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
-import { devicePeople, EVENT_COLUMNS, itemsForPeople, toEvent, loadCalendar, rangeOf } from "./data";
+import { devicePeople, itemsForPeople, loadCalendar, rangeOf } from "./data";
 import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member } from "./types";
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
@@ -43,7 +33,6 @@ import { cookHref, placeTodayMeals } from "../meals/today";
 import { TodayPanel } from "../today-panel/panel";
 import { setPanelOpen } from "../today-panel/actions";
 import { readPanelPrefs } from "../today-panel/prefs";
-import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
 import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
 import { choreSchedule } from "../chores/plan";
 
@@ -64,16 +53,12 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const household = await requireHousehold();
   const { timeZone, weekStartsOn } = household.settings;
   const params = await searchParams;
-  const supabase = await createClient();
 
   const today = localDateOf(new Date(), timeZone);
   const view: View = firstParam(params.view) === "month" ? "month" : "week";
   const rolling = household.settings.monthStyle === "rolling";
   const dateParam = firstParam(params.date);
   const anchor = dateParam && isLocalDate(dateParam) ? dateParam : today;
-  const editId = firstParam(params.edit);
-  const occParam = firstParam(params.occ);
-  const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const panelParam = firstParam(params.panel);
   const panel = panelParam === "people" || panelParam === "templates" || panelParam === "template" ? panelParam : null;
 
@@ -89,7 +74,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Month never gets them).
   await syncEventAndChoreHeadsUps(household);
   await choreSchedule(household, today, timeZone);
-  const [{ members, templates, dayKinds, items, exceptions }, routineData, breaks, specials] = await Promise.all([
+  const [{ members, templates, dayKinds, items }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadBreaks(days[0], days[days.length - 1]),
@@ -104,16 +89,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
-  // The event being edited might be outside the visible range, so fetch it on its own.
-  let editing: CalendarEvent | null = null;
-  if (editId) {
-    const { data } = await supabase
-      .from("events")
-      .select(EVENT_COLUMNS)
-      .eq("id", editId)
-      .maybeSingle();
-    editing = data ? toEvent(data) : null;
-  }
+  // The event being edited (it may be outside the visible range; the sheet loads it itself).
+  const editing = readEditing(params);
 
   // While adding, moving between weeks or views keeps you in adding mode.
   const current: Record<string, string | null> = { view, date: anchor, placing: placing ? "1" : null };
@@ -128,9 +105,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   /** Where tapping a day or time while adding goes (start and length get added for a time). */
   const addHref = (day: LocalDate, extra: Record<string, string> = {}) => href({ add: day, edit: null, panel: null, placing: null, ...extra });
 
-  // Open the edit card on the side away from the event, so it stays in view.
-  const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
-  const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
+  // Open the edit sheet on the side away from the event, so it stays in view.
+  const editSide = (event: CalendarEvent): "left" | "right" =>
+    (dayOfWeek(editing?.occ ?? localDateOf(new Date(event.starts_at), timeZone)) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
   // Week moves a week at a time. Month moves a month: the calendar month keeps
   // the day, and the rolling 5 weeks jumps to the 1st so it sits in the top row.
   const byMonth = view === "month";
@@ -148,26 +125,16 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const sheets = (
     <>
       {editing ? (
-        <Sheet title={editing.title} closeHref={closeHref} narrow side={editSide}>
-          <EditEventPanel
-            everyDateHref={href({ edit: editing.id, occ: editOccurrence ?? null, scope: "all", add: null, panel: null })}
-            showEveryDate={firstParam(params.scope) === "all"}
-            event={editing}
-            household={household}
-            members={members}
-            dayKinds={dayKinds}
-            returnTo={returnTo}
-            closeHref={closeHref}
-            occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
-            occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
-            isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
-            skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
-            memberName={editing.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(" and ") || undefined}
-            headsUps={await loadHeadsUps({ eventId: editing.id })}
-            headsUpReturn={`/calendar?${returnTo}&edit=${editing.id}&scope=all&tab=heads-ups`}
-            initialTab={firstParam(params.tab)}
-          />
-        </Sheet>
+        <EditEventSheet
+          editing={editing}
+          household={household}
+          members={members}
+          dayKinds={dayKinds}
+          here={href({ edit: null, occ: null, add: null, panel: null, placing: null })}
+          returnTo={returnTo}
+          returnPath="/calendar"
+          side={editSide}
+        />
       ) : null}
 
       {pending && !editing ? (
@@ -369,238 +336,6 @@ function DailyListToggle({ open, returnTo }: { open: boolean; returnTo: string }
   );
 }
 
-function EditEventPanel({
-  event,
-  household,
-  members,
-  dayKinds,
-  returnTo,
-  closeHref,
-  memberName,
-  occurrence,
-  occurrenceDate,
-  isException,
-  skippedDates,
-  everyDateHref,
-  showEveryDate,
-  headsUps,
-  headsUpReturn,
-  initialTab,
-}: {
-  headsUps: HeadsUp[];
-  headsUpReturn: string;
-  initialTab: string | undefined;
-  skippedDates: string[];
-  occurrence: CalendarItem | null;
-  occurrenceDate: string | undefined;
-  isException: boolean;
-  event: CalendarEvent;
-  household: Household;
-  members: Member[];
-  dayKinds: DayKind[];
-  returnTo: string;
-  closeHref: string;
-  memberName: string | undefined;
-  /** For a repeating event: the link that switches to changing every date. */
-  everyDateHref: string;
-  showEveryDate: boolean;
-}) {
-  const { timeZone } = household.settings;
-  const start = new Date(event.starts_at);
-  const end = new Date(event.ends_at);
-  const startDate = localDateOf(start, timeZone);
-  const endDate = event.all_day ? addDays(localDateOf(end, timeZone), -1) : localDateOf(end, timeZone);
-  const summary = (
-    <p className="shrink-0 text-lg text-ink-muted">
-      {memberName ? `For ${memberName} · ` : ""}
-      {describeRule(event.recurrence_rule)}
-    </p>
-  );
-
-  // A repeating event opens on "just this date" first; every date is one tap away.
-  if (occurrenceDate && !showEveryDate) {
-    return (
-      <div className="flex h-full flex-col gap-5">
-        {summary}
-        <OccurrenceControls
-          event={event}
-          household={household}
-          occurrence={occurrence}
-          occurrenceDate={occurrenceDate}
-          isException={isException}
-          returnTo={returnTo}
-        />
-        {skippedDates.length > 0 ? <SkippedDates event={event} dates={skippedDates} returnTo={returnTo} /> : null}
-        <div className="mt-auto flex shrink-0 gap-3">
-          <Link
-            href={everyDateHref}
-            scroll={false}
-            className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board"
-          >
-            Change every date
-          </Link>
-          <CloseLink href={closeHref} label="Close" />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full flex-col gap-5">
-      {summary}
-      <form id="edit-event" action={updateEvent} className="group flex min-h-0 flex-1 flex-col">
-        <input type="hidden" name="id" value={event.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <EventCardFields
-          members={members}
-          dayKinds={dayKinds}
-          defaults={{
-            title: event.title,
-            date: startDate,
-            endDate: event.all_day ? endDate : undefined,
-            allDay: event.all_day,
-            startTime: event.all_day ? undefined : localTimeOf(start, timeZone),
-            minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
-            memberIds: event.member_ids,
-            visibility: event.visibility,
-            notes: event.notes ?? "",
-            dayKind: event.day_kind ?? undefined,
-            icon: event.icon ?? "",
-            repeat: parseRule(event.recurrence_rule),
-          }}
-          headsUps={<HeadsUpEditor headsUps={headsUps} source={{ eventId: event.id }} returnTo={headsUpReturn} />}
-          initialTab={initialTab}
-        />
-      </form>
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Button form="edit-event" variant="save">Save</Button>
-        <Button form="edit-event" formAction={saveEventAsTemplate} variant="secondary">
-          Save as template
-        </Button>
-        <CloseLink href={closeHref} />
-        <form action={removeEvent} className="ml-auto">
-          <input type="hidden" name="id" value={event.id} />
-          <input type="hidden" name="title" value={event.title} />
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove"}</Button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/** How many skipped dates to list before "and N more". */
-const SKIPPED_LIMIT = 6;
-
-/** Dates skipped from a repeating event, each with a way to bring it back. */
-function SkippedDates({ event, dates, returnTo }: { event: CalendarEvent; dates: string[]; returnTo: string }) {
-  const shown = dates.slice(-SKIPPED_LIMIT);
-  return (
-    <div className="shrink-0">
-      <h3 className="mb-2 text-lg font-bold text-ink">Skipped dates</h3>
-      <ul className="flex flex-wrap gap-2">
-        {shown.map((date) => (
-          <li key={date}>
-            <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
-              <input type="hidden" name="eventId" value={event.id} />
-              <input type="hidden" name="occurrenceDate" value={date} />
-              <input type="hidden" name="title" value={event.title} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <span className="text-base text-ink">{date}</span>
-              <Button variant="secondary" className="border-0">
-                Bring back
-              </Button>
-            </form>
-          </li>
-        ))}
-      </ul>
-      {dates.length > shown.length ? <p className="mt-2 text-base text-ink-muted">and {dates.length - shown.length} earlier</p> : null}
-    </div>
-  );
-}
-
-/** "Just this one" controls for one date of a repeating event. */
-function OccurrenceControls({
-  event,
-  household,
-  occurrence,
-  occurrenceDate,
-  isException,
-  returnTo,
-}: {
-  event: CalendarEvent;
-  household: Household;
-  occurrence: CalendarItem | null;
-  occurrenceDate: string;
-  isException: boolean;
-  returnTo: string;
-}) {
-  const { timeZone, locale } = household.settings;
-  const start = occurrence ? new Date(occurrence.starts_at) : zonedToUtc(occurrenceDate, localTimeOf(new Date(event.starts_at), event.timezone), timeZone);
-  const end = occurrence ? new Date(occurrence.ends_at) : new Date(start.getTime() + (new Date(event.ends_at).getTime() - new Date(event.starts_at).getTime()));
-  const dayLabel = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(
-    zonedToUtc(occurrenceDate, "12:00", timeZone),
-  );
-  const hidden = (
-    <>
-      <input type="hidden" name="eventId" value={event.id} />
-      <input type="hidden" name="occurrenceDate" value={occurrenceDate} />
-      <input type="hidden" name="title" value={event.title} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-    </>
-  );
-
-  return (
-    <div className="shrink-0 rounded-[var(--radius-card)] bg-rail p-5">
-      <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
-      <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
-        {hidden}
-        <input type="hidden" name="allDay" value={String(event.all_day)} />
-        <Field label="Move to">
-          <Input name="newDate" type="date" defaultValue={localDateOf(start, timeZone)} required />
-        </Field>
-        {event.all_day ? null : (
-          <>
-            <Field label="Starts at">
-              <Input name="newStartTime" type="time" defaultValue={localTimeOf(start, timeZone)} required />
-            </Field>
-            <Field label="Ends at">
-              <Input name="newEndTime" type="time" defaultValue={localTimeOf(end, timeZone)} required />
-            </Field>
-          </>
-        )}
-        <div className="sm:col-span-3">
-          <Button variant="secondary" className="bg-board">Move this one</Button>
-        </div>
-      </form>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <form action={skipOccurrence}>
-          {hidden}
-          <Button variant="danger">Skip this one</Button>
-        </form>
-        {isException ? (
-          <form action={resetOccurrence}>
-            {hidden}
-            <Button variant="secondary">Put back to normal</Button>
-          </form>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function CloseLink({ href, label = "Cancel" }: { href: string; label?: string }) {
-  return (
-    <Link
-      href={href}
-      scroll={false}
-      className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
-    >
-      {label}
-    </Link>
-  );
-}
-
 /**
  * The week's meals as blocks: each planned meal at its eating time, moved
  * out of the way of plans the same way the Agenda does it.
@@ -756,6 +491,7 @@ function TemplateCard({
         </div>
         <Stickers members={members} memberIds={template.member_ids} />
         <DayKindChips kinds={dayKinds} value={template.day_kind} />
+        <LocationField value={template.location} />
         <Field label="Notes">
           <Input name="notes" maxLength={2000} defaultValue={template.notes ?? ""} />
         </Field>

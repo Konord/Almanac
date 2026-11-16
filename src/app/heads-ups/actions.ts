@@ -14,8 +14,8 @@ import { syncEventAndChoreHeadsUps } from "./sync";
 
 function returnPath(formData: FormData): string {
   const value = String(formData.get("huReturnTo") ?? "");
-  // Only our own pages, never another website.
-  return /^\/(calendar|chores\/manage)(\?[\w=&%.:-]*)?$/.test(value) ? value : "/";
+  // Only our own pages (the Agenda "/", the calendar, chores), never another website.
+  return /^\/(calendar|chores\/manage)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/";
 }
 
 function back(formData: FormData, kind: "error" | "message", text: string): never {

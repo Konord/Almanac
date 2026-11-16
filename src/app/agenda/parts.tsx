@@ -59,9 +59,10 @@ export function EventCard({ event }: { event: AgendaEvent }) {
       <span className="min-w-0">
         <span className={`line-clamp-2 font-hand text-[1.625rem] leading-[1.15] ${event.past ? "text-ink-muted" : "text-ink"}`}>{event.title}</span>
         {event.place ? (
-          <span className={`mt-[0.15rem] flex items-center gap-[0.35rem] font-hand text-[1.125rem] ${event.past ? "text-ink-muted" : "text-ink-soft"}`}>
-            <MapPin size="1.125rem" weight="bold" aria-hidden />
-            {event.place}
+          // A small printed line (the place is typed on the event sheet, not handwritten).
+          <span className={`mt-[0.15rem] flex min-w-0 items-center gap-[0.35rem] text-[1.125rem] font-semibold ${event.past ? "text-ink-muted" : "text-ink-soft"}`}>
+            <MapPin size="1.125rem" weight="bold" aria-hidden className="shrink-0" />
+            <span className="truncate">{event.place}</span>
           </span>
         ) : null}
       </span>

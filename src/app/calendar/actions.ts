@@ -58,6 +58,7 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
   const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
   const icon = text(formData, "icon");
+  const location = readLocation(formData);
 
   if (!title) back(formData, "error", "An event needs a title.");
   const endDateInput = text(formData, "endDate") || startDate;
@@ -99,7 +100,13 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     notes: notes || null,
     icon: icon || null,
     day_kind: readDayKind(formData),
+    location,
   };
+}
+
+/** Where it is: a plain line of text (no map, no lookup), or null. */
+function readLocation(formData: FormData): string | null {
+  return text(formData, "location").slice(0, 200) || null;
 }
 
 /** "Makes it a … day" on the card: a kind of day's name, or null for no change. */
@@ -192,6 +199,7 @@ async function insertTemplate(
       member_ids: readIds(formData, "memberIds"),
       notes: event.notes,
       day_kind: event.day_kind,
+      location: event.location,
       sort_order: 100,
     })
     .select("id")
@@ -281,7 +289,7 @@ export async function skipOccurrence(formData: FormData) {
   );
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_occurrence_skipped", "event", eventId, `${title} (${date})`);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `Skipped ${title} on ${date}.`);
 }
 
@@ -317,7 +325,7 @@ export async function moveOccurrence(formData: FormData) {
   );
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_occurrence_moved", "event", eventId, `${title} (${originalDate})`);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `Moved ${title} on ${originalDate}.`);
 }
 
@@ -331,7 +339,7 @@ export async function resetOccurrence(formData: FormData) {
   const { error } = await supabase.from("event_exceptions").delete().eq("event_id", eventId).eq("original_date", date);
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_occurrence_reset", "event", eventId, `${title} (${date})`);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `${title} on ${date} is back to normal.`);
 }
 
@@ -412,6 +420,7 @@ export async function updateTemplate(formData: FormData) {
       member_ids: readIds(formData, "memberIds"),
       notes: notes || null,
       day_kind: readDayKind(formData),
+      location: readLocation(formData),
     })
     .eq("id", id);
   if (error) back(formData, "error", error.message);
