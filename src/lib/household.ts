@@ -5,6 +5,7 @@ import { isLocalTime } from "@/lib/time";
 import { BOX_ID } from "@/lib/panel-boxes";
 import { DEFAULT_SCREEN_SAVER, parseScreenSaver, type ScreenSaverSettings } from "@/lib/screen-saver";
 import { DEFAULT_SOUNDS, parseSounds, type SoundSettings } from "@/lib/sounds";
+import { DEFAULT_BRIGHTNESS, parseBrightness, type BrightnessSettings } from "@/lib/brightness";
 import { parseWeatherPlace, type WeatherPlace } from "@/lib/weather";
 
 /**
@@ -42,6 +43,8 @@ export type HouseholdSettings = {
   holidayThemes: boolean;
   /** Sounds on the kitchen screen: mute, quiet hours, where they play (src/lib/sounds.ts). */
   sounds: SoundSettings;
+  /** The kitchen screen's day and evening brightness (src/lib/brightness.ts). */
+  brightness: BrightnessSettings;
   /** Where the weather and pollen are for (Settings › Weather). Null: no weather yet. */
   weather: WeatherPlace | null;
 };
@@ -66,6 +69,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   screenSaver: DEFAULT_SCREEN_SAVER,
   holidayThemes: true,
   sounds: DEFAULT_SOUNDS,
+  brightness: DEFAULT_BRIGHTNESS,
   weather: null,
 };
 
@@ -101,6 +105,7 @@ export function parseSettings(raw: Json): HouseholdSettings {
     screenSaver: parseScreenSaver(value.screenSaver),
     holidayThemes: pick("holidayThemes", (v) => typeof v === "boolean"),
     sounds: parseSounds(value.sounds),
+    brightness: parseBrightness(value.brightness),
     weather: parseWeatherPlace(value.weather),
   };
 }

@@ -27,7 +27,14 @@ never show the apps.
 - **Screen brightness.** The menu tray gets a brightness slider. It changes
   the monitor's own backlight (the same setting as the buttons on the
   monitor), sent over the video cable with **DDC/CI**, using `ddcutil`. If
-  the monitor can't do that, the slider just doesn't show.
+  the monitor can't do that, the slider just doesn't show. Almanac also
+  changes it by itself at the day and evening times in Settings › Screen
+  saver › Brightness.
+- **A warmer evening colour.** In the evening the helper switches the
+  monitor to its "User" colour preset and turns its blue (and a little of
+  its green) down, like a phone's night mode. In the day it goes back to the
+  normal preset (6500K). It only does this when `ddcutil capabilities`
+  lists Feature 14 (colour preset) and Feature 1A (blue level).
 
 The up checks and the "isn't answering" heads-up are done by Almanac itself
 (Settings › Apps), not by this helper.
@@ -126,6 +133,11 @@ Either way it needs:
   (the number `ddcutil detect` gives it). The helper's log
   (`journalctl --user -u almanac-launcher`) says what brightness it read when
   it started, or why it couldn't.
+- The colour presets, if yours are numbered differently (see Feature 14 in
+  `ddcutil capabilities`): `"colour": { "normalPreset": "05", "userPreset": "0b" }`.
+  The warmer colour sets red to its most, and green and blue to a share of
+  theirs. If the evening looks too strong or too pink, pick "A little" in
+  Settings, or reset the monitor's colour from its own menu.
 - Each web app keeps its own sign-in in `~/almanac-launcher/profiles/`.
   Deleting a folder there signs that app out.
 

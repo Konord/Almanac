@@ -14,7 +14,8 @@
  *   closes the app and brings Almanac back;
  * - brings Almanac back by itself when an app is closed the normal way;
  * - turns the screen off overnight when the art screen saver asks;
- * - sets the monitor's brightness over DDC/CI (ddcutil) for the tray's slider.
+ * - sets the monitor's brightness (and a warmer evening colour) over DDC/CI
+ *   (ddcutil), for the tray's slider and the day and evening levels.
  *
  * It works on both of Ubuntu's desktops. On Xorg it uses wmctrl, xset and
  * pill.py. On Wayland (Ubuntu 25.10 and newer have nothing else) a program
@@ -34,8 +35,13 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import {
   corsHeaders,
+  canWarm,
   ddcutilCommand,
   EVENT_SIZE,
+  GAIN_VCP,
+  WARMTH_GAINS,
+  WARMTHS,
+  type Warmth,
   fromPercent,
   parseBrightness,
   parseConfig,
@@ -273,14 +279,27 @@ function setScreen(on: boolean) {
 let brightness: { raw: number; max: number } | null = null;
 /** False once ddcutil has said this monitor can't be set, so Almanac hides the slider. */
 let brightnessWorks = true;
+/** Whether this monitor has colour presets and a blue level, so the evening can be warmer. */
+let warmthWorks = false;
 
-function ddcutil(command: string[]): Promise<string> {
+function run(command: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(command[0], command.slice(1), { timeout: 10_000 }, (error, stdout, stderr) => {
+    execFile(command[0], command.slice(1), { timeout: 15_000 }, (error, stdout, stderr) => {
       if (error) reject(new Error((stderr || error.message).trim().split("\n")[0]));
       else resolve(stdout);
     });
   });
+}
+
+/*
+ * The monitor answers one question at a time, so every ddcutil runs in
+ * turn, never two at once.
+ */
+let line: Promise<unknown> = Promise.resolve();
+function ddcutil(command: string[]): Promise<string> {
+  const next = line.then(() => run(command));
+  line = next.catch(() => {});
+  return next;
 }
 
 async function readBrightness(): Promise<void> {
@@ -293,6 +312,17 @@ async function readBrightness(): Promise<void> {
     brightness = null;
     brightnessWorks = false;
     log(`Can't read the monitor's brightness (${(e as Error).message}). Is ddcutil installed, and does "ddcutil getvcp 10" work? See README.md.`);
+  }
+}
+
+/** Once, at start: can this monitor do a warmer colour? */
+async function checkWarmth(): Promise<void> {
+  try {
+    const which = config.brightness.display ? ["--display", String(config.brightness.display)] : [];
+    warmthWorks = canWarm(await ddcutil([...config.brightness.command, ...which, "capabilities"]));
+    log(warmthWorks ? "The monitor can do a warmer evening colour" : "The monitor can't do a warmer colour from here (no colour presets or blue level)");
+  } catch {
+    warmthWorks = false;
   }
 }
 
@@ -327,6 +357,29 @@ async function setBrightness(raw: number): Promise<void> {
 
 /** The brightness as Almanac sees it: a percent, or null when this monitor can't. */
 const brightnessPercent = () => (brightnessWorks && brightness ? toPercent(brightness.raw, brightness.max) : null);
+
+/**
+ * The colour: "none" is the monitor's normal preset (6500K); a warmth is
+ * the User preset with less blue (and a little less green).
+ */
+let warmthNow: Warmth | null = null;
+
+async function setWarmth(warmth: Warmth): Promise<void> {
+  if (warmth === "none") {
+    await ddcutil(ddcutilCommand(config, config.colour.normalPreset, "14"));
+  } else {
+    await ddcutil(ddcutilCommand(config, config.colour.userPreset, "14"));
+    const gains = WARMTH_GAINS[warmth];
+    for (const colour of ["red", "green", "blue"] as const) {
+      const vcp = GAIN_VCP[colour];
+      const now = parseBrightness(await ddcutil(ddcutilCommand(config, undefined, vcp)), vcp);
+      if (!now) throw new Error(`the monitor didn't say its ${colour} level`);
+      await ddcutil(ddcutilCommand(config, Math.round(now.max * gains[colour]), vcp));
+    }
+  }
+  warmthNow = warmth;
+  log(warmth === "none" ? "Colour back to normal" : `Colour warmer (${warmth})`);
+}
 
 // ---------------------------------------------------------------------------
 // Talking to Almanac
@@ -370,8 +423,8 @@ const server = createServer(async (req, res) => {
   }
   if (req.method === "GET" && path === "/hello") {
     const programs = Object.entries(config.programs).map(([key, p]) => ({ key, name: p.name }));
-    // version 2: brightness (a percent, or null when this monitor can't be set).
-    return send(res, 200, cors, { ok: true, version: 2, programs, open: current?.plan.label ?? null, brightness: brightnessPercent() });
+    // version 2: brightness (a percent, or null when this monitor can't be set), and whether it can be warmer.
+    return send(res, 200, cors, { ok: true, version: 2, programs, open: current?.plan.label ?? null, brightness: brightnessPercent(), warmth: warmthWorks ? warmthNow ?? "unknown" : null });
   }
   // Anything that does something must come from Almanac's page.
   if (req.method === "POST" && !allowed) return send(res, 403, {}, "Not from Almanac.");
@@ -409,6 +462,20 @@ const server = createServer(async (req, res) => {
     void setBrightness(raw);
     return send(res, 200, cors, { ok: true, brightness: toPercent(raw, brightness.max) });
   }
+  if (req.method === "POST" && path === "/colour") {
+    // The evening's warmer colour: { warmth: "none" | "weak" | "medium" | "strong" }.
+    if (!warmthWorks) return send(res, 409, cors, "This monitor's colour can't be set from here.");
+    const body = await readBody(req);
+    const warmth = body && typeof body === "object" ? (body as { warmth?: unknown }).warmth : undefined;
+    if (!WARMTHS.includes(warmth as Warmth)) return send(res, 400, cors, "Warmth should be none, weak, medium or strong.");
+    try {
+      await setWarmth(warmth as Warmth);
+      return send(res, 200, cors, { ok: true });
+    } catch (e) {
+      log(`Couldn't set the colour: ${(e as Error).message}`);
+      return send(res, 500, cors, `Couldn't set the colour: ${(e as Error).message}`);
+    }
+  }
   if (req.method === "POST" && path === "/home") {
     goHome();
     return send(res, 200, cors, { ok: true });
@@ -422,7 +489,9 @@ server.listen(config.port, "127.0.0.1", () => {
   pill.start();
   watchTouchscreens();
   void readBrightness().then(() => {
-    if (brightness) log(`Monitor brightness is ${brightnessPercent()}%`);
+    if (!brightness) return;
+    log(`Monitor brightness is ${brightnessPercent()}%`);
+    void checkWarmth();
   });
   // A touchscreen plugged in later (or after a sleep) is picked up too.
   setInterval(watchTouchscreens, 30_000);

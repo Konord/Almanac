@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { draftProblem, type SettingsDraft } from "./draft.ts";
 import { DEFAULT_SCREEN_SAVER } from "../../lib/screen-saver.ts";
 import { DEFAULT_SOUNDS } from "../../lib/sounds.ts";
+import { DEFAULT_BRIGHTNESS } from "../../lib/brightness.ts";
 
 const base: SettingsDraft = {
   name: "Home",
@@ -23,6 +24,7 @@ const base: SettingsDraft = {
   screenSaver: DEFAULT_SCREEN_SAVER,
   holidayThemes: true,
   sounds: DEFAULT_SOUNDS,
+  brightness: DEFAULT_BRIGHTNESS,
   weather: null,
 };
 

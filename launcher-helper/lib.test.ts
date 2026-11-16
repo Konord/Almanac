@@ -124,3 +124,14 @@ test("brightness: ddcutil's answer is read, and percents become the monitor's nu
   assert.ok("error" in parseConfig({ ...good, brightness: { display: 0 } }));
   assert.ok("error" in parseConfig({ ...good, brightness: { command: [] } }));
 });
+
+test("warmth: presets are sent as hex, gains read like brightness, and capabilities are checked", async () => {
+  const { ddcutilCommand, parseBrightness, canWarm } = await import("./lib.ts");
+  assert.deepEqual(ddcutilCommand(config(), "0b", "14"), ["ddcutil", "--noverify", "setvcp", "14", "11"]);
+  assert.deepEqual(ddcutilCommand(config(), undefined, "1A"), ["ddcutil", "--brief", "getvcp", "1A"]);
+  assert.deepEqual(parseBrightness("VCP 1A C 50 100", "1A"), { raw: 50, max: 100 });
+  assert.equal(parseBrightness("VCP 1A C 50 100"), null);
+  assert.equal(canWarm("   Feature: 14 (Select color preset)\n   Feature: 1A (Video gain: Blue)"), true);
+  assert.equal(canWarm("   Feature: 10 (Brightness)"), false);
+  assert.ok("error" in parseConfig({ ...good, colour: { userPreset: "User 1" } }));
+});

@@ -2,6 +2,7 @@
 
 import { getHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
+import type { BrightnessSettings } from "@/lib/brightness";
 import { afterCheck, CHECK_TIMEOUT_MS, checkDue, upState, type LauncherApp, type LauncherKind } from "@/lib/launcher";
 
 /*
@@ -25,7 +26,7 @@ async function answers(address: string): Promise<boolean> {
 }
 
 /** The household's apps with their latest up state, checking the ones that are due. */
-export async function loadLauncher(): Promise<{ apps: LauncherApp[]; locale: string; timeZone: string } | null> {
+export async function loadLauncher(): Promise<{ apps: LauncherApp[]; locale: string; timeZone: string; brightness: BrightnessSettings } | null> {
   const household = await getHousehold();
   if (!household) return null;
   const supabase = await createClient();
@@ -47,10 +48,12 @@ export async function loadLauncher(): Promise<{ apps: LauncherApp[]; locale: str
     }),
   );
 
-  const { locale, timeZone } = household.settings;
+  const { locale, timeZone, brightness } = household.settings;
   return {
     locale,
     timeZone,
+    // The day and evening brightness, which the kitchen screen follows (launcher-store.ts).
+    brightness,
     apps: rows.map((row) => {
       const kind: LauncherKind = row.kind === "local" ? "local" : "web";
       const up = upState({ kind, checkUp: row.check_up, failures: row.failures, checkedAt: row.checked_at });

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Clock, FrameCorners, FolderSimple, Monitor, Play, Plus, X } from "@phosphor-icons/react";
+import { Clock, FrameCorners, FolderSimple, Monitor, Moon, Play, Plus, Sun, SunHorizon, X } from "@phosphor-icons/react";
 import { Card, EmptyState } from "@/components/ui";
 import { Pager } from "@/components/pager";
 import { PREVIEW_EVENT } from "@/components/screen-saver";
 import { BACK_AFTER_CHOICES, IDLE_CHOICES, MAX_SET_TIMES, dinnerBlocks, type MatColour, type ScreenSaverSettings, type SetTime } from "@/lib/screen-saver";
+import { LEVEL_CHOICES, type BrightnessSettings, type Warmth } from "@/lib/brightness";
+import { useLauncher } from "@/components/launcher-store";
 import { Choice } from "./fields";
 
 /*
@@ -13,6 +15,9 @@ import { Choice } from "./fields";
  * and the art folders it found. "When" holds the settings (kept until the
  * screen's one Save); "Art folders" only shows what's in the folder, since
  * folders are found by their names.
+ *
+ * "Brightness" (2026-11-16) sets the kitchen screen's day and evening
+ * levels (src/lib/brightness.ts), next to the overnight "Screen off".
  */
 
 export type ArtFolderInfo = { name: string; count: number; use: string; matched: boolean };
@@ -40,7 +45,7 @@ function Toggle({ on, onClick, children, label }: { on: boolean; onClick: () => 
 
 const minutesLabel = (m: number) => (m === 0 ? "Never" : m === 60 ? "1 hour" : `${m} min`);
 
-export type ScreenSaverView = "when" | "folders";
+export type ScreenSaverView = "when" | "brightness" | "folders";
 
 export function ScreenSaverTab({
   value,
@@ -51,9 +56,13 @@ export function ScreenSaverTab({
   art,
   view,
   onView: setView,
+  brightness,
+  onBrightness,
 }: {
   value: ScreenSaverSettings;
   onChange: (v: ScreenSaverSettings) => void;
+  brightness: BrightnessSettings;
+  onBrightness: (v: BrightnessSettings) => void;
   here: boolean;
   onHere: (on: boolean) => void;
   mealTimes: { id: string; name: string }[];
@@ -77,6 +86,7 @@ export function ScreenSaverTab({
           {(
             [
               { id: "when", label: "When", icon: Clock },
+              { id: "brightness", label: "Brightness", icon: Sun },
               { id: "folders", label: "Art folders", icon: FolderSimple },
             ] as const
           ).map((t) => (
@@ -109,25 +119,7 @@ export function ScreenSaverTab({
               <Choice label="Screen saver here" value={here ? "on" : "off"} onChange={(v) => onHere(v === "on")} options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]} />
               <Choice label="After no touch for" value={value.idleMinutes} onChange={(idleMinutes) => set({ idleMinutes })} options={IDLE_CHOICES.map((m) => ({ value: m, label: minutesLabel(m) }))} />
               <Choice label="Back after a tap, in meals and set times" value={value.backAfterMinutes} onChange={(backAfterMinutes) => set({ backAfterMinutes })} options={BACK_AFTER_CHOICES.map((m) => ({ value: m, label: `${m} min` }))} />
-              <div className="flex flex-col gap-2">
-                <Choice
-                  label="Overnight"
-                  value={value.overnight.mode}
-                  onChange={(mode) => set({ overnight: { ...value.overnight, mode } })}
-                  options={[
-                    { value: "none", label: "As usual" },
-                    { value: "art", label: "Show art" },
-                    { value: "off", label: "Screen off" },
-                  ]}
-                />
-                {value.overnight.mode !== "none" ? (
-                  <div className="flex items-center gap-2 text-lg text-ink">
-                    <input type="time" aria-label="Overnight from" value={value.overnight.start} onChange={(e) => e.target.value && set({ overnight: { ...value.overnight, start: e.target.value } })} className={`${inputClass} w-44`} />
-                    to
-                    <input type="time" aria-label="Overnight until" value={value.overnight.end} onChange={(e) => e.target.value && set({ overnight: { ...value.overnight, end: e.target.value } })} className={`${inputClass} w-44`} />
-                  </div>
-                ) : null}
-              </div>
+              <Overnight value={value} set={set} />
             </div>
           </Card>
 
@@ -232,6 +224,8 @@ export function ScreenSaverTab({
             </div>
           </Card>
         </div>
+      ) : view === "brightness" ? (
+        <BrightnessView value={brightness} onChange={onBrightness} saver={value} setSaver={set} />
       ) : (
         <Card
           title={art.root ?? "Art folders"}
@@ -273,6 +267,125 @@ export function ScreenSaverTab({
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+/** Overnight: as usual, art, or the screen off, and from when to when. Shared by "When" and "Brightness". */
+function Overnight({ value, set }: { value: ScreenSaverSettings; set: (c: Partial<ScreenSaverSettings>) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Choice
+        label="Overnight"
+        value={value.overnight.mode}
+        onChange={(mode) => set({ overnight: { ...value.overnight, mode } })}
+        options={[
+          { value: "none", label: "As usual" },
+          { value: "art", label: "Show art" },
+          { value: "off", label: "Screen off" },
+        ]}
+      />
+      {value.overnight.mode !== "none" ? (
+        <div className="flex items-center gap-2 text-lg text-ink">
+          <input type="time" aria-label="Overnight from" value={value.overnight.start} onChange={(e) => e.target.value && set({ overnight: { ...value.overnight, start: e.target.value } })} className={`${inputClass} w-44`} />
+          to
+          <input type="time" aria-label="Overnight until" value={value.overnight.end} onChange={(e) => e.target.value && set({ overnight: { ...value.overnight, end: e.target.value } })} className={`${inputClass} w-44`} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/*
+ * Brightness (2026-11-16): the kitchen screen's day and evening levels,
+ * and the overnight screen off beside them, so the whole day is on one
+ * screen. Levels are big chips rather than a slider: they're set once.
+ */
+function BrightnessView({
+  value,
+  onChange,
+  saver,
+  setSaver,
+}: {
+  value: BrightnessSettings;
+  onChange: (v: BrightnessSettings) => void;
+  saver: ScreenSaverSettings;
+  setSaver: (c: Partial<ScreenSaverSettings>) => void;
+}) {
+  const { helper } = useLauncher();
+  const set = (c: Partial<BrightnessSettings>) => onChange({ ...value, ...c });
+  const here = helper ? helper.brightness : null;
+  const levels = LEVEL_CHOICES.map((p) => ({ value: p, label: `${p}%` }));
+
+  const part = (which: "day" | "evening", label: string) => (
+    <>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-base font-bold text-ink">{label}</span>
+        <input
+          type="time"
+          value={value[which].start}
+          onChange={(e) => e.target.value && set({ [which]: { ...value[which], start: e.target.value } })}
+          className={`${inputClass} w-44`}
+        />
+      </label>
+      <Choice label="Brightness" value={value[which].percent} onChange={(percent) => set({ [which]: { ...value[which], percent } })} options={levels} />
+    </>
+  );
+
+  return (
+    <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-3">
+      <Card title="Day" icon={Sun} tint="orange">
+        <div className="mt-2 flex flex-col gap-4">
+          <Choice
+            label="Change by itself"
+            value={value.scheduled ? "on" : "off"}
+            onChange={(v) => set({ scheduled: v === "on" })}
+            options={[
+              { value: "on", label: "Day and evening" },
+              { value: "off", label: "Only the slider" },
+            ]}
+          />
+          {value.scheduled ? part("day", "Day starts at") : null}
+        </div>
+      </Card>
+
+      <Card title="Evening" icon={SunHorizon} tint="purple">
+        <div className="mt-2 flex flex-col gap-4">
+          {value.scheduled ? (
+            <>
+              {part("evening", "Evening starts at")}
+              {/* Few monitors let a computer reach their "low blue" mode; turning down the blue does the same job. */}
+              <Choice<Warmth>
+                label="Warmer colour (less blue)"
+                value={value.evening.warmth}
+                onChange={(warmth) => set({ evening: { ...value.evening, warmth } })}
+                options={[
+                  { value: "none", label: "Off" },
+                  { value: "weak", label: "A little" },
+                  { value: "medium", label: "Some" },
+                  { value: "strong", label: "A lot" },
+                ]}
+              />
+            </>
+          ) : (
+            <p className="text-lg text-ink-muted">The screen stays where the tray&apos;s slider puts it.</p>
+          )}
+        </div>
+      </Card>
+
+      <Card title="Night" icon={Moon} tint="blue">
+        <div className="mt-2 flex flex-col gap-4">
+          <Overnight value={saver} set={setSaver} />
+          <p className="text-lg text-ink-muted">
+            {saver.overnight.mode === "off" && value.scheduled
+              ? "A touch in the night wakes the screen at the evening level."
+              : "The tray's slider changes the brightness any time, until the next change."}
+          </p>
+          <p className="mt-auto text-lg text-ink-muted">
+            {here === null ? "This screen can't change its brightness. The kitchen screen can." : `This screen is at ${here}% now.`}
+          </p>
+        </div>
+      </Card>
     </div>
   );
 }
