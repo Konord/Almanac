@@ -10,6 +10,7 @@ import {
   type PlaceMatch,
   type PollenDay,
   type WeatherDay,
+  type WeatherHour,
   type WeatherNow,
   type WeatherPlace,
 } from "@/lib/weather";
@@ -33,7 +34,7 @@ const KEEP_OLD_FOR = 12 * 60 * 60_000;
 const ASK_TIMEOUT = 10_000;
 
 type Kept<T> = { value: T; at: number };
-const weatherKept = new Map<string, Kept<{ now: WeatherNow; days: WeatherDay[] }>>();
+const weatherKept = new Map<string, Kept<{ now: WeatherNow; hours: WeatherHour[]; days: WeatherDay[] }>>();
 const pollenKept = new Map<string, Kept<PollenDay[]>>();
 /** When an ask last failed, so a broken service isn't asked on every screen load. */
 const failedAt = new Map<string, number>();
@@ -95,6 +96,7 @@ export async function getForecast(place: WeatherPlace, settings: HouseholdSettin
     unit: fahrenheit ? "F" : "C",
     windUnit: imperial ? "mph" : "km/h",
     now: weather.now,
+    hours: weather.hours,
     days: weather.days,
     pollen: key ? (pollen ?? []) : null,
   };

@@ -38,7 +38,14 @@ test("the forecast address asks for 5 days in the household's units", () => {
 
 test("Open-Meteo's answer becomes now + days", () => {
   const parsed = parseOpenMeteo({
-    current: { temperature_2m: 3.6, apparent_temperature: -0.4, weather_code: 3, is_day: 1, wind_speed_10m: 14.2 },
+    current: { time: "2026-11-16T08:15", temperature_2m: 3.6, apparent_temperature: -0.4, weather_code: 3, is_day: 1, wind_speed_10m: 14.2 },
+    hourly: {
+      time: ["2026-11-16T07:00", "2026-11-16T08:00", "2026-11-16T09:00"],
+      temperature_2m: [2, 3, 4.5],
+      weather_code: [3, 3, 61],
+      precipitation_probability: [0, 5, 70],
+      is_day: [0, 1, 1],
+    },
     daily: {
       time: ["2026-11-16", "2026-11-17"],
       weather_code: [3, 61],
@@ -54,6 +61,10 @@ test("Open-Meteo's answer becomes now + days", () => {
   assert.equal(parsed.now.isDay, true);
   assert.equal(parsed.days.length, 2);
   assert.deepEqual(parsed.days[1], { date: "2026-11-17", code: 61, high: 7, low: 2.2, rainChance: 80, sunrise: "07:04", sunset: "16:49" });
+  assert.deepEqual(
+    parsed.hours.map((h) => [h.time, h.temp, h.rainChance]),
+    [["2026-11-16T08:00", 3, 5], ["2026-11-16T09:00", 4.5, 70]],
+  );
   assert.equal(parseOpenMeteo({ error: true, reason: "bad" }), null);
 });
 

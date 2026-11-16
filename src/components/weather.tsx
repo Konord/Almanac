@@ -10,7 +10,6 @@ import {
   describeWeather,
   POLLEN_WORDS,
   pollenTone,
-  worstPollen,
   type Forecast,
   type PollenType,
   type WeatherAnswer,
@@ -18,8 +17,8 @@ import {
 
 /*
  * The weather in the calendar screens' header (2026-11-16): a picture and
- * the temperature, with today's pollen under it once it's in season. Tap
- * it for the next 5 days and the pollen for each.
+ * the temperature, nothing else (Connor: no pollen on the calendar). Tap
+ * it for the forecast and the pollen.
  *
  * Every screen's header shares one answer, asked from /api/weather every
  * 15 minutes while the screen is showing. Before a place is picked in
@@ -83,12 +82,10 @@ export function WeatherSlot() {
   const forecast = useForecast();
   const [open, setOpen] = useState(false);
 
-  if (!forecast) return <div data-weather-slot aria-hidden className="hidden w-[9rem] shrink-0 lg:block" />;
+  if (!forecast) return <div data-weather-slot aria-hidden className="hidden w-[7.5rem] shrink-0 lg:block" />;
 
   const { now } = forecast;
-  const today = forecast.days[0];
   const look = describeWeather(now.code, now.isDay);
-  const pollen = worstPollen(forecast.pollen?.find((p) => p.date === today?.date));
 
   return (
     <>
@@ -96,23 +93,11 @@ export function WeatherSlot() {
         type="button"
         data-weather-slot
         onClick={() => setOpen(true)}
-        aria-label={`${look.label}, ${degrees(now.temp)}${pollen !== null && pollen > 0 ? `, pollen ${POLLEN_WORDS[pollen].toLowerCase()}` : ""}. Show the forecast`}
-        className="hidden h-[6rem] min-w-[9rem] shrink-0 items-center gap-[0.5rem] rounded-[var(--radius)] px-[0.4rem] lg:flex"
+        aria-label={`${look.label}, ${degrees(now.temp)}. Show the forecast`}
+        className="hidden h-[var(--touch-target)] min-w-[7.5rem] shrink-0 items-center gap-[0.45rem] rounded-[var(--radius)] px-[0.4rem] lg:flex"
       >
-        <Emoji emoji={look.emoji} className="size-[3.75rem] shrink-0" />
-        <span className="flex min-w-0 flex-col items-start gap-[0.35rem]">
-          <span className="text-[2.75rem] leading-none font-extrabold tracking-[-0.03em] text-title">{degrees(now.temp)}</span>
-          {pollen !== null && pollen > 0 ? (
-            <span className={`flex items-center gap-[0.3rem] rounded-full py-[0.1rem] pr-[0.55rem] pl-[0.35rem] text-[1.125rem] leading-snug font-bold whitespace-nowrap ${pollenTone(pollen)}`}>
-              <Emoji emoji="🌿" className="size-[1.3rem]" />
-              {POLLEN_WORDS[pollen]}
-            </span>
-          ) : today ? (
-            <span className="text-[1.125rem] leading-none font-bold whitespace-nowrap text-ink-muted">
-              {degrees(today.high)} / {degrees(today.low)}
-            </span>
-          ) : null}
-        </span>
+        <Emoji emoji={look.emoji} className="size-[3.25rem] shrink-0" />
+        <span className="text-[2.5rem] leading-none font-extrabold tracking-[-0.03em] text-title">{degrees(now.temp)}</span>
       </button>
       {open ? <ForecastCard forecast={forecast} onClose={() => setOpen(false)} /> : null}
     </>

@@ -43,6 +43,18 @@ export type WeatherDay = {
   sunset: string;
 };
 
+export type WeatherHour = {
+  /** Local date and hour, like "2026-11-16T14:00". */
+  time: string;
+  code: number;
+  temp: number;
+  /** Chance of rain or snow, 0–100, or null if not given. */
+  rainChance: number | null;
+  isDay: boolean;
+};
+
+export const WEATHER_HOURS = 24;
+
 export type PollenType = "tree" | "grass" | "weed";
 
 /**
@@ -66,6 +78,8 @@ export type Forecast = {
   unit: "C" | "F";
   windUnit: "km/h" | "mph";
   now: WeatherNow;
+  /** From this hour on, 24 hours. */
+  hours: WeatherHour[];
   /** Today first, 5 days. */
   days: WeatherDay[];
   /** Null when there's no pollen key; [] when Google didn't answer. */
@@ -105,6 +119,7 @@ export function forecastUrl(place: WeatherPlace, timeZone: string, imperial: boo
     latitude: place.latitude.toFixed(4),
     longitude: place.longitude.toFixed(4),
     current: "temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m",
+    hourly: "temperature_2m,weather_code,precipitation_probability,is_day",
     daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset",
     timezone: timeZone,
     forecast_days: String(WEATHER_DAYS),
@@ -121,10 +136,10 @@ function clockOf(v: unknown): string {
   return typeof v === "string" && /T\d{2}:\d{2}/.test(v) ? v.slice(v.indexOf("T") + 1, v.indexOf("T") + 6) : "";
 }
 
-/** Open-Meteo's answer → now + days, or null if it doesn't look right. */
-export function parseOpenMeteo(raw: unknown): { now: WeatherNow; days: WeatherDay[] } | null {
+/** Open-Meteo's answer → now + hours + days, or null if it doesn't look right. */
+export function parseOpenMeteo(raw: unknown): { now: WeatherNow; hours: WeatherHour[]; days: WeatherDay[] } | null {
   if (raw === null || typeof raw !== "object") return null;
-  const r = raw as { current?: Record<string, unknown>; daily?: Record<string, unknown[]> };
+  const r = raw as { current?: Record<string, unknown>; hourly?: Record<string, unknown[]>; daily?: Record<string, unknown[]> };
   const c = r.current;
   const d = r.daily;
   if (!c || !d || !Array.isArray(d.time)) return null;
@@ -155,7 +170,20 @@ export function parseOpenMeteo(raw: unknown): { now: WeatherNow; days: WeatherDa
     });
   });
   if (days.length === 0) return null;
-  return { now, days: days.slice(0, WEATHER_DAYS) };
+
+  // The hours from this one on ("2026-11-16T08:15" → from "2026-11-16T08:00").
+  const hours: WeatherHour[] = [];
+  const h = r.hourly;
+  const thisHour = typeof c.time === "string" ? `${c.time.slice(0, 13)}:00` : "";
+  if (h && Array.isArray(h.time)) {
+    h.time.forEach((time, i) => {
+      const temp = num(h.temperature_2m?.[i]);
+      const hourCode = num(h.weather_code?.[i]);
+      if (typeof time !== "string" || time < thisHour || temp === null || hourCode === null) return;
+      hours.push({ time, code: hourCode, temp, rainChance: num(h.precipitation_probability?.[i]), isDay: h.is_day?.[i] !== 0 });
+    });
+  }
+  return { now, hours: hours.slice(0, WEATHER_HOURS), days: days.slice(0, WEATHER_DAYS) };
 }
 
 /** A place found by name, for Settings › Weather. */
