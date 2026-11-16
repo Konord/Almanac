@@ -38,7 +38,10 @@ import { PendingOutline, PlaceTap, WeekScroller } from "./week-scroll";
  *   - meals and list tasks with a time are cards on the grid too;
  *   - past days (and today's finished things) fade to 55%, keeping colours;
  *   - a holiday's big picture fills the column behind the hours;
- *   - the red Now line crosses today's column.
+ *   - no Now line (Connor, 2026-11-16): instead the hours move on by
+ *     themselves through the day, so finished things slide off the top,
+ *     until midnight reaches the bottom; the hour times show in the
+ *     leftmost day only.
  */
 
 /** One hour of the grid, in rem. */
@@ -92,9 +95,12 @@ export function WeekView({
   breaks,
   specials,
   tasks = [],
+  dropWhenOpen = [],
 }: ViewProps & {
   meals: Map<LocalDate, WeekMeal[]>;
   tasks?: TaskPointItem[];
+  /** The days that fold away while the Daily List is out (so the others keep their width). */
+  dropWhenOpen?: LocalDate[];
 }) {
   const { timeZone, locale } = household.settings;
   const now = new Date();
@@ -216,8 +222,15 @@ export function WeekView({
 
   // Start near now when the week has today; otherwise near the week's first thing.
   const firstThing = Math.min(...columns.flatMap((c) => c.items.map((i) => i.startMin)), 8 * 60);
-  const startMinute = days.includes(today) ? nowMin : firstThing;
-  const cols = { gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` };
+  const following = days.includes(today);
+  const startMinute = following ? nowMin : firstThing;
+  // Two sets of columns: all the days, and with the Daily List out (two days fold to nothing).
+  // The grids pick one by the drawer's data-daily-open (.week-cols in globals.css), so it slides.
+  const colVars = {
+    "--cols-closed": days.map(() => "minmax(0, 1fr)").join(" "),
+    "--cols-open": days.map((d) => (dropWhenOpen.includes(d) ? "minmax(0, 0fr)" : "minmax(0, 1fr)")).join(" "),
+  } as React.CSSProperties;
+  const drops = (day: LocalDate) => (dropWhenOpen.includes(day) ? "week-drop" : "");
   const wash = (c: { isToday: boolean; pastDay: boolean }) =>
     c.isToday
       ? "color-mix(in srgb, var(--color-now) 1.5%, var(--color-board))"
@@ -227,10 +240,10 @@ export function WeekView({
   const hours = Array.from({ length: 24 }, (_, h) => h);
 
   return (
-    <div className="flex min-h-[40rem] flex-col bg-board max-lg:overflow-x-auto lg:min-h-0 lg:flex-1">
+    <div className="flex min-h-[40rem] flex-col bg-board max-lg:overflow-x-auto lg:min-h-0 lg:flex-1" style={colVars}>
       <div className="flex min-h-0 flex-1 flex-col max-lg:min-w-[56rem]">
         {/* Day tops: weekday, date, and a sticker row every column keeps (so the hours line up). */}
-        <div className="grid shrink-0" style={cols}>
+        <div className="week-cols grid shrink-0">
           {columns.map((c, i) => (
             <Link
               key={c.day}
@@ -241,7 +254,7 @@ export function WeekView({
                   ? `Add an all-day event on ${fmt(c.day, { weekday: "long", month: "long", day: "numeric" })}`
                   : `Open ${fmt(c.day, { weekday: "long" })}'s agenda, ${fmt(c.day, { month: "long", day: "numeric" })}`
               }
-              className={`flex min-w-0 flex-col items-start gap-[0.2rem] px-[0.55rem] pt-[0.5rem] pb-[0.3rem] ${i < columns.length - 1 ? "border-r border-frame" : ""}`}
+              className={`flex min-w-0 flex-col items-start gap-[0.2rem] px-[0.55rem] pt-[0.5rem] pb-[0.3rem] ${i < columns.length - 1 ? "border-r border-frame" : ""} ${drops(c.day)}`}
               style={{ background: wash(c) }}
             >
               <span className="text-[1.15rem] leading-none font-bold tracking-[0.08em] text-ink-muted uppercase">
@@ -269,9 +282,9 @@ export function WeekView({
 
         <div className="relative min-h-0 flex-1">
           {/* Behind the hours: each day's wash and its holiday picture (they stay put while the hours scroll). */}
-          <div aria-hidden className="pointer-events-none absolute inset-0 grid" style={cols}>
+          <div aria-hidden className="week-cols pointer-events-none absolute inset-0 grid">
             {columns.map((c, i) => (
-              <div key={c.day} className={`relative min-w-0 ${i < columns.length - 1 ? "border-r border-frame" : ""}`} style={{ background: wash(c) }}>
+              <div key={c.day} className={`relative min-w-0 ${i < columns.length - 1 ? "border-r border-frame" : ""} ${drops(c.day)}`} style={{ background: wash(c) }}>
                 {c.holiday ? (
                   <span className="absolute inset-0 grid place-items-center overflow-hidden" style={{ containerType: "size" }}>
                     <Emoji emoji={c.holiday.icon} className={`size-[88cqmin] ${c.hasEvents ? "opacity-[0.18]" : ""}`} />
@@ -281,23 +294,28 @@ export function WeekView({
             ))}
           </div>
 
-          <WeekScroller key={days[0]} startMinute={startMinute} label="Hours of the week. Drag or swipe to scroll.">
-            <div className="relative grid" style={{ ...cols, height: `${24 * HOUR_REM}rem` }}>
+          <WeekScroller key={days[0]} startMinute={startMinute} follow={following ? timeZone : null} label="Hours of the week. Drag or swipe to scroll.">
+            <div className="week-cols relative grid" style={{ height: `${24 * HOUR_REM}rem` }}>
+              {/*
+                The hour lines and times, under the cards. The times sit at
+                the left only, in the first day showing (Connor, 2026-11-16);
+                a card there covers its own hours.
+              */}
+              <div aria-hidden className="pointer-events-none absolute inset-0">
+                {hours.map((h) => (
+                  <div key={h} className="absolute inset-x-0 border-t border-grid" style={{ top: `${h * HOUR_REM}rem` }}>
+                    {h > 0 ? (
+                      <span className="tabular absolute top-[0.15rem] left-[0.55rem] text-[1.125rem] leading-none font-semibold text-ink-muted">{timeText(h * 60, false)}</span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
               {columns.map((c) => {
                 const placed = layoutDay(c.items.map((x) => ({ id: x.id, startMin: x.startMin, endMin: x.endMin })));
                 const byId = new Map(c.items.map((x) => [x.id, x]));
                 return (
                   // data-drop-day: the column a dragged card lands in (the whole day tall, so drags map onto the hours).
-                  <div key={c.day} data-drop-day={c.day} className="relative min-w-0">
-                    {hours.map((h) => (
-                      <div key={h} aria-hidden className="pointer-events-none absolute inset-x-0 border-t border-grid" style={{ top: `${h * HOUR_REM}rem` }}>
-                        {h > 0 && !labelCovered(h, c.items, c.isToday ? nowMin : null) ? (
-                          <span className="tabular absolute top-[0.15rem] left-[0.55rem] text-[1.125rem] leading-none font-semibold text-ink-muted">
-                            {timeText(h * 60, false)}
-                          </span>
-                        ) : null}
-                      </div>
-                    ))}
+                  <div key={c.day} data-drop-day={c.day} className={`relative min-w-0 ${drops(c.day)}`}>
                     {placed.map((p) => {
                       const item = byId.get(p.id)!;
                       const short = p.lanes >= 2;
@@ -346,7 +364,6 @@ export function WeekView({
                         </div>
                       );
                     })}
-                    {c.isToday ? <NowLine minute={nowMin} label={`Now ${timeText(nowMin, false).replace(/\s*[ap]\.?m\.?$/i, "")}`} /> : null}
                     <PendingOutline day={c.day} minRem={(MIN_MINUTES / 60) * HOUR_REM} hourRem={HOUR_REM} />
                     {placing && adding ? (
                       <PlaceTap
@@ -363,27 +380,6 @@ export function WeekView({
           </WeekScroller>
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * An hour's label sits just under its line; it's left out where a card or
- * the Now line would cover it (so no half-hidden labels peek out).
- */
-function labelCovered(hour: number, items: GridItem[], nowMin: number | null): boolean {
-  const from = hour * 60;
-  const to = from + 15;
-  if (nowMin !== null && nowMin > from - 10 && nowMin < to + 5) return true;
-  return items.some((i) => i.startMin < to && i.endMin > from - 2);
-}
-
-/** The red Now line across today's column, with the time at its start. */
-function NowLine({ minute, label }: { minute: number; label: string }) {
-  return (
-    <div className="pointer-events-none absolute inset-x-0 z-10 flex -translate-y-1/2 items-center" style={{ top: `${(minute / 60) * HOUR_REM}rem` }}>
-      <span className="tabular rounded-[var(--radius-small)] bg-board px-[0.4rem] text-[1.25rem] leading-[1.3] font-extrabold tracking-[-0.02em] text-now-on-tint">{label}</span>
-      <span className="h-[0.2rem] flex-1 rounded-full bg-now" />
     </div>
   );
 }

@@ -29,13 +29,13 @@ export type { Section };
  * Every main screen sits in this frame. On a landscape screen the frame is
  * exactly one screen tall and nothing in it scrolls the page; on a phone the
  * page scrolls as usual. The menu is not shown on screen: it lives in a tray
- * that slides up from the handle at the bottom centre (see menu-tray.tsx).
+ * that slides up with a swipe from the bottom edge (see menu-tray.tsx).
  */
 export function AppFrame({ section, children }: { section: Section; children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-1 flex-col bg-rail lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
-      {/* 3.15rem at the bottom is the tray handle's strip (no dock, no side rail). */}
-      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 pb-12 sm:p-6 sm:pb-12 lg:min-h-0 lg:gap-5 lg:px-8 lg:pt-6 lg:pb-[3.15rem]">
+      {/* No strip at the bottom: the tray comes out with a swipe up from the edge (no dock, no side rail). */}
+      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 sm:p-6 lg:min-h-0 lg:gap-5 lg:px-8 lg:pt-6 lg:pb-6">
         {children}
       </main>
       <MenuTray section={section} />
@@ -75,8 +75,11 @@ export function ScreenHeader({
   weather = false,
   action,
   toolbar,
+  middle,
   children,
 }: {
+  /** Something centred between the title and the right-hand controls (the Planner's checks). */
+  middle?: ReactNode;
   title: ReactNode;
   sub?: ReactNode;
   /** A holiday's big picture, before the title. */
@@ -91,11 +94,12 @@ export function ScreenHeader({
 }) {
   const band = (
     <header className="flex shrink-0 flex-wrap items-center gap-x-[1.15rem] gap-y-2 lg:h-28 lg:max-h-28 lg:flex-nowrap">
-      <div className="mr-auto flex min-w-0 items-baseline gap-[0.8rem] overflow-hidden">
+      <div className={`${middle ? "" : "mr-auto"} flex min-w-0 items-baseline gap-[0.8rem] overflow-hidden`}>
         {hero ? <Emoji emoji={hero} className="size-14 self-center drop-shadow-[0_0.15rem_0.4rem_rgba(0,0,0,0.3)] lg:size-24" /> : null}
         <h1 className="shrink-0 pb-[0.06em] text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
         {sub && sub !== title ? <span className="tabular min-w-0 truncate text-2xl leading-none font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">{sub}</span> : null}
       </div>
+      {middle ? <div className="flex min-w-0 flex-1 items-center justify-center gap-[0.6rem]">{middle}</div> : null}
       {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
       <div className="flex shrink-0 items-center gap-[0.6rem]">
         {weather ? <WeatherSlot /> : null}
@@ -138,6 +142,12 @@ export function Segmented({ options, label }: { options: { href: string; label: 
 /** The look of the main action (Add, Save, New list): ink black, or the holiday colour. */
 export const primaryActionClass =
   "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-primary px-[1.35rem] text-lg font-bold whitespace-nowrap text-primary-ink";
+
+/**
+ * The header's main action keeps one width at least, so Add → Stop or
+ * Save → Saving… never nudges the header (Connor, 2026-11-16).
+ */
+export const headerActionWidth = "min-w-[8.5rem]";
 
 /** A grey second-rank button ("+ Add a kind", "Type it in"). */
 export const secondaryActionClass =
@@ -253,7 +263,7 @@ export function ActionLink({
   scroll?: boolean;
 }) {
   return (
-    <Link href={href} aria-label={label} title={label} scroll={scroll} className={primaryActionClass}>
+    <Link href={href} aria-label={label} title={label} scroll={scroll} className={`${primaryActionClass} ${headerActionWidth}`}>
       {IconComponent ? <IconComponent size="1.25rem" weight="bold" aria-hidden /> : null}
       {children}
     </Link>

@@ -150,7 +150,8 @@ export function QuickAddSheet({
             list: templates,
             href: templateHref,
             chosen: pending.templateId,
-            editHref: `/calendar?${returnTo ? `${returnTo}&` : ""}panel=templates`,
+            // Templates are managed in Settings › Event templates.
+            editHref: "/templates",
           }}
         />
       </form>

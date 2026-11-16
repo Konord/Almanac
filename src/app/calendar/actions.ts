@@ -26,9 +26,9 @@ function back(formData: FormData, kind: "error" | "message", text: string): neve
     if (value && /^[a-z0-9-]+$/.test(value)) params.set(key, value);
   }
   params.set(kind, text);
-  // The Today screen sends returnPath "/" and the Planner "/review"; everything else is the calendar.
+  // The Today screen sends returnPath "/", the Planner "/review" and Settings › Templates "/templates"; everything else is the calendar.
   const sent = formData.get("returnPath");
-  const path = sent === "/" || sent === "/review" ? sent : "/calendar";
+  const path = sent === "/" || sent === "/review" || sent === "/templates" ? sent : "/calendar";
   redirect(`${path}?${params.toString()}`);
 }
 

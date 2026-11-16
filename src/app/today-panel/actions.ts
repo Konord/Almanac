@@ -4,11 +4,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireHousehold } from "@/lib/household";
 import { BOX_ID } from "@/lib/panel-boxes";
-import { PANEL_OPEN_COOKIE, PANEL_TAB_COOKIE } from "./prefs";
+import { PANEL_TAB_COOKIE } from "./prefs";
 
 /**
- * The Today panel remembers two things per screen (per browser, in a
- * cookie): whether it's open, and which list it showed last. A wall screen
+ * The Today panel remembers which list it showed last, per screen (per
+ * browser, in a cookie). Whether the Daily List is open is kept by the
+ * drawer itself (drawer.tsx). A wall screen
  * and a phone each keep their own.
  */
 
@@ -18,19 +19,6 @@ const YEAR = 60 * 60 * 24 * 400;
 function back(formData: FormData): never {
   const value = String(formData.get("returnTo") ?? "");
   redirect(/^\/(calendar)?(\?[\w=&%.:-]*)?$/.test(value) ? value : "/calendar");
-}
-
-/** Opens or closes the panel. */
-export async function setPanelOpen(formData: FormData) {
-  await requireHousehold();
-  const store = await cookies();
-  store.set(PANEL_OPEN_COOKIE, formData.get("open") === "1" ? "1" : "0", {
-    path: "/",
-    maxAge: YEAR,
-    sameSite: "lax",
-    httpOnly: true,
-  });
-  back(formData);
 }
 
 /** Shows "Up next", the daily list ("today") or one list in the working part of the panel. */

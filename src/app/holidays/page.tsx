@@ -13,7 +13,7 @@ import { listArt } from "@/lib/art-folder";
  */
 export default function HolidaysPage() {
   return (
-    <AppFrame section="calendar">
+    <AppFrame section="settings">
       <Suspense fallback={<LoadingOutline />}>
         <Holidays />
       </Suspense>

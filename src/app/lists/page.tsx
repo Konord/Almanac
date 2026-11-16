@@ -9,6 +9,7 @@ import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf, type LocalDate } from "@/lib/time";
 import { onItsList } from "@/lib/todos";
+import { panelBoxes } from "@/lib/panel-boxes";
 import { CHORE_TAGS } from "@/lib/chore-days";
 import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
 import { loadTodos, type ChoreMember } from "../chores/data";
@@ -71,6 +72,8 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const showingDone = firstParam(params.done) === "1";
+  // The lists that are boxes beside the Daily List (the Chores list's box is the chore bucket).
+  const rotation = panelBoxes(household.settings.panelBoxes, lists, false).map((b) => b.id);
 
   return (
     <>
@@ -262,7 +265,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           <form action={updateList} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={list.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <ListFields name={list.name} icon={list.icon} />
+            <ListFields name={list.name} icon={list.icon} inRotation={rotation.includes(list.is_chores ? "bucket" : list.id)} />
             <div className="sm:col-span-2">
               <Button variant="save">Save</Button>
             </div>
@@ -282,7 +285,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
         <Sheet title="New list" closeHref={returnTo}>
           <form action={addList} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="returnTo" value={returnTo} />
-            <ListFields />
+            <ListFields inRotation={false} />
             <div className="sm:col-span-2">
               <Button>Make list</Button>
             </div>
@@ -293,7 +296,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   );
 }
 
-function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
+function ListFields({ name, icon, inRotation }: { name?: string; icon?: string | null; inRotation: boolean }) {
   return (
     <>
       <label className="flex flex-col gap-1.5">
@@ -303,6 +306,11 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
       <label className="flex flex-col gap-1.5">
         <span className="text-base font-bold text-ink">Picture</span>
         <EmojiPicker initial={icon ?? ""} nameField="name" className="self-start!" fullScreen />
+      </label>
+      {/* Whether it's one of the boxes the Daily List flips to (same as Settings › Today panel). */}
+      <label className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-3 text-lg font-bold text-ink select-none sm:col-span-2">
+        <input type="checkbox" name="inRotation" defaultChecked={inRotation} className="size-6 accent-ink" />
+        Show it beside the Daily List (flip to it with the arrows)
       </label>
     </>
   );

@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireHousehold } from "@/lib/household";
+import { DEFAULT_SETTINGS, requireHousehold, type Household } from "@/lib/household";
+import { allBoxes, panelBoxes } from "@/lib/panel-boxes";
 import { createClient } from "@/lib/supabase/server";
 import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
 import { isChoreTag } from "@/lib/chore-days";
@@ -311,6 +312,28 @@ export async function clearDone(formData: FormData) {
   back(formData, "message", "Cleared the done ones.");
 }
 
+/**
+ * Puts a list in the Today panel's rotation (the boxes the Daily List flips
+ * through) or takes it out (Connor, 2026-11-16: chosen on the list itself).
+ * The Chores list's box is the chore bucket. Same as Settings › Today panel.
+ */
+async function setInRotation(household: Household, listId: string, on: boolean) {
+  const supabase = await createClient();
+  const { data: lists } = await supabase.from("task_lists").select("id, name, is_chores").order("sort_order").order("name");
+  const all = lists ?? [];
+  const boxId = all.find((l) => l.id === listId)?.is_chores ? "bucket" : listId;
+  const before = panelBoxes(household.settings.panelBoxes, all, false).map((b) => b.id);
+  if (before.includes(boxId) === on) return;
+  const wanted = new Set(on ? [...before, boxId] : before.filter((id) => id !== boxId));
+  // Keep the usual order (allBoxes); there's always at least the Daily List.
+  const next = allBoxes(all)
+    .map((b) => b.id)
+    .filter((id) => wanted.has(id));
+  const settings = { ...DEFAULT_SETTINGS, ...household.settings, panelBoxes: next.length ? next : ["today"] };
+  const { error } = await supabase.from("households").update({ settings }).eq("id", household.id);
+  if (error) throw error;
+}
+
 export async function addList(formData: FormData) {
   const household = await requireHousehold();
   const name = text(formData, "name");
@@ -322,18 +345,20 @@ export async function addList(formData: FormData) {
     .select("id")
     .single();
   if (error) back(formData, "error", error.message);
+  await setInRotation(household, data.id, formData.get("inRotation") === "on");
   refresh();
   redirect(`/lists?list=${data.id}&message=${encodeURIComponent(`Made the ${name} list.`)}`);
 }
 
 export async function updateList(formData: FormData) {
-  await requireHousehold();
+  const household = await requireHousehold();
   const id = text(formData, "id");
   const name = text(formData, "name");
   if (!name || name.length > 40) back(formData, "error", "A list needs a short name.");
   const supabase = await createClient();
   const { error } = await supabase.from("task_lists").update({ name, icon: readIcon(formData) }).eq("id", id);
   if (error) back(formData, "error", error.message);
+  await setInRotation(household, id, formData.get("inRotation") === "on");
   refresh();
   back(formData, "message", `Saved the ${name} list.`);
 }

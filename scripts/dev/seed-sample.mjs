@@ -343,8 +343,8 @@ async function seed() {
     // Done.
     task({ title: "Buy birthday card", icon: "💌", assignee_id: A, due_date: at3(-1), status: "done", completed_on: at3(-1), completed_at: at(at3(-1), "15:00").toISOString(), completed_by: A }),
     // Other lists.
-    { household_id: H, list_id: listId("Errands"), title: "Drop off dry cleaning", icon: e("👔"), assignee_id: C, due_date: at3(1), date_kind: "start" },
-    { household_id: H, list_id: listId("Errands"), title: "Return the folding chairs", assignee_id: null },
+    // Errands are chores with the Errand tag (no Errands list since 2026-11-16).
+    { household_id: H, list_id: lists.find((l) => l.is_chores).id, title: "Return the folding chairs", tags: ["errand"], assignee_id: null },
     ...["Wood screws", "Furnace filter 16×25", "Light bulbs", "Weatherstripping"].map((title, i) => ({ household_id: H, list_id: listId("Hardware"), title, assignee_id: i === 1 ? C : null })),
     ...["Swimsuits", "Snow pants", "Phone chargers", "Board games"].map((title, i) => ({ household_id: H, list_id: listId("Packing"), title, assignee_id: [S, X, C, null][i] })),
     ...["Lego set for Leo", "Wrapping paper", "Candles"].map((title) => ({ household_id: H, list_id: listId("Birthday"), title })),

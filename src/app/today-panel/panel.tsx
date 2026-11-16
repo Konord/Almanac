@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Plus } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
 import { AppAlerts } from "@/components/app-alerts";
 import { hand, strong } from "@/lib/colours";
@@ -240,14 +240,10 @@ export async function TodayPanel({
   // The chore bucket: occasional and one-off chores the planner has put on the coming days.
   const bucket = showing === "bucket" ? await bucketRows(household, today, todos) : null;
   const choresList = lists.find((l) => l.is_chores);
-  // Where the add box puts things: the list showing, or for the Daily list
-  // the first ordinary list (dated today, so it lands on the Daily list).
-  const addListId =
-    showing === "today"
-      ? (lists.find((l) => !l.is_chores && !l.is_groceries)?.id ?? null)
-      : list && !list.is_groceries
-        ? list.id
-        : null;
+  // Where the add box puts things: the list showing (not the grocery list,
+  // which has its own). The Daily List has no add box (Connor, 2026-11-16):
+  // things are added on To-do, Chores or another list.
+  const addListId = list && !list.is_groceries ? list.id : null;
   // The heading opens the box's own screen. The Daily List and the lists
   // open the Lists screen with that list picked (the Daily List: the list
   // its add box adds to); the chore bucket, the Chores list.
@@ -263,7 +259,7 @@ export async function TodayPanel({
             : showing === "bucket"
               ? listHref(choresList?.id)
               : showing === "today"
-                ? listHref(addListId)
+                ? listHref(lists.find((l) => !l.is_chores && !l.is_groceries)?.id)
                 : listHref(showing);
 
   // The dinner card: tonight's dinner (or the next meal once it's eaten),
@@ -362,18 +358,11 @@ export async function TodayPanel({
     );
   });
 
-  const addId = "panel-add";
   const heading = (
     <Link href={boxHref} className="flex min-h-12 items-center truncate text-[1.75rem] font-bold text-ink">
       {box.name}
     </Link>
   );
-  const plus = addListId ? (
-    // The + puts the cursor in the add box at the bottom of the card.
-    <label htmlFor={addId} aria-label={showing === "today" ? "Add to the Daily List" : `Add to ${box.name}`} className="flex size-[var(--touch-target)] shrink-0 cursor-pointer items-center justify-center rounded-full bg-panel text-ink">
-      <Plus size="1.5rem" weight="bold" aria-hidden />
-    </label>
-  ) : null;
   // Flipping boxes: the boxes either side, by name ("‹ Chores", "Groceries ›"),
   // so it's clear where a tap goes. No row of dots: there can be a dozen boxes.
   const boxAt = Math.max(0, boxes.findIndex((b) => b.id === showing));
@@ -416,7 +405,6 @@ export async function TodayPanel({
             {showing === "today" || (list && !groceries) ? (
               <FitList
                 heading={heading}
-                aside={plus}
                 rows={sideRows}
                 fallback={7}
                 paging="more"
@@ -426,7 +414,6 @@ export async function TodayPanel({
               <>
                 <div className="mb-1 flex min-h-12 shrink-0 items-center gap-3">
                   <h2 className="min-w-0 flex-1">{heading}</h2>
-                  {plus}
                 </div>
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   {showing === "upnext" ? null : showing === "routines" ? (
@@ -474,10 +461,9 @@ export async function TodayPanel({
                 </div>
               </>
             )}
-            {showing === "bucket" && choresList ? <AddRow id={addId} listId={choresList.id} returnTo={returnTo} label="Add a chore" tucked /> : null}
-            {showing !== "bucket" && addListId ? (
-              <AddRow id={addId} listId={addListId} returnTo={returnTo} dueDate={showing === "today" ? today : undefined} label={showing === "today" ? "Add to the Daily List" : `Add to ${box.name}`} tucked />
-            ) : null}
+            {/* To-do, Chores and the other lists add right here, like the grocery list (Connor, 2026-11-16). */}
+            {showing === "bucket" && choresList ? <AddRow listId={choresList.id} returnTo={returnTo} label="Add a chore" /> : null}
+            {showing !== "bucket" && addListId ? <AddRow listId={addListId} returnTo={returnTo} label={`Add to ${box.name}`} /> : null}
             {switcher}
           </>
         )}
