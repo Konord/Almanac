@@ -75,8 +75,11 @@ export function ScreenHeader({
   weather = false,
   action,
   toolbar,
+  middle,
   children,
 }: {
+  /** Something centred between the title and the right-hand controls (the Planner's checks). */
+  middle?: ReactNode;
   title: ReactNode;
   sub?: ReactNode;
   /** A holiday's big picture, before the title. */
@@ -91,11 +94,12 @@ export function ScreenHeader({
 }) {
   const band = (
     <header className="flex shrink-0 flex-wrap items-center gap-x-[1.15rem] gap-y-2 lg:h-28 lg:max-h-28 lg:flex-nowrap">
-      <div className="mr-auto flex min-w-0 items-baseline gap-[0.8rem] overflow-hidden">
+      <div className={`${middle ? "" : "mr-auto"} flex min-w-0 items-baseline gap-[0.8rem] overflow-hidden`}>
         {hero ? <Emoji emoji={hero} className="size-14 self-center drop-shadow-[0_0.15rem_0.4rem_rgba(0,0,0,0.3)] lg:size-24" /> : null}
         <h1 className="shrink-0 pb-[0.06em] text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
         {sub && sub !== title ? <span className="tabular min-w-0 truncate text-2xl leading-none font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">{sub}</span> : null}
       </div>
+      {middle ? <div className="flex min-w-0 flex-1 items-center justify-center gap-[0.6rem]">{middle}</div> : null}
       {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
       <div className="flex shrink-0 items-center gap-[0.6rem]">
         {weather ? <WeatherSlot /> : null}

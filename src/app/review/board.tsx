@@ -4,7 +4,7 @@ import { blocksOn, storedEaters } from "@/lib/meal-blocks";
 import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CaretLeft, CaretRight, ShoppingCart, Suitcase } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Suitcase } from "@phosphor-icons/react";
 import { Emoji, ScreenHeader, segItemClass, segTrackClass } from "@/components/ui";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { eventEmoji } from "@/lib/emoji";
@@ -315,50 +315,50 @@ export function ReviewBoard({
     <>
       <ScreenHeader
         title="Planner"
-        sub={weekHref.isComing ? "Coming week" : undefined}
+        // No "Coming week" or date range: the days are right below (Connor, 2026-11-16).
+        // The checks sit in the middle, in the same quiet type the title's second line used.
+        middle={
+          <>
+            {weekHref.isComing ? null : (
+              <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-3 text-2xl font-bold whitespace-nowrap text-accent lg:text-[2rem]">
+                The coming week
+              </button>
+            )}
+            <div className="flex min-w-0">
+              <ChecksMenu problems={problems} onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))} onLeave={(p) => change((d) => dismiss(d, p.id))} />
+            </div>
+          </>
+        }
+        // The arrows sit right beside the switch, like the calendar pages.
         nav={
           <>
-            <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
-            <span className="tabular px-[0.4rem] text-[1.5rem] font-bold whitespace-nowrap text-ink">{range}</span>
-            <WeekButton label="Week after" onClick={() => go(weekHref.next)} icon="next" />
+            <WeekButton label={`Week before (${range})`} onClick={() => go(weekHref.prev)} icon="prev" />
+            <WeekButton label={`Week after (${range})`} onClick={() => go(weekHref.next)} icon="next" />
           </>
         }
         tabs={
           <div className={segTrackClass} role="group" aria-label="Show">
-            <ViewButton on={view === "week"} onClick={() => setView("week")} label="Week" />
-            <ViewButton on={view === "chores"} onClick={() => setView("chores")} label="Chores" />
+            <ViewButton on={view === "week" && !groceries} onClick={() => { setGroceries(false); setView("week"); }} label="Week" />
+            <ViewButton on={view === "chores" && !groceries} onClick={() => { setGroceries(false); setView("chores"); }} label="Chores" />
+            {/* Groceries opens the grocery list beside the week. */}
+            <ViewButton on={groceries} onClick={() => setGroceries(true)} label="Groceries" />
           </div>
         }
         action={
-          <>
-            <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] shrink-0 items-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-[1.5rem] text-[1.25rem] font-bold whitespace-nowrap text-ink">
-              <ShoppingCart size="1.5rem" weight="bold" aria-hidden />
-              Grocery list
-            </button>
-            <SaveButton
-              dirty={dirty}
-              // A week not yet saved (so its menu isn't on the grocery list) can be saved as it is.
-              ready={!data.reviewed}
-              saving={saving || checking}
-              error={buy ? null : error}
-              onSave={() => startSave()}
-              onUndo={() => {
-                setDraft(data.initial);
-                setError(null);
-              }}
-            />
-          </>
+          <SaveButton
+            dirty={dirty}
+            // A week not yet saved (so its menu isn't on the grocery list) can be saved as it is.
+            ready={!data.reviewed}
+            saving={saving || checking}
+            error={buy ? null : error}
+            onSave={() => startSave()}
+            onUndo={() => {
+              setDraft(data.initial);
+              setError(null);
+            }}
+          />
         }
-      >
-        {weekHref.isComing ? null : (
-          <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-3 text-[1.25rem] font-bold whitespace-nowrap text-accent">
-            The coming week
-          </button>
-        )}
-        <div className="flex min-w-0">
-          <ChecksMenu problems={problems} onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))} onLeave={(p) => change((d) => dismiss(d, p.id))} />
-        </div>
-      </ScreenHeader>
+      />
 
       <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-frame bg-board sm:grid-cols-4 lg:grid-cols-7">
         {data.columns.map((col, i) => {
