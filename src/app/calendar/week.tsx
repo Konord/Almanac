@@ -17,6 +17,7 @@ import {
   monthInk,
   type ViewProps,
 } from "./views";
+import { DraggableEvent } from "@/components/draggable-event";
 import { PendingOutline, PlaceTap, WeekScroller } from "./week-scroll";
 
 /*
@@ -27,11 +28,13 @@ import { PendingOutline, PlaceTap, WeekScroller } from "./week-scroll";
  *   - each column's top is the printed weekday and date (today ringed in
  *     red) and a reserved row of up to three emoji stickers, so the hours
  *     line up across the week;
- *   - below, an hour grid that scrolls up and down (drag or swipe; that is
- *     all dragging does). Hour labels sit on the lines inside the columns.
+ *   - below, an hour grid that scrolls up and down (drag or swipe the
+ *     empty grid). Hour labels sit on the lines inside the columns.
  *     Events are compact agenda cards placed by start time, as tall as they
  *     last (at least one card), side by side where they overlap. Tap one
- *     to change it; moving it is done on its card (date and time);
+ *     to change it; drag it to move it (another time or day), drag its
+ *     bottom edge to change its length, or pull a side over more days
+ *     (SPEC "Week event dragging restored — Connor, Nov 16 2026");
  *   - meals and list tasks with a time are cards on the grid too;
  *   - past days (and today's finished things) fade to 55%, keeping colours;
  *   - a holiday's big picture fills the column behind the hours;
@@ -72,6 +75,8 @@ type GridItem = {
   /** Where its card ends (at least one card tall). */
   endMin: number;
   past: boolean;
+  /** Timed events (not point events) can be dragged: where they really are. */
+  drag?: { eventId: string; occurrenceDate: string | null; start: number; minutes: number; href: string; title: string; background: string };
   draw: (box: { short: boolean; tall: boolean }) => React.ReactNode;
 };
 
@@ -118,28 +123,36 @@ export function WeekView({
       const realEnd = isPointEvent(e) ? startMin : minutesIntoDay(new Date(e.ends_at), timeZone) || 24 * 60;
       const colours = e.member_ids.flatMap((id) => memberById.get(id)?.colour ?? []);
       const { tint, bar } = colours.length > 0 ? cardColours(colours) : { tint: "var(--color-panel)", bar: "var(--color-check-border)" };
+      const point = isPointEvent(e);
+      const body = (box: { short: boolean; tall: boolean }) => (
+        <>
+          <span aria-hidden className="absolute inset-y-0 left-0 w-[0.35rem]" style={{ background: bar }} />
+          <CardBody box={box} time={timeText(startMin, box.short)} emoji={<Emoji emoji={eventEmoji(e.icon, e.title)} className={emojiClass(box)} />}>
+            <HandText colour={monthInk(e, memberById)} className={titleClass()}>
+              {e.recurrence_rule ? <span className="sr-only">Repeats: </span> : null}
+              {e.title}
+            </HandText>
+          </CardBody>
+        </>
+      );
       items.push({
         id: e.id,
         startMin,
         endMin: Math.max(realEnd, startMin + MIN_MINUTES),
-        past: finished(isPointEvent(e) ? startMin + 1 : realEnd),
-        draw: (box) => (
-          <Link
-            href={editLink(e)}
-            scroll={false}
-            aria-label={`Edit event: ${e.title}`}
-            className={cardClass(box)}
-            style={{ background: tint }}
-          >
-            <span aria-hidden className="absolute inset-y-0 left-0 w-[0.35rem]" style={{ background: bar }} />
-            <CardBody box={box} time={timeText(startMin, box.short)} emoji={<Emoji emoji={eventEmoji(e.icon, e.title)} className={emojiClass(box)} />}>
-              <HandText colour={monthInk(e, memberById)} className={titleClass()}>
-                {e.recurrence_rule ? <span className="sr-only">Repeats: </span> : null}
-                {e.title}
-              </HandText>
-            </CardBody>
-          </Link>
-        ),
+        past: finished(point ? startMin + 1 : realEnd),
+        // Like main, a point event (a time with no length) isn't dragged; tap it to change it.
+        drag: point
+          ? undefined
+          : { eventId: e.series_id, occurrenceDate: e.occurrence_date, start: startMin, minutes: realEnd - startMin, href: editLink(e), title: `Edit event: ${e.title}`, background: tint },
+        draw: (box) =>
+          point ? (
+            <Link href={editLink(e)} scroll={false} aria-label={`Edit event: ${e.title}`} className={cardClass(box)} style={{ background: tint }}>
+              {body(box)}
+            </Link>
+          ) : (
+            // Inside a DraggableEvent, which carries the tint, the tap and the drag.
+            <span className={cardClass(box)}>{body(box)}</span>
+          ),
       });
     }
 
@@ -274,7 +287,8 @@ export function WeekView({
                 const placed = layoutDay(c.items.map((x) => ({ id: x.id, startMin: x.startMin, endMin: x.endMin })));
                 const byId = new Map(c.items.map((x) => [x.id, x]));
                 return (
-                  <div key={c.day} className="relative min-w-0">
+                  // data-drop-day: the column a dragged card lands in (the whole day tall, so drags map onto the hours).
+                  <div key={c.day} data-drop-day={c.day} className="relative min-w-0">
                     {hours.map((h) => (
                       <div key={h} aria-hidden className="pointer-events-none absolute inset-x-0 border-t border-grid" style={{ top: `${h * HOUR_REM}rem` }}>
                         {h > 0 && !labelCovered(h, c.items, c.isToday ? nowMin : null) ? (
@@ -288,6 +302,34 @@ export function WeekView({
                       const item = byId.get(p.id)!;
                       const short = p.lanes >= 2;
                       const tall = p.endMin - p.startMin > MIN_MINUTES;
+                      const lane = {
+                        left: `calc(${(p.lane / p.lanes) * 100}% + 0.4rem)`,
+                        width: `calc(${100 / p.lanes}% - ${p.lane === p.lanes - 1 ? 0.8 : 0.5}rem)`,
+                      };
+                      const card = item.past ? <div className="flex size-full opacity-55">{item.draw({ short, tall })}</div> : item.draw({ short, tall });
+                      if (item.drag) {
+                        return (
+                          <DraggableEvent
+                            key={p.id}
+                            href={item.drag.href}
+                            eventId={item.drag.eventId}
+                            occurrenceDate={item.drag.occurrenceDate}
+                            day={c.day}
+                            week={days}
+                            start={item.drag.start}
+                            minutes={item.drag.minutes}
+                            hourRem={HOUR_REM}
+                            minMinutes={MIN_MINUTES}
+                            gapRem={GAP_REM}
+                            title={item.drag.title}
+                            className="absolute z-[1] flex rounded-[var(--radius)] outline-accent focus-visible:outline-2"
+                            // A faded card sits on its day's wash (so hour lines don't show through); the tint fades with it.
+                            style={{ ...lane, background: item.past ? wash(c) : item.drag.background }}
+                          >
+                            {item.past ? <div className="flex size-full rounded-[var(--radius)] opacity-55" style={{ background: item.drag.background }}>{item.draw({ short, tall })}</div> : card}
+                          </DraggableEvent>
+                        );
+                      }
                       return (
                         <div
                           key={p.id}
@@ -297,11 +339,10 @@ export function WeekView({
                             background: item.past ? wash(c) : undefined,
                             top: `${(p.startMin / 60) * HOUR_REM + GAP_REM}rem`,
                             height: `${((p.endMin - p.startMin) / 60) * HOUR_REM - 2 * GAP_REM}rem`,
-                            left: `calc(${(p.lane / p.lanes) * 100}% + 0.4rem)`,
-                            width: `calc(${100 / p.lanes}% - ${p.lane === p.lanes - 1 ? 0.8 : 0.5}rem)`,
+                            ...lane,
                           }}
                         >
-                          {item.past ? <div className="flex size-full opacity-55">{item.draw({ short, tall })}</div> : item.draw({ short, tall })}
+                          {card}
                         </div>
                       );
                     })}

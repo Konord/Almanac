@@ -6,9 +6,11 @@ import { updatePending, usePending } from "@/components/pending-store";
 
 /*
  * The browser-side bits of the Week hour grid (SPEC "Connor's decisions —
- * Nov 15 2026"). Dragging on the grid only scrolls the hours: a finger
- * scrolls it natively, and a mouse can drag it the same way. Nothing on the
- * grid moves or resizes; events are changed by tapping them.
+ * Nov 15 2026", corrected Nov 16). Dragging the empty grid scrolls the
+ * hours: a finger scrolls it natively, and a mouse can drag it the same way.
+ * Event cards are DraggableEvents: they stop their own press from reaching
+ * the scroller, and are touch-action: none so a finger on a card drags the
+ * card instead of scrolling.
  */
 
 /** How far a press can wander and still count as a tap. */

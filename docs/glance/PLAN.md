@@ -29,7 +29,7 @@ Every section below is **done** and committed on `glance-redesign`. `npm run lin
 - **Spec-only animations** (e.g. the list scratch-off) are done simply or left as hooks.
 
 **Deviations and things not kept**
-- **Event drag, stretch and resize are gone** from Today and Week (Connor, Nov 15 decision b). This removed `draggable-event`, `stretch-bar`, `pending-block`, `place-on-timeline`, `place-across-people`, and the `rescheduleEvent`, `stretchEventDays` and `changeEventPeople` actions. Moving events, changing their days and changing who they're for are all done on the edit sheet. Tapping an empty hour on Week still starts an event there. Routine blocks on the Routines grid still drag and resize.
+- **Event drag, stretch and resize: Week only** (Connor, Nov 15 decision b, corrected Nov 16). Today/Agenda and Month have no event dragging; `stretch-bar`, `place-on-timeline`, `place-across-people`, `pending-block` and `changeEventPeople` stay removed. On Week, `draggable-event` and main's `rescheduleEvent` / `stretchEventDays` actions are restored: drag a card to move it (time and day, 15-min snap), drag its bottom edge to resize, pull a side over more days. A tap still opens the edit sheet; tapping an empty hour still starts an event; dragging the empty grid scrolls the hours. Routine blocks on the Routines grid still drag and resize.
 - **No header clock** (locked spec): "Now 8:40" on the Agenda is the time, so `HeaderClock` was removed.
 - **No avatars:** the last `Avatar` uses (people filter, routine checklist, Health box, chores rows) became colour dots, and `Avatar` was removed from `ui.tsx`.
 - **No progress bars off Habits/Health:** the routine checklist shows "2 of 5 done" instead of a bar, and `ProgressBar` was removed.
@@ -69,7 +69,7 @@ How each step works: port the mock's values (rem sizes, colours, spacing) into t
   - People filter (Everyone): moves into a header popover.
   - Per-person routine progress and routine chains/blocks on the day: shown as Daily List rows and as compact routine cards in the timeline. The data is unchanged.
   - Tap routine → checklist: kept.
-  - Quick add / `PlaceAcrossPeople` / pending blocks / drag to move events: the Add button and tap-to-edit keep these. Drag stays on Week.
+  - Quick add / `PlaceAcrossPeople` / pending blocks / drag to move events: the Add button and tap-to-edit keep these. Event drag is on Week only (none on Today/Agenda).
   - Survival card, timers, the panel's box pager (Daily List / lists / habits / health / Spotify): kept as panel boxes with Glance styling.
   - Ribbon for birthdays and holidays: becomes the header hero (holiday) or the strip (birthday).
   - `WallRefresh`, `RememberDisplay`, screen saver: untouched.
@@ -88,14 +88,14 @@ How each step works: port the mock's values (rem sizes, colours, spacing) into t
 ## 4. Week (`/calendar?view=week`)
 - **Mock and spec:** `g-final-week.html`, plus "LOCKED style: week view" and "Week view: LOCKED (spec fixes)".
 - **What the screen shows (built; Connor's Nov 15 decisions override the stacked-cards mock):**
-  - Seven edge-to-edge columns on an **hour grid** that scrolls vertically (drag or swipe; that's all dragging does). Hour labels sit on the lines inside the columns. Compact agenda cards placed by start time, as tall as they last (at least one card), side by side when they overlap. Every column reserves a sticker row. Past days (and today's finished things) fade to 55%, keeping their colours.
+  - Seven edge-to-edge columns on an **hour grid** that scrolls vertically (drag or swipe the empty grid; dragging a card moves it). Hour labels sit on the lines inside the columns. Compact agenda cards placed by start time, as tall as they last (at least one card), side by side when they overlap. Every column reserves a sticker row. Past days (and today's finished things) fade to 55%, keeping their colours.
   - Holiday emoji behind the hours, and the Now line in today's column.
   - When the Daily List opens, two day columns are dropped: past days first.
 - **Parity:**
   - Week meal blocks: meal cards on the grid (tap: Cooking Mode).
   - Timed list tasks (`TodoPoint`): task cards (tap: the list).
   - Breaks and all-day/multi-day events: stickers on each day they cover. Routine progress (`PeopleRow`): in the Daily List panel (no progress bars on calendar pages).
-  - Drag/stretch/resize (`draggable-event`, `stretch-bar`, `side-handles` on Week): **removed** (Connor, Nov 15). Moves are done on the edit card.
+  - Drag/stretch/resize (`draggable-event`, `side-handles`, `timeline-drag` on Week): **restored** (Connor, Nov 16): move (time and day), resize the bottom edge, stretch over days. The all-day `stretch-bar` row is not back (all-day things are stickers).
 
 ## 5. Daily List panel and Lists (`/lists`)
 - **Mock:** `g-final-lists.html`, plus the spec's "Lists".

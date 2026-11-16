@@ -26,6 +26,24 @@ Mock: `g-final-tray.html`.
 
 ---
 
+## Calendar → Week — `calendar/week.tsx`, `calendar/week-scroll.tsx`, `components/draggable-event.tsx`
+
+Live (main): a timeline per day; event blocks drag up/down (15-minute snap) and sideways to another day, the bottom edge resizes, side handles stretch an event over more days (multi-day); a tap opens the edit sheet; tapping an empty time starts an event. Saved by `rescheduleEvent` / `stretchEventDays`.
+
+| Live feature | Glance |
+| --- | --- |
+| Drag an event to another time (15-min snap) | Yes (restored Nov 16, Connor) |
+| Drag an event to another day | Yes (across the days shown; with the Daily List open, the five visible days) |
+| Drag the bottom edge to change length | Yes |
+| Side handles stretch over more days | Yes (the event then shows in the sticker row as multi-day; shorten it on the edit sheet) |
+| Tap an event opens the edit sheet | Yes |
+| Tap an empty hour starts an event | Yes |
+| Drag the empty grid | Scrolls the hours (Glance addition) |
+| Point events (time, no length) | Tap to edit; not dragged (as main) |
+| Today / Agenda, Month dragging | N/A — none (SPEC Nov 16) |
+
+---
+
 ## Add / edit event sheet — `calendar/forms.tsx`, `calendar/when-fields.tsx`, `calendar/adding.tsx`
 
 Live Event tab: emoji picker, title (What), WhenFields (date, start, length dial, end; all-day switch; end on a later day = multi-day), person stickers, day-kind chips. Repeats tab: none/daily/weekly/monthly/yearly plus repeat details. More tab: notes, visibility (everyone / adults / just me). Heads-ups tab when **editing**. Adding also has ready-made templates across the top, “Add and save as a template”, and QuickAddSheet from Planner Plans +. No location field in live CardDefaults.
