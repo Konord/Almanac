@@ -13,7 +13,8 @@
  *   keyboard don't), and it hides again after a few seconds. Tapping it
  *   closes the app and brings Almanac back;
  * - brings Almanac back by itself when an app is closed the normal way;
- * - turns the screen off overnight when the art screen saver asks.
+ * - turns the screen off overnight when the art screen saver asks;
+ * - sets the monitor's brightness over DDC/CI (ddcutil) for the tray's slider.
  *
  * It works on both of Ubuntu's desktops. On Xorg it uses wmctrl, xset and
  * pill.py. On Wayland (Ubuntu 25.10 and newer have nothing else) a program
@@ -24,14 +25,27 @@
  * (Node 22.18 or newer runs TypeScript files directly.)
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { createReadStream, readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { corsHeaders, EVENT_SIZE, parseConfig, planLaunch, touchDowns, touchscreenEvents, type Config, type Plan } from "./lib.ts";
+import {
+  corsHeaders,
+  ddcutilCommand,
+  EVENT_SIZE,
+  fromPercent,
+  parseBrightness,
+  parseConfig,
+  planLaunch,
+  toPercent,
+  touchDowns,
+  touchscreenEvents,
+  type Config,
+  type Plan,
+} from "./lib.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const configPath = process.argv[2] ?? join(here, "launcher.config.json");
@@ -252,6 +266,69 @@ function setScreen(on: boolean) {
 }
 
 // ---------------------------------------------------------------------------
+// Brightness: the monitor's own setting, over the video cable (DDC/CI)
+// ---------------------------------------------------------------------------
+
+/** The monitor's brightness now (null: not read yet, or this monitor can't). */
+let brightness: { raw: number; max: number } | null = null;
+/** False once ddcutil has said this monitor can't be set, so Almanac hides the slider. */
+let brightnessWorks = true;
+
+function ddcutil(command: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(command[0], command.slice(1), { timeout: 10_000 }, (error, stdout, stderr) => {
+      if (error) reject(new Error((stderr || error.message).trim().split("\n")[0]));
+      else resolve(stdout);
+    });
+  });
+}
+
+async function readBrightness(): Promise<void> {
+  try {
+    const found = parseBrightness(await ddcutil(ddcutilCommand(config)));
+    if (!found) throw new Error("the monitor didn't say its brightness");
+    brightness = found;
+    brightnessWorks = true;
+  } catch (e) {
+    brightness = null;
+    brightnessWorks = false;
+    log(`Can't read the monitor's brightness (${(e as Error).message}). Is ddcutil installed, and does "ddcutil getvcp 10" work? See README.md.`);
+  }
+}
+
+/*
+ * Setting it takes ddcutil a moment (a quarter to half a second), and the
+ * slider asks many times while a finger drags. So only one runs at a time,
+ * and only the newest ask waits: the ones in between are skipped.
+ */
+let setting = false;
+let waiting: number | null = null;
+
+async function setBrightness(raw: number): Promise<void> {
+  if (setting) {
+    waiting = raw;
+    return;
+  }
+  setting = true;
+  try {
+    await ddcutil(ddcutilCommand(config, raw));
+    if (brightness) brightness = { ...brightness, raw };
+  } catch (e) {
+    log(`Couldn't set the brightness: ${(e as Error).message}`);
+  } finally {
+    setting = false;
+  }
+  if (waiting !== null) {
+    const next = waiting;
+    waiting = null;
+    await setBrightness(next);
+  }
+}
+
+/** The brightness as Almanac sees it: a percent, or null when this monitor can't. */
+const brightnessPercent = () => (brightnessWorks && brightness ? toPercent(brightness.raw, brightness.max) : null);
+
+// ---------------------------------------------------------------------------
 // Talking to Almanac
 // ---------------------------------------------------------------------------
 
@@ -293,7 +370,8 @@ const server = createServer(async (req, res) => {
   }
   if (req.method === "GET" && path === "/hello") {
     const programs = Object.entries(config.programs).map(([key, p]) => ({ key, name: p.name }));
-    return send(res, 200, cors, { ok: true, version: 1, programs, open: current?.plan.label ?? null });
+    // version 2: brightness (a percent, or null when this monitor can't be set).
+    return send(res, 200, cors, { ok: true, version: 2, programs, open: current?.plan.label ?? null, brightness: brightnessPercent() });
   }
   // Anything that does something must come from Almanac's page.
   if (req.method === "POST" && !allowed) return send(res, 403, {}, "Not from Almanac.");
@@ -316,6 +394,21 @@ const server = createServer(async (req, res) => {
     setScreen(on);
     return send(res, 200, cors, { ok: true });
   }
+  if (req.method === "GET" && path === "/brightness") {
+    // Read it fresh (someone may have used the monitor's own buttons), unless it's being set right now.
+    if (!setting) await readBrightness();
+    return send(res, 200, cors, { ok: true, brightness: brightnessPercent() });
+  }
+  if (req.method === "POST" && path === "/brightness") {
+    // The tray's slider: { percent: 0 to 100 }. Answers straight away; the monitor follows a moment later.
+    if (!brightness) await readBrightness();
+    if (!brightness) return send(res, 409, cors, "This monitor's brightness can't be set from here.");
+    const body = await readBody(req);
+    const raw = fromPercent(body && typeof body === "object" ? (body as { percent?: unknown }).percent : undefined, brightness.max);
+    if (raw === null) return send(res, 400, cors, "Brightness should be a percent.");
+    void setBrightness(raw);
+    return send(res, 200, cors, { ok: true, brightness: toPercent(raw, brightness.max) });
+  }
   if (req.method === "POST" && path === "/home") {
     goHome();
     return send(res, 200, cors, { ok: true });
@@ -328,6 +421,9 @@ server.listen(config.port, "127.0.0.1", () => {
   log(`Almanac launcher listening on http://127.0.0.1:${config.port} for ${config.almanacOrigins.join(", ")} (${wayland ? "Wayland: using the GNOME Shell extension" : "Xorg"})`);
   pill.start();
   watchTouchscreens();
+  void readBrightness().then(() => {
+    if (brightness) log(`Monitor brightness is ${brightnessPercent()}%`);
+  });
   // A touchscreen plugged in later (or after a sleep) is picked up too.
   setInterval(watchTouchscreens, 30_000);
 });

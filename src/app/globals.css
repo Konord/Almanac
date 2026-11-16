@@ -56,6 +56,8 @@
   --color-now-on-tint: var(--color-now-on-tint, #a3261a);
   --color-meal: var(--color-meal, #fbedb5);
   --color-meal-ink: var(--color-meal-ink, #5e4806);
+  --color-sun: var(--color-sun, #f8d96b);
+  --color-sun-ink: var(--color-sun-ink, #5e4806);
   --color-met: var(--color-met, #3d8b37);
   --color-met-soft: var(--color-met-soft, #d8f0d2);
   --color-missed: var(--color-missed, #d9533f);

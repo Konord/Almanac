@@ -19,7 +19,8 @@ export type HelperProgram = { key: string; name: string };
 
 type State = {
   /** Null until the first look; false when there's no helper here. */
-  helper: false | null | { programs: HelperProgram[]; open: string | null };
+  /** brightness: the monitor's brightness in percent, or null when the helper can't set it (or is older). */
+  helper: false | null | { programs: HelperProgram[]; open: string | null; brightness: number | null };
   apps: LauncherApp[];
   locale: string;
   timeZone: string;
@@ -52,7 +53,9 @@ async function findHelper(): Promise<State["helper"]> {
           ) as HelperProgram[])
         : [];
     const open = body && typeof body === "object" && typeof (body as { open?: unknown }).open === "string" ? (body as { open: string }).open : null;
-    return { programs, open };
+    const b = body && typeof body === "object" ? (body as { brightness?: unknown }).brightness : null;
+    const brightness = typeof b === "number" && b >= 0 && b <= 100 ? b : null;
+    return { programs, open, brightness };
   } catch {
     return false;
   }
@@ -130,4 +133,39 @@ export async function launchApp(app: LauncherApp): Promise<boolean> {
 
 export function clearLaunchProblem() {
   set({ problem: null });
+}
+
+/*
+ * The monitor's brightness (2026-11-16), set by the helper over the video
+ * cable (DDC/CI). A finger dragging the slider asks many times a second,
+ * but the monitor takes a moment for each change, so it's sent at most
+ * every BRIGHTNESS_EVERY_MS, and always once more at the end.
+ */
+const BRIGHTNESS_EVERY_MS = 250;
+let lastSent = 0;
+let pending: ReturnType<typeof setTimeout> | null = null;
+
+async function sendBrightness(percent: number) {
+  lastSent = Date.now();
+  try {
+    await fetch(`${HELPER_URL}/brightness`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ percent }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch {
+    // The helper didn't answer: the next refresh shows what the monitor really is.
+  }
+}
+
+/** Sets the monitor's brightness (0 to 100). final: the finger has let go, so send it now. */
+export function setBrightness(percent: number, final = false) {
+  const value = Math.round(Math.min(100, Math.max(0, percent)));
+  if (state.helper) set({ helper: { ...state.helper, brightness: value } });
+  if (pending) clearTimeout(pending);
+  pending = null;
+  const wait = BRIGHTNESS_EVERY_MS - (Date.now() - lastSent);
+  if (final || wait <= 0) void sendBrightness(value);
+  else pending = setTimeout(() => void sendBrightness(value), wait);
 }

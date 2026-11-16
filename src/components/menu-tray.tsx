@@ -10,6 +10,7 @@ import { soft } from "@/lib/colours";
 import { MAX_APPS, type LauncherApp } from "@/lib/launcher";
 import { emojiImage } from "@/lib/emoji";
 import { DownSince } from "./down-since";
+import { BrightnessSlider } from "./brightness-slider";
 import { useEdgeSwipe, useSwipeAway } from "./edge-swipe";
 import type { Icon } from "@phosphor-icons/react";
 
@@ -28,6 +29,9 @@ import type { Icon } from "@phosphor-icons/react";
  * further up (or tap the handle) and it grows to show the apps,
  * like a phone's home screen. Only the kitchen PC runs the launcher
  * helper, so only it gets the second tier (see launcher-store.ts).
+ *
+ * The kitchen screen also gets a brightness slider above the section
+ * buttons (2026-11-16), when its monitor can be set over the video cable.
  */
 
 export type Section = "today" | "calendar" | "chores" | "lists" | "routines" | "habits" | "meals" | "review" | "settings";
@@ -202,6 +206,8 @@ export function MenuTray({ section }: { section: Section }) {
             <div aria-hidden className="mt-2 h-0.5 w-full bg-frame" />
           </section>
         ) : null}
+
+        {launcher.helper && launcher.helper.brightness !== null ? <BrightnessSlider value={launcher.helper.brightness} /> : null}
 
         <div className="flex gap-2">
           {ITEMS.map(({ section: s, href, label, icon: IconComponent }) => {

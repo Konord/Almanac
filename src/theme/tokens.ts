@@ -58,6 +58,9 @@ export type ThemeTokens = {
     /** Meal chips and the dinner card */
     meal: string;
     mealInk: string;
+    /** The tray's brightness slider: its filled part and the sun on it */
+    sun: string;
+    sunInk: string;
     /** Habits: a met day (green tick), and the short bars on a count chart */
     met: string;
     metSoft: string;
@@ -155,6 +158,8 @@ export const brightTheme: Theme = {
       nowOnTint: "#A3261A",
       meal: "#FBEDB5",
       mealInk: "#5E4806",
+      sun: "#F8D96B",
+      sunInk: "#5E4806",
       met: "#3D8B37",
       metSoft: "#D8F0D2",
       missed: "#D9533F",

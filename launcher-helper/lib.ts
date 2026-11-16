@@ -29,6 +29,11 @@ export type Config = {
   touchscreen: string;
   pill: { corner: "bottom-left" | "bottom-right" | "top-left" | "top-right"; hideAfterSeconds: number };
   programs: Record<string, Program>;
+  /**
+   * The monitor's brightness, set over DDC/CI with ddcutil (2026-11-16).
+   * display: which monitor, as `ddcutil detect` numbers them (null: the only one).
+   */
+  brightness: { command: string[]; display: number | null };
 };
 
 export const DEFAULTS: Config = {
@@ -40,6 +45,7 @@ export const DEFAULTS: Config = {
   touchscreen: "auto",
   pill: { corner: "bottom-left", hideAfterSeconds: 4 },
   programs: {},
+  brightness: { command: ["ddcutil"], display: null },
 };
 
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "string" && x.length > 0);
@@ -50,7 +56,7 @@ const CORNERS = ["bottom-left", "bottom-right", "top-left", "top-right"] as cons
 export function parseConfig(raw: unknown): { config: Config } | { error: string } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "The config should be a JSON object." };
   const r = raw as Record<string, unknown>;
-  const config: Config = { ...DEFAULTS, pill: { ...DEFAULTS.pill }, programs: {} };
+  const config: Config = { ...DEFAULTS, pill: { ...DEFAULTS.pill }, programs: {}, brightness: { ...DEFAULTS.brightness } };
 
   if (r.port !== undefined) {
     if (typeof r.port !== "number" || !Number.isInteger(r.port) || r.port < 1024 || r.port > 65535) return { error: "port should be a number from 1024 to 65535." };
@@ -96,6 +102,18 @@ export function parseConfig(raw: unknown): { config: Config } | { error: string 
         ...(v.close ? { close: v.close as string[] } : {}),
         ...(v.handsOff === true ? { handsOff: true } : {}),
       };
+    }
+  }
+  if (r.brightness !== undefined) {
+    const b = r.brightness as Record<string, unknown>;
+    if (!b || typeof b !== "object" || Array.isArray(b)) return { error: "brightness should be an object." };
+    if (b.command !== undefined) {
+      if (!isStrings(b.command)) return { error: 'brightness.command should be a command, like ["ddcutil"].' };
+      config.brightness.command = b.command;
+    }
+    if (b.display !== undefined && b.display !== null) {
+      if (typeof b.display !== "number" || !Number.isInteger(b.display) || b.display < 1 || b.display > 9) return { error: "brightness.display should be a monitor number from `ddcutil detect`, like 1." };
+      config.brightness.display = b.display;
     }
   }
   return { config };
@@ -199,4 +217,40 @@ export function touchDowns(bytes: Uint8Array): number {
     if (type === EV_KEY && code === BTN_TOUCH && value === 1) downs += 1;
   }
   return downs;
+}
+
+/*
+ * The monitor's brightness (2026-11-16). Monitors that speak DDC/CI take
+ * settings over the video cable, the same ones as the buttons on the
+ * monitor's own menu. ddcutil (sudo apt install ddcutil) does the talking.
+ * Brightness is setting (VCP code) 10.
+ */
+export const BRIGHTNESS_VCP = "10";
+
+/** The ddcutil command to read (value undefined) or set the brightness. */
+export function ddcutilCommand(config: Config, raw?: number): string[] {
+  const which = config.brightness.display ? ["--display", String(config.brightness.display)] : [];
+  // --brief: one line that's easy to read back. --noverify: don't read it back after setting (twice as fast).
+  return raw === undefined
+    ? [...config.brightness.command, ...which, "--brief", "getvcp", BRIGHTNESS_VCP]
+    : [...config.brightness.command, ...which, "--noverify", "setvcp", BRIGHTNESS_VCP, String(raw)];
+}
+
+/** Reads `ddcutil --brief getvcp 10` ("VCP 10 C 50 100": now 50 of 100). */
+export function parseBrightness(text: string): { raw: number; max: number } | null {
+  const m = /^VCP\s+10\s+C\s+(\d+)\s+(\d+)\s*$/im.exec(text);
+  if (!m) return null;
+  const raw = Number(m[1]);
+  const max = Number(m[2]);
+  return max > 0 && raw <= max ? { raw, max } : null;
+}
+
+/** The monitor's own number as a percent (most monitors count to 100 anyway). */
+export const toPercent = (raw: number, max: number) => Math.round((raw / max) * 100);
+
+/** A percent asked for by Almanac, as the monitor's own number, or null if it isn't one. */
+export function fromPercent(asked: unknown, max: number): number | null {
+  if (typeof asked !== "number" || !Number.isFinite(asked)) return null;
+  const percent = Math.min(100, Math.max(0, asked));
+  return Math.round((percent / 100) * max);
 }

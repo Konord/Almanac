@@ -24,6 +24,11 @@ never show the apps.
   monitor to sleep. A touch wakes it. It never does this while an app is
   open.
 
+- **Screen brightness.** The menu tray gets a brightness slider. It changes
+  the monitor's own backlight (the same setting as the buttons on the
+  monitor), sent over the video cable with **DDC/CI**, using `ddcutil`. If
+  the monitor can't do that, the slider just doesn't show.
+
 The up checks and the "isn't answering" heads-up are done by Almanac itself
 (Settings › Apps), not by this helper.
 
@@ -48,6 +53,11 @@ Either way it needs:
   `sudo apt install -y nodejs`.
 - Chromium (`sudo snap install chromium`) for Almanac itself and for the web
   apps.
+- For the brightness slider: `sudo apt install ddcutil`, and DDC/CI switched
+  on in the monitor's own menu (most have it on already). Check it with
+  `ddcutil getvcp 10`: it should say the brightness, like `current value = 50`.
+  If it says permission denied, run `sudo usermod -aG i2c $USER` and sign out
+  and back in.
 
 ## Setting it up
 
@@ -112,6 +122,10 @@ Either way it needs:
   `top-right`). How long it stays: `"hideAfterSeconds": 4`.
 - If the pill reacts to the wrong device, set `"touchscreen"` to part of the
   touchscreen's name (see `cat /proc/bus/input/devices`).
+- Brightness, if there's more than one monitor: `"brightness": { "display": 2 }`
+  (the number `ddcutil detect` gives it). The helper's log
+  (`journalctl --user -u almanac-launcher`) says what brightness it read when
+  it started, or why it couldn't.
 - Each web app keeps its own sign-in in `~/almanac-launcher/profiles/`.
   Deleting a folder there signs that app out.
 
