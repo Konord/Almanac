@@ -2,18 +2,19 @@
 
 import { Pager } from "@/components/pager";
 import { useEffect, useState, type ReactNode } from "react";
-import { GearSix, HouseLine, Plus, SignOut, SquaresFour, UserCircle, UsersThree } from "@phosphor-icons/react";
-import { Avatar, Card, EmptyState, ScreenHeader, SoftLink, segItemClass, segTrackClass } from "@/components/ui";
+import { HouseLine, Plus, SignOut } from "@phosphor-icons/react";
+import { ColourDot, EmptyState, ScreenHeader, SoftLink, Toggle, editorInputClass, secondaryActionClass, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { PERSON_COLOURS, strong } from "@/lib/colours";
 import type { PanelBox } from "@/lib/panel-boxes";
+import type { SoundSettings } from "@/lib/sounds";
 import { signOut } from "@/app/login/actions";
 import { useSearchParams } from "next/navigation";
 import { saveHousehold } from "./actions";
 import { AppsTab } from "./apps-tab";
-import { Choice } from "./fields";
+import { Field, SettingsCard, chipClass } from "./fields";
 import { ScreenSaverTab, type ArtOverview, type ScreenSaverView } from "./screen-saver-tab";
 import { SpotifyTab, type SpotifyInfo } from "./spotify-tab";
 import { setScreenSaverHere, useScreenSaverHere } from "@/components/screen-saver-here";
@@ -21,11 +22,19 @@ import { useLauncher } from "@/components/launcher-store";
 import type { MemberDraft, SettingsDraft } from "./draft";
 
 /*
- * Settings (rebuilt 2026-11-10 so nothing scrolls and there's one Save):
- * tabs. People: everyone on the left, the one you tap on the right.
- * Household: the household's settings as big chips. Apps: the kitchen
- * screen's apps (2026-11-11, apps-tab.tsx). Every change waits
- * for Save in the header; leaving with changes asks first.
+ * Settings (Glance, g-final-settings.html). Tabs in the header's tab slot:
+ * People | Household | Apps | Screen saver | Spotify, and one Save at the
+ * far right. Nothing scrolls.
+ *
+ *   - Household (the mock): the people column on the left (colour dots,
+ *     no avatars, and the picked person's editor under the list), then
+ *     four cards: Household, Calendar, Today panel, Sounds and themes.
+ *   - People: the same people and editor with more room (the list on the
+ *     left, the person on the right).
+ *   - Apps, Screen saver, Spotify: their own tabs (apps-tab.tsx,
+ *     screen-saver-tab.tsx, spotify-tab.tsx).
+ *
+ * Every change waits for Save; leaving with changes asks first.
  */
 
 type Tab = "people" | "household" | "apps" | "screen" | "spotify";
@@ -38,22 +47,14 @@ type Tab = "people" | "household" | "apps" | "screen" | "spotify";
 type Place = { tab: Tab; view: ScreenSaverView; selected: string | null; page: number };
 let placeAfterSave: Place | null = null;
 const PER_PAGE = 7;
+/** Rows of people in the Household tab's narrow column (the mock shows four). */
+const COLUMN_ROWS = 4;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** A time field a little smaller than other fields, so two fit side by side. */
+const timeInputClass = `${editorInputClass} !px-3 !text-[1.25rem]`;
 
 let counter = 0;
 const newId = () => `new-${Date.now()}-${counter++}`;
-
-const inputClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink outline-none focus:border-accent";
-
-function TextField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <label className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-base font-bold text-ink">{label}</span>
-      {children}
-      {hint ? <span className="text-base text-ink-muted">{hint}</span> : null}
-    </label>
-  );
-}
 
 export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { initial: SettingsDraft; boxes: PanelBox[]; mealTimes: { id: string; name: string }[]; art: ArtOverview; spotify: SpotifyInfo }) {
   const [draft, setDraft] = useState<SettingsDraft>(initial);
@@ -67,6 +68,7 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
   const [view, setView] = useState<ScreenSaverView>(kept?.view ?? "when");
   const [selected, setSelected] = useState<string | null>(kept && initial.members.some((m) => m.id === kept.selected) ? kept.selected : (initial.members[0]?.id ?? null));
   const [page, setPage] = useState(kept?.page ?? 0);
+  const [columnPage, setColumnPage] = useState(0);
   const [listRef, perPage] = useFitRows<HTMLUListElement>(PER_PAGE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
     setError(null);
     setDraft((d) => ({ ...d, ...changes }));
   };
+  const setSounds = (changes: Partial<SoundSettings>) => set({ sounds: { ...draft.sounds, ...changes } });
   const setMember = (id: string, changes: Partial<MemberDraft>) => {
     setError(null);
     setDraft((d) => ({ ...d, members: d.members.map((m) => (m.id === id ? { ...m, ...changes } : m)) }));
@@ -120,12 +123,42 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
     set({ members: [...draft.members, { id, name: "", role: "child", colour, icon: null, birthYear: null, hasPin: false, pin: "", pinAgain: "", removed: false }] });
     setSelected(id);
     setPage(Math.floor(draft.members.length / perPage));
+    setColumnPage(Math.floor(draft.members.length / COLUMN_ROWS));
   };
 
-  const pages = Math.max(1, Math.ceil(draft.members.length / perPage));
-  const p = Math.min(page, pages - 1);
-  const shown = draft.members.slice(p * perPage, (p + 1) * perPage);
   const member = draft.members.find((m) => m.id === selected);
+  const changeMember = (c: Partial<MemberDraft>) => {
+    if (!member) return;
+    // Someone added and taken away before saving just goes.
+    if (c.removed && member.id.startsWith("new-")) {
+      set({ members: draft.members.filter((m) => m.id !== member.id) });
+      setSelected(null);
+    } else setMember(member.id, c);
+  };
+
+  const removeButton = (short: boolean) =>
+    member ? (
+      member.removed ? (
+        <button type="button" onClick={() => changeMember({ removed: false })} className={secondaryActionClass}>
+          Keep {short ? "them" : member.name || "them"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => changeMember({ removed: true })}
+          aria-label={`Remove ${member.name || "this person"}`}
+          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center rounded-[var(--radius)] border-2 border-danger px-5 text-lg font-bold whitespace-nowrap text-danger"
+        >
+          {short ? "Remove" : `Remove ${member.name || "this person"}`}
+        </button>
+      )
+    ) : null;
+  const addButton = (
+    <button type="button" onClick={addPerson} className={secondaryActionClass}>
+      <Plus size="1.25rem" weight="bold" aria-hidden />
+      Add someone
+    </button>
+  );
 
   return (
     <>
@@ -152,141 +185,165 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
         <AppsTab apps={draft.apps} onChange={(apps) => set({ apps })} />
       ) : tab === "people" ? (
         <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <Card
-            title="People"
-            icon={UsersThree}
-            tint="blue"
-            aside={
-              <Pager page={p} pages={pages} onPage={setPage} />
-            }
-          >
-            <ul ref={listRef} className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-              {shown.map((m) => (
-                <li key={m.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(m.id)}
-                    aria-pressed={selected === m.id}
-                    className={`flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl px-3 text-left ${selected === m.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"} ${m.removed ? "opacity-50" : ""}`}
-                  >
-                    <Avatar name={m.name || "?"} colour={m.colour} icon={m.icon} />
-                    <span className={`min-w-0 flex-1 truncate text-xl font-bold text-ink ${m.removed ? "line-through" : ""}`}>{m.name || "New person"}</span>
-                    <span className="shrink-0 text-base text-ink-muted">
-                      {m.removed ? "Removed when you save" : m.role === "parent" ? (m.hasPin || m.pin ? "Parent · PIN set" : "Parent") : "Child"}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <button type="button" onClick={addPerson} className="mt-3 flex min-h-[var(--touch-target)] items-center gap-2 self-start rounded-2xl bg-rail px-5 text-lg font-bold text-ink hover:bg-panel">
-              <Plus size="1.25rem" weight="bold" aria-hidden />
-              Add someone
-            </button>
-          </Card>
-
-          <Card title={member ? member.name || "New person" : "Person"} icon={UserCircle} tint={member?.colour ?? "slate"}>
+          <PeopleList
+            members={draft.members}
+            selected={selected}
+            onSelect={setSelected}
+            page={page}
+            perPage={perPage}
+            onPage={setPage}
+            listRef={listRef}
+            footer={<div className="mt-3 flex">{addButton}</div>}
+          />
+          <SettingsCard title={member ? member.name || "New person" : "Person"}>
             {member ? (
-              <PersonEditor
-                key={member.id}
-                member={member}
-                onChange={(c) => {
-                  // Someone added and taken away before saving just goes.
-                  if (c.removed && member.id.startsWith("new-")) {
-                    set({ members: draft.members.filter((m) => m.id !== member.id) });
-                    setSelected(null);
-                  } else setMember(member.id, c);
-                }}
-              />
+              <div className="flex min-h-0 max-w-[48rem] flex-1 flex-col">
+                <PersonFields key={member.id} member={member} onChange={changeMember} />
+                <div className="mt-auto flex justify-end pt-4">{removeButton(false)}</div>
+              </div>
             ) : (
               <EmptyState emoji="👋" />
             )}
-          </Card>
+          </SettingsCard>
         </div>
       ) : (
-        <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-2">
-          <Card title="Household" icon={HouseLine} tint="slate">
-            <div className="mt-2 flex flex-col gap-4">
-              <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
-                <TextField label="Name">
-                  <input value={draft.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} className={inputClass} />
-                </TextField>
-                <TextField label="Currency">
-                  <input value={draft.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} maxLength={3} className={`${inputClass} uppercase`} />
-                </TextField>
-              </div>
-              <TextField label="Time zone">
-                <input value={draft.timeZone} onChange={(e) => set({ timeZone: e.target.value })} className={inputClass} />
-              </TextField>
-              <Choice label="Units" value={draft.units} onChange={(units) => set({ units })} options={[{ value: "metric", label: "Metric" }, { value: "imperial", label: "Imperial" }]} />
-              <Choice
-                label="Temperature"
-                value={draft.temperatureUnit}
-                onChange={(temperatureUnit) => set({ temperatureUnit })}
-                options={[{ value: "celsius", label: "Celsius" }, { value: "fahrenheit", label: "Fahrenheit" }]}
-              />
-              <Choice
-                label="Kitchen measures"
-                value={draft.measures}
-                onChange={(measures) => set({ measures })}
-                options={[{ value: "canadian", label: "Canadian (1 cup = 250 ml)" }, { value: "us", label: "US (1 cup = 237 ml)" }]}
-              />
-              <div className="mt-auto flex flex-wrap gap-2.5 border-t border-frame pt-4">
-                <SoftLink href="/households">
-                  <HouseLine size="1.5rem" aria-hidden />
-                  Switch or add household
-                </SoftLink>
-                <form action={signOut}>
-                  <button className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl bg-rail px-4 text-lg font-bold text-ink hover:bg-panel">
-                    <SignOut size="1.5rem" aria-hidden />
-                    Sign out
-                  </button>
-                </form>
-              </div>
-            </div>
-          </Card>
+        <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[26rem_minmax(0,1fr)]">
+          <PeopleList
+            members={draft.members}
+            selected={selected}
+            onSelect={setSelected}
+            page={columnPage}
+            perPage={COLUMN_ROWS}
+            onPage={setColumnPage}
+            footer={
+              <>
+                {member ? <PersonFields key={member.id} member={member} onChange={changeMember} /> : null}
+                <div className="mt-auto flex gap-[0.6rem] pt-3 [&>*]:flex-1">
+                  {addButton}
+                  {removeButton(true)}
+                </div>
+              </>
+            }
+          />
 
-          <div className="flex min-h-0 flex-col gap-5">
-            <Card title="Calendar" icon={GearSix} tint="teal">
-              <div className="mt-2 flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Choice label="Week starts on" value={draft.weekStartsOn} onChange={(weekStartsOn) => set({ weekStartsOn })} options={[{ value: 0, label: "Sunday" }, { value: 1, label: "Monday" }]} />
-                  <Choice label="Month shows" value={draft.monthStyle} onChange={(monthStyle) => set({ monthStyle })} options={[{ value: "rolling", label: "Next 5 weeks" }, { value: "calendar", label: "The month" }]} />
-                  <Choice label="Habits show as" value={draft.habitsView} onChange={(habitsView) => set({ habitsView })} options={[{ value: "lines", label: "Lines" }, { value: "rings", label: "Rings" }]} />
+          <div className="flex min-h-0 flex-col gap-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <SettingsCard title="Household">
+                <div className="grid grid-cols-[minmax(0,1fr)_6rem_14.5rem] gap-x-4">
+                  <Field label="Name">
+                    <input value={draft.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} aria-label="Household name" className={editorInputClass} />
+                  </Field>
+                  <Field label="Currency">
+                    <input value={draft.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} maxLength={3} aria-label="Currency" className={`${editorInputClass} uppercase`} />
+                  </Field>
+                  <Field label="Time zone">
+                    <input value={draft.timeZone} onChange={(e) => set({ timeZone: e.target.value })} aria-label="Time zone" className={editorInputClass} />
+                  </Field>
                 </div>
-                <div className="flex items-end gap-4">
-                  <div className="min-w-0 flex-1">
-                    <Choice label="Planner on" value={draft.reviewWeekday} onChange={(reviewWeekday) => set({ reviewWeekday })} options={WEEKDAYS.map((d, i) => ({ value: i, label: d }))} />
-                  </div>
-                  <TextField label="At">
-                    <input type="time" value={draft.reviewTime} onChange={(e) => set({ reviewTime: e.target.value })} className={`${inputClass} w-40`} />
-                  </TextField>
+                <div className="mt-[0.6rem] grid grid-cols-2 gap-x-4">
+                  <Field label="Units">
+                    <Toggle label="Units" value={draft.units} onChange={(units) => set({ units })} options={[{ value: "metric", label: "Metric" }, { value: "imperial", label: "Imperial" }]} />
+                  </Field>
+                  <Field label="Temperature">
+                    <Toggle label="Temperature" value={draft.temperatureUnit} onChange={(temperatureUnit) => set({ temperatureUnit })} options={[{ value: "celsius", label: "Celsius" }, { value: "fahrenheit", label: "Fahrenheit" }]} />
+                  </Field>
                 </div>
-                <Choice
-                  label="Write to-dos, meals and notes in"
-                  value={draft.handwriting ? "hand" : "plain"}
-                  onChange={(v) => set({ handwriting: v === "hand" })}
-                  options={[{ value: "hand", label: <span className="font-hand text-xl">Handwriting</span> }, { value: "plain", label: "Plain letters" }]}
-                />
-              </div>
-            </Card>
-            <Card title="Today panel" icon={SquaresFour} tint="orange">
-              <div className="flex flex-wrap gap-2">
-                {boxes.map((b) => {
-                  const on = draft.panelBoxes.includes(b.id);
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => set({ panelBoxes: on ? draft.panelBoxes.filter((x) => x !== b.id) : boxes.map((x) => x.id).filter((x) => x === b.id || draft.panelBoxes.includes(x)) })}
-                      className={`flex min-h-[var(--touch-target)] items-center rounded-full border-2 px-4 text-lg text-ink ${on ? "border-ink bg-rail font-bold" : "border-frame bg-board"}`}
-                    >
-                      {b.name}
+                <Field label="Kitchen measures" className="mt-[0.6rem]">
+                  <Toggle label="Kitchen measures" value={draft.measures} onChange={(measures) => set({ measures })} options={[{ value: "canadian", label: "Canadian (1 cup = 250 ml)" }, { value: "us", label: "US (1 cup = 237 ml)" }]} />
+                </Field>
+                <div className="mt-auto flex gap-2 pt-[0.8rem]">
+                  <SoftLink href="/households">
+                    <HouseLine size="1.5rem" aria-hidden />
+                    Switch or add household
+                  </SoftLink>
+                  <form action={signOut}>
+                    <button className={secondaryActionClass}>
+                      <SignOut size="1.5rem" aria-hidden />
+                      Sign out
                     </button>
-                  );
-                })}
-              </div>
-            </Card>
+                  </form>
+                </div>
+              </SettingsCard>
+
+              <SettingsCard title="Calendar">
+                <div className="grid grid-cols-2 gap-x-4">
+                  <Field label="Week starts on">
+                    <Toggle label="Week starts on" value={String(draft.weekStartsOn)} onChange={(v) => set({ weekStartsOn: v === "1" ? 1 : 0 })} options={[{ value: "0", label: "Sunday" }, { value: "1", label: "Monday" }]} />
+                  </Field>
+                  <Field label="Month shows">
+                    <Toggle label="Month shows" value={draft.monthStyle} onChange={(monthStyle) => set({ monthStyle })} options={[{ value: "rolling", label: "Next 5 weeks" }, { value: "calendar", label: "The month" }]} />
+                  </Field>
+                </div>
+                <Field label="Habits show as" className="mt-[0.6rem]">
+                  <Toggle label="Habits show as" value={draft.habitsView} onChange={(habitsView) => set({ habitsView })} options={[{ value: "lines", label: "Lines" }, { value: "rings", label: "Rings" }]} />
+                </Field>
+                <div className="mt-[0.6rem] grid grid-cols-[minmax(0,1fr)_10rem] gap-x-4">
+                  <Field label="Planner on">
+                    <Toggle label="Planner on" value={String(draft.reviewWeekday)} onChange={(v) => set({ reviewWeekday: Number(v) })} options={WEEKDAYS.map((d, i) => ({ value: String(i), label: d }))} />
+                  </Field>
+                  <Field label="At">
+                    <input type="time" value={draft.reviewTime} onChange={(e) => set({ reviewTime: e.target.value })} aria-label="Planner time" className={timeInputClass} />
+                  </Field>
+                </div>
+                <Field label="Write to-dos, meals and notes in" className="mt-[0.6rem]">
+                  <Toggle
+                    label="Write to-dos, meals and notes in"
+                    value={draft.handwriting ? "hand" : "plain"}
+                    onChange={(v) => set({ handwriting: v === "hand" })}
+                    options={[{ value: "hand", label: <span className="font-hand text-[1.35rem]">Handwriting</span> }, { value: "plain", label: "Plain letters" }]}
+                  />
+                </Field>
+              </SettingsCard>
+            </div>
+
+            <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-2">
+              <SettingsCard title="Today panel">
+                <div className="flex flex-wrap gap-[0.45rem]">
+                  {boxes.map((b) => {
+                    const on = draft.panelBoxes.includes(b.id);
+                    return (
+                      <button
+                        key={b.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => set({ panelBoxes: on ? draft.panelBoxes.filter((x) => x !== b.id) : boxes.map((x) => x.id).filter((x) => x === b.id || draft.panelBoxes.includes(x)) })}
+                        className={chipClass(on)}
+                      >
+                        {b.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </SettingsCard>
+
+              <SettingsCard title="Sounds and themes">
+                <div className="grid grid-cols-2 gap-x-4">
+                  <Field label="Sound">
+                    <Toggle label="Sound" value={draft.sounds.muted ? "mute" : "on"} onChange={(v) => setSounds({ muted: v === "mute" })} options={[{ value: "mute", label: "Mute" }, { value: "on", label: "On" }]} />
+                  </Field>
+                  <Field label="Holiday themes">
+                    <Toggle label="Holiday themes" value={draft.holidayThemes ? "on" : "off"} onChange={(v) => set({ holidayThemes: v === "on" })} options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]} />
+                  </Field>
+                </div>
+                <div className="mt-[0.6rem] grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-x-4">
+                  <Field label="Quiet hours">
+                    <div className="flex items-center gap-2">
+                      <input type="time" value={draft.sounds.quietFrom} onChange={(e) => setSounds({ quietFrom: e.target.value })} aria-label="Quiet hours start" className={timeInputClass} />
+                      <span aria-hidden className="text-[1.25rem] font-bold text-ink-muted">–</span>
+                      <input type="time" value={draft.sounds.quietTo} onChange={(e) => setSounds({ quietTo: e.target.value })} aria-label="Quiet hours end" className={timeInputClass} />
+                    </div>
+                  </Field>
+                  <Field label="Output device">
+                    {/* The screen's own speaker is the only place sounds can go for now. */}
+                    <div className={`${editorInputClass} flex items-center truncate !text-[1.25rem]`}>Screen speaker</div>
+                  </Field>
+                </div>
+                <div className="mt-auto flex items-center gap-4 pt-[0.6rem]">
+                  <p className="min-w-0 flex-1 text-[1.15rem] leading-snug font-bold text-ink-muted">Christmas and Halloween colours on those days. Sound files to be added.</p>
+                  <SoftLink href="/holidays">Holidays and birthdays</SoftLink>
+                </div>
+              </SettingsCard>
+            </div>
           </div>
         </div>
       )}
@@ -296,67 +353,121 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
   );
 }
 
-function PersonEditor({ member, onChange }: { member: MemberDraft; onChange: (c: Partial<MemberDraft>) => void }) {
+/** The people as colour dots and names (no avatars), a page at a time, then whatever goes under them. */
+function PeopleList({
+  members,
+  selected,
+  onSelect,
+  page,
+  perPage,
+  onPage,
+  listRef,
+  footer,
+}: {
+  members: MemberDraft[];
+  selected: string | null;
+  onSelect: (id: string) => void;
+  page: number;
+  perPage: number;
+  onPage: (page: number) => void;
+  listRef?: (el: HTMLUListElement | null) => void;
+  footer: ReactNode;
+}) {
+  const pages = Math.max(1, Math.ceil(members.length / perPage));
+  const p = Math.min(page, pages - 1);
+  const shown = members.slice(p * perPage, (p + 1) * perPage);
   return (
-    <div className="mt-2 flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex items-end gap-3">
-        <EmojiPicker initial={member.icon ?? ""} fieldName="" nameText={member.name} letter fullScreen label={`Picture for ${member.name || "this person"}`} onChange={(icon) => onChange({ icon: icon || null })} />
-        <div className="min-w-0 flex-1">
-          <TextField label="Name">
-            <input value={member.name} onChange={(e) => onChange({ name: e.target.value })} maxLength={40} placeholder="Their name" className={inputClass} autoFocus={!member.name} />
-          </TextField>
+    <SettingsCard title="People" aside={<Pager page={p} pages={pages} onPage={onPage} />}>
+      <ul ref={listRef} className={`flex flex-col overflow-hidden ${listRef ? "min-h-0 flex-1" : ""}`}>
+        {shown.map((m) => (
+          <li key={m.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(m.id)}
+              aria-pressed={selected === m.id}
+              className={`flex min-h-[3.75rem] w-full items-center gap-[0.7rem] rounded-[var(--radius)] px-[0.7rem] text-left ${selected === m.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""} ${m.removed ? "opacity-60" : ""}`}
+            >
+              <ColourDot colour={m.colour} className="size-6" />
+              <span className={`min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink ${m.removed ? "line-through" : ""}`}>{m.name || "New person"}</span>
+              <span className="shrink-0 text-[1.15rem] font-bold text-ink-muted">
+                {m.removed ? "Goes on Save" : m.role === "parent" ? (m.hasPin || m.pin ? "Parent · PIN set" : "Parent") : "Child"}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {footer}
+    </SettingsCard>
+  );
+}
+
+/** One person's details: colour, picture, name, born in, role, and a PIN for parents. */
+function PersonFields({ member, onChange }: { member: MemberDraft; onChange: (c: Partial<MemberDraft>) => void }) {
+  const who = member.name || "this person";
+  return (
+    <div className="flex flex-col gap-[0.6rem] pt-[0.8rem]">
+      <Field label={`Colour for ${member.name || "them"}`}>
+        <div role="radiogroup" aria-label={`Colour for ${who}`} className="flex flex-wrap gap-[0.45rem]">
+          {PERSON_COLOURS.map((c) => {
+            const on = member.colour === c.value;
+            return (
+              <button
+                key={c.value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={c.label}
+                title={c.label}
+                onClick={() => onChange({ colour: c.value })}
+                className="size-12 rounded-full"
+                style={{ background: strong(c.value), boxShadow: on ? "0 0 0 0.28rem var(--color-ink), inset 0 0 0 2px #fff" : "inset 0 0 0 2px rgb(255 255 255 / 0.4)" }}
+              />
+            );
+          })}
         </div>
-        <TextField label="Born in">
+      </Field>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_6.5rem] gap-x-3">
+        <Field label="Picture">
+          <EmojiPicker initial={member.icon ?? ""} fieldName="" nameText={member.name} letter fullScreen label={`Picture for ${who}`} onChange={(icon) => onChange({ icon: icon || null })} />
+        </Field>
+        <Field label="Name">
+          <input value={member.name} onChange={(e) => onChange({ name: e.target.value })} maxLength={40} placeholder="Their name" aria-label="Name" className={editorInputClass} autoFocus={!member.name} />
+        </Field>
+        <Field label="Born in">
           <input
             type="number"
             min={1900}
             max={2100}
             value={member.birthYear ?? ""}
-            placeholder="Optional"
+            placeholder="Year"
+            aria-label="Born in"
             onChange={(e) => onChange({ birthYear: e.target.value ? Number(e.target.value) : null })}
-            className={`${inputClass} w-40`}
+            className={`${editorInputClass} !px-3`}
           />
-        </TextField>
+        </Field>
       </div>
-      <Choice label="Role" value={member.role} onChange={(role) => onChange({ role })} options={[{ value: "parent", label: "Parent" }, { value: "child", label: "Child" }]} />
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1.5 text-base font-bold text-ink">Colour</legend>
-        <div className="flex flex-wrap gap-2">
-          {PERSON_COLOURS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              title={c.label}
-              aria-label={c.label}
-              aria-pressed={member.colour === c.value}
-              onClick={() => onChange({ colour: c.value })}
-              className={`size-[var(--touch-target)] rounded-full ring-ink ring-offset-2 ${member.colour === c.value ? "ring-4" : ""}`}
-              style={{ background: strong(c.value) }}
-            />
-          ))}
-        </div>
-      </fieldset>
+      <Field label="Role">
+        <Toggle label="Role" value={member.role} onChange={(role) => onChange({ role })} options={[{ value: "parent", label: "Parent" }, { value: "child", label: "Child" }]} />
+      </Field>
       {member.role === "parent" ? (
-        <div className="grid grid-cols-2 gap-4">
-          <TextField label={member.hasPin ? "New PIN" : "PIN"} hint="4 to 8 digits">
-            <input type="password" inputMode="numeric" autoComplete="off" value={member.pin} onChange={(e) => onChange({ pin: e.target.value.replace(/\D/g, "").slice(0, 8) })} className={inputClass} />
-          </TextField>
-          <TextField label="Type it again">
-            <input type="password" inputMode="numeric" autoComplete="off" value={member.pinAgain} onChange={(e) => onChange({ pinAgain: e.target.value.replace(/\D/g, "").slice(0, 8) })} className={inputClass} />
-          </TextField>
+        <div className="grid grid-cols-2 gap-x-4">
+          <Field label={member.hasPin ? "New PIN" : "PIN"}>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              value={member.pin}
+              placeholder={member.hasPin ? "••••" : "4 to 8 digits"}
+              aria-label={member.hasPin ? "New PIN (a PIN is set)" : "PIN, 4 to 8 digits"}
+              onChange={(e) => onChange({ pin: e.target.value.replace(/\D/g, "").slice(0, 8) })}
+              className={editorInputClass}
+            />
+          </Field>
+          <Field label="Type it again">
+            <input type="password" inputMode="numeric" autoComplete="off" value={member.pinAgain} aria-label="Type the PIN again" onChange={(e) => onChange({ pinAgain: e.target.value.replace(/\D/g, "").slice(0, 8) })} className={editorInputClass} />
+          </Field>
         </div>
       ) : null}
-      <div className="mt-auto flex justify-end">
-        {member.removed ? (
-          <button type="button" onClick={() => onChange({ removed: false })} className="flex min-h-[var(--touch-target)] items-center rounded-2xl bg-rail px-5 text-lg font-bold text-ink">
-            Keep {member.name || "them"}
-          </button>
-        ) : (
-          <button type="button" onClick={() => onChange({ removed: true })} className="flex min-h-[var(--touch-target)] items-center rounded-2xl border-2 border-danger px-5 text-lg font-bold text-danger">
-            Remove {member.name || "this person"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

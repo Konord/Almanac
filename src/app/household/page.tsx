@@ -115,6 +115,8 @@ async function HouseholdContent() {
       removed: false,
     })),
     screenSaver: settings.screenSaver,
+    holidayThemes: settings.holidayThemes,
+    sounds: settings.sounds,
   };
 
   return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} mealTimes={mealTimes ?? []} art={overview} spotify={spotify} />;
