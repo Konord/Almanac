@@ -17,13 +17,14 @@ import { AppsTab } from "./apps-tab";
 import { Field, SettingsCard, chipClass } from "./fields";
 import { ScreenSaverTab, type ArtOverview, type ScreenSaverView } from "./screen-saver-tab";
 import { SpotifyTab, type SpotifyInfo } from "./spotify-tab";
+import { WeatherTab, type WeatherInfo } from "./weather-tab";
 import { setScreenSaverHere, useScreenSaverHere } from "@/components/screen-saver-here";
 import { useLauncher } from "@/components/launcher-store";
 import type { MemberDraft, SettingsDraft } from "./draft";
 
 /*
  * Settings (Glance, g-final-settings.html). Tabs in the header's tab slot:
- * People | Household | Apps | Screen saver | Spotify, and one Save at the
+ * People | Household | Apps | Screen saver | Spotify | Weather, and one Save at the
  * far right. Nothing scrolls.
  *
  *   - Household (the mock): the people column on the left (colour dots,
@@ -31,13 +32,13 @@ import type { MemberDraft, SettingsDraft } from "./draft";
  *     four cards: Household, Calendar, Today panel, Sounds and themes.
  *   - People: the same people and editor with more room (the list on the
  *     left, the person on the right).
- *   - Apps, Screen saver, Spotify: their own tabs (apps-tab.tsx,
- *     screen-saver-tab.tsx, spotify-tab.tsx).
+ *   - Apps, Screen saver, Spotify, Weather: their own tabs (apps-tab.tsx,
+ *     screen-saver-tab.tsx, spotify-tab.tsx, weather-tab.tsx).
  *
  * Every change waits for Save; leaving with changes asks first.
  */
 
-type Tab = "people" | "household" | "apps" | "screen" | "spotify";
+type Tab = "people" | "household" | "apps" | "screen" | "spotify" | "weather";
 
 /*
  * Saving starts the editor afresh (its key is the saved data), so it would
@@ -56,7 +57,21 @@ const timeInputClass = `${editorInputClass} !px-3 !text-[1.25rem]`;
 let counter = 0;
 const newId = () => `new-${Date.now()}-${counter++}`;
 
-export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { initial: SettingsDraft; boxes: PanelBox[]; mealTimes: { id: string; name: string }[]; art: ArtOverview; spotify: SpotifyInfo }) {
+export function SettingsEditor({
+  initial,
+  boxes,
+  mealTimes,
+  art,
+  spotify,
+  weather,
+}: {
+  initial: SettingsDraft;
+  boxes: PanelBox[];
+  mealTimes: { id: string; name: string }[];
+  art: ArtOverview;
+  spotify: SpotifyInfo;
+  weather: WeatherInfo;
+}) {
   const [draft, setDraft] = useState<SettingsDraft>(initial);
   // The tray's "Settings › Apps" link opens straight on the Apps tab.
   const askedTab = useSearchParams().get("tab");
@@ -64,7 +79,7 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
   useEffect(() => {
     placeAfterSave = null;
   }, []);
-  const [tab, setTab] = useState<Tab>(kept?.tab ?? (askedTab === "apps" || askedTab === "household" || askedTab === "screen" || askedTab === "spotify" ? askedTab : "people"));
+  const [tab, setTab] = useState<Tab>(kept?.tab ?? (askedTab === "apps" || askedTab === "household" || askedTab === "screen" || askedTab === "spotify" || askedTab === "weather" ? askedTab : "people"));
   const [view, setView] = useState<ScreenSaverView>(kept?.view ?? "when");
   const [selected, setSelected] = useState<string | null>(kept && initial.members.some((m) => m.id === kept.selected) ? kept.selected : (initial.members[0]?.id ?? null));
   const [page, setPage] = useState(kept?.page ?? 0);
@@ -177,7 +192,9 @@ export function SettingsEditor({ initial, boxes, mealTimes, art, spotify }: { in
         action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />}
       />
 
-      {tab === "spotify" ? (
+      {tab === "weather" ? (
+        <WeatherTab value={draft.weather} onChange={(place) => set({ weather: place })} info={weather} />
+      ) : tab === "spotify" ? (
         <SpotifyTab info={spotify} />
       ) : tab === "screen" ? (
         <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} view={view} onView={setView} />
@@ -472,11 +489,12 @@ function PersonFields({ member, onChange }: { member: MemberDraft; onChange: (c:
   );
 }
 
-/** The Settings tabs, in order (Spotify is live, so it stays beside the four in the mock). */
+/** The Settings tabs, in order (Spotify and Weather are live, so they stay beside the four in the mock). */
 const SETTINGS_TABS = [
   { tab: "people", label: "People" },
   { tab: "household", label: "Household" },
   { tab: "apps", label: "Apps" },
   { tab: "screen", label: "Screen saver" },
   { tab: "spotify", label: "Spotify" },
+  { tab: "weather", label: "Weather" },
 ] as const;

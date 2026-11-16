@@ -7,6 +7,7 @@ import { hand, soft, strong } from "@/lib/colours";
 import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
 import { TimerPill } from "./timer-pill";
 import { MenuTray, type Section } from "./menu-tray";
+import { WeatherSlot } from "./weather";
 
 /**
  * Small building blocks shared by every screen, in the Glance A style
@@ -53,7 +54,7 @@ export function AppFrame({ section, children }: { section: Section; children: Re
  *   - `children`: any other live controls the screen still needs, if they
  *     fit beside the title (they move into the screen bodies as each
  *     screen is redesigned);
- *   - the weather (calendar pages only; empty until there is a weather source);
+ *   - the weather (calendar pages only; see weather.tsx);
  *   - `nav`: prev / next arrows, just left of the tab slot;
  *   - the tab slot, a fixed width so the right-hand end never shifts:
  *     Today | Week | Month on the calendar pages, the page's own sub-tabs
@@ -111,16 +112,6 @@ export function ScreenHeader({
       <div className="-mt-2 flex min-h-[var(--touch-target)] shrink-0 flex-wrap items-center gap-[0.6rem]">{toolbar}</div>
     </>
   );
-}
-
-/**
- * Where the weather (icon + temperature, tap for the forecast) goes on the
- * calendar pages. There is no weather source yet (it needs Connor's OK for
- * an outside service). Connor, Nov 15: keep the place but leave it empty
- * (no icon, no text, no made-up numbers), so nothing moves when it arrives.
- */
-function WeatherSlot() {
-  return <div data-weather-slot aria-hidden className="hidden w-[5rem] shrink-0 lg:block" />;
 }
 
 /** The track of a segmented switch, and one of its options (for switches made of buttons). */

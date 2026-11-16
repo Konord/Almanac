@@ -23,6 +23,7 @@ const base: SettingsDraft = {
   screenSaver: DEFAULT_SCREEN_SAVER,
   holidayThemes: true,
   sounds: DEFAULT_SOUNDS,
+  weather: null,
 };
 
 test("a good settings draft passes", () => assert.equal(draftProblem(base), null));
