@@ -9,12 +9,10 @@ import { eventEmoji } from "@/lib/emoji";
 import { requireHousehold } from "@/lib/household";
 import { addDays, isLocalDate, localDateOf, zonedToUtc } from "@/lib/time";
 import { nowText, shortClockTime, untilText } from "@/lib/time-text";
-import { devicePeople, itemsForPeople, loadCalendar, rangeOf } from "./calendar/data";
-import { PeopleButton, PeopleChooser } from "./calendar/people-filter";
-import { Sheet } from "@/components/sheet";
+import { loadCalendar, rangeOf } from "./calendar/data";
 import type { CalendarItem } from "./calendar/types";
 import { loadSpecialDays } from "./holidays/data";
-import { loadRoutines, personDay } from "./routines/data";
+import { loadRoutines } from "./routines/data";
 import { loadMealBasics, loadMeals } from "./meals/data";
 import { mealsForRoutines, placeTodayMeals } from "./meals/today";
 import { TodayPanel } from "./today-panel/panel";
@@ -94,10 +92,9 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
     reviewReminder(household, today, now),
   ]);
   const todaySpecials = (await loadSpecialDays(day, day)).get(day) ?? [];
-  // The person filter: just some people's things (and things for everyone).
-  const people = await devicePeople(members);
-  const shown = itemsForPeople(items, people);
-  const shownMembers = people.length === 0 ? members : members.filter((m) => people.includes(m.id));
+  // The person filter is left out for now (Connor, 2026-11-16): everyone's things show.
+  const shown = items;
+  const shownMembers = members;
   const colourOf = new Map(members.map((m) => [m.id, m.colour]));
   const coloursOf = (ids: string[]) => ids.flatMap((id) => (colourOf.has(id) ? [colourOf.get(id)!] : []));
 
@@ -198,20 +195,12 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const ahead = cards.filter((c) => !c.past);
 
   // --- The all-day strip --------------------------------------------------------
-  // Official days are printed: today's kinds of day (tap: Set days), days off,
-  // and a holiday when holiday themes are off. Things the family added are
-  // handwritten in their colours: all-day events and birthdays.
-  const kinds = new Map<string, { icon: string | null }>();
-  for (const m of routineData.members.filter((m) => memberIds.has(m.id) || people.length === 0)) {
-    const type = personDay(routineData, m.id, day).dayType;
-    if (type && !kinds.has(type.name)) kinds.set(type.name, { icon: type.icon });
-  }
+  // Just what's really on today (Connor, 2026-11-16): all-day events and
+  // birthdays in the family's handwriting, and a holiday (printed) when
+  // holiday themes are off. Kinds of day ("Weekday") and days off stay with
+  // routines, not here. "Plan the week" still shows on the Planner's day.
   const chips: AllDayChip[] = [
     ...(reviewNow ? [{ key: "review", label: "Plan the week", emoji: "📋", printed: true, colours: [], href: "/review" }] : []),
-    ...[...kinds].map(([name, k]) => ({ key: `kind:${name}`, label: name, emoji: k.icon, printed: true, colours: [], href: "/routines/manage" })),
-    ...routineData.breaks
-      .filter((b) => b.start_date <= day && day <= b.end_date)
-      .map((b) => ({ key: `break:${b.id}`, label: b.name, emoji: eventEmoji(b.icon, b.name), printed: true, colours: [], href: "/routines/manage?tab=breaks" })),
     ...todaySpecials
       .filter((s) => s.kind === "holiday" && !(hero && s.name === hero.title))
       .map((s) => ({ key: s.key, label: specialLabel(s), emoji: s.icon, printed: true, colours: [], href: "/holidays" })),
@@ -219,8 +208,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       .filter((s) => s.kind === "birthday")
       .map((s) => ({ key: s.key, label: specialLabel(s), emoji: s.icon, printed: false, colours: [], href: "/holidays" })),
     ...allDay
-      // An all-day event that only makes the day a kind of day already shows as that kind.
-      .filter((e) => !(e.day_kind && kinds.has(e.day_kind) && e.title.trim().toLowerCase() === e.day_kind.trim().toLowerCase()))
+      // An all-day event that only makes the day a kind of day isn't shown either.
+      .filter((e) => !(e.day_kind && e.title.trim().toLowerCase() === e.day_kind.trim().toLowerCase()))
       .map((e) => ({ key: e.id, label: e.title, emoji: eventEmoji(e.icon, e.title), printed: false, colours: coloursOf(e.member_ids), href: editLink(e) })),
   ];
 
@@ -267,7 +256,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           <Segmented
             label="View"
             options={[
-              { href: "/", label: "Today", active: isToday },
+              { href: "/", label: "Agenda", active: isToday },
               { href: `/calendar?view=week&date=${day}`, label: "Week", active: false },
               { href: `/calendar?view=month&date=${day}`, label: "Month", active: false },
             ]}
@@ -278,10 +267,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             Add
           </ActionLink>
         }
-      >
-        {/* Whose things this screen shows (each screen remembers its own). */}
-        <PeopleButton members={members} shown={people} href={withHere("panel=people")} />
-      </ScreenHeader>
+      />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
@@ -330,12 +316,6 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           }
         />
       </div>
-
-      {firstParam(params.panel) === "people" ? (
-        <Sheet title="Showing" closeHref={here} narrow>
-          <PeopleChooser members={members} shown={people} returnTo={isToday ? "panel=people" : `date=${day}&panel=people`} returnPath="/" />
-        </Sheet>
-      ) : null}
 
       {editing && !pending ? (
         <EditEventSheet editing={editing} household={household} members={members} dayKinds={dayKinds} here={here} returnTo={addReturn} returnPath="/" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { updatePending, usePending } from "@/components/pending-store";
 
@@ -18,25 +18,61 @@ const TAP_SLOP = 6;
 /** Times placed by tapping snap to the quarter hour. */
 const SNAP = 15;
 
+/** How far above now (or the first event) the top of the hours sits. */
+const LEAD_MINUTES = 30;
+/** How often the hours move on with the clock. */
+const FOLLOW_MS = 60_000;
+/** After a touch, the hours stay where they were put for this long before following the clock again. */
+const HOLD_MS = 2 * 60_000;
+
 /**
  * The scrolling hours. On first show it scrolls so `startMinute` (now, or
  * the week's first event) sits near the top.
+ *
+ * On the week with today in it (`follow` is the household's time zone),
+ * the hours then move on by themselves as the day goes (Connor,
+ * 2026-11-16): the top stays half an hour before now, so finished things
+ * slide off the top. It can't scroll past the end of the day, so once
+ * midnight reaches the bottom of the screen it stops there. A touch or
+ * scroll pauses this for a couple of minutes.
  */
-export function WeekScroller({ startMinute, children, label }: { startMinute: number; children: ReactNode; label: string }) {
+export function WeekScroller({ startMinute, follow, children, label }: { startMinute: number; follow: string | null; children: ReactNode; label: string }) {
   const box = useRef<HTMLDivElement>(null);
+  const lastTouch = useRef(0);
 
-  // Start near now (or the first event): about 45 minutes above it, so what's just before shows too.
-  useLayoutEffect(() => {
+  const scrollTo = (minute: number, smooth: boolean) => {
     const el = box.current;
     const content = el?.firstElementChild as HTMLElement | null;
     if (!el || !content) return;
-    el.scrollTop = Math.max(0, ((startMinute - 45) / (24 * 60)) * content.offsetHeight);
+    // The browser stops at the bottom on its own, so midnight never leaves blank space under it.
+    el.scrollTo({ top: Math.max(0, ((minute - LEAD_MINUTES) / (24 * 60)) * content.offsetHeight), behavior: smooth ? "smooth" : "instant" });
+  };
+
+  // Start near now (or the first event), with half an hour above it.
+  useLayoutEffect(() => {
+    scrollTo(startMinute, false);
     // Only when the week is first shown: a refresh keeps where you scrolled to.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Follow the clock through the day, unless someone has just used the hours.
+  useEffect(() => {
+    if (!follow) return;
+    const minuteNow = () => {
+      const [h, m] = new Intl.DateTimeFormat("en-GB", { timeZone: follow, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).split(":").map(Number);
+      return h * 60 + m;
+    };
+    const timer = setInterval(() => {
+      if (document.hidden || Date.now() - lastTouch.current < HOLD_MS) return;
+      scrollTo(minuteNow(), true);
+    }, FOLLOW_MS);
+    return () => clearInterval(timer);
+     
+  }, [follow]);
+
   // A mouse drags the hours up and down like a finger does (touch scrolls natively).
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    lastTouch.current = Date.now();
     if (e.pointerType !== "mouse" || e.button !== 0) return;
     const el = e.currentTarget;
     const startY = e.clientY;
@@ -78,6 +114,8 @@ export function WeekScroller({ startMinute, children, label }: { startMinute: nu
       tabIndex={0}
       aria-label={label}
       onPointerDown={onPointerDown}
+      onWheel={() => (lastTouch.current = Date.now())}
+      onTouchMove={() => (lastTouch.current = Date.now())}
       // A press on a card would start the browser's link drag; here dragging only scrolls.
       onDragStart={(e) => e.preventDefault()}
       className="absolute inset-0 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

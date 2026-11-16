@@ -356,8 +356,9 @@ export function SettingsEditor({
                   </Field>
                 </div>
                 <div className="mt-auto flex items-center gap-4 pt-[0.6rem]">
-                  <p className="min-w-0 flex-1 text-[1.15rem] leading-snug font-bold text-ink-muted">Christmas and Halloween colours on those days. Sound files to be added.</p>
+                  {/* Holidays and event templates live here, not on the calendar (Connor, 2026-11-16). */}
                   <SoftLink href="/holidays">Holidays and birthdays</SoftLink>
+                  <SoftLink href="/templates">Event templates</SoftLink>
                 </div>
               </SettingsCard>
             </div>

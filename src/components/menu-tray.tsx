@@ -10,6 +10,7 @@ import { soft } from "@/lib/colours";
 import { MAX_APPS, type LauncherApp } from "@/lib/launcher";
 import { emojiImage } from "@/lib/emoji";
 import { DownSince } from "./down-since";
+import { useEdgeSwipe, useSwipeAway } from "./edge-swipe";
 import type { Icon } from "@phosphor-icons/react";
 
 /**
@@ -17,8 +18,9 @@ import type { Icon } from "@phosphor-icons/react";
  *
  * The menu used to be an icon rail down the left side, which took space on
  * every screen even though it is only needed when someone walks up to change
- * something. Now there is just a small handle at the bottom centre. Tapping it
- * (or swiping up on it) slides the tray up with the section buttons. The tray
+ * something. Now a swipe up from the bottom edge of the screen slides the tray
+ * up with the section buttons (on a screen with a mouse, a handle shows when
+ * the pointer is near the bottom middle). The tray
  * hides itself again after a short while with no touches, when you pick a
  * section, when you tap outside it, or when you press Escape.
  *
@@ -116,25 +118,32 @@ export function MenuTray({ section }: { section: Section }) {
     return true;
   };
 
+  // A swipe up from the bottom edge opens the tray; a swipe down on it closes it.
+  useEdgeSwipe("bottom", () => openTo(1), !open);
+  const swipeAway = useSwipeAway("bottom", () => (tier === 2 ? setTier(1) : close()));
+
   const apps = launcher.apps.slice(0, MAX_APPS);
 
   return (
     <>
-      {/* The handle: a short grey bar. The button around it is wider and taller so it is easy to hit. */}
-      <button
-        type="button"
-        aria-label="Open the menu"
-        aria-expanded={open}
-        aria-controls="menu-tray"
-        onClick={() => openTo(1)}
-        onPointerDown={(e) => dragStart(e.clientY)}
-        onPointerUp={(e) => dragEnd(e.clientY)}
-        className={`fixed bottom-0 left-1/2 z-40 flex h-[3.15rem] w-48 -translate-x-1/2 touch-none items-end justify-center pb-[0.55rem] ${
-          open ? "invisible" : ""
-        }`}
-      >
-        <span aria-hidden className="h-[0.45rem] w-30 rounded-full bg-handle" />
-      </button>
+      {/*
+        No bar at the bottom any more (Connor, 2026-11-16): a swipe up from
+        the bottom edge brings the tray out (useEdgeSwipe above). A mouse
+        can't swipe, so on a screen with a mouse a handle shows when the
+        pointer comes near the bottom middle.
+      */}
+      <div className={`group fixed bottom-0 left-1/2 z-40 hidden h-[2.25rem] w-[24rem] -translate-x-1/2 items-end justify-center pointer-fine:flex ${open ? "invisible" : ""}`}>
+        <button
+          type="button"
+          aria-label="Open the menu"
+          aria-expanded={open}
+          aria-controls="menu-tray"
+          onClick={() => openTo(1)}
+          className="flex h-full w-48 items-end justify-center pb-[0.55rem] opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <span aria-hidden className="h-[0.45rem] w-30 rounded-full bg-handle" />
+        </button>
+      </div>
 
       {/* A see-through layer behind the tray: tapping it closes the tray. */}
       <div
@@ -148,6 +157,7 @@ export function MenuTray({ section }: { section: Section }) {
         aria-label="Menu"
         inert={!open}
         onPointerDown={keepOpen}
+        {...swipeAway}
         className={`fixed bottom-0 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center rounded-t-[1.75rem] bg-board px-5 pt-[0.35rem] pb-[1.4rem] shadow-[0_-0.25rem_2rem_rgba(30,35,45,0.18)] transition-transform duration-200 ease-out ${
           open ? "translate-y-0" : "translate-y-[calc(100%+3rem)]"
         }`}

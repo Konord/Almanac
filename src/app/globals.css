@@ -280,3 +280,21 @@ body {
       min-height 160ms ease;
   }
 }
+
+/*
+ * The Week grid's day columns (week.tsx). With the Daily List out
+ * (drawer.tsx sets data-daily-open), two days fold to nothing so the
+ * other five keep their width; the change slides rather than jumps.
+ */
+.week-cols {
+  grid-template-columns: var(--cols-closed);
+  transition: grid-template-columns 300ms ease-out;
+}
+[data-daily-open="true"] .week-cols {
+  grid-template-columns: var(--cols-open);
+}
+[data-daily-open="true"] .week-drop {
+  overflow: hidden;
+  padding-inline: 0;
+  border-right-width: 0;
+}

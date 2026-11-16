@@ -55,3 +55,10 @@ export function stepBox(boxes: PanelBox[], current: string, by: 1 | -1): string 
   const at = Math.max(0, boxes.findIndex((b) => b.id === current));
   return boxes[(at + by + boxes.length) % boxes.length].id;
 }
+
+/**
+ * Whether the Daily List is pulled out on Week and Month, per screen. The
+ * drawer sets it in the browser ("1" or "0"); the page reads it so the
+ * list is already out (or not) when the page arrives.
+ */
+export const DAILY_OPEN_COOKIE = "almanac-daily-open";

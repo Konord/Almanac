@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "@phosphor-icons/react";
-import { primaryActionClass, secondaryActionClass } from "./ui";
+import { headerActionWidth, primaryActionClass, secondaryActionClass } from "./ui";
 
 /*
  * One Save for a whole screen (Connor, 2026-11-07: "there are way too many
@@ -98,7 +98,8 @@ export function SaveButton({
   ready?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 shrink-0 items-center gap-2" role="group" aria-label="Save">
+    // One width whatever it shows (Undo + Save, Saving…, or Saved), so the header never shifts after a save (Connor, 2026-11-16).
+    <div className="flex min-w-[16rem] shrink-0 items-center justify-end gap-2" role="group" aria-label="Save">
       {error ? (
         <span className="line-clamp-2 max-w-[28rem] text-right text-[1.15rem] leading-tight font-bold text-danger" role="alert" title={error}>
           {error}
@@ -112,7 +113,7 @@ export function SaveButton({
           </button>
           ) : null}
           {/* The page's one Save: the black main action, with a dot while there are changes. */}
-          <button type="button" onClick={onSave} disabled={saving} className={`${primaryActionClass} disabled:opacity-70`}>
+          <button type="button" onClick={onSave} disabled={saving} className={`${primaryActionClass} ${headerActionWidth} disabled:opacity-70`}>
             {dirty ? <span aria-hidden className="size-2.5 rounded-full bg-primary-ink" /> : null}
             {saving ? "Saving…" : "Save"}
           </button>

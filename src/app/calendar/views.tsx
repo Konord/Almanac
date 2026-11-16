@@ -214,6 +214,8 @@ export function MonthView({
           const stickers = dayStickers(day, allDay, breaks, special, memberById);
           const other = mode === "month" && monthOf(day) !== month;
           const isToday = day === today;
+          // Days already gone are greyed out (Connor, 2026-11-16), like Week's past days.
+          const past = day < today;
           // The 1st of a month (and, rolling, the first square) says which month.
           const label = day.endsWith("-01") || (mode === "weeks" && i === 0) ? `${shortMonth(day)} ${Number(day.slice(8))}` : String(Number(day.slice(8)));
           const wide = label.length > 2;
@@ -237,8 +239,8 @@ export function MonthView({
               style={{
                 background: isToday
                   ? "color-mix(in srgb, var(--color-now) 1.5%, var(--color-board))"
-                  : other
-                    ? "color-mix(in srgb, var(--color-rail) 55%, var(--color-board))"
+                  : past || other
+                    ? "color-mix(in srgb, var(--color-rail) 60%, var(--color-board))"
                     : "var(--color-board)",
               }}
             >
@@ -252,7 +254,7 @@ export function MonthView({
                 <span
                   className={`tabular flex h-[1.75rem] shrink-0 items-center justify-center text-[1.5rem] leading-none font-bold tracking-[-0.02em] ${
                     wide ? "px-[0.3rem]" : "min-w-[1.75rem] px-[0.15rem]"
-                  } ${isToday ? `border-2 border-now-on-tint text-now-on-tint ${wide ? "rounded-[1rem]" : "rounded-full"}` : other ? "text-ink-muted" : "text-ink"}`}
+                  } ${isToday ? `border-2 border-now-on-tint text-now-on-tint ${wide ? "rounded-[1rem]" : "rounded-full"}` : other || past ? "text-ink-muted" : "text-ink"}`}
                 >
                   {label}
                 </span>
@@ -266,7 +268,7 @@ export function MonthView({
                   </span>
                 ) : null}
               </span>
-              <span className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col gap-[0.08rem] pt-[0.06rem]">
+              <span className={`relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col gap-[0.08rem] pt-[0.06rem] ${past ? "opacity-55" : ""}`}>
                 {timed.map((e, n) => (
                   <span key={e.id} data-month-ev hidden={n >= MONTH_CELL_LIMIT} className="flex min-w-0 shrink-0 items-center gap-[0.45rem] pr-[0.15rem]">
                     <span className="grid size-[1.6rem] shrink-0 place-items-center">
