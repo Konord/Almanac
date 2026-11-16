@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Check, UsersThree } from "@phosphor-icons/react/dist/ssr";
-import { Avatar } from "@/components/ui";
+import { ColourDot } from "@/components/ui";
 import { soft, strong } from "@/lib/colours";
 import { choosePeople } from "./actions";
 import type { Member } from "./types";
@@ -91,7 +91,7 @@ export function PeopleChooser({
             m.id,
             !everyone && shown.includes(m.id),
             <>
-              <Avatar name={m.name} colour={m.colour} icon={m.icon} />
+              <ColourDot colour={m.colour} />
               <span className="truncate">{m.name}</span>
             </>,
             m.colour,

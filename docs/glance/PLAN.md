@@ -1,5 +1,47 @@
 # Glance redesign: implementation plan
 
+## Status (2026-11-16, final checks)
+
+Every section below is **done** and committed on `glance-redesign`. `npm run lint`, `npx tsc --noEmit`, `npm test` (289 tests) and `npm run build` pass. `scripts/dev/check-screens.mjs` passes on every route at 2560×1440 and 1920×1080: no page scroll, text ≥ 18px, targets ≥ 48px (1080-equivalent).
+
+| Section | Status |
+|---|---|
+| 0. Sample data | Done |
+| 1. Global chrome, fonts, tokens, header, tray, settings JSON | Done |
+| 2. Agenda (Today) | Done (plus agenda fixes) |
+| 3. Month | Done |
+| 4. Week | Done (hour grid per Connor's Nov 15 decisions) |
+| 5. Daily List and Lists | Done |
+| 6. Planner, with review-what-to-buy | Done |
+| 7. Meals: Menu, Dishes, Backups, Cook mode | Done |
+| 8. Routines and Set days | Done |
+| 9. Chores | Done |
+| 10. Habits and Health | Done |
+| 11. Event sheet, with plain-text location | Done |
+| 12. Settings | Done |
+| 13. Remaining panes and screen checks | Done |
+
+**Open items**
+- **Weather:** the header slot on calendar pages is built but empty until Connor picks a source (Nov 15 decision a). Not on utility pages.
+- **Sounds:** settings (mute, quiet hours, output = screen speaker) and hooks in `src/lib/sounds.ts` only. No audio files yet; Connor will supply them.
+- **Night mode:** deferred.
+- **Theme customisation UI:** not built (Nov 15 decision c). The Holiday themes toggle is.
+- **Spec-only animations** (e.g. the list scratch-off) are done simply or left as hooks.
+
+**Deviations and things not kept**
+- **Event drag, stretch and resize are gone** from Today and Week (Connor, Nov 15 decision b). This removed `draggable-event`, `stretch-bar`, `pending-block`, `place-on-timeline`, `place-across-people`, and the `rescheduleEvent`, `stretchEventDays` and `changeEventPeople` actions. Moving events, changing their days and changing who they're for are all done on the edit sheet. Tapping an empty hour on Week still starts an event there. Routine blocks on the Routines grid still drag and resize.
+- **No header clock** (locked spec): "Now 8:40" on the Agenda is the time, so `HeaderClock` was removed.
+- **No avatars:** the last `Avatar` uses (people filter, routine checklist, Health box, chores rows) became colour dots, and `Avatar` was removed from `ui.tsx`.
+- **No progress bars off Habits/Health:** the routine checklist shows "2 of 5 done" instead of a bar, and `ProgressBar` was removed.
+- **Per-person routine progress** (`PeopleRow`, which used to sit on the calendar pages) is now the "2/5" count on routine rows in the Daily List.
+- **Holidays manager kept** alongside the Settings toggle (conflict 10 below).
+- **Spotify** stays as its own Settings tab, although the mock doesn't show it.
+
+**Known, not changed (already like this on `main`)**
+- `/meals/cook/<not-a-uuid>` shows an error instead of "not found".
+- `src/app/survival-card.tsx`, `ChoreRow`/`SoonRow`/`RoundRow` in `chores/rows.tsx`, and a few meal/routine actions are not used anywhere.
+- **Dev only:** the shared :3100 dev server was started with an `npx`-fetched Next 16.4.6 rather than the project's 16.4.5. That mismatch causes the "Could not validate `instant`… Invariant: moduleLoading" errors (the "2 Issues" badge). With the project's own `next dev` those errors don't appear.
+
 Branch `glance-redesign`. Rules: `WORKFLOW.md`. Design: the locked sections of `SPEC.md`, the mocks in `mockups/glance/src/g-final-*.html`, and the live-feature checklist in `feature-parity.md` (the checklist for "don't drop features"). We judge every screen at **2560×1440** first and check it still works at 1920×1080. Each step below is one commit (`glance: …`), and each step runs lint, tsc and tests before it's committed.
 
 How each step works: port the mock's values (rem sizes, colours, spacing) into tokens and shared components, then restyle the screen. **The data and actions stay as they are.** Screens get a new look over the same server actions, loaders and URL parameters, so live features keep working. When the mock doesn't show a live feature, the feature stays and gets restyled in the Glance style.

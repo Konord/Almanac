@@ -213,7 +213,7 @@ export function ExpandedRoutine({
         <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">
           {progress.done}/{progress.total}
         </span>
-        <Link href="/" scroll={false} aria-label={`Close ${template.name}`} className="flex size-11 shrink-0 items-center justify-center rounded-full bg-board text-ink">
+        <Link href="/" scroll={false} aria-label={`Close ${template.name}`} className="flex size-12 shrink-0 items-center justify-center rounded-full bg-board text-ink">
           <X size="1.25rem" weight="bold" aria-hidden />
         </Link>
       </div>
@@ -245,7 +245,7 @@ export function ExpandedRoutine({
         })}
       </ul>
       {more > 0 ? (
-        <Link href={`/?routine=${template.id}&member=${memberId}`} scroll={false} className="flex h-10 shrink-0 items-center px-3 text-base font-bold text-accent">
+        <Link href={`/?routine=${template.id}&member=${memberId}`} scroll={false} className="flex h-12 shrink-0 items-center px-3 text-base font-bold text-accent">
           +{more} more steps
         </Link>
       ) : null}

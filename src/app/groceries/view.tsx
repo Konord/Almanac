@@ -238,7 +238,7 @@ export function GroceryView({
               {openLine.name}
               {openLine.need ? <span className="text-lg font-bold text-ink-muted"> · {openLine.need.replace(/ needed for meals$/, "")}</span> : null}
             </span>
-            <button type="button" onClick={() => setOpen(null)} aria-label="Close" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
+            <button type="button" onClick={() => setOpen(null)} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
               <X size="1.125rem" weight="bold" aria-hidden />
             </button>
           </div>

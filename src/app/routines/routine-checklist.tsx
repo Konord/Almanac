@@ -1,7 +1,7 @@
 import { Pager } from "@/components/pager";
 import Link from "next/link";
 import { Check, X } from "@phosphor-icons/react/dist/ssr";
-import { Avatar, Emoji, ProgressBar } from "@/components/ui";
+import { ColourDot, Emoji } from "@/components/ui";
 import type { LocalDate } from "@/lib/time";
 import { endRoutine, toggleStep } from "./actions";
 import { dayRoutinesFor, type RoutineData } from "./data";
@@ -56,20 +56,18 @@ export function RoutineChecklist({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2.5 pt-1">
-        <Avatar name={member.name} colour={member.colour} icon={member.icon} size="sm" />
-        <h2 className="min-w-0 flex-1 truncate text-xl font-extrabold text-ink">{template.name}</h2>
-        <Link href={closeHref} aria-label="Close the routine" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
+        <ColourDot colour={member.colour} />
+        <h2 className="min-w-0 flex-1 truncate text-xl font-extrabold text-ink">
+          {template.name} <span className="font-bold text-ink-muted">· {member.name}</span>
+        </h2>
+        <Link href={closeHref} aria-label="Close the routine" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink">
           <X size="1.25rem" weight="bold" aria-hidden />
         </Link>
       </div>
-      <div className="mt-2 flex items-center gap-2.5">
-        <div className="min-w-0 flex-1">
-          <ProgressBar done={progress.done} total={progress.total} colour={member.colour} />
-        </div>
-        <span className={`text-base font-bold ${progress.complete ? "text-success" : "text-ink-muted"}`}>
-          {progress.complete ? "All done ✓" : `${progress.done}/${progress.total}`}
-        </span>
-      </div>
+      {/* Glance: progress bars live only on Habits and Health; here it's just the count. */}
+      <p className={`mt-1 text-base font-bold ${progress.complete ? "text-success" : "text-ink-muted"}`}>
+        {progress.complete ? "All done ✓" : `${progress.done} of ${progress.total} done`}
+      </p>
       <ul className="mt-1 flex flex-col">
         {steps.slice(shownPage * PER_PAGE, shownPage * PER_PAGE + PER_PAGE).map((step) => {
           const done = doneIds.has(step.id);
@@ -108,7 +106,7 @@ export function RoutineChecklist({
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="returnTo" value={returnTo} />
             {ended ? <input type="hidden" name="reopen" value="true" /> : null}
-            <button className="flex min-h-11 items-center rounded-xl bg-rail px-3 text-ink">
+            <button className="flex min-h-[var(--touch-target)] items-center rounded-xl bg-rail px-4 text-ink">
               {ended ? "Reopen" : "End"}
             </button>
           </form>

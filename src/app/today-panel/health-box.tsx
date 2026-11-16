@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Minus, Plus, X } from "@phosphor-icons/react";
 import { Pager } from "@/components/pager";
-import { Avatar, Emoji } from "@/components/ui";
+import { ColourDot, Emoji } from "@/components/ui";
 import { soft, strong } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import { agoText, doseStatus, readingText } from "@/lib/health";
@@ -196,7 +196,7 @@ function LogForm({
       <div className="flex items-center gap-2.5">
         <Emoji emoji={pictureOf(tracker)} className="size-9" />
         <h4 className="min-w-0 flex-1 truncate text-xl font-extrabold text-ink">{tracker.name}</h4>
-        <button type="button" onClick={onClose} aria-label="Close" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
+        <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
           <X size="1.25rem" weight="bold" aria-hidden />
         </button>
       </div>
@@ -211,7 +211,7 @@ function LogForm({
             className="flex min-h-12 flex-1 items-center gap-2 rounded-xl border-2 px-2 text-base font-bold text-ink"
             style={who === m.id ? { borderColor: strong(m.colour), background: soft(m.colour) } : { borderColor: "transparent", background: "var(--color-rail)" }}
           >
-            <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" />
+            <ColourDot colour={m.colour} />
             <span className="truncate">{m.name}</span>
           </button>
         ))}

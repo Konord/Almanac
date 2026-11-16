@@ -347,45 +347,6 @@ export function Card({
   );
 }
 
-/** A person's round avatar: their initial on their strong colour. */
-/**
- * A person's sticker: the first letter of their name in their colour, or
- * their own picture (an emoji) on their pastel colour if they chose one.
- */
-export function Avatar({
-  name,
-  colour,
-  icon,
-  size = "md",
-}: {
-  name: string;
-  colour: string | null | undefined;
-  icon?: string | null;
-  size?: "sm" | "md" | "lg";
-}) {
-  const box = size === "sm" ? "size-7 text-[0.8125rem]" : size === "lg" ? "size-12 text-xl" : "size-11 text-sm";
-  if (icon) {
-    return (
-      <span
-        className={`flex shrink-0 items-center justify-center rounded-full border-2 ${box}`}
-        style={{ background: soft(colour), borderColor: strong(colour) }}
-        aria-hidden
-      >
-        <Emoji emoji={icon} className="size-[72%]" />
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${box}`}
-      style={{ background: strong(colour) }}
-      aria-hidden
-    >
-      {[...name.trim()][0]?.toUpperCase() ?? "?"}
-    </span>
-  );
-}
-
 /** A Fluent 3D picture for an emoji (or the plain emoji if we don't have one). */
 export function Emoji({ emoji, className = "size-10", faded = false }: { emoji: string | null | undefined; className?: string; faded?: boolean }) {
   if (!emoji) return null;
@@ -412,22 +373,6 @@ export function EmptyState({ emoji, title, hint }: { emoji: string; title?: Reac
       <Emoji emoji={emoji} className="size-20 opacity-60" />
       {title ? <p className="text-2xl font-bold text-balance text-ink">{title}</p> : null}
       {hint ? <p className="text-lg text-balance text-ink-muted">{hint}</p> : null}
-    </div>
-  );
-}
-
-/** A thin bar in a person's colour, e.g. 3 of 5 steps done. */
-export function ProgressBar({ done, total, colour, thick = false }: { done: number; total: number; colour?: string | null; thick?: boolean }) {
-  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-  return (
-    <div
-      className={`overflow-hidden rounded-full bg-grid ${thick ? "h-2.5" : "h-2"}`}
-      role="progressbar"
-      aria-valuenow={done}
-      aria-valuemin={0}
-      aria-valuemax={total}
-    >
-      <div className="h-full rounded-full" style={{ width: `${percent}%`, background: colour ? strong(colour) : "var(--color-success)" }} />
     </div>
   );
 }

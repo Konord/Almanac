@@ -1,7 +1,7 @@
 import { ArrowCounterClockwise, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
 import { ListRow } from "@/components/list-row";
 import { hand, strong } from "@/lib/colours";
-import { Avatar, Emoji } from "@/components/ui";
+import { ColourDot, Emoji } from "@/components/ui";
 import { CHORE_TAGS } from "@/lib/chore-days";
 import { daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
@@ -85,7 +85,7 @@ export function ChoreRow({
         <span className="text-xl leading-[1.1] font-semibold text-ink">{chore.name}</span>
         <span className="truncate text-sm font-semibold text-ink-muted">{choreMeta(chore, today, household)}</span>
       </span>
-      {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
+      {who ? <ColourDot colour={who.colour} /> : null}
       <form action={skipChore}>
         {hidden}
         <button
