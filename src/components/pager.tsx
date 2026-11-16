@@ -48,7 +48,7 @@ export function Pager({
   return (
     <div className={`flex shrink-0 items-center gap-2 ${className}`}>
       {side(page - 1, "Previous page", <CaretLeft size="1.25rem" weight="bold" aria-hidden />)}
-      <span className="min-w-16 text-center text-base font-bold text-ink-muted tabular-nums" aria-live="polite">
+      <span className="min-w-16 text-center text-[1.15rem] font-bold text-ink-muted tabular-nums" aria-live="polite">
         {page + 1} of {pages}
       </span>
       {side(page + 1, "Next page", <CaretRight size="1.25rem" weight="bold" aria-hidden />)}

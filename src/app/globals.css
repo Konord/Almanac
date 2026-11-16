@@ -65,6 +65,9 @@
   --color-mat-white: var(--color-mat-white, #f7f6f2);
   --color-mat-cream: var(--color-mat-cream, #ece5d6);
   --color-mat-charcoal: var(--color-mat-charcoal, #36383c);
+  --color-mat-white-shade: var(--color-mat-white-shade, #6d6252);
+  --color-mat-cream-shade: var(--color-mat-cream-shade, #6b5634);
+  --color-mat-charcoal-shade: var(--color-mat-charcoal-shade, #000000);
 
   /* Corners and shadows (values from src/theme/tokens.ts). */
   --shadow-raised: var(--shadow-raised, 0 1px 3px rgba(30, 35, 45, 0.1));

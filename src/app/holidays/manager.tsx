@@ -3,7 +3,7 @@
 import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
 import { Plus, Trash } from "@phosphor-icons/react";
-import { EmptyState, Emoji, ScreenHeader } from "@/components/ui";
+import { cardClass, choiceChipClass, editorInputClass, EmptyState, Emoji, fieldLabelClass, kickerClass, ScreenHeader, secondaryActionClass, segItemClass, segTrackClass, Toggle } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -12,8 +12,8 @@ import { folderNamed, MAX_MIX_DAYS, MAX_ONLY_DAYS, type ArtFolder } from "@/lib/
 import { saveHolidays, type HolidayDraft } from "./actions";
 
 /*
- * The Holidays and birthdays screen. Left: a Holidays tab and a Birthdays
- * tab, each a short list (soonest first, a page at a time so nothing
+ * The Holidays and birthdays screen. The Holidays | Birthdays tabs sit in
+ * the header's tab slot. Left: that tab's list (soonest first, a page at a time so nothing
  * scrolls). Right: whatever was tapped, or the public holiday list to add
  * from. Every change waits for the one Save in the header.
  */
@@ -125,34 +125,32 @@ export function HolidayManager({
 
   return (
     <>
-      <ScreenHeader title="Holidays" sub="and birthdays" action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />} />
-
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,24fr)_minmax(0,56fr)]">
-        {/* Left: the two tabs and their lists */}
-        <section className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board p-4 lg:min-h-0">
-          <div className="flex shrink-0 gap-1 rounded-[var(--radius)] bg-rail p-1" role="tablist">
+      <ScreenHeader
+        title="Holidays"
+        sub="and birthdays"
+        tabs={
+          <div role="tablist" aria-label="Holidays or birthdays" className={segTrackClass}>
             {(["holidays", "birthdays"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={tab === t}
-                onClick={() => switchTab(t)}
-                className={`flex min-h-[var(--touch-target)] flex-1 items-center justify-center gap-2 rounded-[calc(var(--radius)-0.25rem)] text-lg font-bold ${
-                  tab === t ? "bg-board text-ink shadow-sm" : "text-ink-muted"
-                }`}
-              >
-                <Emoji emoji={t === "holidays" ? "🎉" : "🎂"} className="size-7" />
+              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => switchTab(t)} className={segItemClass(tab === t)}>
                 {t === "holidays" ? "Holidays" : "Birthdays"}
-                <span className="text-base text-ink-muted">{t === "holidays" ? draft.holidays.length : draft.birthdays.length}</span>
               </button>
             ))}
           </div>
+        }
+        action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />}
+      />
 
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[26rem_minmax(0,1fr)]">
+        {/* Left: this tab's list, soonest first */}
+        <section aria-label={tab === "holidays" ? "Holidays" : "Birthdays"} className={`${cardClass} gap-[0.2rem]`}>
+          <h2 className="flex shrink-0 items-baseline gap-3 text-[1.75rem] font-bold text-ink">
+            {tab === "holidays" ? "Holidays" : "Birthdays"}
+            <span className="text-[1.25rem] font-semibold text-ink-muted tabular-nums">{count}</span>
+          </h2>
           {count === 0 ? (
-            <p className="px-2 text-lg text-ink-muted">{tab === "holidays" ? "No holidays yet" : "No birthdays yet"}</p>
+            <p className="py-3 text-[1.25rem] font-bold text-ink-muted">{tab === "holidays" ? "No holidays yet" : "No birthdays yet"}</p>
           ) : null}
-          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+          <ul ref={listRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {tab === "holidays"
               ? holidays.slice(p * perPage, (p + 1) * perPage).map(({ h, next }) => (
                   <Row
@@ -175,31 +173,30 @@ export function HolidayManager({
                   />
                 ))}
           </ul>
-
-          <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+          <PageArrows page={p} pages={pages} onPage={setPage} className="justify-center pt-2" />
+          <div className="mt-auto flex shrink-0 items-center gap-2 pt-2">
             {tab === "holidays" ? (
               <>
-                <SmallButton onClick={() => setSelection({ kind: "public" })} active={selection?.kind === "public"}>
-                  <Emoji emoji="🍁" className="size-6" />
+                <button type="button" onClick={() => setSelection({ kind: "public" })} aria-pressed={selection?.kind === "public"} className={`${secondaryActionClass} flex-1 px-4! text-[1.25rem]! ${selection?.kind === "public" ? "bg-ink! text-board!" : ""}`}>
+                  <Emoji emoji="🍁" className="size-7" />
                   Public list
-                </SmallButton>
-                <SmallButton onClick={addOwnHoliday}>
+                </button>
+                <button type="button" onClick={addOwnHoliday} className={`${secondaryActionClass} flex-1 px-4! text-[1.25rem]!`}>
                   <Plus size="1.25rem" weight="bold" aria-hidden />
                   Your own
-                </SmallButton>
+                </button>
               </>
             ) : (
-              <SmallButton onClick={addBirthday}>
+              <button type="button" onClick={addBirthday} className={`${secondaryActionClass} flex-1 text-[1.25rem]!`}>
                 <Plus size="1.25rem" weight="bold" aria-hidden />
                 Birthday
-              </SmallButton>
+              </button>
             )}
-            <Pager page={p} pages={pages} onPage={setPage} />
           </div>
         </section>
 
         {/* Right: what was tapped */}
-        <section className="flex min-w-0 flex-col gap-5 rounded-[var(--radius-card)] border border-frame bg-board p-6 lg:min-h-0">
+        <section aria-label="Details" className={`${cardClass} gap-5`}>
           {selection?.kind === "public" ? (
             <PublicList added={new Set(draft.holidays.flatMap((h) => (h.public_key ? [h.public_key] : [])))} onAdd={addPublic} dateLabel={(r) => dateLabel(nextDate({ rule: r }, today))} />
           ) : selectedHoliday ? (
@@ -227,9 +224,9 @@ export function HolidayManager({
               }}
             />
           ) : tab === "holidays" ? (
-            <EmptyState emoji="🎉" />
+            <EmptyState emoji="🎉" title="Tap a holiday" hint="Or add one from the public list, or your own." />
           ) : (
-            <EmptyState emoji="🎂" />
+            <EmptyState emoji="🎂" title="Tap a birthday" hint="Or add a new one." />
           )}
         </section>
       </div>
@@ -248,33 +245,16 @@ function Row({ emoji, name, detail, active, onClick }: { emoji: string; name: st
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
+        className={`flex min-h-16 w-full items-center gap-[0.65rem] rounded-[var(--radius)] px-[0.7rem] py-1 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
       >
-        <Emoji emoji={emoji} className="size-10" />
+        <Emoji emoji={emoji} className="size-[2.15rem]" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-lg font-bold text-ink">{name}</span>
-          <span className="truncate text-sm font-semibold text-ink-muted">{detail}</span>
+          <span className="truncate text-[1.5rem] leading-[1.1] font-extrabold text-ink">{name}</span>
+          <span className="truncate text-[1.15rem] font-bold text-ink-muted tabular-nums">{detail}</span>
         </span>
       </button>
     </li>
   );
-}
-
-function SmallButton({ onClick, active = false, children }: { onClick: () => void; active?: boolean; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex min-h-12 items-center gap-2 rounded-2xl px-4 text-base font-bold text-ink ${active ? "bg-ink text-board" : "bg-rail hover:bg-panel"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (p: number) => void }) {
-  return <PageArrows page={page} pages={pages} onPage={onPage} className="ml-auto" />;
 }
 
 /** The public holidays not added yet, a page at a time; tap one to add it. */
@@ -285,12 +265,11 @@ function PublicList({ added, onAdd, dateLabel }: { added: Set<string>; onAdd: (k
   return (
     <>
       <div className="flex shrink-0 items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl font-extrabold text-ink">Public holidays</h2>
-        </div>
-        <Pager page={p} pages={pages} onPage={setPage} />
+        <h2 className="min-w-0 flex-1 text-[1.75rem] font-bold text-ink">Public holidays</h2>
+        <span className="text-[1.25rem] font-bold text-ink-muted">Tap one to add it</span>
+        <PageArrows page={p} pages={pages} onPage={setPage} className="ml-4" />
       </div>
-      <ul className="grid min-h-0 grid-cols-3 content-start gap-2">
+      <ul className="grid min-h-0 grid-cols-3 content-start gap-3">
         {PUBLIC_HOLIDAYS.slice(p * PUBLIC_PER_PAGE, (p + 1) * PUBLIC_PER_PAGE).map((h) => {
           const on = added.has(h.key);
           return (
@@ -299,12 +278,12 @@ function PublicList({ added, onAdd, dateLabel }: { added: Set<string>; onAdd: (k
                 type="button"
                 onClick={() => onAdd(h.key)}
                 disabled={on}
-                className={`flex min-h-20 w-full items-center gap-3 rounded-2xl border-2 px-3 text-left ${on ? "border-transparent bg-rail opacity-60" : "border-frame bg-board hover:border-ink"}`}
+                className={`flex min-h-[5.5rem] w-full items-center gap-[0.7rem] rounded-[var(--radius)] border-2 px-[0.9rem] text-left ${on ? "border-transparent bg-rail" : "border-frame bg-board hover:border-ink"}`}
               >
-                <Emoji emoji={h.icon} className="size-10" />
+                <Emoji emoji={h.icon} className="size-[2.6rem]" faded={on} />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-base font-bold text-ink">{h.name}</span>
-                  <span className="truncate text-sm font-semibold text-ink-muted">{on ? "Added" : `${dateLabel(h.rule)} · ${h.where}`}</span>
+                  <span className={`truncate text-[1.35rem] font-extrabold ${on ? "text-ink-muted" : "text-ink"}`}>{h.name}</span>
+                  <span className="truncate text-[1.15rem] font-bold text-ink-muted">{on ? "Added" : `${dateLabel(h.rule)} · ${h.where}`}</span>
                 </span>
               </button>
             </li>
@@ -315,50 +294,71 @@ function PublicList({ added, onAdd, dateLabel }: { added: Set<string>; onAdd: (k
   );
 }
 
+/** The picture, the name box and the remove button at the top of an editor. */
+function EditorTop({ picker, label, value, onName, autoFocus, onRemove }: { picker: ReactNode; label: string; value: string; onName: (v: string) => void; autoFocus?: boolean; onRemove: () => void }) {
+  return (
+    <div className="flex shrink-0 items-end gap-4">
+      {picker}
+      <label className="flex min-w-0 flex-1 flex-col gap-[0.35rem]">
+        <span className={fieldLabelClass}>{label}</span>
+        <input value={value} maxLength={40} autoFocus={autoFocus} onChange={(e) => onName(e.target.value)} className={`${editorInputClass} text-[1.75rem]!`} />
+      </label>
+      <button type="button" onClick={onRemove} className={`${secondaryActionClass} text-danger!`}>
+        <Trash size="1.25rem" aria-hidden />
+        Take it away
+      </button>
+    </div>
+  );
+}
+
 function HolidayEditor({ holiday, next, art, onChange, onRemove }: { holiday: Holiday; next: string; art: ArtFolder[] | null; onChange: (c: Partial<Holiday>) => void; onRemove: () => void }) {
   const fromList = holiday.public_key !== null;
   const rule = holiday.rule;
   return (
     <>
-      <div className="flex shrink-0 items-end gap-4">
-        <EmojiPicker
-          initial={holiday.icon ?? ""}
-          fallback="🎉"
-          fieldName=""
-          nameText={holiday.name}
-          onChange={(e) => onChange({ icon: e || null })}
-          label={`Picture for ${holiday.name}`}
-          className="size-16! self-center!"
-          fullScreen
-        />
-        <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="text-base font-bold text-ink">Name</span>
-          <input value={holiday.name} maxLength={40} onChange={(e) => onChange({ name: e.target.value })} className={input} />
-        </label>
-        <RemoveButton onClick={onRemove} label="Take it away" />
-      </div>
+      <EditorTop
+        picker={
+          <EmojiPicker
+            initial={holiday.icon ?? ""}
+            fallback="🎉"
+            fieldName=""
+            nameText={holiday.name}
+            onChange={(e) => onChange({ icon: e || null })}
+            label={`Picture for ${holiday.name}`}
+            className="size-[4.5rem]! self-end!"
+            fullScreen
+          />
+        }
+        label="Name"
+        value={holiday.name}
+        onName={(name) => onChange({ name })}
+        onRemove={onRemove}
+      />
 
       {fromList ? (
-        <p className="text-lg text-ink-soft">
-          <span className="font-bold text-ink">{describeHolidayRule(rule)}</span>, from the public list. Next: {next}.
+        <p className="text-[1.5rem] font-bold text-ink-soft">
+          <span className="text-ink">{describeHolidayRule(rule)}</span>, from the public list. Next: <span className="tabular-nums">{next}</span>.
         </p>
       ) : (
         <>
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="text-base font-bold text-ink">Every year on</span>
-            <ChipRow
-              options={[
-                { value: "fixed", label: "A date" },
-                { value: "nth", label: "A weekday" },
-              ]}
-              value={rule.kind === "nth" ? "nth" : "fixed"}
-              onChange={(v) =>
-                onChange({
-                  rule: v === "nth" ? { kind: "nth", month: "month" in rule ? rule.month : 1, weekday: 1, n: 1 } : { kind: "fixed", month: "month" in rule ? rule.month : 1, day: 1 },
-                })
-              }
-            />
-            <span className="ml-auto text-base font-bold text-ink-muted">Next: {next}</span>
+          <div className="flex shrink-0 items-center gap-4">
+            <span className={fieldLabelClass}>Every year on</span>
+            <div className="w-[22rem]">
+              <Toggle
+                label="Every year on"
+                value={rule.kind === "nth" ? "nth" : rule.kind === "fixed" ? "fixed" : null}
+                options={[
+                  { value: "fixed", label: "A date" },
+                  { value: "nth", label: "A weekday" },
+                ]}
+                onChange={(v) =>
+                  onChange({
+                    rule: v === "nth" ? { kind: "nth", month: "month" in rule ? rule.month : 1, weekday: 1, n: 1 } : { kind: "fixed", month: "month" in rule ? rule.month : 1, day: 1 },
+                  })
+                }
+              />
+            </div>
+            <span className="ml-auto text-[1.25rem] font-bold text-ink-muted tabular-nums">Next: {next}</span>
           </div>
           {rule.kind === "nth" ? (
             <div className="flex flex-wrap items-center gap-3">
@@ -376,11 +376,9 @@ function HolidayEditor({ holiday, next, art, onChange, onRemove }: { holiday: Ho
               <ChipRow options={WEEKDAYS.map((w, i) => ({ value: String(i), label: w }))} value={String(rule.weekday)} onChange={(v) => onChange({ rule: { ...rule, weekday: Number(v) } })} />
             </div>
           ) : null}
-          {rule.kind === "fixed" || rule.kind === "nth" ? (
-            <MonthChips value={rule.month} onChange={(m) => onChange({ rule: { ...rule, month: m } })} />
-          ) : null}
+          {rule.kind === "fixed" || rule.kind === "nth" ? <MonthChips value={rule.month} onChange={(m) => onChange({ rule: { ...rule, month: m } })} /> : null}
           {rule.kind === "fixed" ? <DayInput value={rule.day} onChange={(d) => onChange({ rule: { ...rule, day: d } })} /> : null}
-          {rule.kind === "before" || rule.kind === "easter" ? <p className="text-lg text-ink-soft">{describeHolidayRule(rule)}</p> : null}
+          {rule.kind === "before" || rule.kind === "easter" ? <p className="text-[1.5rem] font-bold text-ink-soft">{describeHolidayRule(rule)}</p> : null}
         </>
       )}
       {art ? (
@@ -396,28 +394,30 @@ function HolidayEditor({ holiday, next, art, onChange, onRemove }: { holiday: Ho
 function BirthdayEditor({ birthday, thisYear, art, onChange, onRemove }: { birthday: Birthday; thisYear: number; art: ArtFolder[] | null; onChange: (c: Partial<Birthday>) => void; onRemove: () => void }) {
   return (
     <>
-      <div className="flex shrink-0 items-end gap-4">
-        <EmojiPicker
-          initial={birthday.icon ?? ""}
-          fallback="🎂"
-          fieldName=""
-          nameText={birthday.name}
-          onChange={(e) => onChange({ icon: e || null })}
-          label={`Picture for ${birthday.name || "the birthday"}`}
-          className="size-16! self-center!"
-          fullScreen
-        />
-        <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="text-base font-bold text-ink">Whose birthday</span>
-          <input value={birthday.name} maxLength={40} autoFocus={birthday.name === ""} onChange={(e) => onChange({ name: e.target.value })} className={input} />
-        </label>
-        <RemoveButton onClick={onRemove} label="Take it away" />
-      </div>
+      <EditorTop
+        picker={
+          <EmojiPicker
+            initial={birthday.icon ?? ""}
+            fallback="🎂"
+            fieldName=""
+            nameText={birthday.name}
+            onChange={(e) => onChange({ icon: e || null })}
+            label={`Picture for ${birthday.name || "the birthday"}`}
+            className="size-[4.5rem]! self-end!"
+            fullScreen
+          />
+        }
+        label="Whose birthday"
+        value={birthday.name}
+        onName={(name) => onChange({ name })}
+        autoFocus={birthday.name === ""}
+        onRemove={onRemove}
+      />
       <MonthChips value={birthday.month} onChange={(m) => onChange({ month: m })} />
       <DayInput value={birthday.day} onChange={(d) => onChange({ day: d })} />
       <div className="flex flex-wrap items-end gap-6">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-base font-bold text-ink">Born in (optional)</span>
+        <label className="flex flex-col gap-[0.35rem]">
+          <span className={fieldLabelClass}>Born in (optional)</span>
           <input
             type="number"
             inputMode="numeric"
@@ -425,11 +425,11 @@ function BirthdayEditor({ birthday, thisYear, art, onChange, onRemove }: { birth
             max={thisYear}
             value={birthday.birth_year ?? ""}
             onChange={(e) => onChange({ birth_year: e.target.value === "" ? null : Number(e.target.value) })}
-            className={`${input} w-40`}
+            className={`${editorInputClass} w-44! tabular-nums`}
           />
         </label>
         {birthday.birth_year && birthday.birth_year <= thisYear ? (
-          <span className="pb-3 text-lg font-bold text-ink-soft">Turns {thisYear - birthday.birth_year} this year</span>
+          <span className="pb-3 text-[1.5rem] font-bold text-ink-soft tabular-nums">Turns {thisYear - birthday.birth_year} this year</span>
         ) : null}
       </div>
       {art && birthday.name.trim() ? <ArtBox folder={folderNamed(art, birthday.name, true)} name={birthday.name} /> : null}
@@ -437,19 +437,11 @@ function BirthdayEditor({ birthday, thisYear, art, onChange, onRemove }: { birth
   );
 }
 
-const input = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink outline-none focus:border-accent";
-
 function ChipRow({ options, value, onChange }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          aria-pressed={value === o.value}
-          className={`flex min-h-[var(--touch-target)] items-center rounded-full border-2 px-4 text-lg text-ink ${value === o.value ? "border-ink bg-rail font-bold" : "border-frame bg-board"}`}
-        >
+        <button key={o.value} type="button" onClick={() => onChange(o.value)} aria-pressed={value === o.value} className={choiceChipClass(value === o.value)}>
           {o.label}
         </button>
       ))}
@@ -459,17 +451,11 @@ function ChipRow({ options, value, onChange }: { options: { value: string; label
 
 function MonthChips({ value, onChange }: { value: number; onChange: (m: number) => void }) {
   return (
-    <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-base font-bold text-ink">Month</legend>
-      <div className="grid grid-cols-6 gap-2">
+    <fieldset className="flex flex-col gap-[0.35rem]">
+      <legend className={`${fieldLabelClass} mb-[0.35rem]`}>Month</legend>
+      <div className="grid grid-cols-12 gap-2">
         {MONTHS.map((m, i) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => onChange(i + 1)}
-            aria-pressed={value === i + 1}
-            className={`flex min-h-[var(--touch-target)] items-center justify-center rounded-full border-2 text-lg text-ink ${value === i + 1 ? "border-ink bg-rail font-bold" : "border-frame bg-board"}`}
-          >
+          <button key={m} type="button" onClick={() => onChange(i + 1)} aria-pressed={value === i + 1} className={`${choiceChipClass(value === i + 1)} px-0!`}>
             {m}
           </button>
         ))}
@@ -481,16 +467,16 @@ function MonthChips({ value, onChange }: { value: number; onChange: (m: number) 
 /** The day of the month: 1 to 31 as big tappable numbers, three rows. */
 function DayInput({ value, onChange }: { value: number; onChange: (d: number) => void }) {
   return (
-    <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-base font-bold text-ink">Day</legend>
-      <div className="grid grid-cols-11 gap-1.5">
+    <fieldset className="flex flex-col gap-[0.35rem]">
+      <legend className={`${fieldLabelClass} mb-[0.35rem]`}>Day</legend>
+      <div className="grid grid-cols-11 gap-2">
         {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
           <button
             key={d}
             type="button"
             onClick={() => onChange(d)}
             aria-pressed={value === d}
-            className={`flex min-h-12 items-center justify-center rounded-xl border-2 text-lg tabular-nums text-ink ${value === d ? "border-ink bg-rail font-bold" : "border-frame bg-board"}`}
+            className={`flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] border-2 text-[1.35rem] font-bold tabular-nums ${value === d ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink-soft"}`}
           >
             {d}
           </button>
@@ -503,42 +489,33 @@ function DayInput({ value, onChange }: { value: number; onChange: (d: number) =>
 /** The screen saver's art for a holiday or birthday: its folder (found by name) and, for a holiday, its days. */
 function ArtBox({ folder, name, children }: { folder: ArtFolder | null; name: string; children?: ReactNode }) {
   return (
-    <div className="mt-auto flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl bg-rail px-4 py-3">
+    <div className="mt-auto flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-[var(--radius-card)] bg-rail px-[1.1rem] py-4">
       <span className="flex min-w-0 items-center gap-3">
-        <Emoji emoji="🖼" className="size-9" faded={!folder} />
+        <Emoji emoji="🖼" className="size-10" faded={!folder} />
         <span className="flex min-w-0 flex-col">
-          <span className="text-base font-bold text-ink-muted">Screen saver art</span>
-          <span className="truncate text-lg font-bold text-ink">
+          <span className={kickerClass}>Screen saver art</span>
+          <span className="truncate text-[1.35rem] font-bold text-ink">
             {folder ? `${folder.name} · ${folder.files.length === 1 ? "1 painting" : `${folder.files.length} paintings`}` : `No folder named ${name.trim() || "this"}`}
           </span>
         </span>
       </span>
-      {children ? <span className="ml-auto flex flex-wrap items-center gap-5">{children}</span> : null}
+      {children ? <span className="ml-auto flex flex-wrap items-center gap-6">{children}</span> : null}
     </div>
   );
 }
 
 function Stepper({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (v: number) => void }) {
-  const step = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-board text-2xl font-bold text-ink disabled:opacity-40";
+  const step = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-board text-[1.75rem] font-bold text-ink shadow-raised disabled:opacity-40";
   return (
     <span className="flex items-center gap-2">
-      <span className="text-base font-bold text-ink">{label}</span>
+      <span className="text-[1.25rem] font-bold text-ink">{label}</span>
       <button type="button" aria-label={`Fewer: ${label}`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - 1))} className={step}>
         −
       </button>
-      <span className="w-8 text-center text-xl font-bold text-ink tabular-nums">{value}</span>
+      <span className="w-10 text-center text-[1.5rem] font-extrabold text-ink tabular-nums">{value}</span>
       <button type="button" aria-label={`More: ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className={step}>
         +
       </button>
     </span>
-  );
-}
-
-function RemoveButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return (
-    <button type="button" onClick={onClick} className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-2xl px-4 text-base font-bold text-danger hover:bg-rail">
-      <Trash size="1.25rem" aria-hidden />
-      {label}
-    </button>
   );
 }

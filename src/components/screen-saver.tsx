@@ -30,9 +30,9 @@ export const PREVIEW_EVENT = "almanac-screen-saver-preview";
 // The bevel is the same board as the mat, a touch lighter where it's cut, and
 // its faces are shaded toward a darker tone of that same board.
 const MAT: Record<MatColour, { mat: string; core: string; shade: string }> = {
-  white: { mat: "var(--color-mat-white)", core: "var(--color-board)", shade: "#6d6252" },
-  cream: { mat: "var(--color-mat-cream)", core: "color-mix(in srgb, var(--color-mat-cream) 55%, var(--color-board))", shade: "#6b5634" },
-  charcoal: { mat: "var(--color-mat-charcoal)", core: "color-mix(in srgb, var(--color-mat-charcoal) 89%, var(--color-board))", shade: "#000000" },
+  white: { mat: "var(--color-mat-white)", core: "var(--color-board)", shade: "var(--color-mat-white-shade)" },
+  cream: { mat: "var(--color-mat-cream)", core: "color-mix(in srgb, var(--color-mat-cream) 55%, var(--color-board))", shade: "var(--color-mat-cream-shade)" },
+  charcoal: { mat: "var(--color-mat-charcoal)", core: "color-mix(in srgb, var(--color-mat-charcoal) 89%, var(--color-board))", shade: "var(--color-mat-charcoal-shade)" },
 };
 
 async function screenPower(on: boolean) {

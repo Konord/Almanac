@@ -152,6 +152,19 @@ export const primaryActionClass =
 export const secondaryActionClass =
   "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-6 text-lg font-bold whitespace-nowrap text-ink disabled:opacity-40";
 
+/** A white card on the rail (a manager's list or editor panel): the mock's `.card`. */
+export const cardClass = "flex min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised lg:min-h-0";
+
+/** A small capital heading inside a card: the mock's `.k`. */
+export const kickerClass = "shrink-0 text-[1.15rem] font-bold tracking-[0.06em] text-ink-muted uppercase";
+
+/** A big tappable choice (a month, a weekday): a round chip, ink-framed when picked. */
+export function choiceChipClass(on: boolean): string {
+  return `flex min-h-[var(--touch-target)] items-center justify-center rounded-full border-2 px-4 text-[1.25rem] font-bold ${
+    on ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink-soft"
+  }`;
+}
+
 /** A field's small label above it ("When", "Minutes"): the mock's `.fl`. */
 export const fieldLabelClass = "text-[1.15rem] font-bold text-ink-muted";
 
@@ -423,27 +436,36 @@ export function ProgressBar({ done, total, colour, thick = false }: { done: numb
 // Forms and messages
 // ---------------------------------------------------------------------------
 
-/** A simple page for sign-in and first-time setup (no rail). */
-export function PageShell({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A simple page for sign-in and first-time setup (no menu): one centred
+ * Glance card on the grey rail, the big printed title above it.
+ */
+export function PageShell({ title, sub, children }: { title: string; sub?: ReactNode; children: ReactNode }) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-6 sm:p-10">
-      <h1 className="text-[3.5rem] leading-[0.95] font-extrabold tracking-[-0.045em] text-title lg:text-[5rem]">{title}</h1>
-      {children}
+    <main className="flex min-h-dvh flex-1 flex-col items-center justify-center bg-rail p-6 sm:p-10 lg:h-dvh lg:overflow-hidden">
+      <div className="flex w-full max-w-[46rem] flex-col gap-6">
+        <div className="flex items-baseline gap-[0.8rem]">
+          <h1 className="text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
+          {sub ? <span className="text-2xl leading-none font-bold tracking-[-0.02em] text-title-soft lg:text-[2rem]">{sub}</span> : null}
+        </div>
+        {children}
+      </div>
     </main>
   );
 }
 
+/** A white Glance card with an optional title (the sign-in and setup cards). */
 export function Panel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
-      {title ? <h2 className="mb-4 text-2xl font-bold text-ink">{title}</h2> : null}
+    <section className="flex flex-col gap-4 rounded-[var(--radius-card)] bg-board px-[1.65rem] pt-6 pb-[1.6rem] shadow-raised">
+      {title ? <h2 className="text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{title}</h2> : null}
       {children}
     </section>
   );
 }
 
 const buttonBase =
-  "inline-flex min-h-[var(--touch-target)] items-center justify-center gap-2 rounded-[var(--radius)] px-5 text-lg font-bold transition-opacity hover:opacity-90 disabled:opacity-50";
+  "inline-flex min-h-[var(--touch-target)] items-center justify-center gap-[0.6rem] rounded-[var(--radius)] px-[1.35rem] text-[1.25rem] font-bold whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50";
 
 export function Button({
   variant = "primary",
@@ -460,18 +482,20 @@ export function Button({
   return <button className={`${buttonBase} ${look} ${className}`} {...props} />;
 }
 
+/** A labelled field: the mock's small grey `.fl` label above the box, and an optional line of help under it. */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-base font-bold text-ink">{label}</span>
+    <label className="flex min-w-0 flex-col gap-[0.35rem]">
+      <span className={fieldLabelClass}>{label}</span>
       {children}
-      {hint ? <span className="text-sm text-ink-muted">{hint}</span> : null}
+      {hint ? <span className="text-[1.15rem] font-semibold text-ink-muted">{hint}</span> : null}
     </label>
   );
 }
 
+/** The mock's `.inp` (a step smaller, since these sit in forms with many fields). */
 const inputClass =
-  "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink outline-none focus:border-accent";
+  "min-h-[var(--touch-target)] min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-[1.35rem] font-bold text-ink outline-none placeholder:font-semibold placeholder:text-ink-muted focus:border-ink";
 
 export function Input({ className = "", ...props }: ComponentProps<"input">) {
   return <input className={`${inputClass} ${className}`} {...props} />;
@@ -484,7 +508,7 @@ export function Select({ className = "", ...props }: ComponentProps<"select">) {
 export function Notice({ tone, children }: { tone: "error" | "success"; children: ReactNode }) {
   const look = tone === "error" ? "bg-[color-mix(in_srgb,var(--color-danger)_10%,white)] text-danger" : "bg-[color-mix(in_srgb,var(--color-success)_10%,white)] text-success";
   return (
-    <p role={tone === "error" ? "alert" : "status"} className={`shrink-0 rounded-2xl px-5 py-3 text-lg font-bold ${look}`}>
+    <p role={tone === "error" ? "alert" : "status"} className={`shrink-0 rounded-[var(--radius)] px-5 py-3 text-[1.25rem] font-bold ${look}`}>
       {children}
     </p>
   );
@@ -521,12 +545,12 @@ export function Chips({
   const chosen = new Set(Array.isArray(defaultValue) ? defaultValue : defaultValue === undefined ? [] : [defaultValue]);
   return (
     <fieldset className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      <legend className="mb-1.5 text-base font-bold text-ink">{label}</legend>
+      <legend className={`mb-[0.35rem] ${fieldLabelClass}`}>{label}</legend>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <label
             key={o.value}
-            className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent"
+            className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-[1.25rem] font-semibold text-ink-soft select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-accent"
           >
             <input
               type={multiple ? "checkbox" : "radio"}

@@ -46,7 +46,7 @@ export function SurvivalCard({
   const shownMeals = meals.slice(0, MEAL_LIMIT);
   const shownChores = chores.slice(0, CHORE_LIMIT);
   const moreChores = chores.length - shownChores.length;
-  const heading = "mb-3 text-2xl font-bold text-ink";
+  const heading = "mb-3 text-[1.75rem] font-bold text-ink";
 
   return (
     <Modal title="Survival day" icon={<Emoji emoji="🛟" className="size-12" />} closeHref={closeHref} wide>
@@ -57,11 +57,11 @@ export function SurvivalCard({
           <section className="flex min-h-0 flex-col">
             <h3 className={heading}>Swap a meal for a backup?</h3>
             {shownMeals.length === 0 ? (
-              <p className="text-xl text-ink-muted">No meals left to cook today.</p>
+              <p className="text-[1.25rem] font-bold text-ink-muted">No meals left to cook today.</p>
             ) : backups.length === 0 ? (
-              <p className="text-xl text-ink-muted">
+              <p className="text-[1.25rem] font-bold text-ink-muted">
                 No backup meals yet.{" "}
-                <Link href="/meals/backups" className="font-bold text-accent underline">
+                <Link href="/meals/backups" className="font-bold text-ink underline">
                   Make one
                 </Link>
               </p>
@@ -92,7 +92,7 @@ export function SurvivalCard({
                           />
                         ))}
                       </div>
-                      <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-lg text-ink">
+                      <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-[1.25rem] font-semibold text-ink">
                         <input type="checkbox" name={`move-${meal.id}`} defaultChecked className="size-7 accent-[var(--color-ink)]" />
                         If swapped, move {meal.name} to the next free night
                       </label>
@@ -107,7 +107,7 @@ export function SurvivalCard({
           <section className="flex min-h-0 flex-col">
             <h3 className={heading}>Skip today&apos;s chores?</h3>
             {shownChores.length === 0 ? (
-              <p className="text-xl text-ink-muted">No chores on today&apos;s list.</p>
+              <p className="text-[1.25rem] font-bold text-ink-muted">No chores on today&apos;s list.</p>
             ) : (
               <ul className="flex flex-col">
                 {shownChores.map((c) => (
@@ -121,7 +121,7 @@ export function SurvivalCard({
                       <Emoji emoji={c.icon ?? "🧹"} className="size-10" />
                       <span className="min-w-0 flex-1 truncate text-xl font-semibold text-ink">{c.title}</span>
                       {c.must_do ? (
-                        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Essential: stays</span>
+                        <span className="shrink-0 rounded-full bg-now px-3 py-1 text-[1.15rem] font-extrabold text-white">Essential: stays</span>
                       ) : null}
                     </label>
                   </li>
@@ -129,9 +129,9 @@ export function SurvivalCard({
               </ul>
             )}
             {moreChores > 0 ? (
-              <p className="mt-2 text-lg text-ink-muted">
+              <p className="mt-2 text-[1.25rem] font-bold text-ink-muted">
                 +{moreChores} more stay on{" "}
-                <Link href="/chores" className="font-bold text-accent">
+                <Link href="/chores" className="font-bold text-ink underline">
                   Chores
                 </Link>
               </p>
@@ -140,7 +140,7 @@ export function SurvivalCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-5 border-t border-frame pt-4">
-          <Button className="px-8 text-xl">Do it</Button>
+          <Button className="ml-auto px-8">Do it</Button>
         </div>
       </form>
     </Modal>
@@ -166,12 +166,12 @@ function Choice({
   warn?: boolean;
 }) {
   return (
-    <label className="flex min-h-18 cursor-pointer items-center gap-3 rounded-2xl border-2 border-frame px-3.5 has-checked:border-meal-ink has-checked:bg-meal">
+    <label className="flex min-h-18 cursor-pointer items-center gap-3 rounded-[var(--radius)] border-2 border-frame px-3.5 has-checked:border-meal-ink has-checked:bg-meal">
       <input type="radio" name={name} value={value} defaultChecked={checked} className="sr-only" />
       <Emoji emoji={emoji} className="size-12" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-xl leading-tight font-bold text-ink">{label}</span>
-        <span className={`truncate text-sm ${warn ? "text-danger" : "text-ink-muted"}`}>{note}</span>
+        <span className={`truncate text-[1.15rem] font-bold ${warn ? "text-danger" : "text-ink-muted"}`}>{note}</span>
       </span>
     </label>
   );

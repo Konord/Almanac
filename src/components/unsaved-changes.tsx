@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "@phosphor-icons/react";
-import { primaryActionClass } from "./ui";
+import { primaryActionClass, secondaryActionClass } from "./ui";
 
 /*
  * One Save for a whole screen (Connor, 2026-11-07: "there are way too many
@@ -100,14 +100,14 @@ export function SaveButton({
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-2" role="group" aria-label="Save">
       {error ? (
-        <span className="line-clamp-2 max-w-[28rem] text-right text-base leading-tight font-bold text-danger" role="alert" title={error}>
+        <span className="line-clamp-2 max-w-[28rem] text-right text-[1.15rem] leading-tight font-bold text-danger" role="alert" title={error}>
           {error}
         </span>
       ) : null}
       {dirty || ready ? (
         <>
           {dirty ? (
-          <button type="button" onClick={onUndo} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink">
+          <button type="button" onClick={onUndo} disabled={saving} className={secondaryActionClass}>
             Undo
           </button>
           ) : null}
@@ -143,18 +143,18 @@ export function LeaveDialog({
   onLeave: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,35,45,0.35)]" role="dialog" aria-label="Unsaved changes">
-      <div className="flex w-[34rem] max-w-[92vw] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-7 shadow-2xl">
-        <h2 className="text-2xl font-extrabold text-ink">Save your changes?</h2>
-        <p className="text-lg text-ink-soft">You changed {what} and haven&rsquo;t saved them yet.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(35_38_43/0.18)]" role="dialog" aria-label="Unsaved changes">
+      <div className="flex w-[40rem] max-w-[92vw] flex-col gap-4 rounded-[var(--radius-dialog)] bg-board px-[1.65rem] pt-6 pb-[1.4rem] shadow-dialog">
+        <h2 className="text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">Save your changes?</h2>
+        <p className="text-[1.25rem] font-semibold text-ink-soft">You changed {what} and haven&rsquo;t saved them yet.</p>
         <div className="flex flex-wrap gap-2.5">
-          <button type="button" onClick={onSave} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board">
+          <button type="button" onClick={onSave} disabled={saving} className={`${primaryActionClass} disabled:opacity-70`}>
             {saving ? "Saving…" : "Save and go"}
           </button>
-          <button type="button" onClick={onStay} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink">
+          <button type="button" onClick={onStay} className={secondaryActionClass}>
             Go back
           </button>
-          <button type="button" onClick={onLeave} className="ml-auto flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-4 text-base font-bold text-danger">
+          <button type="button" onClick={onLeave} className="ml-auto flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-4 text-lg font-bold text-danger">
             Leave without saving
           </button>
         </div>

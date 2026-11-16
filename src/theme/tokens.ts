@@ -72,6 +72,10 @@ export type ThemeTokens = {
     matWhite: string;
     matCream: string;
     matCharcoal: string;
+    /** The darker tone of each mat that shades the bevel's faces */
+    matWhiteShade: string;
+    matCreamShade: string;
+    matCharcoalShade: string;
     /**
      * One colour per person (see src/lib/colours.ts): strong (accent bars,
      * dots), soft (tints behind their things) and hand (their handwritten
@@ -160,6 +164,9 @@ export const brightTheme: Theme = {
       matWhite: "#F7F6F2",
       matCream: "#ECE5D6",
       matCharcoal: "#36383C",
+      matWhiteShade: "#6D6252",
+      matCreamShade: "#6B5634",
+      matCharcoalShade: "#000000",
       personBlue: "#2F6FB8",
       personBlueSoft: "#CFE3F8",
       personBlueHand: "#2963A6",

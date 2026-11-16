@@ -9,16 +9,18 @@ export default function LoginPage(props: PageProps<"/login">) {
         <Suspense>
           <Messages searchParams={props.searchParams} />
         </Suspense>
-        <form className="mt-4 flex flex-col gap-4">
+        <form className="flex flex-col gap-4">
           <Field label="Email">
             <Input name="email" type="email" autoComplete="email" required />
           </Field>
           <Field label="Password">
             <Input name="password" type="password" autoComplete="current-password" required minLength={8} />
           </Field>
-          <div className="flex flex-wrap gap-3">
-            <Button formAction={signIn}>Sign in</Button>
-            <Button formAction={signUp} variant="secondary">
+          <div className="mt-2 flex flex-wrap gap-3">
+            <Button formAction={signIn} className="flex-1">
+              Sign in
+            </Button>
+            <Button formAction={signUp} variant="secondary" className="flex-1">
               Create household login
             </Button>
           </div>

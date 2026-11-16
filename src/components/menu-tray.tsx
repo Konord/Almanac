@@ -203,7 +203,7 @@ export function MenuTray({ section }: { section: Section }) {
                 href={s === "calendar" ? calendarHref : href}
                 aria-current={active ? "page" : undefined}
                 onClick={close}
-                className={`flex min-h-30 w-30 flex-col items-center justify-start gap-[0.35rem] rounded-[1.25rem] px-[0.4rem] pt-3 pb-[0.45rem] text-lg font-bold ${
+                className={`flex min-h-30 w-30 flex-col items-center justify-start gap-[0.35rem] rounded-[1.25rem] px-[0.4rem] pt-3 pb-[0.45rem] text-[1.25rem] font-bold ${
                   active ? "bg-rail text-ink" : "text-ink-soft hover:bg-rail"
                 }`}
               >

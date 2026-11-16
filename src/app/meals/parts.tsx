@@ -113,28 +113,28 @@ export function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 lg:p-8">
-      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.32)]" />
+      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgb(35_38_43/0.18)]" />
       <section
         role="dialog"
         aria-label={typeof title === "string" ? title : "Meal"}
-        className={`relative flex max-h-full w-full flex-col overflow-hidden rounded-[var(--radius-card)] bg-board shadow-[0_0_2.5rem_rgba(30,35,45,0.25)] ${
+        className={`relative flex max-h-full w-full flex-col overflow-hidden rounded-[var(--radius-dialog)] bg-board shadow-dialog ${
           wide ? "max-w-[96rem] lg:h-[52rem]" : "max-w-[60rem]"
         }`}
       >
-        <div className="flex shrink-0 items-center gap-4 border-b border-frame px-7 py-4">
+        <div className="flex shrink-0 items-center gap-4 px-[1.65rem] pt-6 pb-2">
           {icon}
-          <h2 className="min-w-0 flex-1 truncate text-3xl font-extrabold text-ink">{title}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{title}</h2>
           {aside}
           <Link
             href={closeHref}
             scroll={false}
             aria-label="Close"
-            className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink hover:bg-panel"
+            className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
           >
-            <X size="1.75rem" weight="bold" aria-hidden />
+            <X size="1.5rem" weight="bold" aria-hidden />
           </Link>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-7 py-5">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-[1.65rem] pt-3 pb-[1.4rem]">{children}</div>
       </section>
     </div>
   );

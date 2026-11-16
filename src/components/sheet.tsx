@@ -62,24 +62,24 @@ export function Sheet({
   return (
     <div className={`fixed inset-0 z-40 flex ${side === "left" ? "justify-start" : "justify-end"} ${narrow ? "pointer-events-none" : ""}`}>
       {/* The slim panel leaves the screen behind it usable (e.g. to drag the new event), so it has no dimmed backdrop. */}
-      {narrow ? null : <Link href={closeHref} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.28)]" scroll={false} />}
+      {narrow ? null : <Link href={closeHref} aria-label="Close" className="absolute inset-0 bg-[rgb(35_38_43/0.18)]" scroll={false} />}
       <section
         role="dialog"
         aria-label={title}
-        className={`pointer-events-auto relative flex h-full w-full ${narrow ? "max-w-[46rem]" : "max-w-[52rem]"} flex-col bg-board shadow-[0_0_2.5rem_rgba(30,35,45,0.25)]`}
+        className={`pointer-events-auto relative flex h-full w-full ${narrow ? "max-w-[46rem]" : "max-w-[52rem]"} flex-col bg-board shadow-dialog`}
       >
-        <div className="flex shrink-0 items-center gap-4 border-b border-frame px-8 py-5">
-          <h2 className="min-w-0 flex-1 truncate text-3xl font-extrabold text-ink">{title}</h2>
+        <div className="flex shrink-0 items-center gap-4 px-[1.65rem] pt-6 pb-2">
+          <h2 className="min-w-0 flex-1 truncate text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{title}</h2>
           <Link
             href={closeHref}
             scroll={false}
             aria-label="Close"
-            className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-rail text-ink hover:bg-panel"
+            className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
           >
-            <X size="1.75rem" weight="bold" aria-hidden />
+            <X size="1.5rem" weight="bold" aria-hidden />
           </Link>
         </div>
-        <div className={`min-h-0 flex-1 px-8 py-6 ${narrow ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
+        <div className={`min-h-0 flex-1 px-[1.65rem] pt-4 pb-[1.4rem] ${narrow ? "overflow-hidden" : "overflow-y-auto"}`}>{children}</div>
       </section>
     </div>
   );

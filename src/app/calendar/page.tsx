@@ -145,13 +145,13 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       ) : null}
 
       {panel === "templates" ? (
-        <Sheet title="Templates" closeHref={closeHref} narrow>
+        <Sheet title="Templates" closeHref={closeHref} floating>
           <TemplatesPanel templates={templates} memberById={memberById} returnTo={returnTo} />
         </Sheet>
       ) : null}
 
       {panel === "template" && templates.some((t) => t.id === firstParam(params.tpl)) ? (
-        <Sheet title="Edit template" closeHref={href({ panel: "templates", tpl: null })} narrow>
+        <Sheet title="Edit template" closeHref={href({ panel: "templates", tpl: null })} floating>
           <TemplateCard
             template={templates.find((t) => t.id === firstParam(params.tpl))!}
             members={members}
