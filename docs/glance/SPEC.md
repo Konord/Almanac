@@ -673,12 +673,20 @@ An item marked as already have shows a red X (not a green check), with the name 
 **Weather.** The header weather slot on the calendar pages (Today / Week / Month) stays built but is rendered **empty** for now (reserved width, nothing shown, no placeholder icon or text, no fake data). Connor will pick the weather source later. Weather still never appears on utility pages.
 
 **Hour grid returns on Week only.** Today / Agenda stays exactly as mocked (stacked cards, no hour grid). Week keeps its locked look — 7 edge-to-edge day columns, compact Glance agenda cards, past days fade (~55%) but keep their colours, every column reserves the sticker row, holiday emoji behind, red Now line in today's column — but the cards now sit on an **hour grid** (positioned by start time, height by duration with a minimum of one compact card; overlapping events share the column width side by side).
-- Drag gestures on the grid **scroll the view** (vertical hours) — that is the only thing dragging does.
+- Dragging **empty** grid **scrolls the view** (vertical hours). Dragging an **event card** moves it (see the Nov 16 correction below).
 - Hour labels sit **inline on the grid lines** inside the columns (small printed digits at the left of each hour line), not in a separate gutter, so the columns stay edge-to-edge and nothing moves or resizes.
-- **No dragging or resizing of events anywhere in the app** (Week, Today, Month). Events are edited by tapping the card, which opens the edit sheet.
+- ~~No dragging or resizing of events anywhere in the app~~ — **superseded Nov 16**, see below. Today and Month have no event dragging; tapping a card opens the edit sheet everywhere.
 - Initial scroll puts the current time (or the first event of the week) near the top; the header, tabs, weekday row and sticker row stay fixed while the hours scroll.
 - Daily List open on Week: drop two day columns (past days first, oldest first; if fewer than two past days remain, drop the last days of the week), leaving five full-width days; closing the list restores all seven. Header and tabs stay put. Tap the list button again to close.
 
 **Theme.** Migration `20261120200000_glance_theme.sql` is approved as is. **No theme customization UI** (no colour/theme picker or editor) until the default look is settled. The Holiday themes on/off toggle in Settings is not theme customization and stays.
 
 **Fonts.** Figtree is still used for digits ("Almanac Digits") via the bundled `public/fonts/figtree-latin-wght-normal.woff2` — keep that file. The npm packages `@fontsource-variable/figtree` and `@fontsource/kalam` are unused (nothing imports them) and are removed.
+
+### Week event dragging restored — Connor, Nov 16 2026 (overrides "No dragging or resizing of events" above)
+Connor clarified that "nothing moves or needs resizing" meant the **layout** must not shift or resize to fit the hour grid (hence inline hour labels, no gutter). He explicitly wants **events on the Week grid to be draggable and movable**, as on the live app (`main`).
+- Week: drag an event card up/down to change its time and sideways to another day, snapping exactly like main (`useTimelineDrag`, 15-minute steps); drag the bottom edge to change its length; pull a side handle over more days to make it multi-day (main's `stretchEventDays`). Saved through main's `rescheduleEvent` / `stretchEventDays` actions; the change persists.
+- Dragging empty grid still scrolls the hours. A tap (no movement) on a card still opens the edit sheet. Tapping an empty hour still starts an event there.
+- Today / Agenda: **no** event dragging (cards stay stacked; tap to edit). Month: no dragging (tap opens the day's agenda).
+- Card look stays Glance (compact agenda card); only a drag preview/handles are added.
+
