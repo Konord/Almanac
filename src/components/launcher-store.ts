@@ -3,6 +3,8 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { loadLauncher } from "@/app/apps/actions";
 import { CHECK_EVERY_MS, HELPER_URL, type LauncherApp } from "@/lib/launcher";
+import { brightnessNow, type BrightnessSettings, type Warmth } from "@/lib/brightness";
+import { localDateOf, localTimeOf } from "@/lib/time";
 
 /*
  * What this screen knows about the app launcher, shared by the tray and
@@ -19,7 +21,9 @@ export type HelperProgram = { key: string; name: string };
 
 type State = {
   /** Null until the first look; false when there's no helper here. */
-  helper: false | null | { programs: HelperProgram[]; open: string | null };
+  /** brightness: the monitor's brightness in percent, or null when the helper can't set it (or is older). */
+  /** warmth: whether the monitor can be warmer in the evening (null: it can't, or an older helper). */
+  helper: false | null | { programs: HelperProgram[]; open: string | null; brightness: number | null; warmth: boolean };
   apps: LauncherApp[];
   locale: string;
   timeZone: string;
@@ -52,7 +56,10 @@ async function findHelper(): Promise<State["helper"]> {
           ) as HelperProgram[])
         : [];
     const open = body && typeof body === "object" && typeof (body as { open?: unknown }).open === "string" ? (body as { open: string }).open : null;
-    return { programs, open };
+    const b = body && typeof body === "object" ? (body as { brightness?: unknown }).brightness : null;
+    const brightness = typeof b === "number" && b >= 0 && b <= 100 ? b : null;
+    const warmth = Boolean(body && typeof body === "object" && typeof (body as { warmth?: unknown }).warmth === "string");
+    return { programs, open, brightness, warmth };
   } catch {
     return false;
   }
@@ -67,6 +74,7 @@ async function refresh() {
   try {
     const result = await loadLauncher();
     set(result ? { helper, apps: result.apps, locale: result.locale, timeZone: result.timeZone } : { helper, apps: [] });
+    if (result && helper.brightness !== null) followSchedule(result.brightness, result.timeZone, helper.warmth);
   } catch {
     // Almanac's server didn't answer: keep what we had and try again next time.
     set({ helper });
@@ -130,4 +138,78 @@ export async function launchApp(app: LauncherApp): Promise<boolean> {
 
 export function clearLaunchProblem() {
   set({ problem: null });
+}
+
+/*
+ * The monitor's brightness (2026-11-16), set by the helper over the video
+ * cable (DDC/CI). A finger dragging the slider asks many times a second,
+ * but the monitor takes a moment for each change, so it's sent at most
+ * every BRIGHTNESS_EVERY_MS, and always once more at the end.
+ */
+const BRIGHTNESS_EVERY_MS = 250;
+let lastSent = 0;
+let pending: ReturnType<typeof setTimeout> | null = null;
+
+async function sendBrightness(percent: number) {
+  lastSent = Date.now();
+  try {
+    await fetch(`${HELPER_URL}/brightness`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ percent }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch {
+    // The helper didn't answer: the next refresh shows what the monitor really is.
+  }
+}
+
+/*
+ * The day and evening levels (src/lib/brightness.ts). Checked with the apps,
+ * once a minute: when a new stretch of the day starts (or its level was
+ * changed in Settings), the screen changes to it. In between, the slider
+ * is left alone. Opening the page counts as a new stretch, so the screen
+ * is right after a restart.
+ */
+let followed: string | null = null;
+
+function followSchedule(settings: BrightnessSettings, timeZone: string, canWarm: boolean) {
+  if (!settings.scheduled) {
+    followed = null;
+    return;
+  }
+  const now = new Date();
+  const minute = Number(localTimeOf(now, timeZone).slice(0, 2)) * 60 + Number(localTimeOf(now, timeZone).slice(3, 5));
+  const yesterday = localDateOf(new Date(now.getTime() - 24 * 60 * 60_000), timeZone);
+  const { percent, warmth, stretch } = brightnessNow(settings, localDateOf(now, timeZone), minute, yesterday);
+  const key = `${stretch} ${percent} ${warmth}`;
+  if (key === followed) return;
+  followed = key;
+  setBrightness(percent, true);
+  if (canWarm) void setColour(warmth);
+}
+
+/** The monitor's colour: normal, or warmer by this much. Takes a few seconds; nothing waits for it. */
+async function setColour(warmth: Warmth) {
+  try {
+    await fetch(`${HELPER_URL}/colour`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ warmth }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    // Tried again at the next change.
+  }
+}
+
+/** Sets the monitor's brightness (0 to 100). final: the finger has let go, so send it now. */
+export function setBrightness(percent: number, final = false) {
+  const value = Math.round(Math.min(100, Math.max(0, percent)));
+  if (state.helper) set({ helper: { ...state.helper, brightness: value } });
+  if (pending) clearTimeout(pending);
+  pending = null;
+  const wait = BRIGHTNESS_EVERY_MS - (Date.now() - lastSent);
+  if (final || wait <= 0) void sendBrightness(value);
+  else pending = setTimeout(() => void sendBrightness(value), wait);
 }

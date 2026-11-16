@@ -9,6 +9,7 @@ import { panelBoxes } from "@/lib/panel-boxes";
 import { cleanAddress } from "@/lib/launcher";
 import { parseScreenSaver } from "@/lib/screen-saver";
 import { parseSounds } from "@/lib/sounds";
+import { parseBrightness } from "@/lib/brightness";
 import { parseWeatherPlace } from "@/lib/weather";
 import { draftProblem, isNewId, type SettingsDraft } from "./draft";
 
@@ -56,6 +57,7 @@ export async function saveHousehold(draft: SettingsDraft): Promise<Result> {
     screenSaver: parseScreenSaver(draft.screenSaver),
     holidayThemes: Boolean(draft.holidayThemes),
     sounds: parseSounds(draft.sounds),
+    brightness: parseBrightness(draft.brightness),
     weather: parseWeatherPlace(draft.weather),
   };
   const name = draft.name.trim().slice(0, 80);

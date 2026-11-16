@@ -29,6 +29,17 @@ export type Config = {
   touchscreen: string;
   pill: { corner: "bottom-left" | "bottom-right" | "top-left" | "top-right"; hideAfterSeconds: number };
   programs: Record<string, Program>;
+  /**
+   * The monitor's brightness, set over DDC/CI with ddcutil (2026-11-16).
+   * display: which monitor, as `ddcutil detect` numbers them (null: the only one).
+   */
+  brightness: { command: string[]; display: number | null };
+  /**
+   * The evening's warmer colour (2026-11-16): the colour preset (VCP 14)
+   * for normal colour, and the one whose red, green and blue levels can be
+   * changed ("User 1" on most monitors). Hex, as `ddcutil capabilities` lists them.
+   */
+  colour: { normalPreset: string; userPreset: string };
 };
 
 export const DEFAULTS: Config = {
@@ -40,6 +51,8 @@ export const DEFAULTS: Config = {
   touchscreen: "auto",
   pill: { corner: "bottom-left", hideAfterSeconds: 4 },
   programs: {},
+  brightness: { command: ["ddcutil"], display: null },
+  colour: { normalPreset: "05", userPreset: "0b" },
 };
 
 const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "string" && x.length > 0);
@@ -50,7 +63,7 @@ const CORNERS = ["bottom-left", "bottom-right", "top-left", "top-right"] as cons
 export function parseConfig(raw: unknown): { config: Config } | { error: string } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "The config should be a JSON object." };
   const r = raw as Record<string, unknown>;
-  const config: Config = { ...DEFAULTS, pill: { ...DEFAULTS.pill }, programs: {} };
+  const config: Config = { ...DEFAULTS, pill: { ...DEFAULTS.pill }, programs: {}, brightness: { ...DEFAULTS.brightness }, colour: { ...DEFAULTS.colour } };
 
   if (r.port !== undefined) {
     if (typeof r.port !== "number" || !Number.isInteger(r.port) || r.port < 1024 || r.port > 65535) return { error: "port should be a number from 1024 to 65535." };
@@ -98,8 +111,31 @@ export function parseConfig(raw: unknown): { config: Config } | { error: string 
       };
     }
   }
+  if (r.brightness !== undefined) {
+    const b = r.brightness as Record<string, unknown>;
+    if (!b || typeof b !== "object" || Array.isArray(b)) return { error: "brightness should be an object." };
+    if (b.command !== undefined) {
+      if (!isStrings(b.command)) return { error: 'brightness.command should be a command, like ["ddcutil"].' };
+      config.brightness.command = b.command;
+    }
+    if (b.display !== undefined && b.display !== null) {
+      if (typeof b.display !== "number" || !Number.isInteger(b.display) || b.display < 1 || b.display > 9) return { error: "brightness.display should be a monitor number from `ddcutil detect`, like 1." };
+      config.brightness.display = b.display;
+    }
+  }
+  if (r.colour !== undefined) {
+    const c = r.colour as Record<string, unknown>;
+    if (!c || typeof c !== "object" || Array.isArray(c)) return { error: "colour should be an object." };
+    for (const key of ["normalPreset", "userPreset"] as const) {
+      if (c[key] === undefined) continue;
+      if (typeof c[key] !== "string" || !HEX_BYTE.test(c[key] as string)) return { error: `colour.${key} should be a value from \`ddcutil capabilities\` (Feature: 14), like "05".` };
+      config.colour[key] = (c[key] as string).toLowerCase();
+    }
+  }
   return { config };
 }
+
+const HEX_BYTE = /^[0-9a-fA-F]{2}$/;
 
 /** "http://host:port" from an address, or null. */
 export function originOf(address: string): string | null {
@@ -199,4 +235,64 @@ export function touchDowns(bytes: Uint8Array): number {
     if (type === EV_KEY && code === BTN_TOUCH && value === 1) downs += 1;
   }
   return downs;
+}
+
+/*
+ * The monitor's brightness (2026-11-16). Monitors that speak DDC/CI take
+ * settings over the video cable, the same ones as the buttons on the
+ * monitor's own menu. ddcutil (sudo apt install ddcutil) does the talking.
+ * Brightness is setting (VCP code) 10.
+ */
+export const BRIGHTNESS_VCP = "10";
+
+/** The ddcutil command to read (value undefined) or set one of the monitor's settings (brightness unless named). */
+export function ddcutilCommand(config: Config, raw?: number | string, vcp: string = BRIGHTNESS_VCP): string[] {
+  const which = config.brightness.display ? ["--display", String(config.brightness.display)] : [];
+  // --brief: one line that's easy to read back. --noverify: don't read it back after setting (twice as fast).
+  // A preset is given in hex ("0b"), as `ddcutil capabilities` lists it; it's sent as a plain number.
+  const value = typeof raw === "string" ? String(parseInt(raw, 16)) : String(raw);
+  return raw === undefined
+    ? [...config.brightness.command, ...which, "--brief", "getvcp", vcp]
+    : [...config.brightness.command, ...which, "--noverify", "setvcp", vcp, value];
+}
+
+/** Reads `ddcutil --brief getvcp 10` ("VCP 10 C 50 100": now 50 of 100), or another setting's line. */
+export function parseBrightness(text: string, vcp: string = BRIGHTNESS_VCP): { raw: number; max: number } | null {
+  const m = new RegExp(`^VCP\\s+${vcp}\\s+C\\s+(\\d+)\\s+(\\d+)\\s*$`, "im").exec(text);
+  if (!m) return null;
+  const raw = Number(m[1]);
+  const max = Number(m[2]);
+  return max > 0 && raw <= max ? { raw, max } : null;
+}
+
+/** The monitor's own number as a percent (most monitors count to 100 anyway). */
+export const toPercent = (raw: number, max: number) => Math.round((raw / max) * 100);
+
+/** A percent asked for by Almanac, as the monitor's own number, or null if it isn't one. */
+export function fromPercent(asked: unknown, max: number): number | null {
+  if (typeof asked !== "number" || !Number.isFinite(asked)) return null;
+  const percent = Math.min(100, Math.max(0, asked));
+  return Math.round((percent / 100) * max);
+}
+
+/*
+ * A warmer colour in the evening (2026-11-16). Few monitors let a computer
+ * reach their own "low blue" mode, but most let it pick a colour preset
+ * (VCP 14) and change the red, green and blue levels (16, 18, 1A) of the
+ * "User" preset. Warmer means less blue, and a little less green.
+ */
+export type Warmth = "none" | "weak" | "medium" | "strong";
+export const WARMTHS: readonly Warmth[] = ["none", "weak", "medium", "strong"];
+export const GAIN_VCP = { red: "16", green: "18", blue: "1A" } as const;
+
+/** Each colour's level as a share of its most, for each warmth. */
+export const WARMTH_GAINS: Record<Exclude<Warmth, "none">, { red: number; green: number; blue: number }> = {
+  weak: { red: 1, green: 0.95, blue: 0.85 },
+  medium: { red: 1, green: 0.9, blue: 0.7 },
+  strong: { red: 1, green: 0.82, blue: 0.55 },
+};
+
+/** Whether `ddcutil capabilities` lists the colour presets and the blue level, so warmth can work. */
+export function canWarm(capabilities: string): boolean {
+  return /Feature:\s*14\b/i.test(capabilities) && /Feature:\s*1A\b/i.test(capabilities);
 }

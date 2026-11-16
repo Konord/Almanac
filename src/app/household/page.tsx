@@ -118,6 +118,7 @@ async function HouseholdContent() {
     screenSaver: settings.screenSaver,
     holidayThemes: settings.holidayThemes,
     sounds: settings.sounds,
+    brightness: settings.brightness,
     weather: settings.weather,
   };
 

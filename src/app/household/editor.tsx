@@ -197,7 +197,7 @@ export function SettingsEditor({
       ) : tab === "spotify" ? (
         <SpotifyTab info={spotify} />
       ) : tab === "screen" ? (
-        <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} view={view} onView={setView} />
+        <ScreenSaverTab value={draft.screenSaver} onChange={(screenSaver) => set({ screenSaver })} here={here} onHere={setHereDraft} mealTimes={mealTimes} art={art} view={view} onView={setView} brightness={draft.brightness} onBrightness={(brightness) => set({ brightness })} />
       ) : tab === "apps" ? (
         <AppsTab apps={draft.apps} onChange={(apps) => set({ apps })} />
       ) : tab === "people" ? (

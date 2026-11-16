@@ -105,3 +105,33 @@ test("a finger going down is counted; moving and lifting aren't", () => {
   assert.equal(touchDowns(stream), 1);
   assert.equal(touchDowns(event(1, 0x130, 1)), 0); // a controller's A button
 });
+
+test("brightness: ddcutil's answer is read, and percents become the monitor's numbers", async () => {
+  const { parseBrightness, fromPercent, toPercent, ddcutilCommand } = await import("./lib.ts");
+  assert.deepEqual(parseBrightness("VCP 10 C 50 100\n"), { raw: 50, max: 100 });
+  assert.deepEqual(parseBrightness("VCP 10 C 30 255"), { raw: 30, max: 255 });
+  assert.equal(parseBrightness("Display not found"), null);
+  assert.equal(parseBrightness("VCP 10 ERR"), null);
+  assert.equal(toPercent(30, 255), 12);
+  assert.equal(fromPercent(50, 255), 128);
+  assert.equal(fromPercent(140, 100), 100);
+  assert.equal(fromPercent(-5, 100), 0);
+  assert.equal(fromPercent("50", 100), null);
+  assert.deepEqual(ddcutilCommand(config()), ["ddcutil", "--brief", "getvcp", "10"]);
+  const two = parseConfig({ ...good, brightness: { display: 2 } });
+  assert.ok("config" in two);
+  assert.deepEqual(ddcutilCommand(two.config, 40), ["ddcutil", "--display", "2", "--noverify", "setvcp", "10", "40"]);
+  assert.ok("error" in parseConfig({ ...good, brightness: { display: 0 } }));
+  assert.ok("error" in parseConfig({ ...good, brightness: { command: [] } }));
+});
+
+test("warmth: presets are sent as hex, gains read like brightness, and capabilities are checked", async () => {
+  const { ddcutilCommand, parseBrightness, canWarm } = await import("./lib.ts");
+  assert.deepEqual(ddcutilCommand(config(), "0b", "14"), ["ddcutil", "--noverify", "setvcp", "14", "11"]);
+  assert.deepEqual(ddcutilCommand(config(), undefined, "1A"), ["ddcutil", "--brief", "getvcp", "1A"]);
+  assert.deepEqual(parseBrightness("VCP 1A C 50 100", "1A"), { raw: 50, max: 100 });
+  assert.equal(parseBrightness("VCP 1A C 50 100"), null);
+  assert.equal(canWarm("   Feature: 14 (Select color preset)\n   Feature: 1A (Video gain: Blue)"), true);
+  assert.equal(canWarm("   Feature: 10 (Brightness)"), false);
+  assert.ok("error" in parseConfig({ ...good, colour: { userPreset: "User 1" } }));
+});

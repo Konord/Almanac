@@ -2,6 +2,7 @@ import { appsProblem, type AppDraft } from "../../lib/launcher.ts";
 import { BOX_ID } from "../../lib/panel-boxes.ts";
 import { screenSaverProblem, type ScreenSaverSettings } from "../../lib/screen-saver.ts";
 import type { SoundSettings } from "../../lib/sounds.ts";
+import { brightnessProblem, type BrightnessSettings } from "../../lib/brightness.ts";
 import type { WeatherPlace } from "../../lib/weather.ts";
 
 /*
@@ -45,6 +46,8 @@ export type SettingsDraft = {
   apps: AppDraft[];
   /** The art screen saver (Screen saver tab). */
   screenSaver: ScreenSaverSettings;
+  /** The kitchen screen's day and evening brightness (Screen saver tab › Brightness). */
+  brightness: BrightnessSettings;
   /** Christmas, Halloween and other holidays change the Today title and some colours. */
   holidayThemes: boolean;
   /** Mute, quiet hours and where sounds play (src/lib/sounds.ts). */
@@ -78,5 +81,5 @@ export function draftProblem(d: SettingsDraft): string | null {
       if (m.pin !== m.pinAgain) return `${m.name}'s two PINs don't match.`;
     }
   }
-  return appsProblem(d.apps) ?? screenSaverProblem(d.screenSaver);
+  return appsProblem(d.apps) ?? screenSaverProblem(d.screenSaver) ?? brightnessProblem(d.brightness);
 }
