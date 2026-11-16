@@ -10,6 +10,7 @@ import { folderUse } from "@/lib/screen-saver";
 import type { ArtOverview } from "./screen-saver-tab";
 import type { SpotifyInfo } from "./spotify-tab";
 import { spotifyApp } from "@/lib/spotify";
+import { pollenKey } from "@/lib/weather-server";
 
 /**
  * Settings: the people in the household and the household's settings.
@@ -117,7 +118,8 @@ async function HouseholdContent() {
     screenSaver: settings.screenSaver,
     holidayThemes: settings.holidayThemes,
     sounds: settings.sounds,
+    weather: settings.weather,
   };
 
-  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} mealTimes={mealTimes ?? []} art={overview} spotify={spotify} />;
+  return <SettingsEditor key={JSON.stringify(initial)} initial={initial} boxes={allBoxes(lists ?? [])} mealTimes={mealTimes ?? []} art={overview} spotify={spotify} weather={{ pollenKey: pollenKey() !== null }} />;
 }

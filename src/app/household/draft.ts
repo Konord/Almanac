@@ -2,6 +2,7 @@ import { appsProblem, type AppDraft } from "../../lib/launcher.ts";
 import { BOX_ID } from "../../lib/panel-boxes.ts";
 import { screenSaverProblem, type ScreenSaverSettings } from "../../lib/screen-saver.ts";
 import type { SoundSettings } from "../../lib/sounds.ts";
+import type { WeatherPlace } from "../../lib/weather.ts";
 
 /*
  * The Settings screen keeps every change here until its one Save (Connor,
@@ -48,6 +49,8 @@ export type SettingsDraft = {
   holidayThemes: boolean;
   /** Mute, quiet hours and where sounds play (src/lib/sounds.ts). */
   sounds: SoundSettings;
+  /** Where the weather and pollen are for (Weather tab), or null for no weather. */
+  weather: WeatherPlace | null;
 };
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
