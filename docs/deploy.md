@@ -154,7 +154,8 @@ It backs up first, pulls, runs `npm ci`, applies new migrations with
    Screen Blank: Never); Almanac's art screen saver handles that.
 4. In BIOS (F1 at power on) set **After Power Loss: Power On**. Do the same on
    the server.
-5. Install the tools: `sudo apt install -y curl` (plus `wmctrl python3-gi gir1.2-gtk-3.0` on Xorg),
+5. Install the tools: `sudo apt install -y curl ddcutil` (ddcutil sets the
+   monitor's brightness for the tray's slider) (plus `wmctrl python3-gi gir1.2-gtk-3.0` on Xorg),
    `sudo snap install chromium`, Node 24 (same two NodeSource lines as the
    server), `sudo usermod -aG input $USER`, and stop Ubuntu blanking the screen:
    `gsettings set org.gnome.desktop.session idle-delay 0` and
