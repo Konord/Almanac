@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { ArrowCounterClockwise, Check, SunHorizon } from "@phosphor-icons/react/dist/ssr";
-import { Avatar, Emoji } from "@/components/ui";
+import { ListRow } from "@/components/list-row";
+import { hand, strong } from "@/lib/colours";
+import { ColourDot, Emoji } from "@/components/ui";
 import { CHORE_TAGS } from "@/lib/chore-days";
 import { daysBetween } from "@/lib/chores";
 import type { Household } from "@/lib/household";
@@ -84,7 +85,7 @@ export function ChoreRow({
         <span className="text-xl leading-[1.1] font-semibold text-ink">{chore.name}</span>
         <span className="truncate text-sm font-semibold text-ink-muted">{choreMeta(chore, today, household)}</span>
       </span>
-      {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
+      {who ? <ColourDot colour={who.colour} /> : null}
       <form action={skipChore}>
         {hidden}
         <button
@@ -157,7 +158,12 @@ export function RoundRow({
   );
 }
 
-/** A to-do: tick box, words in handwriting, when and who. */
+/**
+ * A to-do on the Lists screen: the same row as the Daily List (ListRow),
+ * a round tick, the words handwritten in the person's ink, then when and
+ * who. Ticking an open one scratches it off into the done pile; ticking a
+ * done one puts it back.
+ */
 export function TodoRow({
   todo,
   members,
@@ -183,66 +189,60 @@ export function TodoRow({
   // A one-off chore: its tags under the words, and the day the planner picked.
   const tagNames = todo.is_chore ? CHORE_TAGS.filter((t) => todo.tags.includes(t.value)).map((t) => t.label) : [];
   const planned = todo.is_chore && plannedOn ? (todo.due_date === today ? today : (plannedOn.get(todo.id) ?? null)) : undefined;
-  const words = (
-    <>
-      <span className={`line-clamp-2 font-hand text-2xl leading-[1.1] break-words ${done ? "text-ink-muted line-through" : "text-ink"}`}>{todo.title}</span>
-      {todo.is_chore && !done ? (
-        <span className="mt-0.5 block truncate text-sm font-bold text-ink-muted">{["Chore", ...tagNames].join(" · ")}</span>
-      ) : null}
-    </>
-  );
-  return (
-    <li className="flex min-h-19 items-center gap-3.5 border-b border-panel last:border-0">
-      <form action={toggleTodo}>
+  const meta =
+    planned !== undefined && !done ? (
+      <span className={planned ? undefined : "text-now"}>{planned ? dayLabel(planned, today, household) : "No room yet"}</span>
+    ) : todo.must_do && !done ? (
+      <span className="rounded-full bg-now px-2.5 py-1 text-base font-extrabold text-white">Essential</span>
+    ) : todo.due_date && !done && planned === undefined ? (
+      <span className={late ? "text-now" : undefined}>{todoWhen(todo, today, household)}</span>
+    ) : null;
+  // No date (or a chore not planned for today): it stays put until it's put on today's Daily List.
+  const toToday =
+    !done && !todo.must_do && !(todo.due_date && planned === undefined) && planned !== today ? (
+      <form action={doToday} className="shrink-0">
         <input type="hidden" name="id" value={todo.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
-        <button
-          aria-pressed={done}
-          aria-label={done ? `Untick ${todo.title}` : `Tick off ${todo.title}`}
-          className="flex size-[var(--touch-target)] items-center justify-center"
-        >
-          <span
-            className={`flex size-8 items-center justify-center rounded-[0.625rem] text-white ${
-              done ? "bg-success" : "border-[2.5px] border-check-border"
-            }`}
-          >
-            {done ? <Check size="1.125rem" weight="bold" aria-hidden /> : null}
-          </span>
+        <button className="flex min-h-[var(--touch-target)] items-center gap-2 rounded-full bg-panel px-4 text-[1.125rem] font-bold text-ink">
+          <SunHorizon size="1.25rem" aria-hidden />
+          Add to Daily List
         </button>
       </form>
-      <span className="flex min-w-0 flex-1 items-center gap-2.5">
-        {todo.icon ? <Emoji emoji={todo.icon} className="size-8" faded={done} /> : null}
-        {editHref ? (
-          <Link href={editHref} scroll={false} className="min-w-0 flex-1 py-2">
-            {words}
-          </Link>
-        ) : (
-          <span className="min-w-0 flex-1 py-2">{words}</span>
-        )}
-      </span>
-      {planned !== undefined && !done ? (
-        <span className={`shrink-0 text-sm font-bold ${planned ? "text-ink-muted" : "text-now"}`}>
-          {planned ? dayLabel(planned, today, household) : "No room yet"}
-        </span>
-      ) : null}
-      {todo.must_do && !done ? (
-        <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Essential</span>
-      ) : todo.due_date && !done && planned === undefined ? (
-        <span className={`shrink-0 text-sm font-bold ${late ? "text-now" : "text-ink-muted"}`}>{todoWhen(todo, today, household)}</span>
-      ) : !done && planned !== today ? (
-        // No date (or a chore not planned for today): it stays put until it's put on today's daily list.
-        <form action={doToday} className="shrink-0">
-          <input type="hidden" name="id" value={todo.id} />
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <button
-            className="flex min-h-11 items-center gap-1.5 rounded-full bg-rail px-3 text-sm font-bold text-ink"
-          >
-            <SunHorizon size="1.125rem" aria-hidden />
-            Add to Daily list
-          </button>
-        </form>
-      ) : null}
-      {who ? <Avatar name={who.name} colour={who.colour} icon={who.icon} size="sm" /> : null}
-    </li>
+    ) : null;
+  return (
+    <ListRow
+      size="page"
+      title={todo.title}
+      ink={hand(who?.colour)}
+      done={done}
+      tick={{
+        action: toggleTodo,
+        fields: [
+          ["id", todo.id],
+          ["returnTo", returnTo],
+        ],
+      }}
+      editHref={editHref}
+      sub={todo.is_chore && !done ? ["Chore", ...tagNames].join(" · ") : undefined}
+      meta={meta}
+      icon={todo.icon ? <Emoji emoji={todo.icon} className="size-8" faded={done} /> : null}
+      slot
+      end={
+        <>
+          {toToday}
+          {who ? <PersonDot name={who.name} colour={who.colour} /> : null}
+        </>
+      }
+    />
+  );
+}
+
+/** Who a row is for: their colour dot and name, in their ink (no avatars in Glance). */
+export function PersonDot({ name, colour }: { name: string; colour: string }) {
+  return (
+    <span className="flex shrink-0 items-center gap-2 text-[1.125rem] font-bold" style={{ color: hand(colour) }}>
+      <span className="size-[1.15rem] shrink-0 rounded-full" style={{ background: strong(colour) }} aria-hidden />
+      {name}
+    </span>
   );
 }

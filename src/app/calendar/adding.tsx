@@ -70,6 +70,7 @@ export function readAdding(
         title: template.title,
         icon: template.icon ?? "",
         notes: template.notes ?? "",
+        location: template.location ?? "",
         dayKind: template.day_kind ?? undefined,
         startTime,
         minutes: template.minutes,
@@ -134,9 +135,10 @@ export function QuickAddSheet({
   returnPath: "/" | "/calendar" | "/review";
 }) {
   return (
-    <Sheet title="Add an event" closeHref={closeHref} narrow side={side}>
+    // The screen behind stays usable (no scrim), so the dashed outline of the new event can still be moved.
+    <Sheet title="Add an event" closeHref={closeHref} floating scrim={false} side={side}>
       {/* A new template remounts the form so its fields start from the template. */}
-      <form key={pending.templateId ?? "blank"} action={addEvent} className="group flex h-full flex-col gap-5">
+      <form id="add-event" key={pending.templateId ?? "blank"} action={addEvent} className="group flex min-h-0 flex-col">
         <input type="hidden" name="returnTo" value={returnTo} />
         <input type="hidden" name="returnPath" value={returnPath} />
         <EventCardFields
@@ -151,22 +153,22 @@ export function QuickAddSheet({
             editHref: `/calendar?${returnTo ? `${returnTo}&` : ""}panel=templates`,
           }}
         />
-        <div className="mt-auto flex shrink-0 items-center gap-3">
-          <Button>Add event</Button>
-          <Link
-            href={closeHref}
-            scroll={false}
-            className="inline-flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
-          >
-            Cancel
-          </Link>
-          {pending.templateId ? null : (
-            <Button variant="secondary" name="saveTemplate" value="on" className="ml-auto">
-              Add and save as template
-            </Button>
-          )}
-        </div>
       </form>
+      <div className="flex shrink-0 items-center gap-[0.6rem] pt-1">
+        {pending.templateId ? null : (
+          <Button form="add-event" variant="secondary" name="saveTemplate" value="on">
+            Add and save as a template
+          </Button>
+        )}
+        <Link
+          href={closeHref}
+          scroll={false}
+          className="ml-auto inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-panel px-6 text-[1.25rem] font-bold text-ink"
+        >
+          Cancel
+        </Link>
+        <Button form="add-event">Add</Button>
+      </div>
     </Sheet>
   );
 }

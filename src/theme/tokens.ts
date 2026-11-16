@@ -1,23 +1,28 @@
 /**
  * Theme tokens: every colour, font and size the app uses comes from here.
  *
- * Components never hard-code a colour like "#2F74C0". They use a token
+ * Components never hard-code a colour like "#2F6FB8". They use a token
  * such as "accent" (in Tailwind classes like `text-accent`) instead. That
  * way a seasonal theme can swap the whole look by swapping one object.
  *
- * The values follow the locked "bright" style guide: a white board, a light
- * grey icon rail, one colour per person, and butter yellow for meals.
- * The database keeps a copy per household (the `themes` table); this file
- * is the built-in default, and anything missing there falls back to it.
+ * The values are the "Glance A" look (docs/glance/SPEC.md, 2026-11-15):
+ * a light grey rail behind white rounded panels, soft person tints with a
+ * strong accent bar, darker "hand" inks for handwritten text, butter yellow
+ * for meals, and a red Now line.
+ *
+ * This file is the one source of truth. The database's `themes` table only
+ * holds a household's own changes on top of it (the built-in "bright" row
+ * is empty since the Glance migration), so editing a value here changes
+ * every household.
  */
 
 export type ThemeTokens = {
   colors: {
-    /** The white page surface */
+    /** White panels and cards */
     board: string;
-    /** The left icon rail and soft fills (weather pill, chips) */
+    /** The page background behind the panels (the "rail") */
     rail: string;
-    /** Slightly darker fill: segmented switch track, hover */
+    /** Slightly darker fill: segmented switch track, chips, soft buttons */
     panel: string;
     /** Hairlines around cards and between rows */
     frame: string;
@@ -25,20 +30,31 @@ export type ThemeTokens = {
     grid: string;
     /** Main text */
     ink: string;
-    /** Secondary text */
+    /** Labels and secondary text */
     inkMuted: string;
-    /** Text on pastel event blocks (times) */
+    /** Secondary text a step darker (dates beside a title, times) */
     inkSoft: string;
-    /** Empty check boxes and circles */
+    /** Empty check circles */
     checkBorder: string;
+    /** The big page title and its secondary text, which sit on the rail */
+    title: string;
+    titleSoft: string;
+    /** The main action (Add, New list): ink black, or a holiday colour */
+    primary: string;
+    primaryInk: string;
+    /** The chosen tab in a segmented switch */
+    tabOn: string;
+    tabOnInk: string;
     /** Links and small highlights */
     accent: string;
     /** Errors and "remove" buttons */
     danger: string;
     /** Done ticks and success messages */
     success: string;
-    /** The "now" line and today's date badge */
+    /** The Now line on white */
     now: string;
+    /** Now / "IN 20 MIN" on a person's tint (darker so it holds 4.5:1) */
+    nowOnTint: string;
     /** Meal chips and the dinner card */
     meal: string;
     mealInk: string;
@@ -50,30 +66,56 @@ export type ThemeTokens = {
     missedSoft: string;
     /** Health: the shaded band on a reading above its line (a fever) */
     alertSoft: string;
+    /** The tray handle bar */
+    handle: string;
     /** The art screen saver's mat board: white, cream and charcoal (src/components/screen-saver.tsx) */
     matWhite: string;
     matCream: string;
     matCharcoal: string;
-    /** One strong + one pastel colour per person (see src/lib/colours.ts) */
+    /** The darker tone of each mat that shades the bevel's faces */
+    matWhiteShade: string;
+    matCreamShade: string;
+    matCharcoalShade: string;
+    /**
+     * One colour per person (see src/lib/colours.ts): strong (accent bars,
+     * dots), soft (tints behind their things) and hand (their handwritten
+     * text, darkened so it holds 4.5:1 on the soft tint). A holiday theme
+     * never changes these.
+     */
     personBlue: string;
     personBlueSoft: string;
+    personBlueHand: string;
     personPink: string;
     personPinkSoft: string;
+    personPinkHand: string;
     personTeal: string;
     personTealSoft: string;
+    personTealHand: string;
     personPurple: string;
     personPurpleSoft: string;
+    personPurpleHand: string;
     personOrange: string;
     personOrangeSoft: string;
+    personOrangeHand: string;
     personGreen: string;
     personGreenSoft: string;
+    personGreenHand: string;
     personSlate: string;
     personSlateSoft: string;
+    personSlateHand: string;
   };
+  /** Corner rounding for small chips */
+  radiusSmall: string;
   /** Corner rounding for buttons and inputs */
   radius: string;
-  /** Corner rounding for cards */
+  /** Corner rounding for cards and panels */
   radiusCard: string;
+  /** Corner rounding for sheets and dialogs */
+  radiusDialog: string;
+  /** The soft lift under cards and the chosen tab */
+  shadowRaised: string;
+  /** The deeper shadow under sheets, the tray and popovers */
+  shadowDialog: string;
   /** Minimum size of anything you tap; large for a wall touchscreen */
   touchTarget: string;
 };
@@ -86,23 +128,31 @@ export type Theme = {
 };
 
 export const brightTheme: Theme = {
+  // The slug stays "bright" so households' saved "activeTheme" still matches.
   slug: "bright",
-  name: "Bright",
+  name: "Glance",
   tokens: {
     colors: {
       board: "#FFFFFF",
       rail: "#F6F7F9",
-      panel: "#F1F2F5",
-      frame: "#ECEEF1",
-      grid: "#EEF0F3",
+      panel: "#EEF0F3",
+      frame: "#E3E6EA",
+      grid: "#E3E6EA",
       ink: "#23262B",
-      inkMuted: "#6B7078",
+      inkMuted: "#565B63",
       inkSoft: "#4E535B",
-      checkBorder: "#B9BEC6",
-      accent: "#2F74C0",
+      checkBorder: "#8A9099",
+      title: "#23262B",
+      titleSoft: "#4E535B",
+      primary: "#23262B",
+      primaryInk: "#FFFFFF",
+      tabOn: "#FFFFFF",
+      tabOnInk: "#23262B",
+      accent: "#2F6FB8",
       danger: "#C23B2B",
-      success: "#1B8790",
-      now: "#E5533D",
+      success: "#166F77",
+      now: "#CF3F29",
+      nowOnTint: "#A3261A",
       meal: "#FBEDB5",
       mealInk: "#5E4806",
       met: "#3D8B37",
@@ -110,42 +160,76 @@ export const brightTheme: Theme = {
       missed: "#D9533F",
       missedSoft: "#F2A79A",
       alertSoft: "#FDECE8",
+      handle: "#C5C8CE",
       matWhite: "#F7F6F2",
       matCream: "#ECE5D6",
       matCharcoal: "#36383C",
-      personBlue: "#2F74C0",
+      matWhiteShade: "#6D6252",
+      matCreamShade: "#6B5634",
+      matCharcoalShade: "#000000",
+      personBlue: "#2F6FB8",
       personBlueSoft: "#CFE3F8",
-      personPink: "#CC4A78",
+      personBlueHand: "#2963A6",
+      personPink: "#B83D69",
       personPinkSoft: "#F9D3DF",
-      personTeal: "#1B8790",
+      personPinkHand: "#A6375E",
+      personTeal: "#16757D",
       personTealSoft: "#C8EEF0",
-      personPurple: "#9150C2",
+      personTealHand: "#157179",
+      personPurple: "#8A4BBA",
       personPurpleSoft: "#E8D3F5",
-      personOrange: "#C9661C",
+      personPurpleHand: "#7D42A8",
+      personOrange: "#AD540F",
       personOrangeSoft: "#FCDDBE",
-      personGreen: "#3D8B37",
-      personGreenSoft: "#D5EDCC",
-      personSlate: "#5B6472",
-      personSlateSoft: "#E1E4E9",
+      personOrangeHand: "#9C4B0C",
+      personGreen: "#2F7A4A",
+      personGreenSoft: "#CDE8D6",
+      personGreenHand: "#2A6B3F",
+      personSlate: "#5C6370",
+      personSlateSoft: "#E3E6EA",
+      personSlateHand: "#4E535B",
     },
+    radiusSmall: "0.75rem",
     radius: "1.125rem",
     radiusCard: "1.375rem",
+    radiusDialog: "1.875rem",
+    shadowRaised: "0 1px 3px rgba(30,35,45,0.10)",
+    shadowDialog: "0 0 2.5rem rgba(30,35,45,0.25)",
     touchTarget: "3.625rem",
   },
 };
+
+/** The non-colour tokens and the CSS variables they become. */
+const SIZE_VARS = {
+  radiusSmall: "--radius-small",
+  radius: "--radius",
+  radiusCard: "--radius-card",
+  radiusDialog: "--radius-dialog",
+  shadowRaised: "--shadow-raised",
+  shadowDialog: "--shadow-dialog",
+  touchTarget: "--touch-target",
+} as const satisfies Record<Exclude<keyof ThemeTokens, "colors">, string>;
+
+export const SIZE_TOKEN_KEYS = Object.keys(SIZE_VARS) as (keyof typeof SIZE_VARS)[];
 
 /**
  * Turns a theme into CSS variables (e.g. --color-person-blue) that the
  * stylesheet and Tailwind classes read from.
  */
 export function themeToCssVariables(theme: Theme): Record<string, string> {
+  return { ...colorVariables(theme.tokens.colors), ...sizeVariables(theme.tokens) };
+}
+
+/** Just the colour variables, for a partial set (a holiday theme's changes). */
+export function colorVariables(colors: Partial<ThemeTokens["colors"]>): Record<string, string> {
   const vars: Record<string, string> = {};
-  for (const [key, value] of Object.entries(theme.tokens.colors)) {
-    vars[`--color-${toKebabCase(key)}`] = value;
-  }
-  vars["--radius"] = theme.tokens.radius;
-  vars["--radius-card"] = theme.tokens.radiusCard;
-  vars["--touch-target"] = theme.tokens.touchTarget;
+  for (const [key, value] of Object.entries(colors)) if (value) vars[`--color-${toKebabCase(key)}`] = value;
+  return vars;
+}
+
+function sizeVariables(tokens: ThemeTokens): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const key of SIZE_TOKEN_KEYS) vars[SIZE_VARS[key]] = tokens[key];
   return vars;
 }
 

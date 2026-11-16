@@ -2,9 +2,9 @@
 
 import { Pager as PageArrows } from "@/components/pager";
 import type { ReactNode } from "react";
-import { X } from "@phosphor-icons/react";
+import { Plus, X } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
-import { soft, strong } from "@/lib/colours";
+import { strong } from "@/lib/colours";
 
 /*
  * Small pieces the weekly review's screen and its boxes share.
@@ -12,21 +12,10 @@ import { soft, strong } from "@/lib/colours";
 
 export type Person = { id: string; name: string; colour: string; icon: string | null };
 
-/** A person's face: their picture in their colour, or their first letter. */
-export function Face({ person, size = "size-7 text-[0.8125rem]" }: { person: Person | undefined; size?: string }) {
+/** A person as a colour dot (Glance: no avatars; people are colour chips, bars or dots). */
+export function Face({ person, size = "size-4" }: { person: Person | undefined; size?: string }) {
   if (!person) return null;
-  if (person.icon) {
-    return (
-      <span className={`flex shrink-0 items-center justify-center rounded-full border-2 ${size}`} style={{ background: soft(person.colour), borderColor: strong(person.colour) }} title={person.name}>
-        <Emoji emoji={person.icon} className="size-[72%]" />
-      </span>
-    );
-  }
-  return (
-    <span className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${size}`} style={{ background: strong(person.colour) }} title={person.name}>
-      {[...person.name.trim()][0]?.toUpperCase() ?? "?"}
-    </span>
-  );
+  return <span className={`shrink-0 rounded-full ${size}`} style={{ background: strong(person.colour) }} title={person.name} />;
 }
 
 /** A box over the middle of the screen (tap outside or ✕ to close). */
@@ -97,11 +86,11 @@ export function Tile({
 
 export function SectionTitle({ title, onAdd, addLabel }: { title: string; onAdd?: () => void; addLabel?: string }) {
   return (
-    <div className="flex min-h-9 shrink-0 items-center gap-2 px-0.5">
-      <h3 className="flex-1 text-sm font-bold tracking-wide text-ink-muted uppercase">{title}</h3>
+    <div className="mt-[0.2rem] flex min-h-[3rem] shrink-0 items-center gap-2">
+      <h3 className="flex-1 text-[1.15rem] font-bold tracking-[0.04em] text-ink-muted uppercase">{title}</h3>
       {onAdd ? (
-        <button type="button" onClick={onAdd} aria-label={addLabel} className="flex size-10 items-center justify-center rounded-xl bg-board text-2xl leading-none font-bold text-ink hover:bg-panel">
-          +
+        <button type="button" onClick={onAdd} aria-label={addLabel} className="flex size-[3rem] shrink-0 items-center justify-center rounded-full bg-panel text-ink">
+          <Plus size="1.25rem" weight="bold" aria-hidden />
         </button>
       ) : null}
     </div>

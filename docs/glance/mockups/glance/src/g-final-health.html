@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Health</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.hgrid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:1.25rem}
+.chart{display:flex;align-items:flex-end;gap:.8rem;flex:1;min-height:0;padding:.5rem 0 0}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:.4rem;min-height:0;height:100%;justify-content:flex-end}
+.bar .col{width:100%;border-radius:var(--r) var(--r) .4rem .4rem;background:var(--p-teal-soft);border:2px solid var(--p-teal);min-height:3rem}
+.bar .lbl{font-size:1.25rem;font-weight:700;color:var(--muted)}
+.bar .val{font-size:1.5rem;font-weight:800}
+.med{display:flex;align-items:center;gap:.7rem;min-height:4.5rem;padding:.25rem 0;border-bottom:1px solid var(--frame)}
+.med:last-child{border-bottom:0}
+.med img{width:2.25rem;height:2.25rem}
+.med .t{font-size:1.5rem;font-weight:800}
+.med .s{font-size:1.15rem;font-weight:700;color:var(--muted)}
+.entry{display:flex;align-items:center;gap:.7rem;min-height:3.6rem;border-bottom:1px solid var(--frame)}
+.entry .tm{font-size:1.25rem;font-weight:800;font-variant-numeric:tabular-nums;color:var(--muted);min-width:6.5rem}
+.entry .t{font-size:1.35rem;font-weight:700;flex:1}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Habits Sam">
+    <span class="mon">Habits</span>
+    <div class="mo-side"><span class="sub">Sam</span></div>
+  </div>
+  <div class="tools">
+    <div class="navm"><button class="btn icon" aria-label="Previous person"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><button class="btn icon" aria-label="Next person"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button></div>
+    <span class="seg" role="tablist"><button>Habits</button><button class="on" aria-current="page">Health</button></span>
+    <button class="btn secondary" data-tap aria-label="Habit Manager"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.9 7.2l1.9 1.1M17.2 15.7l1.9 1.1M4.9 16.8l1.9-1.1M17.2 8.3l1.9-1.1"/></svg> Manage</button><button class="btn primary add" aria-label="Add an entry"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add an entry</button>
+  </div>
+</header>
+<div class="body">
+  <div class="hgrid">
+    <section class="card">
+      <div class="h2">Last three days <span class="sub">Vitamin D check-in</span></div>
+      <div class="chart">
+        <div class="bar"><div class="val">Taken</div><div class="col" style="height:70%"></div><div class="lbl">Thu 12</div></div>
+        <div class="bar"><div class="val">Taken</div><div class="col" style="height:70%"></div><div class="lbl">Fri 13</div></div>
+        <div class="bar"><div class="val">Due 8 am</div><div class="col" style="height:28%;background:var(--board);border-style:dashed;border-color:var(--now)"></div><div class="lbl">Sat 14</div></div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="h2">Medicines</div>
+      <div class="med"><img class="e" src="../assets/potted_plant.png" alt=""><div><div class="t">Vitamin D</div><div class="s">Every morning · next 8:00 am</div></div>
+        <button class="btn secondary" data-tap>Log it</button></div>
+      <div class="med"><img class="e" src="../assets/leafy_green.webp" alt=""><div><div class="t">Allergy tablet</div><div class="s">As needed · last taken Fri 5 pm</div></div>
+        <button class="btn secondary" data-tap>Log it</button></div>
+    </section>
+    <section class="card">
+      <div class="h2">Today</div>
+      <div class="entry"><span class="tm">8:00 am</span><span class="t">Vitamin D not logged yet</span></div>
+    </section>
+  </div>
+</div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

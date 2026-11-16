@@ -9,11 +9,28 @@ import { isLocalDate, localDateOf } from "@/lib/time";
 import { clampBatches } from "@/lib/menu";
 import { isNewMeal, movesFor, type DraftMeal, type ReviewDraft } from "@/lib/weekly-review";
 import { loadChoreDays } from "../chores/data";
-import { putMenuOnList } from "../groceries/build";
+import { previewMenuLines, putMenuOnList, type PreviewLine } from "../groceries/build";
 import { syncHeadsUps } from "../meals/shared";
 import { loadRoutines } from "../routines/data";
 
 export type SaveReviewResult = { ok: true } | { ok: false; error: string };
+export type PreviewResult = { ok: true; lines: PreviewLine[] } | { ok: false; error: string };
+
+/**
+ * "Review what to buy" (Nov 15 2026): what saving the week with this draft
+ * would put on the grocery list. Nothing is saved.
+ */
+export async function previewGroceries(week: string, draft: ReviewDraft): Promise<PreviewResult> {
+  const household = await requireHousehold();
+  if (!isLocalDate(week)) return { ok: false, error: "That week isn't right." };
+  try {
+    return { ok: true, lines: await previewMenuLines(household, week, draft) };
+  } catch (e) {
+    return { ok: false, error: `Couldn't work out the groceries: ${e instanceof Error ? e.message : "try again"}.` };
+  }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Confirm week: saves every change on the review in one go and marks the
@@ -25,8 +42,10 @@ export type SaveReviewResult = { ok: true } | { ok: false; error: string };
  *     where someone's kind of day differs from their usual one gets a
  *     one-day break that switches it.
  *   - Meals: changed (kind, which one, who, servings), added or taken off.
+ *   - Then the menu goes on the grocery list, less `skipped`: the items
+ *     marked "already have" on Review what to buy.
  */
-export async function saveReview(week: string, draft: ReviewDraft): Promise<SaveReviewResult> {
+export async function saveReview(week: string, draft: ReviewDraft, skipped: string[] = []): Promise<SaveReviewResult> {
   const household = await requireHousehold();
   if (!isLocalDate(week)) return { ok: false, error: "That week isn't right." };
   const today = localDateOf(new Date(), household.settings.timeZone);
@@ -105,9 +124,9 @@ export async function saveReview(week: string, draft: ReviewDraft): Promise<Save
     (await supabase.from("weekly_reviews").upsert({ household_id: household.id, week_start: week, reviewed_at: new Date().toISOString(), dismissed: draft.dismissed.slice(0, 100) }, { onConflict: "household_id,week_start" })).error,
   );
   if (done) return done;
-  // Saving the menu puts its ingredients on the grocery list (no approve step: planning is the approval).
+  // Saving the menu puts its ingredients on the grocery list, less what was marked "already have".
   try {
-    await putMenuOnList(household, week);
+    await putMenuOnList(household, week, (Array.isArray(skipped) ? skipped : []).filter((id) => typeof id === "string" && UUID.test(id)).slice(0, 500));
   } catch (e) {
     return { ok: false, error: `The week is saved, but the grocery list couldn't be made: ${e instanceof Error ? e.message : "try saving again"}.` };
   }

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { draftProblem, type SettingsDraft } from "./draft.ts";
 import { DEFAULT_SCREEN_SAVER } from "../../lib/screen-saver.ts";
+import { DEFAULT_SOUNDS } from "../../lib/sounds.ts";
 
 const base: SettingsDraft = {
   name: "Home",
@@ -20,6 +21,8 @@ const base: SettingsDraft = {
   members: [{ id: "a", name: "Jess", role: "parent", colour: "blue", icon: null, birthYear: null, hasPin: false, pin: "", pinAgain: "", removed: false }],
   apps: [],
   screenSaver: DEFAULT_SCREEN_SAVER,
+  holidayThemes: true,
+  sounds: DEFAULT_SOUNDS,
 };
 
 test("a good settings draft passes", () => assert.equal(draftProblem(base), null));
@@ -36,4 +39,8 @@ test("apps are checked with the rest of the settings", () => {
   const app = { id: "new-1", name: "Jellyfin", icon: "🍿", colour: "purple", kind: "web" as const, address: "", localKey: "", checkUp: true, removed: false };
   assert.match(draftProblem({ ...base, apps: [app] }) ?? "", /web address/);
   assert.equal(draftProblem({ ...base, apps: [{ ...app, address: "192.168.2.10:8096" }] }), null);
+});
+test("quiet hours need a start and an end", () => {
+  assert.match(draftProblem({ ...base, sounds: { ...DEFAULT_SOUNDS, quietTo: "" } }) ?? "", /quiet hours/);
+  assert.equal(draftProblem({ ...base, sounds: { ...DEFAULT_SOUNDS, muted: true, quietFrom: "22:30", quietTo: "06:15" } }), null);
 });

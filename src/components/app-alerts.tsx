@@ -17,7 +17,7 @@ export function AppAlerts() {
   const first = down[0];
   const warning = emojiImage("⚠️");
   return (
-    <div role="status" className="ml-auto flex min-w-0 items-center gap-2.5 rounded-[1.125rem] border-2 border-danger/30 bg-board px-3 py-1.5">
+    <div role="status" className="ml-auto flex min-w-0 items-center gap-2.5 rounded-[var(--radius)] border-2 border-danger/30 bg-board px-3 py-1.5">
       {/* eslint-disable-next-line @next/next/no-img-element -- small local picture */}
       {warning ? <img src={warning} alt="" aria-hidden className="size-9 shrink-0" /> : null}
       <span className="flex min-w-0 flex-col leading-tight">

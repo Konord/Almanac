@@ -466,7 +466,7 @@ function Plate({
                   aria-pressed={on}
                   className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-full border-2 pr-4 pl-1.5 text-lg font-bold ${on ? "border-ink bg-rail text-ink" : "border-frame text-ink"}`}
                 >
-                  <Face person={m} size="size-10 text-base" />
+                  <Face person={m} size="size-5" />
                   {m.name}
                 </button>
               );

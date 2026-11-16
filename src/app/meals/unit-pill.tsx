@@ -8,7 +8,7 @@ import { conversions, type Measures } from "@/lib/units";
  * converted on the recipe; tapping one shows what it is in other units
  * (1 cup = 250 ml · 16 tbsp), using the household's kitchen measures.
  */
-export function UnitPill({ amount, unit, text, measures, size = "lg" }: { amount: number | null; unit: string | null; text: string; measures: Measures; size?: "md" | "lg" }) {
+export function UnitPill({ amount, unit, text, measures, size = "lg" }: { amount: number | null; unit: string | null; text: string; measures: Measures; size?: "md" | "lg" | "xl" }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
   const other = conversions(amount, unit, measures);
@@ -20,7 +20,7 @@ export function UnitPill({ amount, unit, text, measures, size = "lg" }: { amount
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
-  const look = `${size === "lg" ? "text-xl" : "text-lg"} font-extrabold text-ink`;
+  const look = `${size === "xl" ? "text-[1.5rem]" : size === "lg" ? "text-xl" : "text-lg"} font-extrabold text-ink tabular`;
   if (other.length === 0) return <span className={`${look} mr-1.5`}>{text}</span>;
   // A span, not a button: it sits inside rows that are buttons themselves.
   return (

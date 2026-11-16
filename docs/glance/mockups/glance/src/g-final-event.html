@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Edit event</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.agenda{flex:1;min-height:0;display:grid;grid-template-columns:1fr 36rem;gap:1.25rem;padding:0 2rem 1.25rem}
+.evs{display:flex;flex-direction:column;gap:.7rem;min-height:0}
+.ev{display:grid;grid-template-columns:8rem 3.25rem 1fr;align-items:center;gap:1rem;padding:.8rem 1.1rem .8rem 1.6rem;border-radius:var(--r-card);background:var(--es);min-height:5.5rem;position:relative;overflow:hidden}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.45rem;background:var(--ec)}
+.ev.split::before{background:linear-gradient(to bottom,var(--ec) 50%,var(--ec2) 50%)}
+.ev .tm{font-size:1.5rem;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.ev .tm span{display:block;font-size:1.125rem;font-weight:600;color:var(--soft)}
+.ev img{width:3rem;height:3rem}
+.ev .ti{font-size:1.5rem;font-weight:700}
+.nowline{display:flex;align-items:center;gap:.75rem;color:var(--now);font-weight:800;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.nowline::after{content:"";flex:1;height:.2rem;background:var(--now);border-radius:1rem}
+.sheet .rowish{display:grid;grid-template-columns:auto 1fr;gap:.8rem;align-items:end}
+.sheet .when{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:end}
+.sheet .who-row{display:flex;flex-wrap:wrap;gap:.45rem}
+.emoji-pick{width:var(--tt);height:var(--tt);min-height:var(--tt);border-radius:var(--r);background:var(--panel);display:grid;place-items:center;border:0;cursor:pointer}
+.emoji-pick img{width:2.35rem;height:2.35rem}
+.sheet .actions{display:flex;justify-content:flex-end;gap:.6rem;margin-top:.25rem}
+.sheet-tabs{display:flex;gap:.25rem;background:var(--panel);border-radius:var(--r);padding:.25rem;align-self:flex-start}
+.sheet-tabs button{min-height:3rem;padding:0 1.1rem;border:0;border-radius:calc(var(--r) - .1rem);background:transparent;font:inherit;font-size:1.25rem;font-weight:700;color:var(--muted);cursor:pointer}
+.sheet-tabs button.on{background:var(--board);color:var(--ink);box-shadow:var(--sh-raised)}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Saturday November 14">
+    <span class="mon">Saturday</span>
+    <div class="mo-side"><span class="sub">November 14</span></div>
+  </div>
+  <div class="tools">
+    
+    <span class="seg" role="tablist"><button class="on" aria-current="page">Today</button><button>Week</button><button>Month</button></span>
+    <button class="btn primary add" aria-label="Add"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
+  </div>
+</header>
+<div class="agenda">
+  <div class="evs">
+    <div class="nowline">Now 8:40</div>
+    <div class="ev " style="--es:var(--p-blue-soft);--ec:var(--p-blue)"><div class="tm">9 am<span>until 10 am</span></div><img class="e" src="../assets/tooth.png" alt=""><div class="ti">Dentist appointment downtown</div></div>
+    <div class="ev " style="--es:var(--p-pink-soft);--ec:var(--p-pink)"><div class="tm">9 am<span>until 9:30</span></div><img class="e" src="../assets/calendar.png" alt=""><div class="ti">Team standup</div></div>
+    <div class="ev split" style="--es:var(--p-teal-soft);--ec:var(--p-teal)"><div class="tm">4 pm<span>until 5 pm</span></div><img class="e" src="../assets/person_swimming.webp" alt=""><div class="ti">Swim lessons</div></div>
+    <div class="ev split" style="--es:var(--p-blue-soft);--ec:var(--p-blue)"><div class="tm">6 pm<span>until 7 pm</span></div><img class="e" src="../assets/teacher.webp" alt=""><div class="ti">Parent-teacher</div></div>
+  </div>
+  <div class="side">
+    <div class="card" style="background:var(--meal)"><div class="k" style="color:var(--meal-ink)">Dinner tonight · 6 pm</div><div style="font-size:1.75rem;font-weight:800;color:var(--ink);margin-top:.3rem">Sheet-pan chicken fajitas</div></div>
+  </div>
+</div>
+<button class="scrim" aria-label="Close"></button>
+<aside class="sheet" role="dialog" aria-label="Edit event">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <h2>Edit event</h2>
+    <button class="btn icon" aria-label="Close"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="sheet-tabs" role="tablist">
+    <button class="on">Event</button><button>Repeats</button><button>More</button><button>Heads-ups</button>
+  </div>
+  <div class="rowish">
+    <button class="emoji-pick" aria-label="Choose an emoji"><img class="e" src="../assets/tooth.png" alt=""></button>
+    <div class="field"><label>What</label><input class="inp" value="Dentist appointment downtown"></div>
+  </div>
+  <div class="when">
+    <div class="field"><label>Starts</label><input class="inp" value="9:00 am"></div>
+    <div style="padding-bottom:.7rem"><button class="who-chip" aria-pressed="false">All day</button></div>
+    <div class="field"><label>Ends</label><input class="inp" value="10:00 am"></div>
+  </div>
+  <div class="field"><label>Who</label>
+    <div class="who-row">
+      <button class="who-chip on" style="--pc:var(--p-blue);--ps:var(--p-blue-soft);--hc:var(--hand-blue)" aria-pressed="true"><span class="dot"></span>Connor</button>
+      <button class="who-chip" style="--pc:var(--p-pink);--ps:var(--p-pink-soft);--hc:var(--hand-pink)" aria-pressed="false"><span class="dot"></span>Alexandra</button>
+      <button class="who-chip" style="--pc:var(--p-teal);--ps:var(--p-teal-soft);--hc:var(--hand-teal)" aria-pressed="false"><span class="dot"></span>Sam</button>
+      <button class="who-chip" style="--pc:var(--p-purple);--ps:var(--p-purple-soft);--hc:var(--hand-purple)" aria-pressed="false"><span class="dot"></span>Christopher</button>
+    </div>
+  </div>
+  <div class="field"><label>Kind of day</label>
+    <div class="who-row">
+      <button class="who-chip on" aria-pressed="true">School day</button>
+      <button class="who-chip" aria-pressed="false">Family day</button>
+      <button class="who-chip" aria-pressed="false">Free day</button>
+    </div>
+  </div>
+  <div class="field"><label>Location</label><input class="inp" value="Bloor St W"></div>
+  <div class="actions">
+    <button class="btn secondary" data-tap>Cancel</button>
+    <button class="btn primary" data-tap>Save</button>
+  </div>
+</aside>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

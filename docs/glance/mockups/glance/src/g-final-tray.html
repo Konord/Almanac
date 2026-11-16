@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Menu</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.app{padding-bottom:0}
+.mini-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);background:var(--board);min-height:0}
+.mini-col{position:relative;border-right:1px solid var(--frame);padding:.5rem .45rem;overflow:hidden}
+.mini-col:last-child{border-right:0}
+.mini-col.past{background:#F7F8F9}
+.mini-col.today{background:#FFFCFB}
+.mini-h .wd{font-size:1.15rem;font-weight:700;color:var(--muted);letter-spacing:.08em}
+.mini-h .n{font-size:2.25rem;font-weight:800;letter-spacing:-.03em}
+.today-n{width:2.85rem;height:2.85rem;border:2px solid var(--now);border-radius:50%;color:var(--now);display:inline-flex;align-items:center;justify-content:center}
+.mini-ev{display:flex;align-items:center;gap:.35rem;min-height:3.2rem;margin-top:.35rem;padding:.25rem .4rem .25rem .7rem;border-radius:var(--r);background:var(--es);position:relative;overflow:hidden}
+.mini-ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--ec)}
+.mini-ev .tm{font-size:1.15rem;font-weight:800;font-variant-numeric:tabular-nums;flex:none}
+.mini-ev img{width:1.5rem;height:1.5rem}
+.mini-ev .ti{font-size:1.15rem;font-weight:700}
+.mini-ev.past-ev{opacity:.82}
+.mini-hol{position:absolute;inset:5rem 0 0;display:grid;place-items:center;pointer-events:none}
+.mini-hol img.hol{width:14rem;height:14rem}
+.menu-tray{padding-bottom:1.4rem}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="November 2026">
+    <span class="mon">November</span>
+    <div class="mo-side"><span class="sub">2026</span></div>
+  </div>
+  <div class="tools">
+    <div class="navm"><button class="btn icon" aria-label="Previous week"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><button class="btn icon" aria-label="Next week"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button></div>
+    <span class="seg" role="tablist"><button>Today</button><button class="on" aria-current="page">Week</button><button>Month</button></span>
+    <button class="btn primary add" aria-label="Add"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add</button>
+  </div>
+</header>
+<div class="mini-grid"><div class="mini-col past"><div class="mini-h"><div class="wd">SUN</div><div class="n">8</div></div><div class="mini-ev past-ev" style="--es:var(--p-orange-soft);--ec:var(--p-orange)"><span class="tm">9 am</span><img class="e" src="../assets/fork_and_knife_with_plate.png" alt=""><span class="ti">Family breakfast</span></div></div><div class="mini-col past"><div class="mini-h"><div class="wd">MON</div><div class="n">9</div></div></div><div class="mini-col past"><div class="mini-h"><div class="wd">TUE</div><div class="n">10</div></div><div class="mini-ev past-ev" style="--es:var(--p-teal-soft);--ec:var(--p-teal)"><span class="tm">4 pm</span><img class="e" src="../assets/person_swimming.webp" alt=""><span class="ti">Swim lessons</span></div></div><div class="mini-col past hol"><div class="mini-hol"><img class="hol" src="../assets/maple_leaf.png" alt=""></div><div class="mini-h"><div class="wd">WED</div><div class="n">11</div></div></div><div class="mini-col past"><div class="mini-h"><div class="wd">THU</div><div class="n">12</div></div></div><div class="mini-col past"><div class="mini-h"><div class="wd">FRI</div><div class="n">13</div></div><div class="mini-ev past-ev" style="--es:var(--p-teal-soft);--ec:var(--p-teal)"><span class="tm">4 pm</span><img class="e" src="../assets/musical_note.png" alt=""><span class="ti">Piano</span></div></div><div class="mini-col today"><div class="mini-h"><div class="wd">SAT</div><div class="n today-n">14</div></div><div class="mini-ev" style="--es:var(--p-blue-soft);--ec:var(--p-blue)"><span class="tm">9 am</span><img class="e" src="../assets/tooth.png" alt=""><span class="ti">Dentist</span></div><div class="mini-ev" style="--es:var(--p-pink-soft);--ec:var(--p-pink)"><span class="tm">9 am</span><img class="e" src="../assets/calendar.png" alt=""><span class="ti">Team standup</span></div></div></div>
+<div class="tray-scrim" aria-hidden="true"></div>
+<nav class="menu-tray" id="menu-tray" aria-label="Menu">
+  <button class="handle" aria-label="Close the menu"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg></button>
+  <div class="items"><button class="menu-item on" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3.5v4M16 3.5v4M3.5 10h17"/></svg><span>Calendar</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17M8.5 14h3M8.5 17.5h7"/></svg><span>Planner</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.5"/><path d="M12 9.5v4l2.5 1.5M12 3.5v2"/></svg><span>Routines</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7h11M9 12h11M9 17h11M4.5 7h.01M4.5 12h.01M4.5 17h.01"/></svg><span>Lists</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20l3.5-9.5L14 15 19 4"/><path d="M8.5 10.5c-2 0-4-1.5-4-3.5 2 .2 4 1.5 4 3.5z"/></svg><span>Chores</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5v8M8 11.5c0 5-2.5 8-2.5 8M11 3.5v8c0 5 2.5 8 2.5 8M11 7h2.5M17 3.5v17"/></svg><span>Meals</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 3.5 3.5L20 7"/><path d="M14.5 7H20v5.5"/></svg><span>Habits</span></button><button class="menu-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3V20.5M4.9 7.2l1.9 1.1M17.2 15.7l1.9 1.1M4.9 16.8l1.9-1.1M17.2 8.3l1.9-1.1"/></svg><span>Settings</span></button></div>
+</nav>
+
+
+</div>
+</body>
+</html>

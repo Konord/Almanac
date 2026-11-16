@@ -3,12 +3,25 @@
 import { Pager } from "@/components/pager";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
-import { Avatar, EmptyState, Emoji } from "@/components/ui";
+import { CaretDown, CaretUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
+import {
+  ColourDot,
+  EmptyState,
+  Emoji,
+  ScreenHeader,
+  Toggle,
+  fieldLabelClass,
+  editorInputClass as inputClass,
+  primaryActionClass,
+  secondaryActionClass,
+  segItemClass,
+  segTrackClass,
+  whoChipStyle,
+} from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
-import { soft, strong } from "@/lib/colours";
+import { hand, soft, strong } from "@/lib/colours";
 import { MEAL_MINUTES, NEW_PREFIX, copyRoutine, noPresets, dailyListState, draftProblem, joinRuns, routinePeople, sameDraft, stepPeople, type GridRun, type DraftMealBlock, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
 import { placeRoutines, toMinutes, wantedSlot, type Anchor, type DayAnchors } from "@/lib/routine-placement";
 import { SideHandles } from "@/components/side-handles";
@@ -37,9 +50,10 @@ type Column = { key: string; member: ManagerMember; dayType: ManagerDayType | nu
 
 const STEPS_PER_PAGE = 7;
 const ANCHOR_LABEL: Record<Anchor, string> = {
-  wake: "After wake-up",
+  // A non-breaking hyphen, so "wake-up" never splits over two lines.
+  wake: "After wake\u2011up",
   bed: "Ends by bedtime",
-  meal: "After a mealtime",
+  meal: "After a meal",
   clock: "At a set time",
 };
 const VISIBILITY = [
@@ -459,40 +473,44 @@ export function RoutineManager({
   return (
     <>
       {/* Title, which kind of day, and Set days */}
-      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="shrink-0 text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Routines</h1>
-        <div role="group" aria-label="Which day" className="flex min-w-0 flex-wrap items-center gap-2">
-          {dayNames.map((name) => (
-            <Chip key={name} active={view === name} onClick={() => pickView(name)}>
-              {name}
-            </Chip>
-          ))}
-        </div>
-        <Link
-          href="/routines/manage"
-          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
-        >
-          <GearSix size="1.5rem" aria-hidden />
-          Set days
-        </Link>
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </header>
+      <ScreenHeader
+        title="Routines"
+        sub={view}
+        tabs={
+          <div role="group" aria-label="Which day" className={segTrackClass}>
+            {dayNames.map((name) => (
+              <button key={name} type="button" aria-pressed={view === name} onClick={() => pickView(name)} className={segItemClass(view === name)}>
+                {name}
+              </button>
+            ))}
+          </div>
+        }
+        action={
+          <>
+            <Link href="/routines/manage" className={secondaryActionClass}>
+              <GearSix size="1.5rem" weight="bold" aria-hidden />
+              Set days
+            </Link>
+            <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
+          </>
+        }
+      />
 
-      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)]">
-        {/* The time grid */}
-        <section aria-label="Routines" className="relative flex min-h-[32rem] min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-4 pt-3 pb-4 lg:min-h-0">
-          <div className="flex shrink-0 gap-2.5 pl-16">
+      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,40rem)]">
+        {/* The time grid: hours in a gutter on the left, one grey column per person. */}
+        <section aria-label="Routines" className="relative flex min-h-[32rem] min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-4 pt-[0.8rem] pb-4 shadow-raised lg:min-h-0">
+          <div className="flex shrink-0 gap-2 pb-[0.45rem] pl-[5rem]">
             {columns.map((c) => (
-              <div key={c.key} className="flex min-w-0 flex-1 basis-0 items-center gap-2 border-b-2 pb-2" style={{ borderColor: strong(c.member.colour) }}>
-                <Avatar name={c.member.name} colour={c.member.colour} icon={c.member.icon} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{c.title}</span>
+              <div key={c.key} className="flex min-w-0 flex-1 basis-0 items-center gap-[0.45rem] border-b-[0.2rem] pb-[0.4rem]" style={{ borderColor: strong(c.member.colour) }}>
+                <span aria-hidden className="h-[1.6rem] w-[0.35rem] shrink-0 rounded-full" style={{ background: strong(c.member.colour) }} />
+                <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{c.title}</span>
                 {c.dayType ? (
                   <button
                     type="button"
                     onClick={() => setAdding(adding === c.key ? null : c.key)}
                     aria-expanded={adding === c.key}
                     aria-label={`Add a routine for ${c.member.name}`}
-                    className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rail text-ink hover:bg-panel"
+                    className="flex size-12 shrink-0 items-center justify-center rounded-[var(--radius)] bg-rail text-ink hover:bg-panel"
                   >
                     <Plus size="1.25rem" weight="bold" aria-hidden />
                   </button>
@@ -501,22 +519,30 @@ export function RoutineManager({
             ))}
           </div>
           {columns.length === 0 ? <p className="mt-6 text-lg text-ink-muted">Add the people in your household first, in Settings.</p> : null}
-          <div className="relative mt-2 flex min-h-0 flex-1 gap-2.5 pl-16">
-            {/* Hour lines */}
-            <div className="pointer-events-none absolute inset-0" aria-hidden>
-              {Array.from({ length: lastHour - firstHour + 1 }, (_, i) => (
-                <div key={i} className="absolute right-0 left-0 border-t border-grid" style={{ top: `${(i * 60 * 100) / span}%` }}>
-                  {i % 2 === 0 && i < lastHour - firstHour ? (
-                    <span className="absolute -top-2.5 left-0 w-14 text-right text-sm font-bold whitespace-nowrap text-ink-muted">{hourLabel(firstHour + i)}</span>
-                  ) : null}
-                </div>
-              ))}
+          <div className="relative mt-2 flex min-h-0 flex-1 gap-2 pl-[5rem]">
+            {/* Hour labels in the gutter (every other hour; each column draws its own hour lines). */}
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-[4.5rem]" aria-hidden>
+              {Array.from({ length: lastHour - firstHour }, (_, i) =>
+                i % 2 === 0 ? (
+                  <span
+                    key={i}
+                    className="tabular absolute left-0 -translate-y-1/2 text-[1.15rem] font-bold whitespace-nowrap text-ink-muted"
+                    style={{ top: `${(i * 60 * 100) / span}%` }}
+                  >
+                    {hourLabel(firstHour + i)}
+                  </span>
+                ) : null,
+              )}
             </div>
             {placed.map(({ column, blocks }) => (
               <div
                 key={column.key}
                 data-drop-day={column.key}
-                className={`relative min-w-0 flex-1 basis-0 ${column.dayType ? "cursor-copy" : ""}`}
+                className={`relative min-w-0 flex-1 basis-0 bg-panel ${column.dayType ? "cursor-copy" : ""}`}
+                style={{
+                  backgroundImage: "linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 9%, transparent) 0 1px, transparent 1px)",
+                  backgroundSize: `100% ${100 / (lastHour - firstHour)}%`,
+                }}
                 onClick={(e) => {
                   if (e.target !== e.currentTarget || !column.dayType) return;
                   const box = e.currentTarget.getBoundingClientRect();
@@ -524,7 +550,7 @@ export function RoutineManager({
                 }}
               >
                 {!column.dayType ? (
-                  <p className="mt-4 px-2 text-center text-base text-ink-muted">
+                  <p className="mt-4 px-2 text-center text-lg font-semibold text-ink-muted">
                     {`No ${view} for ${column.member.name}`}
                   </p>
                 ) : null}
@@ -547,7 +573,7 @@ export function RoutineManager({
               </div>
             ))}
             {/* Meal blocks and routine blocks, over the columns. */}
-            <div className="pointer-events-none absolute inset-y-0 right-0 left-16">
+            <div className="pointer-events-none absolute inset-y-0 right-0 left-[5rem]">
               {mealRuns.map((run) => {
                 const m = draft.meals.find((x) => x.id === run.routineId);
                 if (!m) return null;
@@ -578,7 +604,6 @@ export function RoutineManager({
                     run={run}
                     columns={columns.map((c) => c.key)}
                     colours={colours}
-                    icon={draft.steps.find((x) => x.routine_id === r.id && x.icon)?.icon ?? "✅"}
                     active={r.id === selected}
                     first={firstHour}
                     last={lastHour}
@@ -593,74 +618,62 @@ export function RoutineManager({
           </div>
         </section>
 
-        {/* The editor */}
-        <section aria-label="Edit routine" className="flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4">
+        {/* The editor for the tapped block */}
+        <section aria-label="Edit routine" className="relative flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
           {routine ? (
             <>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-[0.6rem]">
+                <Emoji emoji={steps.find((s) => s.icon)?.icon ?? "✅"} className="size-10 shrink-0" />
                 <input
                   value={routine.name}
                   onChange={(e) => setRoutine({ name: e.target.value })}
                   maxLength={60}
                   aria-label="Routine name"
-                  className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
+                  className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-1.5 text-[1.85rem] font-extrabold tracking-[-0.02em] text-ink outline-none hover:border-frame focus:border-ink"
                 />
                 {routine.is_template ? null : (
-                  <button
-                    type="button"
-                    onClick={saveAsTemplate}
-                    aria-label="Save as template"
-                    className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-rail px-3 text-base font-bold text-ink hover:bg-panel"
-                  >
-                    <Copy size="1.125rem" weight="bold" aria-hidden />
-                    Template
+                  <button type="button" onClick={saveAsTemplate} aria-label="Save as template" title="Save as template" className={iconButtonClass}>
+                    <Copy size="1.5rem" weight="bold" aria-hidden />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={removeRoutine}
-                  className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-danger px-3 text-base font-bold text-danger"
-                >
-                  <Trash size="1.125rem" weight="bold" aria-hidden />
-                  Delete
+                <button type="button" onClick={removeRoutine} aria-label="Delete this routine" title="Delete this routine" className={`${iconButtonClass} text-danger`}>
+                  <Trash size="1.5rem" weight="bold" aria-hidden />
                 </button>
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink-muted">
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {note ? (
-                  <span role="status" className={`line-clamp-2 ${note.warn ? "text-danger" : "text-success"}`}>
+                  <span role="status" className={`line-clamp-2 text-lg font-bold ${note.warn ? "text-danger" : "text-success"}`}>
                     {note.text}
                   </span>
                 ) : routine.is_template ? (
-                  <span className="rounded-full bg-panel px-2.5 py-1 text-ink">Template</span>
-                ) : usedBy.length === 0 ? (
-                  <span>Nobody yet</span>
+                  <span className="rounded-full bg-panel px-3 py-1 text-lg font-bold text-ink">Template</span>
                 ) : (
-                  <span>Used by</span>
+                  <span className={fieldLabelClass}>{usedBy.length === 0 ? "Nobody yet" : "Used by"}</span>
                 )}
-                {note ? null : usedBy.map(({ use, member, dayType }) => (
-                  <span key={use.id} className="flex h-8 items-center gap-1 rounded-full pr-1 pl-2.5 text-ink" style={{ background: soft(member?.colour) }}>
-                    {member?.name ?? "?"} · {dayType?.name ?? "?"}
-                    <button type="button" onClick={() => removeUse(use.id)} aria-label={`Take it off ${member?.name}'s ${dayType?.name}`} className="flex size-6 items-center justify-center rounded-full hover:bg-board">
-                      <X size="0.875rem" weight="bold" aria-hidden />
-                    </button>
-                  </span>
-                ))}
+                {note ? null : (
+                  <UseChips
+                    uses={usedBy.map(({ use, member, dayType }) => ({ id: use.id, member, dayType }))}
+                    view={view}
+                    onRemove={removeUse}
+                  />
+                )}
               </div>
 
-              {/* Steps, in order */}
-              {steps.length === 0 ? <p className="mt-2 text-base text-ink-muted">No steps yet</p> : null}
-              <ul ref={stepsRef} className="mt-3 flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
+              {/* Steps, in order. Blue words are on the Daily list. */}
+              {steps.length === 0 ? <p className="mt-3 text-lg text-ink-muted">No steps yet</p> : null}
+              <ul ref={stepsRef} className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
                 {steps.slice(page * stepsPerPage, page * stepsPerPage + stepsPerPage).map((step, i) => {
                   const index = page * stepsPerPage + i;
                   return (
-                    <li key={step.id} className="relative flex items-center gap-1.5">
+                    <li key={step.id} className="relative flex min-h-[3.15rem] shrink-0 items-center gap-[0.35rem] border-b border-frame py-0.5">
+                      <span className="tabular flex size-[1.85rem] shrink-0 items-center justify-center rounded-full bg-panel text-[1.15rem] font-extrabold text-ink">{index + 1}</span>
                       <EmojiPicker
                         initial={step.icon ?? ""}
                         fieldName=""
                         nameText={step.text}
                         onChange={(icon) => setStep(step.id, { icon: icon || null })}
                         label={`Picture for ${step.text}`}
-                        className="size-11! self-center!"
+                        className="size-12! self-center!"
                         fullScreen
                       />
                       <input
@@ -668,7 +681,7 @@ export function RoutineManager({
                         onChange={(e) => setStep(step.id, { text: e.target.value })}
                         maxLength={80}
                         aria-label={`Step ${index + 1}`}
-                        className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
+                        className={`min-h-12 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-1.5 text-[1.35rem] font-bold outline-none hover:border-frame focus:border-ink ${step.daily_list ? "text-accent" : "text-ink"}`}
                       />
                       {people.length > 1 ? (
                         <StepWho
@@ -686,7 +699,7 @@ export function RoutineManager({
                         onClick={() => setStep(step.id, { daily_list: !step.daily_list })}
                         tone={step.daily_list ? "list" : "plain"}
                       >
-                        <ListChecks size="1.125rem" weight="bold" aria-hidden />
+                        <ListChecks size="1.375rem" weight="bold" aria-hidden />
                       </SmallButton>
                       {/* Track one step as a habit on the Habits page (2026-11-12). Not needed when the whole routine is tracked. */}
                       {routine.habit_since ? null : (
@@ -696,103 +709,91 @@ export function RoutineManager({
                           onClick={() => setStep(step.id, { habit_since: step.habit_since ? null : today })}
                           tone={step.habit_since ? "on" : "plain"}
                         >
-                          <ChartLineUp size="1.125rem" weight="bold" aria-hidden />
+                          <ChartLineUp size="1.375rem" weight="bold" aria-hidden />
                         </SmallButton>
                       )}
                       <SmallButton label={`Move ${step.text} up`} disabled={index === 0} onClick={() => moveStep(step.id, -1)}>
-                        <ArrowUp size="1.125rem" weight="bold" aria-hidden />
+                        <CaretUp size="1.375rem" weight="bold" aria-hidden />
                       </SmallButton>
                       <SmallButton label={`Move ${step.text} down`} disabled={index === steps.length - 1} onClick={() => moveStep(step.id, 1)}>
-                        <ArrowDown size="1.125rem" weight="bold" aria-hidden />
+                        <CaretDown size="1.375rem" weight="bold" aria-hidden />
                       </SmallButton>
-                      <SmallButton label={`Delete ${step.text}`} onClick={() => removeStep(step.id)} tone="danger">
-                        <Trash size="1.125rem" weight="bold" aria-hidden />
+                      <SmallButton label={`Delete ${step.text}`} onClick={() => removeStep(step.id)}>
+                        <Trash size="1.375rem" weight="bold" aria-hidden />
                       </SmallButton>
                     </li>
                   );
                 })}
               </ul>
-              <div className="mt-1.5 flex items-center gap-3 text-base font-bold">
-                <Pager page={page} pages={pages} onPage={setStepPage} />
-                <span className="ml-auto flex items-center gap-3 text-sm">
-                  <span className="flex items-center gap-1.5 text-accent">
-                    <ListChecks size="1rem" weight="bold" aria-hidden />
-                    Blue = on the Daily list
-                  </span>
+              <div className="mt-[0.4rem] flex shrink-0 items-center gap-3">
+                <span className="flex items-center gap-[0.4rem] text-[1.15rem] font-bold text-accent">
+                  <ListChecks size="1.25rem" weight="bold" aria-hidden />
+                  Blue = on the Daily list
                 </span>
+                <Pager page={page} pages={pages} onPage={setStepPage} className="ml-auto" />
               </div>
               <AddStep key={routine.id} onAdd={addStep} />
 
-              {/* When it happens, and the switches */}
-              <div className="mt-auto flex flex-col gap-2.5 border-t border-frame pt-3">
-                <div className="flex flex-wrap items-end gap-2.5">
-                  <Labelled label="When">
-                    <select
-                      value={routine.anchor}
-                      onChange={(e) => {
-                        const anchor = e.target.value as Anchor;
-                        setRoutine({
-                          anchor,
-                          usual_start: anchor === "clock" ? (routine.usual_start ?? "16:00") : routine.usual_start,
-                          anchor_meal_time_id: anchor === "meal" ? (routine.anchor_meal_time_id ?? mealTimes[0]?.id ?? null) : routine.anchor_meal_time_id,
-                        });
-                      }}
-                      className={fieldClass}
-                    >
-                      {(Object.keys(ANCHOR_LABEL) as Anchor[]).map((a) => (
-                        <option key={a} value={a}>
-                          {ANCHOR_LABEL[a]}
-                        </option>
-                      ))}
-                    </select>
-                  </Labelled>
+              {/* When it happens, how long, the Daily list, and who sees it */}
+              <div className="mt-auto flex shrink-0 flex-col gap-[0.7rem] border-t border-frame pt-[0.9rem]">
+                <Field label="When">
+                  <Toggle
+                    label="When"
+                    value={routine.anchor}
+                    options={(Object.keys(ANCHOR_LABEL) as Anchor[]).map((a) => ({ value: a, label: ANCHOR_LABEL[a] }))}
+                    onChange={(anchor) =>
+                      setRoutine({
+                        anchor,
+                        usual_start: anchor === "clock" ? (routine.usual_start ?? "16:00") : routine.usual_start,
+                        anchor_meal_time_id: anchor === "meal" ? (routine.anchor_meal_time_id ?? mealTimes[0]?.id ?? null) : routine.anchor_meal_time_id,
+                      })
+                    }
+                  />
+                </Field>
+                <div className="flex flex-wrap items-end gap-[0.8rem]">
                   {routine.anchor === "meal" ? (
-                    <Labelled label="Which mealtime">
-                      <select value={routine.anchor_meal_time_id ?? ""} onChange={(e) => setRoutine({ anchor_meal_time_id: e.target.value || null })} className={fieldClass}>
+                    <Field label="Which mealtime" className="min-w-[10rem] flex-1">
+                      <select value={routine.anchor_meal_time_id ?? ""} onChange={(e) => setRoutine({ anchor_meal_time_id: e.target.value || null })} className={inputClass}>
                         {mealTimes.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.name}
                           </option>
                         ))}
                       </select>
-                    </Labelled>
+                    </Field>
                   ) : null}
                   {routine.anchor === "clock" ? (
-                    <Labelled label="Starts at">
-                      <input type="time" value={routine.usual_start ?? ""} onChange={(e) => setRoutine({ usual_start: e.target.value || null })} className={fieldClass} />
-                    </Labelled>
+                    <Field label="Starts at" className="w-[10.5rem]">
+                      <input type="time" value={routine.usual_start ?? ""} onChange={(e) => setRoutine({ usual_start: e.target.value || null })} className={inputClass} />
+                    </Field>
                   ) : (
-                    <Labelled label={routine.anchor === "bed" ? "Ends before bed (min)" : "Gap (min)"}>
+                    <Field label={routine.anchor === "bed" ? "Before bed (min)" : "Gap (min)"} className="w-[10rem]">
                       <NumberField value={routine.anchor_offset} min={0} max={240} onChange={(v) => setRoutine({ anchor_offset: v })} />
-                    </Labelled>
+                    </Field>
                   )}
-                  <Labelled label="Takes (min)">
+                  <Field label="Minutes" className="w-[7rem]">
                     <NumberField value={routine.usual_minutes} min={5} max={240} onChange={(v) => setRoutine({ usual_minutes: v })} />
-                  </Labelled>
+                  </Field>
+                  <span className="ml-auto flex gap-[0.6rem]">
+                    <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" hint="A loose routine can move to fit the day" />
+                    <Switch on={Boolean(routine.habit_since)} onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })} label="Track" hint="Track it as a habit" />
+                  </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" />
-                  <Switch
-                    on={Boolean(routine.habit_since)}
-                    onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })}
-                    label="Track"
-                  />
-                  <Switch
-                    on={listState === "all"}
-                    partly={listState === "some"}
-                    onClick={() => setWholeDailyList(listState !== "all")}
-                    label={listState === "some" ? "Daily list: some steps" : "On the Daily list"}
-                  />
-                  <label className="ml-auto flex items-center gap-2 text-sm font-bold text-ink-muted">
-                    Who can see it
-                    <select value={routine.visibility} onChange={(e) => setRoutine({ visibility: e.target.value })} className={`${fieldClass} min-h-11`}>
-                      {VISIBILITY.map((v) => (
-                        <option key={v.value} value={v.value}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="flex items-end gap-[0.8rem]">
+                  <Field label={listState === "some" ? "Daily list: some" : "On the Daily list"} className="w-[11rem]">
+                    <Toggle
+                      label="On the Daily list"
+                      value={listState === "all" ? "on" : listState === "some" ? null : "off"}
+                      options={[
+                        { value: "on", label: "On" },
+                        { value: "off", label: "Off" },
+                      ]}
+                      onChange={(v) => setWholeDailyList(v === "on")}
+                    />
+                  </Field>
+                  <Field label="Who can see it" className="flex-1">
+                    <Toggle label="Who can see it" value={routine.visibility} options={VISIBILITY} onChange={(v) => setRoutine({ visibility: v })} />
+                  </Field>
                 </div>
               </div>
             </>
@@ -808,11 +809,11 @@ export function RoutineManager({
               onChange={(patch) => setMeal(mealBlock.id, patch)}
               onRemoveUse={removeMealUse}
               onRemove={removeMeal}
+              view={view}
             />
           ) : (
-            <EmptyState emoji="📝" />
+            <EmptyState emoji="📝" hint="Tap a routine or a meal to change it." />
           )}
-
         </section>
       </div>
 
@@ -827,21 +828,11 @@ export function RoutineManager({
 // Small pieces
 // ---------------------------------------------------------------------------
 
-const fieldClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent";
+const fieldClass = inputClass;
+/** A round grey icon button in the editor's title row (save as template, delete). */
+const iconButtonClass = "flex size-12 shrink-0 items-center justify-center rounded-full bg-panel text-ink";
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex min-h-11 items-center gap-2 rounded-full border-2 px-4 text-base font-bold ${active ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink hover:border-ink"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
+/** A step's small icon buttons: plain grey ink, blue when on the Daily list, green when tracked as a habit. */
 function SmallButton({
   label,
   onClick,
@@ -854,22 +845,35 @@ function SmallButton({
   onClick: () => void;
   disabled?: boolean;
   pressed?: boolean;
-  tone?: "plain" | "danger" | "on" | "list";
+  tone?: "plain" | "on" | "list";
   children: React.ReactNode;
 }) {
   const look =
-    tone === "danger" ? "bg-rail text-danger" : tone === "on" ? "bg-success text-white" : tone === "list" ? "bg-accent text-white" : "bg-rail text-ink";
+    tone === "on"
+      ? "bg-[color-mix(in_srgb,var(--color-success)_14%,white)] text-success"
+      : tone === "list"
+        ? "bg-[color-mix(in_srgb,var(--color-accent)_14%,white)] text-accent"
+        : "bg-transparent text-ink-soft hover:bg-rail";
   return (
-    <button type="button" aria-label={label} title={label} aria-pressed={pressed} disabled={disabled} onClick={onClick} className={`flex size-11 shrink-0 items-center justify-center rounded-xl disabled:opacity-30 ${look}`}>
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex size-12 shrink-0 items-center justify-center rounded-[var(--radius)] disabled:opacity-30 ${look}`}
+    >
       {children}
     </button>
   );
 }
 
-function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
+/** A labelled field in the editor: small grey label above, the control below. */
+function Field({ label, className = "", children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-sm font-bold text-ink-muted">{label}</span>
+    <label className={`flex min-w-0 flex-col gap-[0.35rem] ${className}`}>
+      <span className={fieldLabelClass}>{label}</span>
       {children}
     </label>
   );
@@ -884,7 +888,7 @@ function NumberField({ value, min, max, onChange }: { value: number; min: number
       min={min}
       max={max}
       onChange={(e) => onChange(e.target.value === "" ? Number.NaN : Number(e.target.value))}
-      className={`${fieldClass} w-28`}
+      className={`${fieldClass} tabular`}
     />
   );
 }
@@ -897,7 +901,7 @@ function Switch({ on, partly = false, onClick, label, hint }: { on: boolean; par
       aria-checked={partly ? "mixed" : on}
       onClick={onClick}
       title={hint}
-      className={`flex min-h-11 items-center gap-2.5 rounded-2xl px-3 text-base font-bold ${on ? "bg-[color-mix(in_srgb,var(--color-success)_12%,white)] text-success" : "bg-rail text-ink"}`}
+      className={`flex min-h-[var(--touch-target)] shrink-0 items-center gap-2.5 rounded-[var(--radius)] px-3 text-[1.25rem] font-bold ${on ? "bg-[color-mix(in_srgb,var(--color-success)_12%,white)] text-success" : "bg-panel text-ink"}`}
     >
       <span
         className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 ${on ? "justify-end bg-success" : partly ? "justify-center bg-[color-mix(in_srgb,var(--color-success)_55%,white)]" : "justify-start bg-check-border"}`}
@@ -911,7 +915,53 @@ function Switch({ on, partly = false, onClick, label, hint }: { on: boolean; par
 }
 
 /**
- * Who does a step in a shared routine: their faces on the button (or a
+ * Who has this routine (or meal) on the kind of day on screen, each with an
+ * × to take it off. Other kinds of day are named on one line after them;
+ * pick that kind of day in the header to change those (so the list never
+ * grows past a line or two).
+ */
+function UseChips({
+  uses,
+  view,
+  onRemove,
+}: {
+  uses: { id: string; member: ManagerMember | undefined; dayType: ManagerDayType | undefined }[];
+  view: string;
+  onRemove: (id: string) => void;
+}) {
+  const here = uses.filter((u) => u.dayType?.name === view);
+  const elsewhere = [...new Set(uses.filter((u) => u.dayType?.name !== view).map((u) => u.dayType?.name ?? "?"))];
+  return (
+    <>
+      {here.map(({ id, member }) => {
+        const look = whoChipStyle(member?.colour, true);
+        return (
+          <span key={id} className={`${look.className} min-h-12! gap-[0.3rem]! pr-0 pl-3! text-lg!`} style={look.style}>
+            <ColourDot colour={member?.colour} className="size-[0.9rem]" />
+            <span className="truncate">{member?.name ?? "?"}</span>
+            <button
+              type="button"
+              onClick={() => onRemove(id)}
+              aria-label={`Take it off ${member?.name}'s ${view}`}
+              className="-my-1 flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-board/60"
+            >
+              <X size="1.125rem" weight="bold" aria-hidden />
+            </button>
+          </span>
+        );
+      })}
+      {elsewhere.length > 0 ? (
+        <span className="min-w-0 basis-full truncate text-lg font-semibold text-ink-muted" title={elsewhere.join(", ")}>
+          {here.length > 0 ? "Also on " : "On "}
+          {elsewhere.join(", ")}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Who does a step in a shared routine: a chip with their colour dots (a
  * group sign for everyone); tap to pick people.
  */
 function StepWho({
@@ -931,6 +981,8 @@ function StepWho({
 }) {
   const everyone = chosen.length === 0;
   const faces = people.filter((p) => chosen.includes(p.id));
+  const one = faces.length === 1 ? faces[0] : null;
+  const look = whoChipStyle(one?.colour ?? null, Boolean(one));
   return (
     <>
       <button
@@ -938,41 +990,42 @@ function StepWho({
         onClick={onOpen}
         aria-expanded={open}
         aria-label={`Who does ${step.text}: ${everyone ? "everyone" : faces.map((p) => p.name).join(", ")}`}
-        className={`flex h-11 shrink-0 items-center justify-center rounded-xl px-1.5 ${open ? "bg-ink text-board" : "bg-rail text-ink"}`}
+        className={`${look.className} max-w-[9rem] shrink-0 px-3! ${open ? "border-ink!" : ""}`}
+        style={look.style}
       >
         {everyone ? (
-          <span className="flex w-8 justify-center">
+          <>
             <Users size="1.25rem" weight="bold" aria-hidden />
-          </span>
+            <span>All</span>
+          </>
+        ) : one ? (
+          <>
+            <ColourDot colour={one.colour} />
+            <span className="truncate">{one.name}</span>
+          </>
         ) : (
-          <span className="flex -space-x-2">
-            {faces.slice(0, 3).map((p) => (
-              <Avatar key={p.id} name={p.name} colour={p.colour} icon={p.icon} size="sm" />
+          <span className="flex -space-x-1">
+            {faces.slice(0, 4).map((p) => (
+              <ColourDot key={p.id} colour={p.colour} className="size-[1.15rem] ring-2 ring-board" />
             ))}
           </span>
         )}
       </button>
       {open ? (
-        <div className="absolute top-full right-0 z-20 mt-1 flex flex-wrap items-center gap-1.5 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)]">
-          <span className="px-1 text-sm font-bold text-ink-muted">Who does it?</span>
+        <div className="absolute top-full right-0 z-20 mt-1 flex flex-wrap items-center gap-1.5 rounded-[var(--radius-card)] bg-board p-2 shadow-dialog">
+          <span className={`px-1 ${fieldLabelClass}`}>Who does it?</span>
           {people.map((p) => {
             const on = everyone || chosen.includes(p.id);
+            const chip = whoChipStyle(p.colour, on);
             return (
-              <button
-                key={p.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onToggle(p.id)}
-                className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 pr-3 pl-1.5 text-base font-bold ${on ? "text-ink" : "border-frame text-ink-muted opacity-60"}`}
-                style={on ? { borderColor: strong(p.colour), background: soft(p.colour) } : undefined}
-              >
-                <Avatar name={p.name} colour={p.colour} icon={p.icon} size="sm" />
+              <button key={p.id} type="button" aria-pressed={on} onClick={() => onToggle(p.id)} className={`${chip.className} ${on ? "" : "text-ink-muted!"}`} style={chip.style}>
+                <ColourDot colour={p.colour} />
                 {p.name}
               </button>
             );
           })}
-          <button type="button" onClick={onOpen} aria-label="Done" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
-            <X size="1rem" weight="bold" aria-hidden />
+          <button type="button" onClick={onOpen} aria-label="Done" className="flex size-12 items-center justify-center rounded-full bg-panel text-ink">
+            <X size="1.125rem" weight="bold" aria-hidden />
           </button>
         </div>
       ) : null}
@@ -992,8 +1045,8 @@ function AddStep({ onAdd }: { onAdd: (text: string, icon: string) => void }) {
     setRound((r) => r + 1);
   };
   return (
-    <div className="mt-2 flex items-center gap-1.5 rounded-2xl border-2 border-dashed border-frame p-1.5">
-      <EmojiPicker key={round} initial="" fieldName="" nameText={text} onChange={setIcon} label="Picture for the new step" className="size-11! self-center!" fullScreen />
+    <div className="mt-[0.7rem] flex shrink-0 items-center gap-2">
+      <EmojiPicker key={round} initial="" fieldName="" nameText={text} onChange={setIcon} label="Picture for the new step" className="size-12! self-center!" fullScreen />
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -1001,12 +1054,12 @@ function AddStep({ onAdd }: { onAdd: (text: string, icon: string) => void }) {
           if (e.key === "Enter") add();
         }}
         maxLength={80}
-        placeholder="New step"
-        aria-label="New step"
-        className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
+        placeholder="Add a step"
+        aria-label="Add a step"
+        className={`${inputClass} flex-1 placeholder:text-ink-muted`}
       />
-      <button type="button" onClick={add} disabled={!text.trim()} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-ink px-4 text-base font-bold text-board disabled:opacity-40">
-        <Plus size="1.125rem" weight="bold" aria-hidden />
+      <button type="button" onClick={add} disabled={!text.trim()} className={`${primaryActionClass} disabled:opacity-40`}>
+        <Plus size="1.25rem" weight="bold" aria-hidden />
         Add
       </button>
     </div>
@@ -1050,19 +1103,19 @@ function AddExisting({
     const mealPages = Math.max(1, Math.ceil(meals.length / per));
     const p = Math.min(page, mealPages - 1);
     return (
-      <div className="absolute top-1 right-0 left-0 z-40 flex flex-col gap-1 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)]">
+      <div className="absolute top-1 right-0 z-40 flex w-[max(100%,28rem)] flex-col gap-1 rounded-[var(--radius-card)] bg-board p-2 shadow-dialog">
         <AddTabs tab={tab} setTab={(t) => (setTab(t), setPage(0))} onClose={onClose} />
-        <button type="button" onClick={onNewMeal} className="flex min-h-11 items-center gap-2 rounded-xl bg-meal px-2 text-left text-base font-bold text-meal-ink">
+        <button type="button" onClick={onNewMeal} className="flex min-h-12 items-center gap-2 rounded-[var(--radius)] bg-meal px-2 text-left text-lg font-bold text-meal-ink">
           <Plus size="1rem" weight="bold" aria-hidden />
           New mealtime
         </button>
         {meals.slice(p * per, p * per + per).map((m) => (
-          <button key={m.id} type="button" onClick={() => onPickMeal(m.id)} className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-left text-base font-bold text-ink hover:bg-rail">
+          <button key={m.id} type="button" onClick={() => onPickMeal(m.id)} className="flex min-h-12 min-w-0 items-center gap-2 rounded-[var(--radius)] px-2 text-left text-lg font-bold text-ink hover:bg-rail">
             <Emoji emoji={m.icon ?? "🍽️"} className="size-6" />
             <span className="truncate">{m.name || "Meal"}</span>
           </button>
         ))}
-        {meals.length === 0 ? <p className="px-1 text-sm text-ink-muted">Nothing to add</p> : null}
+        {meals.length === 0 ? <p className="px-1 text-lg text-ink-muted">Nothing to add</p> : null}
         <Pager page={p} pages={mealPages} onPage={setPage} />
       </div>
     );
@@ -1071,10 +1124,10 @@ function AddExisting({
   const pages = Math.max(1, Math.ceil(list.length / ADD_PER_PAGE));
   const shown = list.slice(page * ADD_PER_PAGE, page * ADD_PER_PAGE + ADD_PER_PAGE);
   return (
-    <div className="absolute top-1 right-0 left-0 z-40 flex flex-col gap-1 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)]">
+    <div className="absolute top-1 right-0 z-40 flex w-[max(100%,28rem)] flex-col gap-1 rounded-[var(--radius-card)] bg-board p-2 shadow-dialog">
       <AddTabs tab={tab} setTab={(t) => (setTab(t), setPage(0))} onClose={onClose} />
       {shown.length === 0 ? (
-        <p className="px-1 text-base text-ink-muted">
+        <p className="px-1 text-lg text-ink-muted">
           {tab === "share"
             ? "Nothing to add"
             : "No templates yet"}
@@ -1085,12 +1138,12 @@ function AddExisting({
           <button
             type="button"
             onClick={() => (tab === "share" ? onPick(r.id) : onStartFrom(r.id))}
-            className="flex min-h-11 min-w-0 flex-1 items-center rounded-xl px-2 text-left text-base font-bold text-ink hover:bg-rail"
+            className="flex min-h-12 min-w-0 flex-1 items-center rounded-[var(--radius)] px-2 text-left text-lg font-bold text-ink hover:bg-rail"
           >
             <span className="truncate">{r.name || "Untitled"}</span>
           </button>
           {tab === "template" ? (
-            <button type="button" onClick={() => onEditTemplate(r.id)} className="min-h-10 shrink-0 rounded-xl bg-rail px-2.5 text-sm font-bold text-ink">
+            <button type="button" onClick={() => onEditTemplate(r.id)} className="min-h-12 shrink-0 rounded-[var(--radius)] bg-rail px-2.5 text-lg font-bold text-ink">
               Edit
             </button>
           ) : null}
@@ -1105,25 +1158,58 @@ function AddExisting({
 function AddTabs({ tab, setTab, onClose }: { tab: "share" | "template" | "meal"; setTab: (t: "share" | "template" | "meal") => void; onClose: () => void }) {
   return (
     <div className="flex items-center gap-1">
+      <div className="flex min-w-0 flex-1 gap-1 rounded-[var(--radius)] bg-panel p-1">
       {(["share", "template", "meal"] as const).map((t) => (
         <button
           key={t}
           type="button"
           aria-pressed={tab === t}
           onClick={() => setTab(t)}
-          className={`min-h-10 flex-1 rounded-xl px-1.5 text-sm font-bold ${tab === t ? "bg-ink text-board" : "bg-rail text-ink"}`}
+          className={`min-h-12 flex-1 rounded-[var(--radius)] px-1.5 text-lg font-bold whitespace-nowrap ${tab === t ? "bg-board text-ink shadow-raised" : "text-ink-muted"}`}
         >
           {t === "share" ? "Share one" : t === "template" ? "Template" : "Mealtime"}
         </button>
       ))}
-      <button type="button" onClick={onClose} aria-label="Close" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
+      </div>
+      <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
         <X size="1rem" weight="bold" aria-hidden />
       </button>
     </div>
   );
 }
 
-const GRID_GAP = "0.625rem";
+const GRID_GAP = "0.5rem";
+
+/**
+ * A block on the grid (mock: .blk): a rounded pastel tile with its name in
+ * bold print, at least 3rem tall so the name always fits. Tapped: an ink
+ * ring, and only then do the grab marks for stretching show.
+ */
+function blockClass(active: boolean): string {
+  return `pointer-events-auto absolute z-[1] flex min-h-[3rem] touch-none items-center overflow-hidden rounded-[0.7rem] px-[0.6rem] text-left select-none ${
+    active ? "z-[2] shadow-[inset_0_0_0_2px_var(--color-ink)]" : "[&_.handle-mark]:opacity-0"
+  }`;
+}
+
+/** Where a block sits: its columns (inset a little), from its start for as long as it lasts. */
+function blockBox(box: { left: string; width: string }, start: number, minutes: number, first: number, span: number) {
+  return {
+    left: `calc(${box.left} + 0.15rem)`,
+    width: `calc(${box.width} - 0.3rem)`,
+    top: `calc(${((start - first * 60) / span) * 100}% + 1px)`,
+    height: `calc(${(minutes / span) * 100}% - 2px)`,
+  };
+}
+
+/** A block's printed name; while it's being dragged, the time it would land on. */
+function BlockText({ name, time }: { name: string; time: string | null }) {
+  return (
+    <span className="flex min-w-0 flex-1 items-baseline gap-2 leading-[1.15]">
+      <span className="truncate text-[1.25rem] font-extrabold">{name}</span>
+      {time ? <span className="tabular shrink-0 text-lg font-bold opacity-80">{time}</span> : null}
+    </span>
+  );
+}
 
 /**
  * A meal block (Lunch, Dinner) on the grid, over the columns of everyone who
@@ -1166,8 +1252,7 @@ function MealRun({
   const span = (last - first) * 60;
   const start = drag.shown.start;
   const minutes = drag.shown.minutes;
-  // Short meals still get room for their name.
-  const tall = Math.max(minutes, 40);
+  const tall = minutes;
   const box = spanBox(spreading?.[0] ?? run.c0, spreading?.[1] ?? run.c1, columns.length, GRID_GAP);
   return (
     <div
@@ -1179,22 +1264,13 @@ function MealRun({
       onKeyDown={(e) => {
         if (e.key === "Enter") onSelect();
       }}
-      className={`pointer-events-auto absolute z-[1] flex cursor-grab touch-none items-center gap-1.5 overflow-hidden rounded-xl border-2 border-meal-ink/40 bg-meal px-4 text-left text-meal-ink select-none active:cursor-grabbing ${active ? "shadow-[0_0_0_3px_var(--color-ink)]" : ""} ${drag.dragging || spreading ? "z-30 shadow-lg" : ""}`}
-      style={{
-        left: box.left,
-        width: box.width,
-        top: `calc(${((start - first * 60) / span) * 100}% + 1px)`,
-        height: `calc(${(tall / span) * 100}% - 2px)`,
-      }}
+      className={`${blockClass(active)} cursor-grab bg-meal text-meal-ink active:cursor-grabbing ${drag.dragging || spreading ? "z-30 shadow-dialog" : ""}`}
+      style={blockBox(box, start, tall, first, span)}
     >
-      <Emoji emoji={meal.icon ?? "🍽️"} className="size-6" />
-      <span className="flex min-w-0 flex-1 items-baseline gap-2 leading-[1.1]">
-        <span className="truncate text-base font-bold">{meal.name || "Meal"}</span>
-        <span className="truncate text-sm font-semibold opacity-75">{timeLabel(start)}</span>
-      </span>
+      <BlockText name={meal.name || "Meal"} time={drag.dragging ? timeLabel(start) : null} />
       <SideHandles byDay fullHeight columns={columns} c0={run.c0} c1={run.c1} onPreview={setSpreading} onDone={onSpread} />
-      <div {...drag.handleHandlers} aria-hidden className="absolute inset-x-4 bottom-0 flex h-2.5 cursor-ns-resize touch-none items-end justify-center pb-0.5">
-        <span className="h-1 w-8 rounded-full bg-meal-ink/40" />
+      <div {...drag.handleHandlers} aria-hidden className="absolute inset-x-4 bottom-0 flex h-3 cursor-ns-resize touch-none items-end justify-center pb-0.5">
+        <span className="handle-mark h-1 w-8 rounded-full bg-meal-ink/40" />
       </div>
     </div>
   );
@@ -1216,6 +1292,7 @@ function MealEditor({
   onChange,
   onRemoveUse,
   onRemove,
+  view,
 }: {
   meal: DraftMealBlock;
   uses: { id: string; member: ManagerMember | undefined; dayType: ManagerDayType | undefined }[];
@@ -1224,6 +1301,7 @@ function MealEditor({
   onChange: (patch: Partial<DraftMealBlock>) => void;
   onRemoveUse: (id: string) => void;
   onRemove: () => void;
+  view: string;
 }) {
   const [day, setDay] = useState<number | null>(null);
   const days = Array.from({ length: 7 }, (_, i) => (i + weekStartsOn) % 7);
@@ -1236,14 +1314,14 @@ function MealEditor({
   const setPreset = (weekday: number, value: string | null) => onChange({ presets: meal.presets.map((p, i) => (i === weekday ? value : p)) });
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-[0.6rem]">
         <EmojiPicker
           initial={meal.icon ?? ""}
           fieldName=""
           nameText={meal.name}
           onChange={(icon) => onChange({ icon: icon || null })}
           label={`Picture for ${meal.name || "this meal"}`}
-          className="size-14! self-center!"
+          className="size-12! self-center!"
           fullScreen
         />
         <input
@@ -1251,35 +1329,27 @@ function MealEditor({
           onChange={(e) => onChange({ name: e.target.value })}
           maxLength={30}
           aria-label="Mealtime name"
-          className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
+          className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-1.5 text-[1.85rem] font-extrabold tracking-[-0.02em] text-ink outline-none hover:border-frame focus:border-ink"
         />
-        <button type="button" onClick={onRemove} className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border-2 border-danger px-3 text-base font-bold text-danger">
-          <Trash size="1.125rem" weight="bold" aria-hidden />
-          Delete
+        <button type="button" onClick={onRemove} aria-label="Delete this mealtime" title="Delete this mealtime" className={`${iconButtonClass} text-danger`}>
+          <Trash size="1.5rem" weight="bold" aria-hidden />
         </button>
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-ink-muted">
-        {uses.length === 0 ? <span>Nobody yet</span> : <span>Eaten by</span>}
-        {uses.map(({ id, member, dayType }) => (
-          <span key={id} className="flex h-8 items-center gap-1 rounded-full pr-1 pl-2.5 text-ink" style={{ background: soft(member?.colour) }}>
-            {member?.name ?? "?"} · {dayType?.name ?? "?"}
-            <button type="button" onClick={() => onRemoveUse(id)} aria-label={`Take it off ${member?.name}'s ${dayType?.name}`} className="flex size-6 items-center justify-center rounded-full hover:bg-board">
-              <X size="0.875rem" weight="bold" aria-hidden />
-            </button>
-          </span>
-        ))}
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <span className={fieldLabelClass}>{uses.length === 0 ? "Nobody yet" : "Eaten by"}</span>
+        <UseChips uses={uses} view={view} onRemove={onRemoveUse} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-2.5">
-        <Labelled label="Usually at">
+      <div className="mt-4 flex items-end gap-[0.8rem]">
+        <Field label="Usually at" className="w-[11rem]">
           <input type="time" value={meal.usual_time} onChange={(e) => e.target.value && onChange({ usual_time: e.target.value })} className={fieldClass} />
-        </Labelled>
-        <Labelled label="Eating takes (min)">
+        </Field>
+        <Field label="Eating takes (min)" className="w-[11rem]">
           <NumberField value={meal.minutes} min={MEAL_MINUTES.min} max={MEAL_MINUTES.max} onChange={(v) => onChange({ minutes: v })} />
-        </Labelled>
+        </Field>
       </div>
 
-      <h3 className="mt-4 text-xl font-bold text-ink">Every week</h3>
+      <h3 className="mt-5 text-[1.5rem] font-extrabold text-ink">Every week</h3>
       <div className="mt-2 grid grid-cols-7 gap-1.5">
         {days.map((d) => {
           const chosen = look(meal.presets[d]);
@@ -1289,11 +1359,11 @@ function MealEditor({
               type="button"
               onClick={() => setDay(d)}
               aria-label={`${WEEKDAY_SHORT[d]}: ${chosen?.name ?? "nothing set"}`}
-              className={`flex min-h-24 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-1 ${chosen ? "border-meal-ink/40 bg-meal text-meal-ink" : "border-dashed border-frame text-ink-muted hover:bg-rail"}`}
+              className={`flex min-h-28 min-w-0 flex-col items-center justify-center gap-1 rounded-[var(--radius)] px-1 ${chosen ? "bg-meal text-meal-ink" : "border-2 border-dashed border-frame text-ink-muted hover:bg-rail"}`}
             >
-              <span className="text-sm font-bold">{WEEKDAY_SHORT[d]}</span>
-              {chosen ? <Emoji emoji={chosen.icon ?? "🍽️"} className="size-8" /> : <Plus size="1.25rem" weight="bold" aria-hidden />}
-              <span className="w-full truncate text-center text-xs font-bold">{chosen?.name ?? ""}</span>
+              <span className="text-lg font-extrabold">{WEEKDAY_SHORT[d]}</span>
+              {chosen ? <Emoji emoji={chosen.icon ?? "🍽️"} className="size-9" /> : <Plus size="1.5rem" weight="bold" aria-hidden />}
+              <span className="w-full truncate text-center text-lg font-bold">{chosen?.name ?? ""}</span>
             </button>
           );
         })}
@@ -1328,26 +1398,26 @@ function PresetChooser({
   ];
   const pages = Math.max(1, Math.ceil(list.length / CHOICES_PER_PAGE));
   const p = Math.min(page, pages - 1);
-  const tile = "flex min-h-0 min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-1.5 text-center";
+  const tile = "flex min-h-0 min-w-0 flex-col items-center justify-center gap-1 rounded-[var(--radius)] border-2 px-1.5 text-center";
   return (
     <div role="dialog" aria-label={`${weekday} ${mealName}`} className="absolute inset-0 z-20 flex flex-col gap-3 bg-board">
       <div className="flex shrink-0 items-center gap-2">
-        <h3 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">
+        <h3 className="min-w-0 flex-1 truncate text-[1.75rem] font-extrabold text-ink">
           {weekday} {mealName.toLowerCase() || "meal"}
         </h3>
-        <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
+        <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-panel text-ink">
           <X size="1.25rem" weight="bold" aria-hidden />
         </button>
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-3 gap-2">
         <button type="button" onClick={() => onPick(null)} className={`${tile} ${current === null ? "border-ink bg-rail" : "border-dashed border-frame hover:bg-rail"}`}>
           <X size="1.75rem" weight="bold" aria-hidden className="text-ink-muted" />
-          <span className="text-base font-bold text-ink">Nothing</span>
+          <span className="text-lg font-bold text-ink">Nothing</span>
         </button>
         {list.slice(p * CHOICES_PER_PAGE, (p + 1) * CHOICES_PER_PAGE).map((c) => (
           <button key={c.value} type="button" onClick={() => onPick(c.value)} className={`${tile} ${c.value === current ? "border-meal-ink bg-meal" : "border-frame hover:bg-rail"}`}>
             <Emoji emoji={c.icon ?? "🍽️"} className="size-10" />
-            <span className="line-clamp-2 text-base font-bold text-ink">{c.name}</span>
+            <span className="line-clamp-2 text-lg font-bold text-ink">{c.name}</span>
           </button>
         ))}
       </div>
@@ -1369,7 +1439,6 @@ function RoutineRun({
   run,
   columns,
   colours,
-  icon,
   active,
   first,
   last,
@@ -1382,7 +1451,6 @@ function RoutineRun({
   run: GridRun<{ routineId: string; start: number; end: number }>;
   columns: string[];
   colours: string[];
-  icon: string;
   active: boolean;
   first: number;
   last: number;
@@ -1402,16 +1470,12 @@ function RoutineRun({
   const span = (last - first) * 60;
   const start = drag.shown.start;
   const minutes = drag.shown.minutes;
-  // Short routines still get room for a line of text.
-  const tall = Math.max(minutes, 45);
+  const tall = minutes;
   const box = spanBox(spreading?.[0] ?? run.c0, spreading?.[1] ?? run.c1, columns.length, GRID_GAP);
   const movable = routine.anchor === "clock";
-  const background =
-    colours.length > 1
-      ? `linear-gradient(90deg, ${colours.map((c) => (active ? soft(c) : `color-mix(in srgb, ${strong(c)} 9%, white)`)).join(", ")})`
-      : active
-        ? soft(colours[0])
-        : `color-mix(in srgb, ${strong(colours[0])} 7%, white)`;
+  // One person: their pastel and ink. Shared by several: their pastels side by side, in dark ink.
+  const background = colours.length > 1 ? `linear-gradient(90deg, ${colours.map((c) => soft(c)).join(", ")})` : soft(colours[0]);
+  const ink = colours.length > 1 ? "var(--color-ink)" : hand(colours[0]);
   return (
     <div
       {...(movable ? drag.bodyHandlers : { onClick: onSelect })}
@@ -1422,26 +1486,14 @@ function RoutineRun({
       onKeyDown={(e) => {
         if (e.key === "Enter") onSelect();
       }}
-      className={`pointer-events-auto absolute z-[1] flex touch-none items-center gap-1.5 overflow-hidden rounded-xl border-2 px-4 text-left text-ink select-none ${movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${active ? "border-solid shadow-[0_0_0_3px_var(--color-ink)]" : "border-dashed"} ${drag.dragging || spreading ? "z-30 shadow-lg" : ""}`}
-      style={{
-        left: box.left,
-        width: box.width,
-        top: `calc(${((start - first * 60) / span) * 100}% + 1px)`,
-        height: `calc(${(tall / span) * 100}% - 2px)`,
-        borderColor: colours.length > 1 ? "var(--color-ink-soft)" : strong(colours[0]),
-        background,
-      }}
+      className={`${blockClass(active)} ${movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${drag.dragging || spreading ? "z-30 shadow-dialog" : ""}`}
+      style={{ ...blockBox(box, start, tall, first, span), background, color: ink }}
     >
-      <Emoji emoji={icon} className="size-6" />
-      {/* Short blocks put the time beside the name; taller ones below it. */}
-      <span className={`flex min-w-0 flex-1 leading-[1.1] ${tall >= 75 ? "flex-col" : "items-baseline gap-2"}`}>
-        <span className="truncate text-base font-bold">{routine.name || "Untitled"}</span>
-        <span className="truncate text-sm font-semibold text-ink-soft">{`${timeLabel(start)}–${timeLabel(start + minutes)}`}</span>
-      </span>
+      <BlockText name={routine.name || "Untitled"} time={drag.dragging ? `${timeLabel(start)}–${timeLabel(start + minutes)}` : null} />
       <SideHandles byDay fullHeight columns={columns} c0={run.c0} c1={run.c1} onPreview={setSpreading} onDone={onSpread} />
-      {/* A thin strip along the bottom, so short blocks still have room to grab and move. */}
-      <div {...drag.handleHandlers} aria-hidden className="absolute inset-x-4 bottom-0 flex h-2.5 cursor-ns-resize touch-none items-end justify-center pb-0.5">
-        <span className="h-1 w-8 rounded-full bg-ink/40" />
+      {/* A thin strip along the bottom: drag it to change how long it takes. */}
+      <div {...drag.handleHandlers} aria-hidden className="absolute inset-x-4 bottom-0 flex h-3 cursor-ns-resize touch-none items-end justify-center pb-0.5">
+        <span className="handle-mark h-1 w-8 rounded-full bg-current opacity-40" />
       </div>
     </div>
   );

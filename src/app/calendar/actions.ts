@@ -58,6 +58,7 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
   const visibility = text(formData, "visibility") || "everyone";
   const notes = text(formData, "notes");
   const icon = text(formData, "icon");
+  const location = readLocation(formData);
 
   if (!title) back(formData, "error", "An event needs a title.");
   const endDateInput = text(formData, "endDate") || startDate;
@@ -99,7 +100,13 @@ function readEvent(formData: FormData, settings: HouseholdSettings) {
     notes: notes || null,
     icon: icon || null,
     day_kind: readDayKind(formData),
+    location,
   };
+}
+
+/** Where it is: a plain line of text (no map, no lookup), or null. */
+function readLocation(formData: FormData): string | null {
+  return text(formData, "location").slice(0, 200) || null;
 }
 
 /** "Makes it a … day" on the card: a kind of day's name, or null for no change. */
@@ -192,6 +199,7 @@ async function insertTemplate(
       member_ids: readIds(formData, "memberIds"),
       notes: event.notes,
       day_kind: event.day_kind,
+      location: event.location,
       sort_order: 100,
     })
     .select("id")
@@ -281,7 +289,7 @@ export async function skipOccurrence(formData: FormData) {
   );
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_occurrence_skipped", "event", eventId, `${title} (${date})`);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `Skipped ${title} on ${date}.`);
 }
 
@@ -317,7 +325,7 @@ export async function moveOccurrence(formData: FormData) {
   );
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_occurrence_moved", "event", eventId, `${title} (${originalDate})`);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `Moved ${title} on ${originalDate}.`);
 }
 
@@ -331,7 +339,7 @@ export async function resetOccurrence(formData: FormData) {
   const { error } = await supabase.from("event_exceptions").delete().eq("event_id", eventId).eq("original_date", date);
   if (error) back(formData, "error", error.message);
   await log(household.id, "event_occurrence_reset", "event", eventId, `${title} (${date})`);
-  revalidatePath("/calendar");
+  revalidatePath("/", "layout");
   back(formData, "message", `${title} on ${date} is back to normal.`);
 }
 
@@ -376,11 +384,9 @@ export async function choosePeople(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 /**
- * Moves or stretches an event after it's dragged on the week or Today
- * timeline. A one-off event just changes; for a repeating event only the
- * dragged date moves (like "Move just this one"). Dropping it in another
- * person's column on Today swaps that person in for the one whose column
- * it came from (one-off events only).
+ * Moves or stretches an event after it's dragged on the Week hour grid.
+ * A one-off event just changes; for a repeating event only the dragged
+ * date moves (like "Move just this one").
  * Called straight from the browser, so it returns an error instead of redirecting.
  */
 export async function rescheduleEvent(input: {
@@ -389,8 +395,6 @@ export async function rescheduleEvent(input: {
   date: string;
   startTime: string;
   minutes: number;
-  /** Slid sideways on Today: these people come off and those go on. */
-  members?: { remove: string[]; add: string[] };
 }): Promise<{ error?: string }> {
   const household = await requireHousehold();
   const { timeZone } = household.settings;
@@ -425,10 +429,7 @@ export async function rescheduleEvent(input: {
       .update({ starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), all_day: false })
       .eq("id", eventId);
     if (error) return { error: error.message };
-    if (input.members) {
-      const linkError = await moveMembers(household.id, eventId, input.members);
-      if (linkError) return { error: linkError };
-    }
+    await log(household.id, "event_updated", "event", eventId, event.title);
   }
   revalidatePath("/calendar");
   revalidatePath("/");
@@ -513,43 +514,6 @@ export async function stretchEventDays(input: {
   return {};
 }
 
-/**
- * Takes some people off an event and puts others on. An event for everyone
- * counts as being for each person; one that ends up for everybody in the
- * household is stored as "everyone".
- */
-async function moveMembers(householdId: string, eventId: string, change: { remove: string[]; add: string[] }): Promise<string | null> {
-  const supabase = await createClient();
-  const [{ data: rows, error }, { data: all, error: allError }] = await Promise.all([
-    supabase.from("event_members").select("member_id").eq("event_id", eventId),
-    supabase.from("members").select("id"),
-  ]);
-  if (error || allError) return (error ?? allError)!.message;
-  const everyone = all.map((m) => m.id);
-  const current = rows.length > 0 ? rows.map((r) => r.member_id) : everyone;
-  const next = new Set(current.filter((id) => !change.remove.includes(id)));
-  for (const id of change.add) if (everyone.includes(id)) next.add(id);
-  const ids = everyone.every((id) => next.has(id)) ? [] : [...next];
-  return setMembers(householdId, eventId, ids);
-}
-
-/**
- * Stretching a bubble on Today over more (or fewer) people. For a
- * repeating event this changes who every date is for.
- */
-export async function changeEventPeople(input: { eventId: string; remove: string[]; add: string[] }): Promise<{ error?: string }> {
-  const household = await requireHousehold();
-  const supabase = await createClient();
-  const { data: event, error: findError } = await supabase.from("events").select("id, title").eq("id", input.eventId).maybeSingle();
-  if (findError || !event) return { error: "Couldn't find that event." };
-  const error = await moveMembers(household.id, event.id, { remove: input.remove, add: input.add });
-  if (error) return { error };
-  await log(household.id, "event_updated", "event", event.id, event.title);
-  revalidatePath("/calendar");
-  revalidatePath("/");
-  return {};
-}
-
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
@@ -591,6 +555,7 @@ export async function updateTemplate(formData: FormData) {
       member_ids: readIds(formData, "memberIds"),
       notes: notes || null,
       day_kind: readDayKind(formData),
+      location: readLocation(formData),
     })
     .eq("id", id);
   if (error) back(formData, "error", error.message);

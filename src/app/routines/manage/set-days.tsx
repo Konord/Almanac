@@ -3,8 +3,8 @@
 import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, Bell, CalendarCheck, Car, Check, Plus, SunHorizon, Trash, Umbrella, X } from "@phosphor-icons/react";
-import { Avatar, Emoji } from "@/components/ui";
+import { Bell, CaretLeft, Car, Check, Plus, Trash, X } from "@phosphor-icons/react";
+import { ColourDot, Emoji, ScreenHeader, Toggle, fieldLabelClass, secondaryActionClass, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
@@ -114,16 +114,26 @@ export function SetDays({
 
   return (
     <>
-      <header className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Set days</h1>
-        <nav aria-label="What to set" className="flex gap-1 rounded-2xl bg-panel p-1.25">
+      <ScreenHeader
+        title="Set days"
+        action={
+          <>
+            <Link href="/routines" className={secondaryActionClass}>
+              <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+              Routines
+            </Link>
+            <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
+          </>
+        }
+        tabs={
+        <nav aria-label="What to set" className={segTrackClass}>
           {(
             [
-              ["week", "Week", CalendarCheck],
-              ["kinds", "Days", SunHorizon],
-              ["breaks", "Days off", Umbrella],
+              ["week", "Week"],
+              ["kinds", "Days"],
+              ["breaks", "Days off"],
             ] as const
-          ).map(([value, label, Icon]) => (
+          ).map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -133,24 +143,14 @@ export function SetDays({
                 // Keep the tab in the address, so it stays after Save.
                 window.history.replaceState(null, "", `?tab=${value}`);
               }}
-              className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl px-4 text-base font-bold ${
-                tab === value ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"
-              }`}
+              className={segItemClass(tab === value)}
             >
-              <Icon size="1.375rem" aria-hidden />
               {label}
             </button>
           ))}
         </nav>
-        <Link
-          href="/routines"
-          className="inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel"
-        >
-          <ArrowLeft size="1.5rem" aria-hidden />
-          Routines
-        </Link>
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </header>
+        }
+      />
 
       <div className="flex min-h-0 flex-1 flex-col">
         {tab === "week" ? <WeekTab draft={draft} update={update} members={members} weekdays={weekdays} today={today} /> : null}
@@ -159,7 +159,7 @@ export function SetDays({
       </div>
 
       {losing > 0 ? (
-        <p className="shrink-0 text-base font-bold text-danger">
+        <p role="alert" className="shrink-0 text-lg font-bold text-danger">
           Saving also takes {losing === 1 ? "1 routine" : `${losing} routines`} off the days you removed.
         </p>
       ) : null}
@@ -186,7 +186,8 @@ function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekd
   const [page, setPage] = useState(0);
   const [rowsRef, rowsPerPage] = useFitRows<HTMLDivElement>(ROWS_PER_PAGE);
   const [picking, setPicking] = useState<{ plan: string; weekday: number } | null>(null);
-  const [chosen, setChosen] = useState<string | null>(null);
+  // The first person's week is open on the right to start with (Glance mock).
+  const [chosen, setChosen] = useState<string | null>(rows[0]?.plan.id ?? null);
   const pages = Math.max(1, Math.ceil(rows.length / rowsPerPage));
   const at = Math.min(page, pages - 1);
   const shown = rows.slice(at * rowsPerPage, at * rowsPerPage + rowsPerPage);
@@ -197,33 +198,33 @@ function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekd
 
   return (
     <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-      <section aria-label="The week" className="flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-5 py-4">
-        <div className="grid shrink-0 grid-cols-[13rem_repeat(7,minmax(0,1fr))] gap-1.5 pb-2">
+      <section aria-label="The week" className={`${cardClass} px-[1.2rem] py-4`}>
+        <div className="grid shrink-0 grid-cols-[13rem_repeat(7,minmax(0,1fr))] gap-[0.4rem] pb-[0.3rem]">
           <span aria-hidden />
           {weekdays.map((w) => (
-            <span key={w.value} className="text-center text-lg font-bold text-ink" title={w.long}>
+            <span key={w.value} className="text-center text-[1.35rem] font-extrabold text-ink" title={w.long}>
               {w.short}
             </span>
           ))}
         </div>
-        <div ref={rowsRef} className="flex min-h-0 flex-1 flex-col gap-1.5">
+        <div ref={rowsRef} className="flex min-h-0 flex-1 flex-col gap-[0.4rem]">
           {shown.map(({ member, plan }, rowIndex) => {
             const plans = draft.weekPlans.filter((p) => p.member_id === member.id);
             const settings = draft.members.find((x) => x.member_id === member.id);
             const status = plans.length < 2 ? null : settings?.rotate ? "turns" : (settings?.current_week_plan_id ?? plans[0].id) === plan.id ? "in use" : "not used";
             const types = draft.dayTypes.filter((t) => t.member_id === member.id);
             return (
-              <div key={plan.id} className="grid max-h-28 min-h-16 flex-1 grid-cols-[13rem_repeat(7,minmax(0,1fr))] gap-1.5">
+              <div key={plan.id} className="grid h-[5.75rem] shrink-0 grid-cols-[13rem_repeat(7,minmax(0,1fr))] gap-[0.4rem]">
                 <button
                   type="button"
                   onClick={() => setChosen(chosen === plan.id ? null : plan.id)}
                   aria-pressed={chosen === plan.id}
-                  className={`flex min-h-16 min-w-0 items-center gap-2.5 rounded-2xl px-2 text-left ${chosen === plan.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
+                  className={`flex min-w-0 items-center gap-[0.55rem] rounded-[var(--radius)] px-2 text-left ${chosen === plan.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
                 >
-                  <Avatar name={member.name} colour={member.colour} icon={member.icon} size="md" />
-                  <span className="flex min-w-0 flex-col leading-tight">
-                    <span className="truncate text-lg font-bold text-ink">{member.name}</span>
-                    <span className="truncate text-sm font-semibold text-ink-muted" title={`${plan.name}${status ? `, ${status}` : ""}`}>
+                  <ColourDot colour={member.colour} className="size-6" />
+                  <span className="flex min-w-0 flex-col leading-[1.1]">
+                    <span className="truncate text-[1.5rem] font-extrabold text-ink">{member.name}</span>
+                    <span className="truncate text-[1.15rem] font-bold text-ink-muted" title={`${plan.name}${status ? `, ${status}` : ""}`}>
                       {plan.name || "Untitled"}
                       {status ? ` · ${status}` : ""}
                     </span>
@@ -240,19 +241,20 @@ function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekd
                         onClick={() => setPicking(open ? null : { plan: plan.id, weekday: w.value })}
                         aria-expanded={open}
                         aria-label={`${member.name}, ${w.long}: ${type?.name ?? "not set"}. Change`}
-                        className="flex h-full min-h-16 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 px-1 text-ink"
+                        className="flex h-full w-full min-w-0 flex-col items-center justify-center gap-[0.15rem] rounded-[var(--radius)] border-2 px-1 text-ink"
                         style={{ borderColor: open ? "var(--color-ink)" : "transparent", background: soft(member.colour) }}
                       >
-                        {type?.icon ? <Emoji emoji={type.icon} className="size-8" /> : null}
-                        <span className="w-full truncate text-center text-base font-bold">{type?.name ?? "?"}</span>
+                        {type?.icon ? <Emoji emoji={type.icon} className="size-[1.85rem]" /> : null}
+                        <span className="w-full truncate text-center text-[1.25rem] font-extrabold">{type?.name ?? "?"}</span>
                       </button>
                       {open ? (
                         <div
-                          className={`absolute z-20 flex w-56 flex-col gap-1 rounded-2xl border border-frame bg-board p-2 shadow-[0_0.5rem_2rem_rgba(30,35,45,0.18)] ${
-                            rowIndex >= shown.length / 2 && rowIndex > 1 ? "bottom-full mb-1" : "top-full mt-1"
+                          className={`absolute z-20 flex w-[16rem] flex-col gap-[0.2rem] rounded-[var(--radius-card)] bg-board p-2 shadow-dialog ${
+                            // Downwards unless it would run off the bottom (about four rows tall).
+                            rowIndex >= 4 && rowIndex + 5 > rowsPerPage ? "bottom-full mb-1" : "top-full mt-1"
                           } ${w === weekdays[6] || w === weekdays[5] ? "right-0" : "left-0"}`}
                         >
-                          <span className="px-1 text-sm font-bold text-ink-muted">
+                          <span className={`px-[0.4rem] py-[0.2rem] ${fieldLabelClass}`}>
                             {member.name}&rsquo;s {w.long}
                           </span>
                           {types.slice(0, 7).map((t) => (
@@ -263,11 +265,11 @@ function WeekTab({ draft, update, members, weekdays, today }: TabProps & { weekd
                                 setDay(plan.id, w.value, t.id);
                                 setPicking(null);
                               }}
-                              className={`flex min-h-11 items-center gap-2 rounded-xl px-2 text-left text-base font-bold text-ink ${t.id === typeId ? "bg-rail" : "hover:bg-rail"}`}
+                              className={`flex min-h-12 items-center gap-2 rounded-[var(--radius)] px-[0.6rem] text-left text-[1.25rem] font-bold text-ink ${t.id === typeId ? "bg-rail" : "hover:bg-rail"}`}
                             >
-                              {t.icon ? <Emoji emoji={t.icon} className="size-6" /> : <span className="size-6" />}
+                              {t.icon ? <Emoji emoji={t.icon} className="size-7" /> : <span className="size-7" />}
                               <span className="min-w-0 flex-1 truncate">{t.name || "Untitled"}</span>
-                              {t.id === typeId ? <Check size="1.125rem" weight="bold" aria-hidden /> : null}
+                              {t.id === typeId ? <Check size="1.25rem" weight="bold" aria-hidden /> : null}
                             </button>
                           ))}
                         </div>
@@ -297,8 +299,9 @@ function WeeksPanel({
 }: Pick<TabProps, "draft" | "update"> & { row: { member: DaysMember; plan: { id: string; name: string } } | null; today: string; onAdded: (id: string) => void }) {
   if (!row) {
     return (
-      <section className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-frame bg-board p-6 text-center">
+      <section className={`${cardClass} items-center justify-center gap-3 p-6 text-center`}>
         <Emoji emoji="🗓️" className="size-16" />
+        <p className="text-lg font-semibold text-ink-muted">Tap someone to see their weeks.</p>
       </section>
     );
   }
@@ -308,79 +311,93 @@ function WeeksPanel({
   const current = settings?.current_week_plan_id ?? plans[0]?.id;
   const rotate = Boolean(settings?.rotate);
   return (
-    <section aria-label={`${member.name}'s weeks`} className="flex min-h-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board px-5 py-4">
-      <div className="flex items-center gap-3">
-        <Avatar name={member.name} colour={member.colour} icon={member.icon} size="lg" />
-        <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">{member.name}&rsquo;s weeks</h2>
+    <section aria-label={`${member.name}'s weeks`} className={`${cardClass} gap-3 px-[1.4rem] py-5`}>
+      <h2 className="flex items-center gap-3 text-[1.75rem] font-bold text-ink">
+        <ColourDot colour={member.colour} className="size-[1.15rem]" />
+        <span className="min-w-0 truncate">{member.name}&rsquo;s weeks</span>
+      </h2>
+      <div role="radiogroup" aria-label="Which week" className="flex flex-col gap-2">
+        {plans.slice(0, 5).map((p) => {
+          const inUse = !rotate && p.id === current;
+          return (
+            <div key={p.id} className={`flex min-h-[3.6rem] items-center gap-1 rounded-[var(--radius)] pr-3 pl-1 ${p.id === row.plan.id ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
+              {plans.length > 1 ? (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={inUse}
+                  aria-label={`Use ${p.name} every week`}
+                  onClick={() => update((d) => pickWeek(d, member.id, p.id))}
+                  className="flex size-12 shrink-0 items-center justify-center rounded-full"
+                >
+                  <span className={`flex size-7 items-center justify-center rounded-full border-[2.5px] ${inUse ? "border-ink bg-ink text-board" : "border-check-border"}`}>
+                    {inUse ? <Check size="0.875rem" weight="bold" aria-hidden /> : null}
+                  </span>
+                </button>
+              ) : null}
+              <input
+                value={p.name}
+                onChange={(e) => update((d) => ({ ...d, weekPlans: d.weekPlans.map((x) => (x.id === p.id ? { ...x, name: e.target.value } : x)) }))}
+                maxLength={30}
+                aria-label="Week name"
+                className="min-h-12 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-1.5 text-[1.5rem] font-extrabold text-ink outline-none hover:border-frame focus:border-ink"
+              />
+              <span className="shrink-0 text-[1.15rem] font-bold text-ink-muted">{rotate ? "Taking turns" : inUse ? "In use" : ""}</span>
+              {plans.length > 1 ? (
+                <button
+                  type="button"
+                  aria-label={`Remove ${p.name}`}
+                  title={`Remove ${p.name}`}
+                  onClick={() => update((d) => removeWeekPlan(d, p.id))}
+                  className="flex size-12 shrink-0 items-center justify-center rounded-full text-danger hover:bg-panel"
+                >
+                  <Trash size="1.375rem" weight="bold" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
-      <div className="flex flex-col gap-2">
-        {plans.slice(0, 5).map((p) => (
-          <div key={p.id} className={`flex items-center gap-2 rounded-2xl p-1.5 ${p.id === row.plan.id ? "bg-rail" : ""}`}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={!rotate && p.id === current}
-              aria-label={`Use ${p.name} every week`}
-              disabled={plans.length < 2}
-              onClick={() => update((d) => pickWeek(d, member.id, p.id))}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full"
-            >
-              <span className={`flex size-7 items-center justify-center rounded-full border-[2.5px] ${!rotate && p.id === current ? "border-ink bg-ink text-board" : "border-check-border"}`}>
-                {!rotate && p.id === current ? <Check size="0.875rem" weight="bold" aria-hidden /> : null}
-              </span>
-            </button>
-            <input
-              value={p.name}
-              onChange={(e) => update((d) => ({ ...d, weekPlans: d.weekPlans.map((x) => (x.id === p.id ? { ...x, name: e.target.value } : x)) }))}
-              maxLength={30}
-              aria-label="Week name"
-              className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
-            />
-            {plans.length > 1 ? (
-              <button
-                type="button"
-                aria-label={`Remove ${p.name}`}
-                title={`Remove ${p.name}`}
-                onClick={() => update((d) => removeWeekPlan(d, p.id))}
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-danger"
-              >
-                <Trash size="1.25rem" aria-hidden />
-              </button>
-            ) : null}
-          </div>
-        ))}
-      </div>
-      {plans.length > 1 ? (
-        <button
-          type="button"
-          role="switch"
-          aria-checked={rotate}
-          onClick={() => update((d) => (rotate ? pickWeek(d, member.id, current ?? plans[0].id) : takeTurns(d, member.id, row.plan.id, today)))}
-          className={`flex min-h-11 items-center gap-2.5 self-start rounded-2xl px-3 text-base font-bold ${rotate ? "bg-[color-mix(in_srgb,var(--color-success)_12%,white)] text-success" : "bg-rail text-ink"}`}
-        >
-          <span className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 ${rotate ? "justify-end bg-success" : "justify-start bg-check-border"}`} aria-hidden>
-            <span className="size-5 rounded-full bg-white" />
-          </span>
-          Take turns each week{rotate ? "" : ` (${row.plan.name || "this one"} first)`}
-        </button>
-      ) : null}
-      {plans.length < 5 ? (
-        <button
-          type="button"
-          onClick={() => {
-            const id = newId();
-            update((d) => addWeekPlan(d, member.id, id, plans.length === 1 ? "Second week" : `Week ${plans.length + 1}`, row.plan.id));
-            onAdded(id);
+      <label className="mt-1 flex flex-col gap-[0.35rem]">
+        <span className={fieldLabelClass}>If there is more than one week</span>
+        <Toggle
+          label="If there is more than one week"
+          value={rotate ? "turns" : "one"}
+          disabled={plans.length < 2}
+          options={[
+            { value: "turns", label: "Take turns" },
+            { value: "one", label: "Use one" },
+          ]}
+          onChange={(v) => {
+            if (v === "turns" && !rotate) update((d) => takeTurns(d, member.id, row.plan.id, today));
+            if (v === "one" && rotate) update((d) => pickWeek(d, member.id, current ?? plans[0].id));
           }}
-          className="mt-auto flex min-h-[var(--touch-target)] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-frame text-base font-bold text-ink hover:border-ink"
-        >
-          <Plus size="1.25rem" weight="bold" aria-hidden />
-          Another week (a copy of {row.plan.name || "this one"})
-        </button>
+        />
+        {plans.length > 1 && !rotate ? <span className="text-lg font-semibold text-ink-muted">Taking turns starts with the week picked above.</span> : null}
+      </label>
+      {plans.length < 5 ? (
+        <div className="mt-auto flex flex-col gap-1">
+          <span className="text-lg font-semibold text-ink-muted">A new week starts as a copy of {row.plan.name || "this one"}.</span>
+          <button
+            type="button"
+            onClick={() => {
+              const id = newId();
+              update((d) => addWeekPlan(d, member.id, id, plans.length === 1 ? "Second week" : `Week ${plans.length + 1}`, row.plan.id));
+              onAdded(id);
+            }}
+            className={`${secondaryActionClass} w-full`}
+          >
+            <Plus size="1.25rem" weight="bold" aria-hidden />
+            Add a week
+          </button>
+        </div>
       ) : null}
     </section>
   );
 }
+
+/** A white card on the board (no frame line; the raised shadow). */
+const cardClass = "flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] bg-board shadow-raised";
 
 // ---------------------------------------------------------------------------
 // Kinds of day: one card for each, with who has it and their times
@@ -438,7 +455,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className={`grid min-h-0 flex-1 gap-4 lg:grid-cols-3 ${perPage === 6 ? "lg:grid-rows-2" : "lg:grid-rows-1"}`}>
         {shown.map((g) => (
-          <section key={g.group} aria-label={g.name || "New day"} className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] border border-frame bg-board px-4 py-3">
+          <section key={g.group} aria-label={g.name || "New day"} className={`${cardClass} gap-1.5 px-4 py-3`}>
             <div className="flex items-center gap-2">
               <EmojiPicker
                 key={g.group}
@@ -447,7 +464,7 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 nameText={g.name}
                 onChange={(icon) => setGroup(g.group, { icon: icon || null })}
                 label={`Picture for ${g.name || "this day"}`}
-                className="size-11! self-center!"
+                className="size-12! self-center!"
                 fullScreen
               />
               <input
@@ -455,13 +472,13 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 onChange={(e) => setGroup(g.group, { name: e.target.value })}
                 maxLength={30}
                 aria-label="Day name"
-                className="min-h-11 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
+                className="min-h-12 min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-xl font-extrabold text-ink outline-none hover:border-frame focus:border-ink"
               />
               <button
                 type="button"
                 aria-pressed={g.types[0]?.errands ?? false}
                 onClick={() => setGroup(g.group, { errands: !(g.types[0]?.errands ?? false) })}
-                className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-frame px-3 text-sm font-bold text-ink-muted aria-pressed:border-solid aria-pressed:border-ink aria-pressed:bg-rail aria-pressed:text-ink"
+                className="flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border-2 border-dashed border-frame px-3 text-lg font-bold text-ink-muted aria-pressed:border-solid aria-pressed:border-ink aria-pressed:bg-rail aria-pressed:text-ink"
               >
                 <Car size="1.25rem" aria-hidden />
                 Errands
@@ -470,11 +487,11 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 type="button"
                 onClick={() => setBells(g.group)}
                 aria-label={`Heads-ups for ${g.name || "this day"}`}
-                className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-ink"
+                className="relative flex size-12 shrink-0 items-center justify-center rounded-[var(--radius)] bg-rail text-ink"
               >
                 <Bell size="1.25rem" aria-hidden />
                 {draft.headsUps.some((h) => h.group === g.group) ? (
-                  <span className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-ink text-xs font-bold text-board">
+                  <span className="absolute -top-1 -right-1 flex size-7 items-center justify-center rounded-full bg-ink text-lg font-bold text-board">
                     {draft.headsUps.filter((h) => h.group === g.group).length}
                   </span>
                 ) : null}
@@ -483,12 +500,12 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                 type="button"
                 onClick={() => removeGroup(g.group)}
                 aria-label={`Remove ${g.name || "this day"}`}
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rail text-danger"
+                className="flex size-12 shrink-0 items-center justify-center rounded-[var(--radius)] bg-rail text-danger"
               >
                 <Trash size="1.25rem" aria-hidden />
               </button>
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_8.5rem_8.5rem] items-center gap-x-1.5 px-1 text-sm font-bold text-ink-muted">
+            <div className="grid grid-cols-[minmax(0,1fr)_9.5rem_9.5rem] items-center gap-x-1.5 px-1 text-lg font-bold text-ink-muted">
               <span>Who has it</span>
               <span>Wake-up</span>
               <span>Bedtime</span>
@@ -496,15 +513,15 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
             {members.map((m) => {
               const mine = g.types.find((t) => t.member_id === m.id);
               return (
-                <div key={m.id} className="grid grid-cols-[minmax(0,1fr)_8.5rem_8.5rem] items-center gap-x-1.5">
+                <div key={m.id} className="grid grid-cols-[minmax(0,1fr)_9.5rem_9.5rem] items-center gap-x-1.5">
                   <button
                     type="button"
                     aria-pressed={Boolean(mine)}
                     onClick={() => toggle(g.group, m)}
-                    className={`flex min-h-11 min-w-0 items-center gap-2 rounded-full border-2 pr-3 pl-1 text-base font-bold ${mine ? "border-transparent text-ink" : "border-dashed border-frame text-ink-muted"}`}
+                    className={`flex min-h-12 min-w-0 items-center gap-2 rounded-full border-2 pr-3 pl-1 text-lg font-bold ${mine ? "border-transparent text-ink" : "border-dashed border-frame text-ink-muted"}`}
                     style={mine ? { background: soft(m.colour) } : undefined}
                   >
-                    <Avatar name={m.name} colour={mine ? m.colour : "grey"} icon={m.icon} size="sm" />
+                    <ColourDot colour={mine ? m.colour : "slate"} className={`size-[1.15rem] ${mine ? "" : "opacity-40"}`} />
                     <span className="truncate">{m.name}</span>
                   </button>
                   {mine ? (
@@ -573,18 +590,18 @@ function KindHeadsUps({
     setLabel("");
   };
   const chip = (on: boolean) =>
-    `flex min-h-11 items-center rounded-full border-2 px-4 text-base ${on ? "border-ink bg-rail font-bold text-ink" : "border-frame bg-board text-ink"}`;
+    `flex min-h-12 items-center rounded-full border-2 px-4 text-lg ${on ? "border-ink bg-rail font-bold text-ink" : "border-frame bg-board text-ink"}`;
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(30,35,45,0.35)] p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-label={`Heads-ups for ${name}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-[40rem] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-6 shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)]"
+        className="flex w-full max-w-[40rem] flex-col gap-4 rounded-[var(--radius-card)] bg-board p-6 shadow-dialog"
       >
         <div className="flex items-center gap-3">
           <h2 className="flex-1 text-2xl font-extrabold text-ink">Heads-ups for {name}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
+          <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
             <X size="1.25rem" weight="bold" aria-hidden />
           </button>
         </div>
@@ -595,7 +612,7 @@ function KindHeadsUps({
                 <Emoji emoji={h.makes === "grocery" ? "🛒" : "🔔"} className="size-7" />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-lg font-semibold text-ink">{h.label}</span>
-                  <span className="text-sm font-semibold text-ink-muted">
+                  <span className="text-lg font-semibold text-ink-muted">
                     {leadLabel(h.minutes_before).replace("At the start", "At wake-up").replace(" before", " before wake-up")}
                     {h.makes === "grocery" ? " · on the grocery list" : ""}
                   </span>
@@ -604,7 +621,7 @@ function KindHeadsUps({
                   type="button"
                   onClick={() => onRemove(h.id)}
                   aria-label={`Remove the heads-up ${h.label}`}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-ink"
+                  className="flex size-12 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-ink"
                 >
                   <X size="1.25rem" aria-hidden />
                 </button>
@@ -616,23 +633,23 @@ function KindHeadsUps({
           <div className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-rail p-4">
             <div className="flex items-end gap-3">
               <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <span className="text-base font-bold text-ink">New heads-up</span>
+                <span className="text-lg font-bold text-ink">New heads-up</span>
                 <input
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={80}
-                  className="min-h-11 rounded-xl border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
+                  className="min-h-12 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-ink"
                 />
               </label>
-              <label className="flex w-24 shrink-0 flex-col gap-1.5">
-                <span className="text-base font-bold text-ink">How long</span>
+              <label className="flex w-28 shrink-0 flex-col gap-1.5">
+                <span className="text-lg font-bold text-ink">How long</span>
                 <input
                   type="number"
                   min={0}
                   max={999}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="min-h-11 rounded-xl border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent"
+                  className="min-h-12 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-ink"
                 />
               </label>
             </div>
@@ -642,7 +659,7 @@ function KindHeadsUps({
                   {u.label}
                 </button>
               ))}
-              <span className="px-1 text-base text-ink-muted">before wake-up, makes a</span>
+              <span className="px-1 text-lg text-ink-muted">before wake-up, makes a</span>
               <button type="button" aria-pressed={makes === "todo"} onClick={() => setMakes("todo")} className={chip(makes === "todo")}>
                 To-do
               </button>
@@ -655,23 +672,23 @@ function KindHeadsUps({
                 type="button"
                 onClick={add}
                 disabled={!label.trim() || minutes === null}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-ink px-5 text-base font-bold text-board disabled:opacity-40"
+                className="inline-flex min-h-12 items-center gap-2 rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board disabled:opacity-40"
               >
                 <Plus size="1.25rem" weight="bold" aria-hidden />
                 Add heads-up
               </button>
-              {minutes === null ? <span className="text-sm font-bold text-danger">Up to 60 days.</span> : null}
+              {minutes === null ? <span className="text-lg font-bold text-danger">Up to 60 days.</span> : null}
             </div>
           </div>
         ) : (
-          <p className="text-base text-ink-muted">That&rsquo;s the most for one day.</p>
+          <p className="text-lg text-ink-muted">That&rsquo;s the most for one day.</p>
         )}
       </div>
     </div>
   );
 }
 
-const timeClass = "min-h-11 w-full min-w-0 rounded-xl border-2 border-frame bg-board px-1.5 text-base text-ink outline-none focus:border-accent";
+const timeClass = "min-h-12 w-full min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-1.5 text-lg text-ink outline-none focus:border-ink";
 
 // ---------------------------------------------------------------------------
 // Breaks: a list on the left, the one picked on the right
@@ -698,11 +715,11 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
 
   return (
     <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-      <section aria-label="Days off" className="flex min-h-0 min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame bg-board px-4 py-4">
+      <section aria-label="Days off" className={`${cardClass} gap-2 px-4 py-4`}>
         <button
           type="button"
           onClick={add}
-          className="flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-ink text-base font-bold text-board"
+          className="flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-[var(--radius)] bg-ink text-lg font-bold text-board"
         >
           <Plus size="1.25rem" weight="bold" aria-hidden />
           Day off
@@ -715,12 +732,12 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
               type="button"
               onClick={() => setSelected(b.id)}
               aria-pressed={b.id === selected}
-              className={`flex min-h-16 min-w-0 items-center gap-3 rounded-2xl px-2.5 text-left ${b.id === selected ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
+              className={`flex min-h-16 min-w-0 items-center gap-3 rounded-[var(--radius)] px-2.5 text-left ${b.id === selected ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
             >
               <Emoji emoji={eventEmoji(b.icon, b.name)} className="size-10" />
               <span className="flex min-w-0 flex-1 flex-col leading-tight">
                 <span className="truncate text-lg font-bold text-ink">{b.name || "New day off"}</span>
-                <span className="truncate text-sm font-semibold text-ink-muted">
+                <span className="truncate text-lg font-semibold text-ink-muted">
                   {now ? "Now · " : ""}
                   {b.start === b.end ? dateLabel(b.start, true) : `${dateLabel(b.start)} – ${dateLabel(b.end)}`}
                 </span>
@@ -728,7 +745,7 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
               <span className="flex shrink-0 -space-x-1.5">
                 {b.people.slice(0, 4).map((p) => {
                   const m = members.find((x) => x.id === p.member_id);
-                  return m ? <Avatar key={m.id} name={m.name} colour={m.colour} icon={m.icon} size="sm" /> : null;
+                  return m ? <ColourDot key={m.id} colour={m.colour} className="size-[1.15rem] ring-2 ring-board" /> : null;
                 })}
               </span>
             </button>
@@ -752,7 +769,7 @@ function BreaksTab({ draft, update, members, today, dateLabel }: TabProps & { to
           close={() => setSelected(null)}
         />
       ) : (
-        <section className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-frame bg-board p-6 text-center">
+        <section className={`${cardClass} items-center justify-center gap-3 p-6 text-center`}>
           <Emoji emoji="🏖️" className="size-16" />
         </section>
       )}
@@ -807,7 +824,7 @@ function BreakEditor({
     (!group || item.people.some((p) => draft.dayTypes.some((x) => x.group === group && x.id === p.day_type_id)));
 
   return (
-    <section aria-label="Edit day off" className="flex min-h-0 min-w-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4">
+    <section aria-label="Edit day off" className={`${cardClass} gap-3 px-[1.4rem] py-4`}>
       <div className="flex items-center gap-2.5">
         <EmojiPicker
           initial={item.icon ?? ""}
@@ -823,20 +840,21 @@ function BreakEditor({
           onChange={(e) => set({ name: e.target.value })}
           maxLength={40}
           aria-label="Name"
-          className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-accent"
+          placeholder="Name this day off"
+          className="placeholder:text-ink-muted min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-transparent bg-transparent px-2 text-3xl font-extrabold text-ink outline-none hover:border-frame focus:border-ink"
         />
-        <button type="button" onClick={remove} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-rail px-3 text-base font-bold text-danger">
+        <button type="button" onClick={remove} className="flex min-h-12 items-center gap-1.5 rounded-[var(--radius)] bg-rail px-3 text-lg font-bold text-danger">
           <Trash size="1.125rem" aria-hidden />
           Delete
         </button>
-        <button type="button" onClick={close} aria-label="Close" className="flex size-11 items-center justify-center rounded-xl bg-rail text-ink">
+        <button type="button" onClick={close} aria-label="Close" className="flex size-12 items-center justify-center rounded-[var(--radius)] bg-rail text-ink">
           <X size="1.125rem" weight="bold" aria-hidden />
         </button>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-bold text-ink-muted">From</span>
+          <span className="text-lg font-bold text-ink-muted">From</span>
           <input
             type="date"
             value={item.start}
@@ -849,18 +867,18 @@ function BreakEditor({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-bold text-ink-muted">To</span>
+          <span className="text-lg font-bold text-ink-muted">To</span>
           <input type="date" value={item.end} min={item.start} onChange={(e) => set({ end: e.target.value })} className={dateClass} />
         </label>
-        <span className="pb-3 text-base font-semibold text-ink-muted">{dayCount(item.start, item.end)}</span>
-        <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2.5 text-base font-bold text-ink">
+        <span className="pb-3 text-lg font-semibold text-ink-muted">{dayCount(item.start, item.end)}</span>
+        <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2.5 text-lg font-bold text-ink">
           <input type="checkbox" checked={Boolean(item.away)} onChange={(e) => set({ away: e.target.checked })} className="size-7 accent-[var(--color-ink)]" />
           Away from home (no chores)
         </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-sm font-bold text-ink-muted">Everyone has</span>
+        <span className="mr-1 text-lg font-bold text-ink-muted">Everyone has</span>
         {groups.slice(0, 5).map((g) => (
           <MiniChip key={g.group} active={allOn(g.group)} onClick={() => everyone(g.group)}>
             {g.icon ? <Emoji emoji={g.icon} className="size-5" /> : null}
@@ -873,7 +891,7 @@ function BreakEditor({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 border-t border-frame pt-2.5">
-        <span className="text-sm font-bold text-ink-muted">Who it&rsquo;s for, and their days</span>
+        <span className="text-lg font-bold text-ink-muted">Who it&rsquo;s for, and their days</span>
         {members.map((m) => {
           const p = person(m.id);
           const types = draft.dayTypes.filter((t) => t.member_id === m.id);
@@ -884,10 +902,10 @@ function BreakEditor({
                 type="button"
                 aria-pressed={Boolean(p)}
                 onClick={() => setPerson(m.id, p ? null : {})}
-                className={`flex min-h-11 w-40 shrink-0 items-center gap-2 rounded-full border-2 pr-3 pl-1 text-base font-bold ${p ? "border-transparent text-ink" : "border-dashed border-frame text-ink-muted"}`}
+                className={`flex min-h-12 w-40 shrink-0 items-center gap-2 rounded-full border-2 pr-3 pl-1 text-lg font-bold ${p ? "border-transparent text-ink" : "border-dashed border-frame text-ink-muted"}`}
                 style={p ? { background: soft(m.colour) } : undefined}
               >
-                <Avatar name={m.name} colour={p ? m.colour : "grey"} icon={m.icon} size="sm" />
+                <ColourDot colour={p ? m.colour : "slate"} className={`size-[1.15rem] ${p ? "" : "opacity-40"}`} />
                 <span className="truncate">{m.name}</span>
               </button>
               {p ? (
@@ -910,7 +928,7 @@ function BreakEditor({
                   </MiniChip>
                 </div>
               ) : (
-                <span className="text-base text-ink-muted">Not on these days off</span>
+                <span className="text-lg text-ink-muted">Not on these days off</span>
               )}
             </div>
           );
@@ -920,7 +938,7 @@ function BreakEditor({
   );
 }
 
-const dateClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent";
+const dateClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-ink";
 
 function dayCount(start: string, end: string): string {
   const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
@@ -938,7 +956,7 @@ function MiniChip({ active, onClick, colour, children }: { active: boolean; onCl
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 px-3 text-base ${active ? "border-ink font-bold text-ink" : "border-frame bg-board text-ink hover:border-ink"}`}
+      className={`flex min-h-12 items-center gap-1.5 rounded-full border-2 px-3 text-lg ${active ? "border-ink font-bold text-ink" : "border-frame bg-board text-ink hover:border-ink"}`}
       style={active ? { background: colour ? soft(colour) : "var(--color-rail)", borderColor: colour ? strong(colour) : undefined } : undefined}
     >
       {children}

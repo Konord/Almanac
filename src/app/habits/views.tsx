@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { X } from "@phosphor-icons/react/dist/ssr";
-import { Avatar, Emoji } from "@/components/ui";
+import { ColourDot, Emoji, segItemClass, segTrackClass } from "@/components/ui";
 import { soft, strong } from "@/lib/colours";
 import { emojiImage, eventEmoji } from "@/lib/emoji";
 import { chartTop, dayMet, monthDates, weekdayOf, type HabitPeriod } from "@/lib/habits";
@@ -26,55 +26,65 @@ const periodic = (row: HabitRowData) => row.rule.frequency === "week" || row.rul
 // Lines
 // ---------------------------------------------------------------------------
 
-/** Day cells: 2.125rem circles with a 0.45rem gap. */
-const CELL = 2.125;
-const GAP = 0.45;
+/** The mock's `.hd` / `.hrow` columns: habit name, the month's days, "In a row". */
+const LINE_COLUMNS = "grid grid-cols-[22rem_minmax(0,1fr)_5.5rem] gap-[0.4rem]";
+const dayGrid = (n: number) => ({ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: "0.25rem" });
 
+/**
+ * Lines (g-final-habits): one white card, a row per habit and person. The
+ * day circles are compact history (not buttons); the habit's name is the
+ * big target and opens its last 12 months.
+ */
 export function LinesView({ rows, month, today, locale, href }: { rows: HabitRowData[]; month: string; today: LocalDate; locale: string; href: (key: string) => string }) {
   const dates = monthDates(month);
   return (
-    <section aria-label="Habits this month" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-8 shrink-0 items-center border-b border-frame">
-        <span className="w-[25rem] shrink-0" />
-        <div className="flex" style={{ gap: `${GAP}rem` }}>
-          {dates.map((d) => {
-            const weekend = weekdayOf(d) === 0 || weekdayOf(d) === 6;
-            return (
-              <span key={d} className={`text-center text-sm font-bold tabular-nums ${d === today ? "text-now" : weekend ? "text-check-border" : "text-ink-soft"}`} style={{ width: `${CELL}rem` }}>
-                {Number(d.slice(8))}
-              </span>
-            );
-          })}
+    <section aria-label="Habits this month" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-card)] bg-board px-[1.2rem] pt-4 pb-[1.1rem] shadow-raised">
+      <div className={`${LINE_COLUMNS} shrink-0 items-end border-b border-frame pb-[0.4rem] text-[1.15rem] font-bold text-ink-muted`}>
+        <span>Habit</span>
+        <div style={dayGrid(dates.length)} aria-hidden>
+          {dates.map((d) => (
+            <span key={d} className={`text-center tabular-nums ${d === today ? "text-now" : ""}`}>
+              {Number(d.slice(8))}
+            </span>
+          ))}
         </div>
+        <span className="text-right whitespace-nowrap">In a row</span>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        {rows.map((row, i) => {
-          const nextPerson = rows[i + 1] && rows[i + 1].member.id !== row.member.id;
+        {rows.map((row) => {
           const sub = [row.member.name, habitSub(row, locale)].filter(Boolean).join(" · ");
+          const colour = strong(row.member.colour);
           return (
-            <div key={row.key} className={`flex max-h-24 min-h-0 flex-1 items-center ${nextPerson ? "border-b border-frame" : ""}`}>
-              <Link href={href(row.key)} scroll={false} className="flex w-[25rem] shrink-0 items-center gap-3 pr-3">
-                <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ background: strong(row.member.colour) }} aria-hidden />
-                <Emoji emoji={habitPicture(row)} className="size-9" />
-                <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="truncate text-xl font-bold text-ink">{row.name}</span>
-                  <span className="truncate text-sm text-ink-muted">{sub}</span>
+            <div key={row.key} className={`${LINE_COLUMNS} max-h-[9.5rem] min-h-[3.5rem] flex-1 items-center border-b border-frame last:border-b-0`}>
+              <Link
+                href={href(row.key)}
+                scroll={false}
+                aria-label={`${row.name}, ${sub}, ${row.stats.streak} in a row. Show the last 12 months`}
+                className="flex min-h-[var(--touch-target)] min-w-0 items-center gap-[0.6rem] self-stretch"
+              >
+                <span className="h-[2.2rem] w-[0.35rem] shrink-0 rounded-full" style={{ background: colour }} aria-hidden />
+                <Emoji emoji={habitPicture(row)} className="size-8" />
+                <span className="flex min-w-0 flex-col leading-[1.15]">
+                  <span className="truncate text-[1.5rem] leading-[1.1] font-extrabold text-ink">{row.name}</span>
+                  <span className="truncate text-[1.15rem] font-bold text-ink-muted">{sub}</span>
                 </span>
               </Link>
               {periodic(row) ? (
-                <div className="flex" style={{ gap: `${GAP}rem` }}>
+                <div style={dayGrid(dates.length)} aria-hidden>
+                  {/* An invisible circle sets the row's height; the pills span their days. */}
+                  <span className="aspect-square" style={{ gridColumn: 1, gridRow: 1 }} />
                   {row.periods.map((p) => (
                     <PeriodPill key={p.from} period={p} row={row} dates={dates} />
                   ))}
                 </div>
               ) : (
-                <div className="flex" style={{ gap: `${GAP}rem` }}>
+                <div style={dayGrid(dates.length)} aria-hidden>
                   {dates.map((d) => (
-                    <DayCircle key={d} cell={row.cells.get(d) ?? { day: "future", amount: 0 }} row={row} />
+                    <DayCircle key={d} cell={row.cells.get(d) ?? { day: "future", amount: 0 }} row={row} today={d === today} />
                   ))}
                 </div>
               )}
-              <span className="flex-1 text-right text-2xl font-extrabold tabular-nums" style={{ color: strong(row.member.colour) }} title="In a row">
+              <span className="text-right text-[2.15rem] font-extrabold tabular-nums" style={{ color: colour }} aria-hidden>
                 {row.stats.streak}
               </span>
             </div>
@@ -85,29 +95,30 @@ export function LinesView({ rows, month, today, locale, href }: { rows: HabitRow
   );
 }
 
-function DayCircle({ cell, row }: { cell: HabitCell; row: HabitRowData }) {
+/** One day: filled = done, grey ring = missed, red ring = today, dashed = still to come, small dot = not a day for it. */
+function DayCircle({ cell, row, today }: { cell: HabitCell; row: HabitRowData; today: boolean }) {
   const colour = strong(row.member.colour);
-  const size = { width: `${CELL}rem`, height: `${CELL}rem` };
-  const base = "shrink-0 rounded-full border-2";
+  const base = "aspect-square w-full rounded-full border-2";
   if (cell.day === "off" || cell.day === "rest" || cell.day === "blank") {
     return (
-      <span className="flex shrink-0 items-center justify-center" style={size}>
-        <span className="size-2.5 rounded-full bg-frame" />
+      <span className="flex aspect-square w-full items-center justify-center">
+        <span className="size-[0.6rem] rounded-full bg-frame" />
       </span>
     );
   }
-  if (cell.day === "future") return <span className={`${base} border-grid`} style={size} />;
+  if (cell.day === "future") return <span className={`${base} border-dashed border-frame`} />;
   const fill = row.rule.measure === "count" ? Math.min(1, cell.amount / row.rule.goal) : cell.day === "done" ? 1 : 0;
-  const border = cell.day === "open" ? "var(--color-now)" : fill > 0 ? colour : "var(--color-check-border)";
+  const border = today || cell.day === "open" ? "var(--color-now)" : fill > 0 ? colour : "var(--color-check-border)";
   return (
     <span
       className={base}
-      style={{ ...size, borderColor: border, background: fill > 0 ? `linear-gradient(to top, ${colour} ${fill * 100}%, white ${fill * 100}%)` : "white" }}
+      style={{ borderColor: border, background: fill > 0 ? `linear-gradient(to top, ${colour} ${fill * 100}%, var(--color-board) ${fill * 100}%)` : "transparent" }}
       title={row.rule.measure === "count" ? `${cell.amount}` : undefined}
     />
   );
 }
 
+/** A week or month habit: one pill across the days it covers. */
 function PeriodPill({ period, row, dates }: { period: HabitPeriod; row: HabitRowData; dates: LocalDate[] }) {
   const first = dates[0];
   const last = dates[dates.length - 1];
@@ -115,7 +126,6 @@ function PeriodPill({ period, row, dates }: { period: HabitPeriod; row: HabitRow
   const to = period.to > last ? last : period.to;
   const n = dates.filter((d) => d >= from && d <= to).length;
   if (n === 0) return null;
-  const width = `${n * CELL + (n - 1) * GAP}rem`;
   const colour = strong(row.member.colour);
   const look =
     period.status === "done"
@@ -124,9 +134,12 @@ function PeriodPill({ period, row, dates }: { period: HabitPeriod; row: HabitRow
         ? { borderColor: "var(--color-now)", color: "var(--color-now)" }
         : period.status === "missed"
           ? { borderColor: "var(--color-check-border)" }
-          : { borderColor: "var(--color-grid)" };
+          : { borderColor: "var(--color-frame)", borderStyle: "dashed" as const };
   return (
-    <span className="flex shrink-0 items-center justify-center rounded-full border-2 text-sm font-extrabold tabular-nums" style={{ width, height: `${CELL}rem`, ...look }}>
+    <span
+      className="flex items-center justify-center rounded-full border-2 text-[1.15rem] font-extrabold tabular-nums"
+      style={{ gridColumn: `${dates.indexOf(from) + 1} / span ${n}`, gridRow: 1, ...look }}
+    >
       {period.status === "open" && row.rule.times > 1 && n >= 2 ? `${period.met}/${row.rule.times}` : ""}
     </span>
   );
@@ -170,16 +183,16 @@ export function RingsView({
   const weeks = weekly[0]?.periods ?? [];
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,64fr)_minmax(0,36fr)] gap-6">
-      <div className="relative min-h-0 min-w-0">
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,64fr)_minmax(0,36fr)] gap-5">
+      <div className="relative min-h-0 min-w-0 rounded-[var(--radius-card)] bg-board shadow-raised">
         <Rings member={member} rows={daily} dates={dates} today={today} href={href} />
       </div>
-      <aside className="flex min-h-0 min-w-0 flex-col gap-4 pt-3">
+      <aside className="flex min-h-0 min-w-0 flex-col gap-5">
         {weekly.length ? (
-          <section className="flex flex-col gap-2.5 rounded-[1.375rem] bg-rail px-5 py-4">
+          <section className="flex flex-col gap-2.5 rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
             <div className="flex items-center">
-              <span className="flex-1 text-lg font-extrabold text-ink">Weekly</span>
-              <span className="flex gap-2 text-sm font-bold text-ink-muted">
+              <span className="flex-1 text-[1.75rem] font-bold text-ink">Weekly</span>
+              <span className="flex gap-2 text-[1.15rem] font-bold text-ink-muted">
                 {weeks.map((_, i) => (
                   <span key={i} className="w-10 text-center">
                     W{i + 1}
@@ -188,8 +201,8 @@ export function RingsView({
               </span>
             </div>
             {weekly.slice(0, 3).map((r) => (
-              <Link key={r.key} href={href(r.key)} scroll={false} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{r.name}</span>
+              <Link key={r.key} href={href(r.key)} scroll={false} className="flex min-h-[var(--touch-target)] items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-[1.35rem] font-bold text-ink">{r.name}</span>
                 <span className="flex gap-2">
                   {r.periods.map((p) => (
                     <PeriodMark key={p.from} period={p} times={r.rule.times} />
@@ -200,11 +213,11 @@ export function RingsView({
           </section>
         ) : null}
         {monthly.length ? (
-          <section className="flex flex-col gap-2.5 rounded-[1.375rem] bg-rail px-5 py-4">
-            <span className="text-lg font-extrabold text-ink">Monthly</span>
+          <section className="flex flex-col gap-2.5 rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
+            <span className="text-[1.75rem] font-bold text-ink">Monthly</span>
             {monthly.slice(0, 3).map((r) => (
-              <Link key={r.key} href={href(r.key)} scroll={false} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-lg font-bold text-ink">{r.name}</span>
+              <Link key={r.key} href={href(r.key)} scroll={false} className="flex min-h-[var(--touch-target)] items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-[1.35rem] font-bold text-ink">{r.name}</span>
                 {r.periods.slice(-1).map((p) => (
                   <PeriodMark key={p.from} period={p} times={r.rule.times} />
                 ))}
@@ -213,17 +226,17 @@ export function RingsView({
           </section>
         ) : null}
         {chart ? (
-          <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-[1.375rem] bg-rail px-5 py-4">
+          <section className="flex min-h-0 flex-1 flex-col gap-2 rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
             <div className="flex items-center gap-2">
-              <span className="flex-1 text-lg font-extrabold text-ink">{monthName}</span>
+              <span className="flex-1 text-[1.75rem] font-bold text-ink">{monthName}</span>
               {counted.slice(0, 3).map((r) => (
                 <Link
                   key={r.key}
                   href={chartHref(r.key)}
                   scroll={false}
                   aria-current={r.key === chart.key ? "true" : undefined}
-                  className="flex min-h-11 items-center rounded-full px-4 text-base font-bold"
-                  style={r.key === chart.key ? { background: strong(member.colour), color: "white" } : { background: "var(--color-board)", color: "var(--color-ink)" }}
+                  className="flex min-h-[var(--touch-target)] items-center rounded-full px-4 text-[1.15rem] font-bold"
+                  style={r.key === chart.key ? { background: strong(member.colour), color: "white" } : { background: "var(--color-panel)", color: "var(--color-ink)" }}
                 >
                   {r.name}
                 </Link>
@@ -242,7 +255,7 @@ function PeriodMark({ period, times }: { period: HabitPeriod; times: number }) {
   if (period.status === "done") return <span className={`${base} bg-met-soft text-met`}>✓</span>;
   if (period.status === "missed") return <span className={`${base} bg-[color-mix(in_srgb,var(--color-missed)_22%,white)] text-missed`}>✕</span>;
   if (period.status === "open")
-    return <span className={`${base} border-2 border-now text-sm text-now`}>{times > 1 && period.met > 0 ? `${period.met}/${times}` : ""}</span>;
+    return <span className={`${base} border-2 border-now text-[1.15rem] text-now`}>{times > 1 && period.met > 0 ? `${period.met}/${times}` : ""}</span>;
   return <span className={`${base} border-2 border-frame`} />;
 }
 
@@ -319,8 +332,8 @@ function Rings({ member, rows, dates, today, href }: { member: HabitMember; rows
       })}
       <foreignObject x={CX - 100} y={CY - 52} width={200} height={110}>
         <div className="flex h-full flex-col items-center justify-center gap-1">
-          <Avatar name={member.name} colour={member.colour} icon={member.icon} size="lg" />
-          <span className="text-[24px] font-extrabold text-ink">{member.name}</span>
+          <ColourDot colour={member.colour} className="size-[1.6rem]" />
+          <span className="text-[1.5rem] font-extrabold text-ink">{member.name}</span>
         </div>
       </foreignObject>
     </svg>
@@ -331,13 +344,13 @@ function Rings({ member, rows, dates, today, href }: { member: HabitMember; rows
 // A count habit's bars, one per day
 // ---------------------------------------------------------------------------
 
-export function CountBars({ dates, row, small = false }: { dates: LocalDate[]; row: HabitRowData; small?: boolean }) {
+export function CountBars({ dates, row }: { dates: LocalDate[]; row: HabitRowData }) {
   const amounts = dates.map((d) => row.cells.get(d)?.amount ?? 0);
   const top = chartTop(row.rule.goal, Math.max(0, ...amounts));
-  const label = small ? "text-xs" : "text-sm";
+  const label = "text-[1.15rem]";
   return (
     <div className="flex min-h-0 flex-1 gap-1">
-      <div className={`flex w-8 flex-col items-end justify-between pb-5 font-bold text-ink-muted tabular-nums ${label}`}>
+      <div className={`flex w-8 flex-col items-end justify-between pb-7 font-bold text-ink-muted tabular-nums ${label}`}>
         <span>{top}</span>
         <span>{top / 2}</span>
         <span>0</span>
@@ -354,7 +367,7 @@ export function CountBars({ dates, row, small = false }: { dates: LocalDate[]; r
             />
           ))}
         </div>
-        <div className={`flex h-5 items-end justify-between pl-1 font-bold text-ink-muted ${label}`}>
+        <div className={`flex h-7 items-end justify-between pl-1 font-bold text-ink-muted ${label}`}>
           <span>1</span>
           <span>10</span>
           <span>20</span>
@@ -403,40 +416,40 @@ export function YearPopup({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6">
       <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.35)]" />
-      <section role="dialog" aria-label={`${row.member.name} · ${row.name}, last 12 months`} className="relative flex h-full max-h-[63rem] w-full max-w-[113rem] flex-col gap-4 rounded-[2.25rem] bg-board px-10 py-7 shadow-2xl">
+      <section role="dialog" aria-label={`${row.member.name} · ${row.name}, last 12 months`} className="relative flex h-full max-h-[63rem] w-full max-w-[113rem] flex-col gap-4 rounded-[var(--radius-card)] bg-board px-10 py-7 shadow-2xl">
         <div className="flex items-center gap-4">
           <Emoji emoji={habitPicture(row)} className="size-16" />
           <div className="flex min-w-0 flex-col">
             <h2 className="truncate text-3xl font-extrabold text-ink">
               {row.member.name} · {row.name}
             </h2>
-            {sub ? <span className="text-base text-ink-muted">{sub}</span> : null}
+            {sub ? <span className="text-[1.15rem] font-bold text-ink-muted">{sub}</span> : null}
           </div>
           <span className="flex-1" />
           <div className="mr-3 flex gap-9">
             {stats.map((s) => (
               <div key={s.l} className="flex flex-col items-center">
                 <span className="text-4xl leading-none font-extrabold text-ink tabular-nums">{s.v}</span>
-                <span className="text-sm text-ink-muted">{s.l}</span>
+                <span className="text-[1.15rem] font-bold text-ink-muted">{s.l}</span>
               </div>
             ))}
           </div>
           {count ? (
-            <nav aria-label="Show as" className="flex gap-1 rounded-2xl bg-panel p-1.25">
+            <nav aria-label="Show as" className={segTrackClass}>
               {[false, true].map((b) => (
                 <Link
                   key={String(b)}
                   href={modeHref(b)}
                   scroll={false}
                   aria-current={showBars === b ? "page" : undefined}
-                  className={`flex min-h-12 items-center rounded-xl px-5 text-base font-bold ${showBars === b ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
+                  className={segItemClass(showBars === b)}
                 >
                   {b ? "Bars" : "Months"}
                 </Link>
               ))}
             </nav>
           ) : null}
-          <Link href={closeHref} scroll={false} aria-label="Close" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink">
+          <Link href={closeHref} scroll={false} aria-label="Close" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink">
             <X size="1.5rem" weight="bold" aria-hidden />
           </Link>
         </div>
@@ -446,10 +459,10 @@ export function YearPopup({
               <div className="flex items-baseline">
                 <span className="flex-1 text-lg font-extrabold text-ink">{monthName(m, i === 0 || m.endsWith("-01"))}</span>
                 {showBars ? (
-                  <span className="text-sm font-bold text-ink-muted tabular-nums">{monthDates(m).reduce((s, d) => s + (row.cells.get(d)?.amount ?? 0), 0)}</span>
+                  <span className="text-[1.15rem] font-bold text-ink-muted tabular-nums">{monthDates(m).reduce((s, d) => s + (row.cells.get(d)?.amount ?? 0), 0)}</span>
                 ) : null}
               </div>
-              {showBars ? <CountBars dates={monthDates(m)} row={row} small /> : <MiniMonth month={m} row={row} today={today} />}
+              {showBars ? <CountBars dates={monthDates(m)} row={row} /> : <MiniMonth month={m} row={row} today={today} />}
             </div>
           ))}
         </div>
@@ -468,7 +481,7 @@ function MiniMonth({ month, row, today }: { month: string; row: HabitRowData; to
       ))}
       {dates.map((d) => {
         const cell = row.cells.get(d) ?? { day: "future" as const, amount: 0 };
-        const base = "flex size-[1.95rem] items-center justify-center rounded-full text-sm font-extrabold text-white";
+        const base = "flex size-[1.95rem] items-center justify-center rounded-full text-[1.15rem] font-extrabold text-white";
         if (d === today && cell.day !== "done") return <span key={d} className={`${base} border-2 border-now`} />;
         if (cell.day === "done") return <span key={d} className={`${base} bg-met`}>✓</span>;
         if (cell.day === "missed") return <span key={d} className={`${base} bg-missed`}>✕</span>;

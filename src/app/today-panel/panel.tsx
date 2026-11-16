@@ -1,14 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import {
-  CaretLeft,
-  CaretRight,
-  Check,
-} from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, Plus } from "@phosphor-icons/react/dist/ssr";
 import { Emoji } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
 import { AppAlerts } from "@/components/app-alerts";
-import { strong } from "@/lib/colours";
+import { hand, strong } from "@/lib/colours";
 import type { Household } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
@@ -20,11 +15,11 @@ import { cookHref, mealsForRoutines, placeTodayMeals, startCooking } from "../me
 import { tickSteps, toggleStep } from "../routines/actions";
 import { loadRoutines } from "../routines/data";
 import { floatingRoutines } from "../routines/floating";
-import { pickPanelTab, setPanelOpen } from "./actions";
+import { pickPanelTab } from "./actions";
 import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
 import { PanelPages } from "@/components/panel-pages";
-import { panelBoxes, stepBox } from "@/lib/panel-boxes";
+import { panelBoxes } from "@/lib/panel-boxes";
 import { addTodo, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
 import { shortClockTime } from "@/lib/time-text";
@@ -32,34 +27,27 @@ import { HabitsBox } from "./habits-box";
 import { HealthBox } from "./health-box";
 import { SpotifyBox } from "./spotify-box";
 import { loadHealthLogs, loadTrackers } from "../habits/health-data";
+import { FitList } from "@/components/fit-list";
+import { ListRow } from "@/components/list-row";
 
 /**
- * The Today panel: a column on the left of the calendar with three parts.
+ * The Today panel: the Glance right-hand column on the Agenda, and the
+ * Daily List panel that Week and Month push open. Two cards:
  *
- * 1. The top never changes: the day, the big date, the weather and the clock.
- * 2. The working part shows the daily list, "Up next" or one of the lists.
- *    Chips switch between them, and the screen remembers the last one picked.
- *    The daily list is today's tasks from every list: chores, heads-ups and
- *    list tasks for today (tasks rework, 2026-11-09). Timed ones come first,
- *    with the time beside them; a task for one person is in their colour.
- *    Routines switched to "Show on daily list" join it (tasks rework,
- *    step 3), and so does the cook's "Start dinner".
- *    A routine's checklist can take this part over for a while.
- * 3. The bottom box shows the next meal, or the song playing on Spotify
- *    while music plays (spotify-box.tsx, when Spotify is connected).
- *
- * The panel can be closed, leaving the calendar the whole width. Each screen
- * remembers whether it's open.
+ * 1. The dinner card: tonight's dinner (or the next meal), or the song
+ *    playing on Spotify while music plays (spotify-box.tsx).
+ * 2. The box: the Daily List, or another box picked in Settings (a list,
+ *    routines, habits, health, the chore bucket), flipped with the named
+ *    arrows at the bottom; the screen remembers the last one. The Daily
+ *    List is today's tasks from every list: chores, heads-ups and list
+ *    tasks for today (tasks rework, 2026-11-09). Timed ones come first,
+ *    with the time beside them; a task for one person is in their ink.
+ *    Routines switched to "Show on daily list" join it, and so does the
+ *    cook's "Start dinner". A routine's checklist can take this card over.
+ *    The box's title opens its own screen; for the Daily List and the lists
+ *    that's the Lists screen with that list picked. Its rows are the same
+ *    ListRow the Lists screen uses.
  */
-
-/** One thing coming up today, ready to show. */
-export type UpNextItem = {
-  id: string;
-  title: string;
-  emoji: string;
-  time: string;
-  colour: string;
-};
 
 /** A row on the daily list: a task, a routine (or some of its steps) switched on to show there, or the cook's "Start dinner". */
 type Row =
@@ -82,15 +70,12 @@ type Row =
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
-/** The rows that fit above an add box. */
-const ADD_ROWS = 5;
 /** The Chores box's rows, leaving room for its add box. */
 const BUCKET_ROWS = 4;
 
 export async function TodayPanel({
   household,
   today,
-  upNext,
   tab,
   returnTo,
   day = false,
@@ -98,8 +83,6 @@ export async function TodayPanel({
 }: {
   household: Household;
   today: LocalDate;
-  /** Today's timed events still to come, soonest first. */
-  upNext: UpNextItem[];
   /** "upnext" or a list's id: what this screen showed last. */
   tab: string;
   /** This page's address, to come back to after a tap. */
@@ -234,46 +217,8 @@ export async function TodayPanel({
   const times = new Map(basics.mealTimes.map((t) => [t.id, t]));
   const nowTime = localTimeOf(new Date(), timeZone);
   const hourAgo = `${String(Math.max(0, Number(nowTime.slice(0, 2)) - 1)).padStart(2, "0")}${nowTime.slice(2, 5)}`;
-  const nextMeal = meals
-    .filter((m) => m.status === "planned")
-    .map((m) => ({
-      meal: m,
-      at: m.eat_at ?? times.get(m.meal_time_id)?.usual_time ?? "18:00",
-      timeName: times.get(m.meal_time_id)?.name ?? "Meal",
-    }))
-    .filter((m) => m.meal.date > today || m.at >= hourAgo)
-    .sort((a, b) =>
-      a.meal.date === b.meal.date
-        ? a.at < b.at
-          ? -1
-          : 1
-        : a.meal.date < b.meal.date
-          ? -1
-          : 1,
-    )[0];
-
-  const now = new Date();
-  const fmt = (o: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat(locale, { timeZone, ...o }).format(now);
-  const mealTime = nextMeal
-    ? shortClockTime(zonedToUtc(nextMeal.meal.date, nextMeal.at, timeZone), locale, timeZone)
-    : "";
-
   const taskTime = (time: string) =>
     shortClockTime(zonedToUtc(today, time.slice(0, 5), timeZone), locale, timeZone);
-
-  const arrowButton = (by: 1 | -1) => (
-    <form action={pickPanelTab}>
-      <input type="hidden" name="tab" value={stepBox(boxes, showing, by)} />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <button
-        aria-label={by === 1 ? "Next box" : "Previous box"}
-        className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-board text-ink"
-      >
-        {by === 1 ? <CaretRight size="1.5rem" weight="bold" aria-hidden /> : <CaretLeft size="1.5rem" weight="bold" aria-hidden />}
-      </button>
-    </form>
-  );
 
   // Today's routines, for the Routines box: tapping one opens its checklist in the panel.
   const routineRows =
@@ -303,7 +248,9 @@ export async function TodayPanel({
       : list && !list.is_groceries
         ? list.id
         : null;
-  // The heading opens the box's own screen.
+  // The heading opens the box's own screen. The Daily List and the lists
+  // open the Lists screen with that list picked (the Daily List: the list
+  // its add box adds to); the chore bucket, the Chores list.
   const boxHref =
     showing === "upnext"
       ? "/"
@@ -313,305 +260,238 @@ export async function TodayPanel({
           ? "/habits"
           : showing === "health"
             ? "/habits/health"
-        : showing === "bucket"
-          ? "/chores"
-          : showing === "today"
-            ? "/lists"
-            : `/lists?list=${showing}`;
+            : showing === "bucket"
+              ? listHref(choresList?.id)
+              : showing === "today"
+                ? listHref(addListId)
+                : listHref(showing);
 
-  const mealBox = (
+  // The dinner card: tonight's dinner (or the next meal once it's eaten),
+  // with today's other meals still to come as a small line under it.
+  const upcoming = meals
+    .filter((m) => m.status === "planned")
+    .map((m) => ({ meal: m, at: m.eat_at ?? times.get(m.meal_time_id)?.usual_time ?? "18:00", timeName: times.get(m.meal_time_id)?.name ?? "Meal" }))
+    .filter((m) => m.meal.date > today || m.at >= hourAgo)
+    .sort((a, b) => (a.meal.date === b.meal.date ? a.at.localeCompare(b.at) : a.meal.date.localeCompare(b.meal.date)));
+  const main = upcoming.find((m) => m.meal.date === today && m.timeName.toLowerCase() === "dinner") ?? upcoming[0];
+  const others = upcoming.filter((m) => m !== main && m.meal.date === today);
+  const at = (m: (typeof upcoming)[number]) => shortClockTime(zonedToUtc(m.meal.date, m.at, timeZone), locale, timeZone);
+  const label = (m: (typeof upcoming)[number]) =>
+    m.meal.date > today ? `${m.timeName} tomorrow` : m.timeName.toLowerCase() === "dinner" ? "Dinner tonight" : m.timeName;
+  const dinnerCard = (
     <Link
-      href={
-        nextMeal
-          ? cookHref({ id: nextMeal.meal.id, canCook: Boolean(nextMeal.meal.recipe_id) || nextMeal.meal.dishes.some((d) => d.recipe_id) })
-          : `/review?week=${today}`
-      }
-      className="mt-4 flex min-h-22 items-center gap-4 rounded-[1.375rem] bg-meal px-5 py-3 text-meal-ink"
+      href={main ? cookHref({ id: main.meal.id, canCook: Boolean(main.meal.recipe_id) || main.meal.dishes.some((d) => d.recipe_id) }) : `/review?week=${today}`}
+      className="flex shrink-0 items-center gap-5 rounded-[var(--radius-card)] bg-meal px-[1.4rem] py-5 text-meal-ink shadow-raised"
     >
-      {nextMeal ? (
-        <>
-          <Emoji
-            emoji={mealIcon(nextMeal.meal, recipes, categories)}
-            className="size-14"
-          />
-          <span className="flex min-w-0 flex-col">
-            <span className="text-sm font-extrabold tracking-[0.08rem] uppercase opacity-75">
-              {nextMeal.timeName}
-              {nextMeal.meal.date > today ? " tomorrow" : ""} · {mealTime}
+      <Emoji emoji={main ? mealIcon(main.meal, recipes, categories) : "🍽️"} className="size-18" />
+      <span className="flex min-w-0 flex-col">
+        {main ? (
+          <>
+            <span className="tabular text-[1.125rem] font-bold tracking-[0.06em] uppercase">
+              {label(main)} · {at(main)}
             </span>
-            <span className="truncate text-2xl font-extrabold">
-              {mealName(nextMeal.meal, recipes, categories)}
-            </span>
-          </span>
-        </>
-      ) : (
-        <>
-          <Emoji emoji="🍽️" className="size-12" />
-          <span className="min-w-0 flex-1 truncate text-xl font-bold">No meals</span>
-          <span className="shrink-0 rounded-full bg-board/70 px-4 py-2 text-base font-extrabold">Plan meals</span>
-        </>
-      )}
+            <b className="line-clamp-2 font-hand text-[1.75rem] leading-[1.15]" style={{ color: hand(main.meal.cook_id ? colourOf.get(main.meal.cook_id) : null) }}>
+              {mealName(main.meal, recipes, categories)}
+            </b>
+            {others.map((m) => (
+              <span key={m.meal.id} className="tabular mt-1 truncate text-[1.125rem] font-semibold">
+                {m.timeName} · {at(m)} · <span className="font-hand">{mealName(m.meal, recipes, categories)}</span>
+              </span>
+            ))}
+          </>
+        ) : (
+          <b className="text-[1.75rem] leading-[1.15] text-ink">Plan dinner</b>
+        )}
+      </span>
     </Link>
   );
 
-  return (
-    <aside
-      aria-label="Today"
-      className="relative flex w-[30rem] shrink-0 flex-col rounded-[1.75rem] bg-rail px-7 pt-6 pb-6 max-lg:w-full"
-    >
-      {/* 1. The top: never changes. */}
-      <div className="flex items-end gap-4">
-        <span className="text-[8.5rem] leading-[0.85] font-extrabold tracking-[-0.3rem] text-ink">
-          {fmt({ day: "numeric" })}
-        </span>
-        <span className="flex flex-col pb-1.5">
-          <span className="text-2xl font-bold text-ink-muted">
-            {fmt({ weekday: "long" })}
-          </span>
-          <span className="text-3xl font-extrabold text-ink">
-            {fmt({ month: "long" })}
-          </span>
-        </span>
-      </div>
-      {/* Weather goes here once it's set up (it needs a weather service). */}
-      <div className="mt-5 flex items-center gap-3 text-xl font-semibold text-ink-muted">
-        <span className="text-3xl font-bold">
-          <HeaderClock locale={locale} timeZone={timeZone} />
-        </span>
-        {/* A server app that stopped answering (kitchen screen only). */}
-        <AppAlerts />
-      </div>
+  // The Daily List's rows (and a list's, on a list box): tick to scratch off.
+  const sideRows = open.map((row) => {
+    const colour = row.kind === "todo" ? (row.todo.assignee_id ? colourOf.get(row.todo.assignee_id) : null) : row.colour;
+    const title = row.kind === "todo" ? row.todo.title : row.title;
+    const icon = row.kind === "todo" ? row.todo.icon : row.kind === "start" ? "🔪" : row.icon;
+    const meta =
+      row.time !== null ? (
+        `${row.kind === "todo" && row.todo.date_kind === "due" ? "by " : ""}${taskTime(row.time)}`
+      ) : row.kind === "todo" && row.todo.must_do ? (
+        <span className="rounded-full bg-now px-2.5 py-1 text-base font-extrabold text-white">Essential</span>
+      ) : null;
+    if (row.kind === "start") {
+      // Start dinner opens the cook's view: a › where the tick goes.
+      return (
+        <ListRow
+          key={row.key}
+          title={title}
+          ink={hand(colour)}
+          lead={
+            <Link href={row.href} aria-label={`Open ${title}`} className="flex size-12 shrink-0 items-center justify-center text-ink-muted">
+              <CaretRight size="1.5rem" weight="bold" aria-hidden />
+            </Link>
+          }
+          editHref={row.href}
+          meta={meta}
+          icon={<Emoji emoji={icon} className="size-8" />}
+          slot
+        />
+      );
+    }
+    const fields: [string, string][] =
+      row.kind === "todo"
+        ? [
+            ["id", row.todo.id],
+            ["returnTo", returnTo],
+          ]
+        : [
+            ["memberId", row.memberId],
+            ...row.stepIds.map((id): [string, string] => ["stepId", id]),
+            ["templateId", row.templateId],
+            ["date", today],
+            ["returnTo", returnTo],
+          ];
+    return (
+      <ListRow
+        key={row.key}
+        tick={{ action: row.kind === "todo" ? toggleTodo : row.stepIds.length === 1 ? toggleStep : tickSteps, fields }}
+        title={title}
+        ink={hand(colour)}
+        icon={icon ? <Emoji emoji={icon} className="size-8" /> : null}
+        meta={row.kind === "routine" && row.count ? `${row.count}${meta ? ` · ${meta}` : ""}` : meta}
+        slot
+      />
+    );
+  });
 
-      {/* 2. The working part: the daily list, Up next or a list. */}
-      {routine ? (
-        <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">{routine}</div>
-      ) : (
-      <>
-      {/* Which box: arrows flip between the ones chosen in Settings. */}
-      <div className="mt-6 flex items-center gap-2">
-        {boxes.length > 1 ? arrowButton(-1) : null}
-        {/* The heading opens the box's own screen (Connor, 2026-11-11). */}
-        <h3 className="min-w-0 flex-1 text-center text-2xl font-extrabold text-ink">
-          <Link href={boxHref} className="block truncate rounded-xl py-1 hover:bg-board">
-            {box.name}
-          </Link>
-        </h3>
-        {boxes.length > 1 ? arrowButton(1) : null}
-      </div>
-      <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.375rem] bg-board px-5 py-3">
-        {showing === "upnext" ? (
-          upNext.length === 0 ? null : (
-            <PanelPages
-              pages={pagesOf(upNext, ROWS).map((items, p) => (
-            <ul key={p} className="flex flex-col">
-              {items.map((item, i) => (
-                <li
-                  key={item.id}
-                  className="flex min-h-16 items-center gap-3.5 border-b border-panel last:border-0"
-                >
-                  <Emoji
-                    emoji={item.emoji}
-                    className={i === 0 ? "size-12" : "size-9"}
-                  />
-                  <span
-                    className={`min-w-0 flex-1 truncate font-bold text-ink ${i === 0 ? "text-2xl" : "text-xl"}`}
-                  >
-                    {item.title}
-                  </span>
-                  <span
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ background: strong(item.colour) }}
-                    aria-hidden
-                  />
-                  <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">
-                    {item.time}
-                  </span>
-                </li>
-              ))}
-            </ul>
-              ))}
-            />
-          )
-        ) : showing === "routines" ? (
-          routineRows.length === 0 ? null : (
-            <PanelPages
-              pages={pagesOf(routineRows, ROWS).map((rows, p) => (
-                <ul key={p} className="flex flex-col">
-                  {rows.map(({ key, member, routine: r, startMin }) => (
-                    <li key={key} className="border-b border-panel last:border-0">
-                      <Link href={routineHref(r.template.id, member.id)} scroll={false} className="flex min-h-16 items-center gap-3">
-                        <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ background: strong(member.colour) }} aria-hidden />
-                        <Emoji emoji={r.progress.next?.icon ?? r.steps[0]?.icon ?? "✨"} className="size-8" />
-                        <span className={`min-w-0 flex-1 truncate font-hand text-2xl ${r.progress.complete ? "text-ink-muted line-through" : "text-ink"}`}>{r.template.name}</span>
-                        <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">
-                          {r.progress.done}/{r.progress.total}
-                        </span>
-                        <span className="shrink-0 text-right text-lg font-bold whitespace-nowrap text-ink-muted tabular-nums">{taskTime(hhmm(startMin))}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ))}
-            />
-          )
-        ) : showing === "bucket" && bucket ? (
-          <>
-            <PanelPages
-              pages={pagesOf(bucket, BUCKET_ROWS).map((rows, p) => (
-                <ul key={p} className="flex flex-col">
-                  {rows.map((row) => (
-                    <li key={row.key} className="flex min-h-16 items-center gap-3 border-b border-panel last:border-0">
-                      <Emoji emoji={row.icon} className="size-8" />
-                      <span className="min-w-0 flex-1 truncate font-hand text-2xl text-ink">{row.title}</span>
-                      <span className={`shrink-0 text-lg font-bold tabular-nums ${row.date ? "text-ink-muted" : "text-danger"}`}>
-                        {row.date ? weekdayShort(row.date, household) : "No room"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ))}
-            />
-            {/* Adding here adds a one-off chore to the Chores list; the planner finds it a day. */}
-            {choresList ? <AddRow listId={choresList.id} returnTo={returnTo} label="Add a chore" /> : null}
-          </>
-        ) : showing === "habits" ? (
-          <HabitsBox today={today} returnTo={returnTo} />
-        ) : showing === "health" ? (
-          <HealthPanelBox household={household} today={today} />
-        ) : groceries ? (
-          <GroceryView initial={groceries} compact rows={8} />
-        ) : (
-          <>
-          {open.length === 0 ? null : (
-          <PanelPages
-            pages={pagesOf(open, ADD_ROWS).map((rows, p) => (
-              <ul key={p} className="flex flex-col">
-            {rows.map((row) => {
-              const colour =
-                row.kind === "todo"
-                  ? row.todo.assignee_id
-                    ? colourOf.get(row.todo.assignee_id)
-                    : undefined
-                  : (row.colour ?? undefined);
-              const title = row.kind === "todo" ? row.todo.title : row.title;
-              const icon = row.kind === "todo" ? row.todo.icon : row.kind === "start" ? "🔪" : row.icon;
-              const box = (
-                <span className="flex size-8 items-center justify-center rounded-[0.625rem] border-[2.5px] border-check-border text-transparent hover:text-check-border">
-                  <Check size="1.125rem" weight="bold" aria-hidden />
-                </span>
-              );
-              return (
-                <li
-                  key={row.key}
-                  className="flex min-h-16 items-center gap-2 border-b border-panel last:border-0"
-                >
-                  {row.kind === "todo" ? (
-                    <form action={toggleTodo}>
-                      <input type="hidden" name="id" value={row.todo.id} />
-                      <input type="hidden" name="returnTo" value={returnTo} />
-                      <button aria-label={`Tick off ${title}`} className="flex size-[var(--touch-target)] items-center justify-center">
-                        {box}
-                      </button>
-                    </form>
-                  ) : row.kind === "routine" ? (
-                    <form action={row.stepIds.length === 1 ? toggleStep : tickSteps}>
-                      <input type="hidden" name="memberId" value={row.memberId} />
-                      {row.stepIds.map((id) => (
-                        <input key={id} type="hidden" name="stepId" value={id} />
-                      ))}
-                      <input type="hidden" name="templateId" value={row.templateId} />
-                      <input type="hidden" name="date" value={today} />
-                      <input type="hidden" name="returnTo" value={returnTo} />
-                      <button aria-label={`Tick off ${title}`} className="flex size-[var(--touch-target)] items-center justify-center">
-                        {box}
-                      </button>
-                    </form>
-                  ) : (
-                    // Start dinner opens the cook's view.
-                    <Link
-                      href={row.href}
-                      aria-label={`Open ${title}`}
-                      className="flex size-[var(--touch-target)] items-center justify-center text-ink-muted"
-                    >
-                      <CaretRight size="1.5rem" weight="bold" aria-hidden />
-                    </Link>
-                  )}
-                  {icon ? <Emoji emoji={icon} className="size-8" /> : null}
-                  <span
-                    className="line-clamp-2 min-w-0 flex-1 font-hand text-2xl leading-[1.1] break-words text-ink"
-                    style={colour ? { color: strong(colour) } : undefined}
-                  >
-                    {title}
-                  </span>
-                  {row.kind === "routine" && row.count ? (
-                    <span className="shrink-0 text-base font-bold text-ink-muted tabular-nums">{row.count}</span>
-                  ) : null}
-                  {row.time ? (
-                    <span className="shrink-0 text-lg font-bold text-ink-muted tabular-nums">
-                      {row.kind === "todo" && row.todo.date_kind === "due" ? "by " : ""}
-                      {taskTime(row.time)}
-                    </span>
-                  ) : row.kind === "todo" && row.todo.must_do ? (
-                    <span className="shrink-0 rounded-full bg-now px-2.5 py-1 text-sm font-extrabold text-white">Essential</span>
-                  ) : null}
-                </li>
-              );
-            })}
-              </ul>
-            ))}
-          />
-          )}
-          {/* Add straight to the list showing; the Daily list adds a to-do for today. */}
-          {addListId ? (
-            <AddRow listId={addListId} returnTo={returnTo} dueDate={showing === "today" ? today : undefined} label={showing === "today" ? "Add to the Daily list" : `Add to ${box.name}`} />
-          ) : null}
-          </>
-        )}
-      </div>
-      </>
-      )}
-
-      {/* 3. The bottom box: the next meal, or Spotify while music plays. */}
-      {spotify ? <SpotifyBox meal={mealBox} /> : mealBox}
-
-      {/* Close: the calendar takes the whole width. */}
-      <form
-        action={setPanelOpen}
-        className="absolute top-1/2 -right-5.5 z-10 -translate-y-1/2 max-lg:hidden"
-      >
-        <input type="hidden" name="open" value="0" />
+  const addId = "panel-add";
+  const heading = (
+    <Link href={boxHref} className="flex min-h-12 items-center truncate text-[1.75rem] font-bold text-ink">
+      {box.name}
+    </Link>
+  );
+  const plus = addListId ? (
+    // The + puts the cursor in the add box at the bottom of the card.
+    <label htmlFor={addId} aria-label={showing === "today" ? "Add to the Daily List" : `Add to ${box.name}`} className="flex size-[var(--touch-target)] shrink-0 cursor-pointer items-center justify-center rounded-full bg-panel text-ink">
+      <Plus size="1.5rem" weight="bold" aria-hidden />
+    </label>
+  ) : null;
+  // Flipping boxes: the boxes either side, by name ("‹ Chores", "Groceries ›"),
+  // so it's clear where a tap goes. No row of dots: there can be a dozen boxes.
+  const boxAt = Math.max(0, boxes.findIndex((b) => b.id === showing));
+  const neighbour = (by: 1 | -1) => {
+    const b = boxes[(boxAt + by + boxes.length) % boxes.length];
+    return (
+      <form action={pickPanelTab} className="min-w-0">
+        <input type="hidden" name="tab" value={b.id} />
         <input type="hidden" name="returnTo" value={returnTo} />
         <button
-          aria-label="Hide the Today panel"
-          className="flex h-22 w-11 items-center justify-center rounded-full border border-frame bg-board text-ink-muted shadow-[0_1px_3px_rgba(30,35,45,0.12)]"
+          aria-label={`Show ${b.name}`}
+          className="flex min-h-[var(--touch-target)] max-w-full min-w-[var(--touch-target)] items-center gap-1.5 rounded-full bg-panel px-4 text-[1.125rem] leading-none font-bold text-ink-soft"
         >
-          <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+          {by === -1 ? <CaretLeft size="1.125rem" weight="bold" aria-hidden className="shrink-0" /> : null}
+          <span className="truncate">{b.name}</span>
+          {by === 1 ? <CaretRight size="1.125rem" weight="bold" aria-hidden className="shrink-0" /> : null}
         </button>
       </form>
+    );
+  };
+  const switcher =
+    boxes.length > 1 ? (
+      <nav aria-label={`Boxes: ${box.name}, ${boxAt + 1} of ${boxes.length}`} className="mt-3 grid shrink-0 grid-cols-2 items-center gap-3 [&>form:last-child]:justify-self-end">
+        {/* With two boxes, both ways lead to the same one: just "Next ›". */}
+        {boxes.length > 2 ? neighbour(-1) : <span />}
+        {neighbour(1)}
+      </nav>
+    ) : null;
+
+  return (
+    <aside aria-label="Today" className="flex min-h-0 min-w-0 flex-col gap-5">
+      {/* A server app that stopped answering (kitchen screen only). */}
+      <AppAlerts />
+      {spotify ? <SpotifyBox meal={dinnerCard} /> : dinnerCard}
+      <section className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
+        {routine ? (
+          routine
+        ) : (
+          <>
+            {showing === "today" || (list && !groceries) ? (
+              <FitList
+                heading={heading}
+                aside={plus}
+                rows={sideRows}
+                fallback={7}
+                paging="more"
+                className="mt-1"
+              />
+            ) : (
+              <>
+                <div className="mb-1 flex min-h-12 shrink-0 items-center gap-3">
+                  <h2 className="min-w-0 flex-1">{heading}</h2>
+                  {plus}
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {showing === "upnext" ? null : showing === "routines" ? (
+                    routineRows.length === 0 ? null : (
+                      <PanelPages
+                        pages={pagesOf(routineRows, ROWS).map((rows, p) => (
+                          <ul key={p} className="flex flex-col">
+                            {rows.map(({ key, member, routine: r, startMin }) => (
+                              <li key={key} className="border-b border-frame last:border-0">
+                                <Link href={routineHref(r.template.id, member.id)} scroll={false} className="flex min-h-16 items-center gap-3">
+                                  <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ background: strong(member.colour) }} aria-hidden />
+                                  <span className={`min-w-0 flex-1 truncate font-hand text-[1.375rem] ${r.progress.complete ? "text-ink-muted" : ""}`} style={r.progress.complete ? undefined : { color: hand(member.colour) }}>{r.template.name}</span>
+                                  <span className="tabular shrink-0 text-lg font-semibold text-ink-soft">{taskTime(hhmm(startMin))}</span>
+                                  <Emoji emoji={r.progress.next?.icon ?? r.steps[0]?.icon ?? "✨"} className="size-8" />
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        ))}
+                      />
+                    )
+                  ) : showing === "bucket" && bucket ? (
+                    <PanelPages
+                      pages={pagesOf(bucket, BUCKET_ROWS).map((rows, p) => (
+                        <ul key={p} className="flex flex-col">
+                          {rows.map((row) => (
+                            <li key={row.key} className="flex min-h-16 items-center gap-3 border-b border-frame last:border-0">
+                              <span className="min-w-0 flex-1 truncate font-hand text-[1.375rem] text-ink">{row.title}</span>
+                              <span className={`tabular shrink-0 text-lg font-bold ${row.date ? "text-ink-soft" : "text-danger"}`}>
+                                {row.date ? weekdayShort(row.date, household) : "No room"}
+                              </span>
+                              <Emoji emoji={row.icon} className="size-8" />
+                            </li>
+                          ))}
+                        </ul>
+                      ))}
+                    />
+                  ) : showing === "habits" ? (
+                    <HabitsBox today={today} returnTo={returnTo} />
+                  ) : showing === "health" ? (
+                    <HealthPanelBox household={household} today={today} />
+                  ) : groceries ? (
+                    <GroceryView initial={groceries} compact rows={8} />
+                  ) : null}
+                </div>
+              </>
+            )}
+            {showing === "bucket" && choresList ? <AddRow id={addId} listId={choresList.id} returnTo={returnTo} label="Add a chore" tucked /> : null}
+            {showing !== "bucket" && addListId ? (
+              <AddRow id={addId} listId={addListId} returnTo={returnTo} dueDate={showing === "today" ? today : undefined} label={showing === "today" ? "Add to the Daily List" : `Add to ${box.name}`} tucked />
+            ) : null}
+            {switcher}
+          </>
+        )}
+      </section>
     </aside>
   );
 }
 
-/** The tab on the left edge that opens the panel again. */
-export function OpenPanelTab({ returnTo }: { returnTo: string }) {
-  return (
-    <form
-      action={setPanelOpen}
-      className="fixed top-1/2 left-0 z-30 -translate-y-1/2 max-lg:hidden"
-    >
-      <input type="hidden" name="open" value="1" />
-      <input type="hidden" name="returnTo" value={returnTo} />
-      <button
-        aria-label="Show the Today panel"
-        className="flex h-22 w-9 items-center justify-center rounded-r-full border border-l-0 border-frame bg-rail text-ink-muted shadow-[0_1px_3px_rgba(30,35,45,0.12)]"
-      >
-        <CaretRight size="1.5rem" weight="bold" aria-hidden />
-      </button>
-    </form>
-  );
+/** Splits rows into pages of a set size (at least one page). */
+/** The Lists screen with a list picked (or the first list). */
+function listHref(listId: string | null | undefined): string {
+  return listId ? `/lists?list=${listId}` : "/lists";
 }
 
-/** Splits rows into pages of a set size (at least one page). */
 function pagesOf<T>(items: T[], size: number): T[][] {
   const pages: T[][] = [];
   for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size));
@@ -660,10 +540,21 @@ function weekdayShort(date: LocalDate, household: Household): string {
   );
 }
 
-/** The add box at the bottom of a Today panel list: a bare field and Add (Connor, 2026-11-11: no placeholder words). */
-function AddRow({ listId, returnTo, dueDate, label }: { listId: string; returnTo: string; dueDate?: LocalDate; label: string }) {
+/**
+ * The add box at the bottom of a Today panel list: a bare field and Add
+ * (Connor, 2026-11-11: no placeholder words). `tucked` (the Glance panel):
+ * folded away until the round + in the title row puts the cursor in it.
+ */
+function AddRow({ id, listId, returnTo, dueDate, label, tucked = false }: { id?: string; listId: string; returnTo: string; dueDate?: LocalDate; label: string; tucked?: boolean }) {
   return (
-    <form action={addTodo} className="mt-2 flex shrink-0 items-center gap-2 border-t border-panel pt-2">
+    <form
+      action={addTodo}
+      className={`flex shrink-0 items-center gap-2 ${
+        tucked
+          ? "max-h-0 overflow-hidden focus-within:mt-2 focus-within:max-h-[calc(var(--touch-target)+1rem)] focus-within:border-t focus-within:border-frame focus-within:pt-2"
+          : "mt-2 border-t border-frame pt-2"
+      }`}
+    >
       <input type="hidden" name="listId" value={listId} />
       <input type="hidden" name="returnTo" value={returnTo} />
       {dueDate ? (
@@ -673,13 +564,14 @@ function AddRow({ listId, returnTo, dueDate, label }: { listId: string; returnTo
         </>
       ) : null}
       <input
+        id={id}
         name="title"
         required
         maxLength={120}
         aria-label={label}
         className="min-h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-3 font-hand text-xl text-ink outline-none focus:border-accent"
       />
-      <button className="min-h-[var(--touch-target)] shrink-0 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board">Add</button>
+      <button className="min-h-[var(--touch-target)] shrink-0 rounded-[var(--radius)] bg-primary px-4 text-lg font-bold text-primary-ink">Add</button>
     </form>
   );
 }

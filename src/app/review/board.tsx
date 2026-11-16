@@ -1,11 +1,11 @@
 "use client";
 
 import { blocksOn, storedEaters } from "@/lib/meal-blocks";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Broom, CalendarDots, CaretLeft, CaretRight, ShoppingCart, Suitcase } from "@phosphor-icons/react";
-import { Emoji } from "@/components/ui";
+import { CaretLeft, CaretRight, ShoppingCart, Suitcase } from "@phosphor-icons/react";
+import { Emoji, ScreenHeader, segItemClass, segTrackClass } from "@/components/ui";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { eventEmoji } from "@/lib/emoji";
 import { mainDish } from "@/lib/menu";
@@ -28,7 +28,10 @@ import {
   type KindGroup,
   type ReviewDraft,
 } from "@/lib/weekly-review";
-import { saveReview } from "./actions";
+import { previewGroceries, saveReview } from "./actions";
+import { BuySheet } from "./buy-sheet";
+import type { PreviewLine } from "../groceries/build";
+import { soft, strong } from "@/lib/colours";
 import { ChecksMenu, KindBox, PickerBox, type KindChoice, type Picker } from "./boxes";
 import type { ReviewColumn, ReviewData } from "./data";
 import { ChoreColumn, choresOnDay, useChorePlan, type PlannedChore } from "./chores-view";
@@ -109,16 +112,41 @@ export function ReviewBoard({
     hardChores: data.hardChores,
   });
 
-  const save = async (then?: string | null) => {
-    setSaving(true);
-    const result = await saveReview(data.week, draft);
-    setSaving(false);
+  /**
+   * Save first shows "Review what to buy" when the week's meals would put
+   * anything on the grocery list (Connor, Nov 15 2026); its "Put the rest
+   * on the grocery list" saves. A week with nothing to buy saves straight away.
+   */
+  const [buy, setBuy] = useState<{ lines: PreviewLine[]; then: string | null } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const startSave = async (then?: string | null) => {
+    setChecking(true);
+    setError(null);
+    const result = await previewGroceries(data.week, draft);
+    setChecking(false);
     if (!result.ok) {
       setError(result.error);
       guard.stay();
       setGoTo(null);
       return;
     }
+    if (result.lines.length === 0) return save(then);
+    setBuy({ lines: result.lines, then: then ?? null });
+  };
+  const save = async (then?: string | null, skipped: string[] = []) => {
+    setSaving(true);
+    const result = await saveReview(data.week, draft, skipped);
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      // On the review sheet the problem shows there; leaving waits.
+      if (!buy) {
+        guard.stay();
+        setGoTo(null);
+      }
+      return;
+    }
+    setBuy(null);
     guard.saved(then ?? goTo);
     setGoTo(null);
   };
@@ -285,60 +313,70 @@ export function ReviewBoard({
 
   return (
     <>
-      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 lg:h-18 lg:flex-nowrap">
-        <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">Planner</h1>
-        <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25">
-          <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
-          <span className="px-2 text-lg font-bold whitespace-nowrap text-ink">{range}</span>
-          <WeekButton label="Week after" onClick={() => go(weekHref.next)} icon="next" />
-        </div>
+      <ScreenHeader
+        title="Planner"
+        sub={weekHref.isComing ? "Coming week" : undefined}
+        nav={
+          <>
+            <WeekButton label="Week before" onClick={() => go(weekHref.prev)} icon="prev" />
+            <span className="tabular px-[0.4rem] text-[1.5rem] font-bold whitespace-nowrap text-ink">{range}</span>
+            <WeekButton label="Week after" onClick={() => go(weekHref.next)} icon="next" />
+          </>
+        }
+        tabs={
+          <div className={segTrackClass} role="group" aria-label="Show">
+            <ViewButton on={view === "week"} onClick={() => setView("week")} label="Week" />
+            <ViewButton on={view === "chores"} onClick={() => setView("chores")} label="Chores" />
+          </div>
+        }
+        action={
+          <>
+            <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] shrink-0 items-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-[1.5rem] text-[1.25rem] font-bold whitespace-nowrap text-ink">
+              <ShoppingCart size="1.5rem" weight="bold" aria-hidden />
+              Grocery list
+            </button>
+            <SaveButton
+              dirty={dirty}
+              // A week not yet saved (so its menu isn't on the grocery list) can be saved as it is.
+              ready={!data.reviewed}
+              saving={saving || checking}
+              error={buy ? null : error}
+              onSave={() => startSave()}
+              onUndo={() => {
+                setDraft(data.initial);
+                setError(null);
+              }}
+            />
+          </>
+        }
+      >
         {weekHref.isComing ? null : (
-          <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-2xl px-3 text-base font-bold whitespace-nowrap text-accent">
+          <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-3 text-[1.25rem] font-bold whitespace-nowrap text-accent">
             The coming week
           </button>
         )}
-        <div className="flex min-w-0 flex-1">
+        <div className="flex min-w-0">
           <ChecksMenu problems={problems} onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))} onLeave={(p) => change((d) => dismiss(d, p.id))} />
         </div>
-        <div className="flex items-center gap-1 rounded-2xl bg-panel p-1.25" role="group" aria-label="Show">
-          <ViewButton on={view === "week"} onClick={() => setView("week")} icon={<CalendarDots size="1.5rem" weight="bold" aria-hidden />} label="Week" />
-          <ViewButton on={view === "chores"} onClick={() => setView("chores")} icon={<Broom size="1.5rem" weight="bold" aria-hidden />} label="Chores" />
-        </div>
-        <button type="button" onClick={() => setGroceries(true)} className="flex min-h-[var(--touch-target)] items-center gap-2.5 rounded-2xl bg-meal px-5 text-lg font-bold whitespace-nowrap text-meal-ink">
-          <ShoppingCart size="1.625rem" weight="bold" aria-hidden />
-          Grocery list
-        </button>
-        <SaveButton
-          dirty={dirty}
-          saving={saving}
-          error={error}
-          onSave={() => save()}
-          onUndo={() => {
-            setDraft(data.initial);
-            setError(null);
-          }}
-        />
-      </header>
+      </ScreenHeader>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-grid sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-frame bg-board sm:grid-cols-4 lg:grid-cols-7">
         {data.columns.map((col, i) => {
           const groups = groupsOn(col.date);
           const chores = choresOn(col.date);
           const slots = slotsOn(col.date);
-          // A block whose only meals are named extras ("Snack") still shows its own tile.
-          const tiles = slots.reduce((n, s) => n + s.meals.length + (s.meals.some((m) => !m.name) ? 0 : 1), 0);
-          // Three tiles or fewer get the big look (picture over the name); more sit in rows.
-          const big = tiles <= 3;
           const can = !col.past;
+          const [weekday, ...rest] = col.label.split(" ");
           return (
             <section
               key={col.date}
               aria-label={col.name}
-              className={`relative flex min-h-0 min-w-0 flex-col gap-1 px-2.5 pt-3 pb-2.5 ${i > 0 ? "border-l border-grid" : ""} ${col.past ? "bg-rail" : ""}`}
+              className={`relative flex min-h-0 min-w-0 flex-col gap-[0.45rem] px-[0.5rem] pt-[0.55rem] pb-[0.6rem] ${i > 0 ? "border-l border-frame" : ""} ${col.past ? "bg-rail" : ""}`}
             >
-              <div className={`flex h-11 shrink-0 items-center gap-2.5 px-1 ${col.past ? "opacity-50" : ""}`}>
-                <h2 className="truncate text-[1.75rem] text-ink">
-                  <span className="font-extrabold">{col.label.split(" ")[0]}</span> <span className="font-medium text-ink-soft">{col.label.split(" ").slice(1).join(" ")}</span>
+              <div className={`flex shrink-0 items-start gap-2 ${col.past ? "opacity-50" : ""}`}>
+                <h2 className="min-w-0 flex-1">
+                  <span className="block text-[1.15rem] font-bold tracking-[0.08em] text-ink-muted uppercase">{weekday}</span>
+                  <span className="tabular block text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{rest.join(" ")}</span>
                 </h2>
                 {col.away ? <Badge /> : null}
               </div>
@@ -367,107 +405,67 @@ export function ReviewBoard({
                   })()}
                 </div>
               ) : (
-              <div className={`flex min-h-0 flex-1 flex-col gap-1 ${col.past ? "opacity-50" : ""}`}>
-                {/* Day: each kind of day once, with who has it. */}
-                <SectionTitle title="Day" onAdd={can ? () => setKindAt({ date: col.date, start: null }) : undefined} addLabel={`Add a day on ${col.name}`} />
-                <div className="flex shrink-0 flex-col gap-1.5">
+                <div className={`flex min-h-0 flex-1 flex-col gap-[0.45rem] ${col.past ? "opacity-50" : ""}`}>
+                  {/* Kind of day: each kind once, with who has it (colour dots). */}
+                  <SectionTitle title="Day" onAdd={can ? () => setKindAt({ date: col.date, start: null }) : undefined} addLabel={`Add a day on ${col.name}`} />
                   {groups.map((g) => (
-                    <Row key={g.key} changed={kindChanged(col.date, g)} onClick={can ? () => setKindAt({ date: col.date, start: g.key }) : undefined}>
-                      <Emoji emoji={g.icon ?? "📅"} className="size-7" />
-                      <span className="min-w-0 flex-1 truncate">{g.name}</span>
-                      <span className="flex shrink-0">
-                        {g.memberIds.map((id) => (
-                          <span key={id} className="-ml-1.5 first:ml-0">
-                            <Face person={person.get(id)} size="size-6 text-[0.6875rem]" />
-                          </span>
-                        ))}
-                      </span>
-                    </Row>
+                    <KindRow
+                      key={g.key}
+                      changed={kindChanged(col.date, g)}
+                      onClick={can ? () => setKindAt({ date: col.date, start: g.key }) : undefined}
+                      icon={g.icon ?? "📅"}
+                      name={g.name}
+                      who={g.memberIds.map((id) => person.get(id)).filter((m) => m !== undefined)}
+                    />
                   ))}
-                </div>
 
-                {/* Meals: one tile per meal block; dashed only while nothing is picked. */}
-                <SectionTitle title="Meals" onAdd={can ? () => addMeal(col) : undefined} addLabel={`Add a meal on ${col.name}`} />
-                <div className="flex min-h-0 shrink flex-col gap-1.5">
+                  {/* Meals: one tile per meal block; dashed while nothing is picked. */}
+                  <SectionTitle title="Meals" onAdd={can ? () => addMeal(col) : undefined} addLabel={`Add a meal on ${col.name}`} />
                   {slots.flatMap(({ time, meals }) => [
                     ...(meals.some((m) => !m.name)
                       ? []
-                      : [
-                          <button
-                            key={time.id}
-                            type="button"
-                            disabled={!can}
-                            onClick={() => setMealAt({ mealId: null, date: col.date, mealTimeId: time.id })}
-                            className={`flex min-h-12 min-w-0 shrink rounded-[1.375rem] border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_32%,var(--color-meal))] px-2.5 font-extrabold text-[color-mix(in_srgb,var(--color-meal-ink)_72%,white)] ${
-                              big ? "basis-[8.5rem] flex-col items-center justify-center gap-1 text-center text-xl" : "basis-[4rem] items-center gap-2.5 text-left text-lg"
-                            }`}
-                          >
-                            <Emoji emoji={time.icon ?? "🍽️"} className={`${big ? "size-14" : "size-9"} opacity-60`} />
-                            <span className="min-w-0 truncate">{time.name}</span>
-                          </button>,
-                        ]),
+                      : [<Tile key={time.id} empty disabled={!can} onClick={() => setMealAt({ mealId: null, date: col.date, mealTimeId: time.id })} title={time.name} />]),
                     ...meals.map((m) => {
-                          const look = mealLook(m, time.name);
-                          if (naming === m.id)
-                            return (
-                              <NameTile key={m.id} big={big} onDone={(name) => nameMeal(m, name)} />
-                            );
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              disabled={!can}
-                              onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
-                              title={`${time.name}: ${look.title}`}
-                              className={`relative flex min-h-12 min-w-0 shrink rounded-[1.375rem] border-2 px-2.5 font-extrabold ${look.picked ? "bg-meal text-meal-ink" : ""} ${
-                                big ? "basis-[8.5rem] flex-col items-center justify-center gap-1 text-center text-xl" : "basis-[4rem] items-center gap-2.5 text-left text-lg"
-                              } ${
-                                !look.picked
-                                  ? `border-dashed ${mealChanged(m.id) ? "border-accent" : "border-[color-mix(in_srgb,var(--color-meal-ink)_32%,var(--color-meal))]"} text-[color-mix(in_srgb,var(--color-meal-ink)_72%,white)]`
-                                  : mealChanged(m.id)
-                                    ? "border-accent"
-                                    : "border-[color-mix(in_srgb,var(--color-meal-ink)_16%,var(--color-meal))]"
-                              }`}
-                            >
-                              {m.memberIds.length > 0 ? (
-                                <span className={`flex ${big ? "absolute top-2 right-2" : "order-last ml-auto"}`}>
-                                  {m.memberIds.map((id) => (
-                                    <span key={id} className="-ml-1.5 first:ml-0">
-                                      <Face person={person.get(id)} size="size-6 text-[0.6875rem]" />
-                                    </span>
-                                  ))}
-                                </span>
-                              ) : null}
-                              <Emoji emoji={look.icon} className={big ? "size-14" : "size-9"} />
-                              <span className={`min-w-0 leading-tight ${big ? "line-clamp-2" : "truncate"}`}>{look.title}</span>
-                            </button>
-                          );
-                        }),
+                      const look = mealLook(m, time.name);
+                      if (naming === m.id) return <NameTile key={m.id} onDone={(name) => nameMeal(m, name)} />;
+                      return (
+                        <Tile
+                          key={m.id}
+                          meal={look.picked}
+                          empty={!look.picked}
+                          changed={mealChanged(m.id)}
+                          disabled={!can}
+                          onClick={() => setMealAt({ mealId: m.id, date: col.date, mealTimeId: time.id })}
+                          label={`${time.name}: ${look.title}`}
+                          icon={look.picked ? look.icon : undefined}
+                          title={look.title}
+                          who={m.memberIds.map((id) => person.get(id)).filter((p) => p !== undefined)}
+                        />
+                      );
+                    }),
                   ])}
-                </div>
 
-                {/* Chores: the chore days on this day. */}
-                <SectionTitle title="Chores" onAdd={can ? () => addChore(col) : undefined} addLabel={`Add a chore day on ${col.name}`} />
-                <div className="flex shrink-0 flex-col gap-1.5">
+                  {/* Chores: the chore days on this day. */}
+                  <SectionTitle title="Chores" onAdd={can ? () => addChore(col) : undefined} addLabel={`Add a chore day on ${col.name}`} />
                   {chores.length === 0 ? (
-                    <Row muted>
-                      <Emoji emoji={col.away ? "🧳" : (freeDay?.icon ?? "🌿")} className="size-7" />
-                      <span className="min-w-0 truncate">{col.away ? "Away" : (freeDay?.name ?? "Free day")}</span>
-                    </Row>
+                    <KindRow icon={col.away ? "🧳" : (freeDay?.icon ?? "🌿")} name={col.away ? "Away" : (freeDay?.name ?? "Free day")} />
                   ) : (
                     chores.map((id) => (
-                      <Row key={id} changed={choreChanged(col.date, id)} onClick={can ? () => pickChoreDay(col, id) : undefined}>
-                        <Emoji emoji={choreDay.get(id)?.icon ?? "🧹"} className="size-7" />
-                        <span className="min-w-0 truncate">{choreDay.get(id)?.name}</span>
-                      </Row>
+                      <Tile
+                        key={id}
+                        changed={choreChanged(col.date, id)}
+                        disabled={!can}
+                        onClick={() => pickChoreDay(col, id)}
+                        icon={choreDay.get(id)?.icon ?? "🧹"}
+                        title={choreDay.get(id)?.name ?? "Chores"}
+                      />
                     ))
                   )}
-                </div>
 
-                {/* Plans: the day's events by picture and name; + adds one on this day. */}
-                <SectionTitle title="Plans" onAdd={can ? () => router.push(`/review?week=${data.week}&add=${col.date}&allday=1`) : undefined} addLabel={`Add an event on ${col.name}`} />
-                <Plans plans={col.events} moreHref={`/calendar?view=week&date=${col.date}`} />
-              </div>
+                  {/* Plans: the day's events in their person's colour; + adds one on this day. */}
+                  <SectionTitle title="Plans" onAdd={can ? () => router.push(`/review?week=${data.week}&add=${col.date}&allday=1`) : undefined} addLabel={`Add an event on ${col.name}`} />
+                  <Plans plans={col.events} colourOf={(id) => (id ? person.get(id)?.colour : undefined)} moreHref={`/calendar?view=week&date=${col.date}`} />
+                </div>
               )}
             </section>
           );
@@ -516,7 +514,7 @@ export function ReviewBoard({
         <LeaveDialog
           what="this week"
           saving={saving}
-          onSave={() => save(guard.leaving ?? goTo)}
+          onSave={() => startSave(guard.leaving ?? goTo)}
           onStay={() => {
             guard.stay();
             setGoTo(null);
@@ -531,25 +529,41 @@ export function ReviewBoard({
           }}
         />
       ) : null}
+      {buy ? (
+        <BuySheet
+          lines={buy.lines}
+          saving={saving}
+          error={error}
+          onConfirm={(skipped) => save(buy.then, skipped)}
+          onClose={() => {
+            setBuy(null);
+            setError(null);
+            // "Not now" while leaving: stay on the week.
+            if (buy.then !== null || goTo) {
+              guard.stay();
+              setGoTo(null);
+            }
+          }}
+        />
+      ) : null}
     </>
   );
 }
 
 /** A day's plans: as many as fit, then "+ N more" (to the calendar). */
-function Plans({ plans, moreHref }: { plans: ReviewColumn["events"]; moreHref: string }) {
+function Plans({ plans, colourOf, moreHref }: { plans: ReviewColumn["events"]; colourOf: (memberId: string | null) => string | undefined; moreHref: string }) {
   const [ref, fit] = useFitRows<HTMLUListElement>(4);
   const shown = plans.length > fit ? plans.slice(0, Math.max(0, fit - 1)) : plans;
   return (
-    <ul ref={ref} className="flex min-h-[7.5rem] flex-1 flex-col gap-0.5 overflow-hidden">
+    <ul ref={ref} className="flex min-h-[3.15rem] flex-1 flex-col gap-[0.45rem] overflow-hidden">
       {shown.map((e) => (
-        <li key={e.id} className="flex min-h-9 min-w-0 shrink-0 items-center gap-2 px-1 text-base font-bold text-ink">
-          <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-6" />
-          <span className="min-w-0 truncate">{e.title}</span>
+        <li key={e.id} className="flex shrink-0 flex-col">
+          <Tile icon={eventEmoji(e.icon, e.title)} title={e.title} colour={colourOf(e.memberId)} />
         </li>
       ))}
       {plans.length > shown.length ? (
-        <li className="flex min-h-9 shrink-0 items-center px-1">
-          <Link href={moreHref} className="text-sm font-bold text-accent">
+        <li className="flex min-h-[3.15rem] shrink-0 items-center px-1">
+          <Link href={moreHref} className="flex min-h-[var(--touch-target)] items-center text-[1.15rem] font-bold text-accent">
             + {plans.length - shown.length} more
           </Link>
         </li>
@@ -558,21 +572,94 @@ function Plans({ plans, moreHref }: { plans: ReviewColumn["events"]; moreHref: s
   );
 }
 
-function Row({ children, onClick, changed = false, muted = false }: { children: ReactNode; onClick?: () => void; changed?: boolean; muted?: boolean }) {
-  const className = `flex min-h-11 w-full min-w-0 shrink-0 items-center gap-2 rounded-[0.875rem] border-2 bg-rail px-2 text-left text-base font-extrabold ${
-    changed ? "border-accent" : "border-transparent"
-  } ${muted ? "font-bold text-ink-muted" : "text-ink"}`;
+/**
+ * A Planner tile (mock .tile): a soft fill with an accent bar on the left,
+ * a picture and a printed name. Meals are the meal yellow; plans take
+ * their person's colour; chore days are grey. `empty`: a dashed block
+ * still to pick ("Dinner"). A tile changed on this review gets a blue ring.
+ */
+function Tile({
+  title,
+  icon,
+  colour,
+  meal = false,
+  empty = false,
+  changed = false,
+  disabled = false,
+  onClick,
+  label,
+  who = [],
+}: {
+  title: string;
+  icon?: string;
+  colour?: string | null;
+  meal?: boolean;
+  empty?: boolean;
+  changed?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+  label?: string;
+  who?: Person[];
+}) {
+  const tinted = !empty && !meal && colour;
+  const style: CSSProperties | undefined = tinted ? ({ background: soft(colour), "--bar": strong(colour) } as CSSProperties) : undefined;
+  const look = empty
+    ? `justify-center border-2 border-dashed ${changed ? "border-accent" : "border-frame"} text-ink-muted`
+    : `${meal ? "bg-meal text-meal-ink before:bg-meal-ink" : tinted ? "text-ink before:bg-[var(--bar)]" : "bg-panel text-ink before:bg-check-border"} before:absolute before:inset-y-0 before:left-0 before:w-[0.28rem] ${
+        changed ? "ring-[0.15rem] ring-accent ring-inset" : ""
+      }`;
+  const className = `relative flex min-h-[3.15rem] w-full min-w-0 shrink-0 items-center gap-[0.45rem] overflow-hidden rounded-[var(--radius)] py-[0.25rem] pr-[0.55rem] pl-[0.7rem] text-left ${look}`;
+  const body = (
+    <>
+      {icon && !empty ? <Emoji emoji={icon} className="size-[1.6rem]" /> : null}
+      <span className={`min-w-0 truncate text-[1.25rem] leading-[1.15] font-bold ${empty ? "" : "flex-1"}`}>{title}</span>
+      {who.length > 0 ? (
+        <span className="flex shrink-0 gap-[0.2rem]">
+          {who.map((p) => (
+            <Face key={p.id} person={p} size="size-[0.8rem]" />
+          ))}
+        </span>
+      ) : null}
+    </>
+  );
   return onClick ? (
-    <button type="button" onClick={onClick} className={`${className} hover:bg-panel`}>
-      {children}
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={label ?? title} className={className} style={style}>
+      {body}
     </button>
   ) : (
-    <span className={className}>{children}</span>
+    <span className={className} style={style}>
+      {body}
+    </span>
+  );
+}
+
+/** A kind of day (mock .kind): picture, name, and who has it as colour dots. */
+function KindRow({ icon, name, who = [], onClick, changed = false }: { icon: string; name: string; who?: Person[]; onClick?: () => void; changed?: boolean }) {
+  const className = `flex min-h-[3rem] w-full min-w-0 shrink-0 items-center gap-[0.4rem] rounded-[var(--radius)] px-[0.3rem] text-left text-[1.15rem] font-bold text-ink-soft ${
+    changed ? "ring-[0.15rem] ring-accent ring-inset" : ""
+  }`;
+  const body = (
+    <>
+      <Emoji emoji={icon} className="size-[1.6rem]" />
+      <span className="min-w-0 flex-1 truncate">{name}</span>
+      <span className="flex shrink-0 gap-[0.2rem]">
+        {who.map((p) => (
+          <Face key={p.id} person={p} size="size-[0.8rem]" />
+        ))}
+      </span>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${className} hover:bg-rail`}>
+      {body}
+    </button>
+  ) : (
+    <span className={className}>{body}</span>
   );
 }
 
 /** A new meal tile being named: type its name, then Done (or Enter). */
-function NameTile({ big, onDone }: { big: boolean; onDone: (name: string) => void }) {
+function NameTile({ onDone }: { onDone: (name: string) => void }) {
   const [name, setName] = useState("");
   return (
     <form
@@ -580,7 +667,7 @@ function NameTile({ big, onDone }: { big: boolean; onDone: (name: string) => voi
         e.preventDefault();
         onDone(name);
       }}
-      className={`flex min-h-12 min-w-0 shrink flex-col justify-center gap-1.5 rounded-[1.375rem] border-2 border-dashed border-accent p-2 ${big ? "basis-[8.5rem]" : "basis-[4rem]"}`}
+      className="flex shrink-0"
     >
       <input
         autoFocus
@@ -590,21 +677,15 @@ function NameTile({ big, onDone }: { big: boolean; onDone: (name: string) => voi
         onBlur={() => onDone(name)}
         placeholder="Name it"
         aria-label="Meal name"
-        className="min-h-11 w-full min-w-0 rounded-xl border-2 border-frame bg-board px-2.5 text-lg font-extrabold text-ink outline-none focus:border-accent"
+        className="min-h-[3.15rem] w-full min-w-0 rounded-[var(--radius)] border-2 border-accent bg-board px-[0.7rem] text-[1.25rem] font-bold text-ink outline-none"
       />
     </form>
   );
 }
 
-function ViewButton({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+function ViewButton({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl px-3.5 text-lg font-bold whitespace-nowrap ${on ? "bg-board text-ink shadow-sm" : "text-ink-soft hover:bg-board"}`}
-    >
-      {icon}
+    <button type="button" onClick={onClick} aria-pressed={on} className={segItemClass(on)}>
       {label}
     </button>
   );
@@ -613,7 +694,7 @@ function ViewButton({ on, onClick, icon, label }: { on: boolean; onClick: () => 
 function WeekButton({ label, onClick, icon }: { label: string; onClick: () => void; icon: "prev" | "next" }) {
   const Icon = icon === "prev" ? CaretLeft : CaretRight;
   return (
-    <button type="button" onClick={onClick} aria-label={label} className="flex size-[var(--touch-target)] items-center justify-center rounded-xl text-ink hover:bg-board">
+    <button type="button" onClick={onClick} aria-label={label} className="flex size-[var(--touch-target)] items-center justify-center rounded-full bg-panel text-ink">
       <Icon size="1.5rem" weight="bold" aria-hidden />
     </button>
   );

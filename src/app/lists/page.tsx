@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { FitList } from "@/components/fit-list";
-import { ListChecks, PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
+import { ActionLink, AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { requireHousehold } from "@/lib/household";
@@ -20,8 +20,12 @@ import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
 
 /**
- * To-do lists. Each to-do can have a day and a person, both optional.
- * The words are in handwriting (unless that's switched off in Settings).
+ * Lists (Glance): the list editor. Left, every list (picture, name, how
+ * many are open) and New list; middle, the list picked. Groceries show
+ * aisle columns; the Chores list adds with tags; other lists add with a
+ * day (Done by / On), a time and who. The words are handwritten in the
+ * person's ink, on the same row as the Daily List. Lists are mostly
+ * reached from the Daily List, whose title opens the list it shows.
  */
 export default function ListsPage(props: PageProps<"/lists">) {
   return (
@@ -70,16 +74,21 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
 
   return (
     <>
-      <ScreenHeader title="Lists" />
+      <ScreenHeader title="Lists" action={<ActionLink href={here("&newList=1")}>New list</ActionLink>} />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
       {message ? <Notice tone="success">{message}</Notice> : null}
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-        {/* Which list */}
-        <Card title="Lists" icon={ListChecks} tint="blue">
-          <ul className="flex flex-col gap-1.5 lg:min-h-0 lg:overflow-hidden">
-            {lists.map((l) => {
+      {/* Master–detail (Glance mock): the lists on the left, the one picked in the middle. */}
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_minmax(0,1fr)]">
+        {/* Which list: as many as fit, then pages (there can be lots). */}
+        <Card>
+          <FitList
+            heading={<span className="text-[1.75rem]">Lists</span>}
+            fallback={LISTS_PAGE}
+            focus={Math.max(0, lists.findIndex((l) => l.id === list?.id))}
+            className="gap-1"
+            rows={lists.map((l) => {
               const count = l.is_groceries ? groceries.filter((g) => !g.checked).length : todos.filter((t) => t.list_id === l.id && t.status === "open").length;
               const active = l.id === list?.id;
               return (
@@ -87,156 +96,147 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                   <Link
                     href={`/lists?list=${l.id}`}
                     aria-current={active ? "page" : undefined}
-                    className={`flex min-h-16 items-center gap-3 rounded-2xl px-3 ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
+                    className={`flex min-h-16 items-center gap-[0.7rem] rounded-[var(--radius)] px-3 ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
                   >
-                    <Emoji emoji={l.icon ?? "📝"} className="size-9" />
-                    <span className="min-w-0 flex-1 truncate text-xl font-bold text-ink">{l.name}</span>
-                    <span className="text-lg font-bold text-ink-muted">{count || ""}</span>
+                    <Emoji emoji={l.icon ?? "📝"} className="size-[2.15rem]" />
+                    <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{l.name}</span>
+                    <span className="tabular text-[1.35rem] font-extrabold text-ink-muted">{count || ""}</span>
                   </Link>
                 </li>
               );
             })}
-          </ul>
-          <SoftLink href={here("&newList=1")} className="mt-3">
-            <Plus size="1.5rem" aria-hidden />
-            New list
-          </SoftLink>
+            footer={
+              <SoftLink href={here("&newList=1")} className="w-full">
+                <Plus size="1.25rem" weight="bold" aria-hidden />
+                New list
+              </SoftLink>
+            }
+          />
         </Card>
 
         {/* The list itself */}
-        {list ? (
-          <Card
-            title={list.name}
-            icon={ListChecks}
-            tint="teal"
-            aside={
-              <Link
-                href={here("&editList=1")}
-                scroll={false}
-                aria-label="Rename or remove this list"
-                className="flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-rail"
-              >
-                <PencilSimple size="1.5rem" aria-hidden />
-              </Link>
-            }
-          >
-            {list.is_groceries ? (
-              // The grocery list: its own lines, with amounts and aisles (saving the weekly review fills it).
-              <div className="mt-2 flex flex-col lg:min-h-0 lg:flex-1">
-                <GroceryView initial={groceries} rows={10} columns={4} />
+        <Card>
+          {list ? (
+            <>
+              <div className="mb-[0.35rem] flex shrink-0 items-center gap-[0.7rem]">
+                <h2 className="min-w-0 flex-1 truncate text-[1.85rem] font-extrabold text-ink">{list.name}</h2>
+                <Link
+                  href={here("&editList=1")}
+                  scroll={false}
+                  aria-label={list.is_groceries || list.is_chores ? "Rename this list or change its picture" : "Rename or remove this list"}
+                  title="Rename or change the picture"
+                  className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
+                >
+                  <PencilSimple size="1.5rem" aria-hidden />
+                </Link>
               </div>
-            ) : list.is_chores ? (
-              // The Chores list: just the words and tags; the chore planner picks the day.
-              <form action={addTodo} className="mt-2 mb-2 flex flex-col gap-2">
-                <input type="hidden" name="listId" value={list.id} />
-                <input type="hidden" name="returnTo" value={returnTo} />
-                <div className="flex items-center gap-2">
-                  <Input name="title" required maxLength={120} aria-label="New chore" className="min-w-0 flex-1" />
-                  <Button>
-                    <Plus size="1.25rem" weight="bold" aria-hidden />
-                    Add
-                  </Button>
+              {list.is_groceries ? (
+                // The grocery list: its own lines, with amounts and aisles (saving the weekly review fills it).
+                <div className="flex flex-col lg:min-h-0 lg:flex-1">
+                  <GroceryView initial={groceries} rows={10} columns={4} />
                 </div>
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Tags">
-                  {CHORE_TAGS.map((t) => (
-                    <label
-                      key={t.value}
-                      className="flex min-h-11 cursor-pointer items-center rounded-full border-2 border-frame bg-board px-3.5 text-base text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold"
-                    >
-                      <input type="checkbox" name="tags" value={t.value} className="sr-only" />
-                      {t.label}
-                    </label>
-                  ))}
-                </div>
-              </form>
-            ) : (
-            <form action={addTodo} className="mt-2 mb-2 flex flex-wrap items-center gap-2">
-              <input type="hidden" name="listId" value={list.id} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <div className="min-w-56 flex-[3]">
-                <Input name="title" required maxLength={120} aria-label="New to-do" className="w-full" />
-              </div>
-              <div className="min-w-36 flex-1">
-                <Select name="dateKind" aria-label="What the day means" defaultValue="due" className="w-full">
-                  <option value="due">Done by</option>
-                  <option value="start">On</option>
-                </Select>
-              </div>
-              <div className="min-w-44 flex-1">
-                <Input name="dueDate" type="date" aria-label="Day (optional)" className="w-full" />
-              </div>
-              <div className="min-w-32 flex-1">
-                <Input name="atTime" type="time" aria-label="Time (optional)" title="Time (optional): with a day, it shows on the calendar" className="w-full" />
-              </div>
-              <div className="min-w-36 flex-1">
-                <Select name="assigneeId" aria-label="For someone (optional)" defaultValue="" className="w-full">
-                  <option value="">Anyone</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <Button>
-                <Plus size="1.25rem" weight="bold" aria-hidden />
-                Add
-              </Button>
-            </form>
-            )}
-            {list.is_groceries ? null : (
-            <div className="flex flex-col lg:min-h-0 lg:flex-1">
-              {showingDone ? (
-                <>
-                  <FitList
-                    key={`${list.id}-done`}
-                    fallback={LIST_PAGE}
-                    rows={done.map((t) => (
-                      <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo={returnTo} />
-                    ))}
-                    footer={
-                      <>
-                        <SoftLink href={here()}>Back to the list</SoftLink>
-                        <form action={clearDone} className="ml-auto">
-                          <input type="hidden" name="listId" value={list.id} />
-                          <input type="hidden" name="returnTo" value={returnTo} />
-                          <Button variant="secondary">Clear the done ones</Button>
-                        </form>
-                      </>
-                    }
-                  />
-                </>
               ) : (
                 <>
-                  {open.length === 0 ? <p className="py-4 text-xl text-ink-muted">Nothing on this list</p> : null}
-                  <FitList
-                    key={list.id}
-                    fallback={LIST_PAGE}
-                    rows={open.map((t) => (
-                      <TodoRow
-                        key={t.id}
-                        todo={t}
-                        members={memberById}
-                        today={today}
-                        household={household}
-                        returnTo={returnTo}
-                        editHref={here(`&edit=${t.id}`)}
-                        plannedOn={plannedOn}
+                  {list.is_chores ? (
+                    // The Chores list: just the words and tags; the chore planner picks the day.
+                    <form action={addTodo} className="mb-2 flex shrink-0 flex-col gap-2">
+                      <input type="hidden" name="listId" value={list.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <div className="flex items-center gap-[0.6rem]">
+                        <Input name="title" required maxLength={120} aria-label="New chore" placeholder="Add a chore" className="max-w-[36rem] min-w-0 flex-1 font-hand text-[1.5rem]!" />
+                        <Button>
+                          <Plus size="1.25rem" weight="bold" aria-hidden />
+                          Add
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="Tags">
+                        {CHORE_TAGS.map((t) => (
+                          <label
+                            key={t.value}
+                            className="flex min-h-[var(--touch-target)] cursor-pointer items-center rounded-full border-2 border-frame bg-board px-[1.1rem] text-[1.25rem] font-bold text-ink-soft select-none has-checked:border-ink has-checked:bg-rail has-checked:text-ink"
+                          >
+                            <input type="checkbox" name="tags" value={t.value} className="sr-only" />
+                            {t.label}
+                          </label>
+                        ))}
+                      </div>
+                    </form>
+                  ) : (
+                    // Other lists: the words, Done by / On a day, a time (shows on the calendar), and who.
+                    <form action={addTodo} className="mb-2 flex shrink-0 flex-wrap items-center gap-[0.6rem]">
+                      <input type="hidden" name="listId" value={list.id} />
+                      <input type="hidden" name="returnTo" value={returnTo} />
+                      <Input name="title" required maxLength={120} aria-label="New to-do" placeholder="Add something" className="min-w-56 flex-[3] font-hand text-[1.5rem]!" />
+                      <Select name="dateKind" aria-label="What the day means" defaultValue="due" className="min-w-36 flex-1">
+                        <option value="due">Done by</option>
+                        <option value="start">On</option>
+                      </Select>
+                      <Input name="dueDate" type="date" aria-label="Day (optional)" className="min-w-44 flex-1" />
+                      <Input name="atTime" type="time" aria-label="Time (optional)" title="Time (optional): with a day, it shows on the calendar" className="min-w-32 flex-1" />
+                      <Select name="assigneeId" aria-label="For someone (optional)" defaultValue="" className="min-w-36 flex-1">
+                        <option value="">Anyone</option>
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button>
+                        <Plus size="1.25rem" weight="bold" aria-hidden />
+                        Add
+                      </Button>
+                    </form>
+                  )}
+                  <div className="flex flex-col lg:min-h-0 lg:flex-1">
+                    {showingDone ? (
+                      <FitList
+                        key={`${list.id}-done`}
+                        fallback={LIST_PAGE}
+                        heading={<span className="text-[1.25rem] text-ink-muted">Done ({done.length})</span>}
+                        rows={done.map((t) => (
+                          <TodoRow key={t.id} todo={t} members={memberById} today={today} household={household} returnTo={here("&done=1")} />
+                        ))}
+                        footer={
+                          <>
+                            <SoftLink href={here()}>Back to the list</SoftLink>
+                            {done.length > 0 ? (
+                              <form action={clearDone} className="ml-auto">
+                                <input type="hidden" name="listId" value={list.id} />
+                                <input type="hidden" name="returnTo" value={returnTo} />
+                                <Button variant="secondary">Clear the done ones</Button>
+                              </form>
+                            ) : null}
+                          </>
+                        }
                       />
-                    ))}
-                    footer={done.length > 0 ? <SoftLink href={here("&done=1")}>Done ({done.length})</SoftLink> : undefined}
-                  />
+                    ) : (
+                      <FitList
+                        key={list.id}
+                        fallback={LIST_PAGE}
+                        empty={<li className="py-4 text-xl text-ink-muted">Nothing on this list</li>}
+                        rows={open.map((t) => (
+                          <TodoRow
+                            key={t.id}
+                            todo={t}
+                            members={memberById}
+                            today={today}
+                            household={household}
+                            returnTo={returnTo}
+                            editHref={here(`&edit=${t.id}`)}
+                            plannedOn={plannedOn}
+                          />
+                        ))}
+                        footer={done.length > 0 ? <SoftLink href={here("&done=1")}>Done ({done.length})</SoftLink> : undefined}
+                      />
+                    )}
+                  </div>
                 </>
               )}
-            </div>
-            )}
-          </Card>
-        ) : (
-          <Card title="No lists yet" icon={ListChecks} tint="teal">
-            {null}
-          </Card>
-        )}
-
+            </>
+          ) : (
+            <p className="text-xl text-ink-muted">No lists yet. Make one with New list.</p>
+          )}
+        </Card>
       </div>
 
       {editing ? (
@@ -308,6 +308,7 @@ function ListFields({ name, icon }: { name?: string; icon?: string | null }) {
   );
 }
 
-/* Long lists turn into pages, so nothing scrolls on the wall screen. Before the list is measured: */
+/* Long lists turn into pages, so nothing scrolls on the wall screen. Before the lists are measured: */
 const LIST_PAGE = 8;
+const LISTS_PAGE = 10;
 

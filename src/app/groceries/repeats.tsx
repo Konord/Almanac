@@ -63,7 +63,7 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
     >
       <div className="flex items-center gap-2">
         <span className="flex-1 text-2xl font-extrabold text-ink">Repeats</span>
-        <button type="button" onClick={onClose} aria-label="Close" className="flex size-11 items-center justify-center rounded-full bg-rail text-ink">
+        <button type="button" onClick={onClose} aria-label="Close" className="flex size-12 items-center justify-center rounded-full bg-rail text-ink">
           <X size="1.125rem" weight="bold" aria-hidden />
         </button>
       </div>
@@ -116,7 +116,7 @@ export function RepeatsCard({ onLines, onClose, dateLabel }: { onLines: (lines: 
               disabled={pending}
               onClick={() => start(async () => take(await removeRepeat(r.id)))}
               aria-label={`Stop ${r.name} repeating`}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-danger"
+              className="flex size-12 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-danger"
             >
               <X size="1.125rem" weight="bold" aria-hidden />
             </button>

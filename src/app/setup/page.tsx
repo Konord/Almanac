@@ -6,7 +6,7 @@ import { createHousehold } from "./actions";
 
 export default function SetupPage(props: PageProps<"/setup">) {
   return (
-    <PageShell title="Welcome to Almanac">
+    <PageShell title="Welcome" sub="to Almanac">
       <Suspense>
         <SetupForm searchParams={props.searchParams} />
       </Suspense>
@@ -22,11 +22,11 @@ async function SetupForm({ searchParams }: { searchParams: PageProps<"/setup">["
   return (
     <Panel title="Name your household">
       {error ? <Notice tone="error">{error}</Notice> : null}
-      <form action={createHousehold} className="mt-4 flex flex-col gap-4">
+      <form action={createHousehold} className="flex flex-col gap-4">
         <Field label="Household name">
           <Input name="name" required maxLength={80} />
         </Field>
-        <div>
+        <div className="mt-2 flex justify-end">
           <Button>Create household</Button>
         </div>
       </form>

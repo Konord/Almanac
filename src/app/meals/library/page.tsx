@@ -1,17 +1,17 @@
 import { Suspense } from "react";
 import { FitList } from "@/components/fit-list";
 import Link from "next/link";
-import { BookOpen, Plus, Trash } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Card, Emoji, Field, Input, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
-import { BATCHES, batchAmount } from "@/lib/meals";
+import type { ReactNode } from "react";
+import { ActionLink, AppFrame, Button, Emoji, Field, Input, Select, firstParam, LoadingOutline, secondaryActionClass } from "@/components/ui";
+import { batchAmount } from "@/lib/meals";
 import { clampBatches, menuMealName } from "@/lib/menu";
 import { measureText, type Measures } from "@/lib/units";
 import { UnitPill } from "../unit-pill";
 import { requireHousehold } from "@/lib/household";
 import { minutesText } from "@/lib/meal-helpers";
-import { importRecipe, removeRecipe } from "../actions";
+import { importRecipe } from "../actions";
 import { loadMealBasics, loadRecipeDetail, type DishKind, type MealBasics, type Recipe } from "../data";
-import { MealsHeader, Modal, Pager, linker, pageOf } from "../parts";
+import { BatchSwitch, MealsHeader, Modal, Pager, linker, pageOf, pickRowClass } from "../parts";
 import { DishEditor, type DishTab } from "../dish-editor";
 
 /**
@@ -30,8 +30,8 @@ export default function LibraryPage(props: PageProps<"/meals/library">) {
   );
 }
 
-const KIND_PAGE = 12;
-const DISH_PAGE = 8;
+const KIND_PAGE = 11;
+const DISH_PAGE = 11;
 /** The pretend kinds: every dish, and dishes with no kind. */
 const ALL = "all";
 const NONE = "none";
@@ -48,106 +48,115 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
   const kind: DishKind | undefined = basics.kinds.find((k) => k.id === kindParam);
   const picked = kind ? kind.id : kindParam === NONE ? NONE : ALL;
 
-  const current = { kind: p("kind") ?? null, kpage: p("kpage") ?? null };
+  const current = { kind: p("kind") ?? null, kpage: p("kpage") ?? null, recipe: p("recipe") ?? null };
   const here = linker("/meals/library", current);
 
-  const tiles = [
-    { id: ALL, name: "All dishes", icon: "📖", count: dishes.length },
-    ...basics.kinds.map((k) => ({ id: k.id, name: k.name, icon: k.icon, count: dishes.filter((r) => r.kind_ids.includes(k.id)).length })),
-    ...(loose.length ? [{ id: NONE, name: "No course", icon: "📒", count: loose.length }] : []),
+  // Left: what a dish can be in a meal (Main, Starch, Veggie…), as in g-final-library.
+  const rows = [
+    { id: ALL, name: "All dishes", count: dishes.length },
+    ...basics.kinds.map((k) => ({ id: k.id, name: k.name, count: dishes.filter((r) => r.kind_ids.includes(k.id)).length })),
+    ...(loose.length ? [{ id: NONE, name: "No course", count: loose.length }] : []),
   ];
-  const tilePage = pageOf(tiles, Number(p("kpage") ?? 0), KIND_PAGE);
+  const kindPage = pageOf(rows, Number(p("kpage") ?? 0), KIND_PAGE);
   const list = picked === ALL ? dishes : picked === NONE ? loose : dishes.filter((r) => r.kind_ids.includes(picked));
-  const tagById = new Map(basics.tags.map((t) => [t.id, t]));
-  const kindById = new Map(basics.kinds.map((k) => [k.id, k]));
   const pickedName = picked === ALL ? "All dishes" : picked === NONE ? "No course" : (kind?.name ?? "");
 
+  // Right: the dish asked for, or the first one in the middle column.
   const recipeId = p("recipe");
-  const openRecipe = recipeId ? basics.recipes.find((r) => r.id === recipeId) : undefined;
+  const openRecipe = (recipeId ? dishes.find((r) => r.id === recipeId) : undefined) ?? (recipeId ? undefined : list[0]);
   const mainKind = basics.kinds.find((k) => k.name === "Main");
 
   return (
     <>
-      <MealsHeader title="Meals" tab="library" error={p("error")} message={p("message")}>
-        <SoftLink href={here({ add: "type" })}>
-          <Plus size="1.5rem" weight="bold" aria-hidden />
+      <MealsHeader tab="library" error={p("error")} message={p("message")}>
+        <ActionLink href={here({ add: "type" })} scroll={false}>
           Add a dish
-        </SoftLink>
+        </ActionLink>
       </MealsHeader>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
-        <Card title="Courses" icon={BookOpen} tint="yellow">
-          <div className="grid min-h-0 flex-1 grid-cols-4 gap-2.5" style={{ gridTemplateRows: "repeat(3, minmax(0, 1fr))" }}>
-            {tilePage.items.map((t) => (
-              <Link
-                key={t.id}
-                href={here({ kind: t.id === ALL ? null : t.id })}
-                scroll={false}
-                className={`flex min-h-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 px-2 text-center ${t.id === picked ? "border-meal-ink bg-meal" : "border-frame hover:bg-rail"}`}
-              >
-                <Emoji emoji={t.icon} className="size-14" />
-                <span className="line-clamp-1 text-xl font-bold text-ink">{t.name}</span>
-                <span className="text-base text-ink-muted">
-                  {t.count} dish{t.count === 1 ? "" : "es"}
-                </span>
-              </Link>
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[16rem_22rem_minmax(0,1fr)]">
+        <section className={card}>
+          <h2 className={h2}>In a meal</h2>
+          <ul className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {kindPage.items.map((r) => (
+              <li key={r.id}>
+                <Link href={here({ kind: r.id === ALL ? null : r.id, recipe: null })} scroll={false} aria-current={r.id === picked ? "true" : undefined} className={pickRowClass(r.id === picked)}>
+                  <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{r.name}</span>
+                  <span className="tabular text-[1.35rem] font-extrabold text-ink-muted">{r.count}</span>
+                </Link>
+              </li>
             ))}
-          </div>
-          <div className="mt-3">
-            <Pager page={tilePage.page} pages={tilePage.pages} href={(n) => here({ kpage: n || null })} />
-          </div>
-        </Card>
+          </ul>
+          <Pager page={kindPage.page} pages={kindPage.pages} href={(n) => here({ kpage: n || null })} />
+        </section>
 
-        <Card>
+        <section className={card}>
           <FitList
             key={picked}
             heading={pickedName}
             fallback={DISH_PAGE}
-            className="mt-2 gap-2"
-            empty={<li className="text-lg text-ink-muted">No dishes yet</li>}
+            paging="more"
+            focus={openRecipe ? list.indexOf(openRecipe) : undefined}
+            empty={<li className="px-1 text-lg text-ink-muted">No dishes yet</li>}
             rows={list.map((r) => (
               <li key={r.id}>
-                <Link href={here({ recipe: r.id, tab: "recipe" })} scroll={false} className="flex min-h-18 items-center gap-3 rounded-2xl bg-rail px-4 hover:bg-panel">
-                  <Emoji emoji={r.icon ?? kindById.get(r.kind_ids[0] ?? "")?.icon} className="size-12" />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-xl font-bold text-ink">{r.name}</span>
-                    <span className="truncate text-base text-ink-muted">
-                      {[
-                        r.kind_ids.map((id) => kindById.get(id)?.name).filter(Boolean).join(", ") || null,
-                        r.total_minutes ? minutesText(r.total_minutes) : null,
-                        `Serves ${r.serves}`,
-                        ...r.tag_ids.map((id) => tagById.get(id)?.name),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </span>
-                  </span>
+                <Link href={here({ recipe: r.id })} scroll={false} aria-current={r.id === openRecipe?.id ? "true" : undefined} className={pickRowClass(r.id === openRecipe?.id)}>
+                  <Emoji emoji={r.icon ?? basics.kinds.find((k) => k.id === r.kind_ids[0])?.icon} className="size-[2.15rem]" />
+                  <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{r.name}</span>
                 </Link>
               </li>
             ))}
           />
-        </Card>
+        </section>
+
+        {openRecipe ? (
+          <RecipeCard
+            recipe={openRecipe}
+            basics={basics}
+            tab={p("tab") ?? "recipe"}
+            batches={clampBatches(p("batches") ?? 1)}
+            here={here}
+            temperatureUnit={household.settings.temperatureUnit}
+            measures={household.settings.measures}
+          />
+        ) : (
+          <section className={card}>
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
+              <Emoji emoji="🍽️" className="size-16" />
+              <p className="text-2xl font-bold text-ink">No dish open</p>
+            </div>
+            <AddWays here={here} />
+          </section>
+        )}
       </div>
 
       {p("add") ? <AddCard mode={ADD_MODES.find((m) => m === p("add")) ?? "type"} basics={basics} kindId={kind?.id ?? mainKind?.id ?? ""} here={here} /> : null}
-      {openRecipe ? (
-        <RecipeCard
-          recipe={openRecipe}
-          basics={basics}
-          tab={p("tab") ?? "recipe"}
-          batches={clampBatches(p("batches") ?? 1)}
-          here={here}
-          temperatureUnit={household.settings.temperatureUnit}
-          measures={household.settings.measures}
-        />
-      ) : null}
     </>
+  );
+}
+
+/** The card and title looks shared by the three columns (g-final-library). */
+const card = "flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised";
+const h2 = "mb-1 flex min-h-12 shrink-0 items-center text-2xl font-bold text-ink";
+
+/** The three ways to add a dish, at the foot of the recipe (the header's Add a dish opens the first). */
+function AddWays({ here, children }: { here: ReturnType<typeof linker>; children?: ReactNode }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-2 pt-3">
+      <span className="mr-1 text-[1.15rem] font-bold text-ink-muted">Add a dish:</span>
+      {ADD_MODES.map((m) => (
+        <Link key={m} href={here({ add: m })} scroll={false} className={secondaryActionClass}>
+          {ADD_MODE_NAMES[m]}
+        </Link>
+      ))}
+      {children}
+    </div>
   );
 }
 
 const ADD_MODES = ["type", "paste", "link"] as const;
 type AddMode = (typeof ADD_MODES)[number];
-const ADD_MODE_NAMES: Record<AddMode, string> = { type: "Type it in", paste: "Paste it", link: "From a web page" };
+const ADD_MODE_NAMES: Record<AddMode, string> = { type: "Type it in", paste: "Paste a recipe", link: "From a web page" };
 
 /**
  * Adding a dish (Connor, 2026-11-11): one way in for every dish. Type it
@@ -278,27 +287,21 @@ async function RecipeCard({
       temperatureUnit={temperatureUnit}
       initialTab={DISH_TABS.find((t) => t === tab) ?? "recipe"}
       dishHref={here({ recipe: recipe.id })}
-      closeHref={here({})}
+      batches={<BatchSwitch value={batches} href={(b) => here({ recipe: recipe.id, tab: "recipe", batches: b === 1 ? null : b })} />}
       view={<RecipeView recipe={recipe} detail={detail} batches={batches} here={here} measures={measures} basics={basics} />}
-      remove={
-        <form action={removeRecipe}>
-          <input type="hidden" name="returnTo" value={here({})} />
-          <input type="hidden" name="id" value={recipe.id} />
-          <input type="hidden" name="name" value={recipe.name} />
-          <Button variant="danger">
-            <Trash size="1.375rem" aria-hidden />
-            Remove dish
-          </Button>
-        </form>
-      }
+      removeTo={here({ recipe: null })}
     />
   );
 }
 
-const VIEW_INGREDIENTS = 12;
-const VIEW_STEPS = 6;
+const VIEW_INGREDIENTS = 11;
+const VIEW_STEPS = 5;
 
-/** The recipe to read: ingredients times the batches, units you can tap, and the steps. */
+/**
+ * The recipe to read: big printed ingredients times the batches (tap a
+ * unit to see it in other units), the steps beside them, then the ways to
+ * add a dish and Cook this.
+ */
 function RecipeView({
   recipe,
   detail,
@@ -317,79 +320,65 @@ function RecipeView({
   const ingredients = detail.ingredients;
   const dishes = new Map(basics.recipes.map((r) => [r.id, r]));
   const inMeals = basics.menuMeals.filter((m) => m.spots.some((s) => s.recipe_id === recipe.id)).map((m) => menuMealName(m, dishes));
-  const column = (list: typeof ingredients) => (
-    <ul className="flex min-w-0 flex-col gap-1">
-      {list.map((i) => {
-        const amount = batchAmount(i.amount === null ? null : Number(i.amount), batches);
-        const text = measureText(amount, i.unit);
-        return (
-          <li key={i.id} className="flex min-h-12 items-center gap-2.5">
-            <Emoji emoji={i.item.icon} className="size-8" />
-            {text ? <UnitPill amount={amount} unit={i.unit} text={text} measures={measures} size="md" /> : null}
-            <span className="min-w-0 flex-1 truncate leading-tight">
-              <span className="text-lg text-ink">{i.item.name}</span>
-              {i.note ? <span className="text-base text-ink-muted">, {i.note}</span> : null}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-  const shown = ingredients.slice(0, VIEW_INGREDIENTS * 2);
+  const shown = ingredients.slice(0, VIEW_INGREDIENTS);
+  const label = "shrink-0 text-[1.15rem] font-bold tracking-[0.06em] text-ink-muted uppercase";
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-8">
-      <section className="flex min-h-0 flex-col gap-3">
-        <div className="flex shrink-0 items-center gap-3">
-          <h3 className="flex-1 text-2xl font-bold text-ink">Ingredients</h3>
-          <span className="text-base text-ink-muted">Makes {recipe.serves * batches} servings</span>
-          <nav aria-label="Batches" className="flex gap-1 rounded-2xl bg-meal p-1.5">
-            {BATCHES.map((b) => (
-              <Link
-                key={b}
-                href={here({ recipe: recipe.id, tab: "recipe", batches: b === 1 ? null : b })}
-                scroll={false}
-                aria-current={b === batches ? "true" : undefined}
-                className={`flex h-12 min-w-14 items-center justify-center rounded-xl px-3 text-lg font-bold ${b === batches ? "bg-board text-ink" : "text-meal-ink"}`}
-              >
-                ×{b}
-              </Link>
+    <>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-8">
+        <section className="flex min-h-0 flex-col">
+          <h3 className={label}>
+            Ingredients · serves {recipe.serves * batches}
+            {recipe.total_minutes ? ` · ${minutesText(recipe.total_minutes)}` : ""}
+          </h3>
+          <ul className="flex min-h-0 flex-col">
+            {shown.map((i) => {
+              const amount = batchAmount(i.amount === null ? null : Number(i.amount), batches);
+              const text = measureText(amount, i.unit);
+              return (
+                <li key={i.id} className="flex min-h-[3.4rem] items-center gap-[0.7rem] border-b border-frame text-[1.5rem] font-bold text-ink">
+                  <span className="min-w-0 flex-1 truncate">
+                    {i.item.name}
+                    {i.note ? `, ${i.note}` : ""}
+                  </span>
+                  {text ? <UnitPill amount={amount} unit={i.unit} text={text} measures={measures} size="xl" /> : null}
+                </li>
+              );
+            })}
+            {ingredients.length === 0 ? <li className="pt-2 text-lg text-ink-muted">No ingredients yet</li> : null}
+          </ul>
+          {ingredients.length > shown.length ? (
+            <Link href={here({ recipe: recipe.id, tab: "ingredients" })} scroll={false} className="flex min-h-12 shrink-0 items-center text-lg font-bold text-accent">
+              + {ingredients.length - shown.length} more
+            </Link>
+          ) : null}
+        </section>
+        <section className="flex min-h-0 flex-col gap-3">
+          <h3 className={label}>Steps</h3>
+          <ol className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+            {detail.steps.slice(0, VIEW_STEPS).map((s, i) => (
+              <li key={s.id} className="flex gap-3">
+                <span className="tabular flex size-10 shrink-0 items-center justify-center rounded-full bg-rail text-lg font-extrabold text-ink">{i + 1}</span>
+                <span className="line-clamp-3 text-[1.25rem] leading-snug font-bold text-ink">{s.text}</span>
+              </li>
             ))}
-          </nav>
-        </div>
-        {ingredients.length ? (
-          <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-x-6">
-            {column(shown.slice(0, VIEW_INGREDIENTS))}
-            {column(shown.slice(VIEW_INGREDIENTS))}
-          </div>
-        ) : (
-          <p className="text-lg text-ink-muted">No ingredients yet</p>
-        )}
-        {ingredients.length > shown.length ? (
-          <Link href={here({ recipe: recipe.id, tab: "ingredients" })} scroll={false} className="text-base font-bold text-accent">
-            + {ingredients.length - shown.length} more
-          </Link>
-        ) : null}
-      </section>
-      <section className="flex min-h-0 flex-col gap-3">
-        <h3 className="shrink-0 text-2xl font-bold text-ink">Steps</h3>
-        <ol className="flex min-h-0 flex-1 flex-col gap-2.5">
-          {detail.steps.slice(0, VIEW_STEPS).map((s, i) => (
-            <li key={s.id} className="flex gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rail text-base font-extrabold text-ink">{i + 1}</span>
-              <span className="line-clamp-3 text-lg leading-snug text-ink">{s.text}</span>
-            </li>
-          ))}
-          {detail.steps.length === 0 ? <li className="text-lg text-ink-muted">No steps yet</li> : null}
-        </ol>
-        {detail.steps.length > VIEW_STEPS ? (
-          <Link href={here({ recipe: recipe.id, tab: "steps" })} scroll={false} className="shrink-0 text-base font-bold text-accent">
-            + {detail.steps.length - VIEW_STEPS} more steps
-          </Link>
-        ) : null}
-        <p className="shrink-0 border-t border-frame pt-3 text-base text-ink-muted">
-          {inMeals.length ? `On the menu in ${inMeals.slice(0, 3).join(", ")}${inMeals.length > 3 ? ` and ${inMeals.length - 3} more` : ""}.` : "Not in a meal yet."}
-        </p>
-      </section>
-    </div>
+            {detail.steps.length === 0 ? <li className="text-lg text-ink-muted">No steps yet</li> : null}
+          </ol>
+          {detail.steps.length > VIEW_STEPS ? (
+            <Link href={here({ recipe: recipe.id, tab: "steps" })} scroll={false} className="flex min-h-12 shrink-0 items-center text-lg font-bold text-accent">
+              + {detail.steps.length - VIEW_STEPS} more steps
+            </Link>
+          ) : null}
+          <p className="shrink-0 text-lg text-ink-muted">
+            {inMeals.length ? `On the menu in ${inMeals.slice(0, 3).join(", ")}${inMeals.length > 3 ? ` and ${inMeals.length - 3} more` : ""}.` : "Not in a meal yet."}
+          </p>
+        </section>
+      </div>
+      <AddWays here={here}>
+        {/* Cook mode for this dish alone, at the batches picked here. */}
+        <Link href={`/meals/cook/dish/${recipe.id}${batches > 1 ? `?batches=${batches}` : ""}`} className={`${secondaryActionClass} ml-auto bg-meal! text-meal-ink!`}>
+          Cook this
+        </Link>
+      </AddWays>
+    </>
   );
 }

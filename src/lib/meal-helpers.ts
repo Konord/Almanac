@@ -165,6 +165,17 @@ export function helperText(helper: Helper, temperatureUnit: "celsius" | "fahrenh
   }
 }
 
+/**
+ * A temperature in both units, the household's first: 425 °F → "425°F / 220°C".
+ * Ovens round the other unit to the nearest 5 (how dials are marked);
+ * food stays exact to the degree (165°F / 74°C).
+ */
+export function bothTemperatures(value: number, unit: "celsius" | "fahrenheit", kind: "oven" | "doneness"): string {
+  const other = unit === "fahrenheit" ? ((value - 32) * 5) / 9 : (value * 9) / 5 + 32;
+  const rounded = kind === "oven" ? Math.round(other / 5) * 5 : Math.round(other);
+  return unit === "fahrenheit" ? `${value}°F / ${rounded}°C` : `${value}°C / ${rounded}°F`;
+}
+
 /** 45 → "45 min", 90 → "1 h 30", 480 → "8 h". */
 export function minutesText(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;

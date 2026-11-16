@@ -1,5 +1,5 @@
 import { X } from "@phosphor-icons/react/dist/ssr";
-import { Button, Chips, Emoji, Input } from "@/components/ui";
+import { Button, Chips, Emoji, fieldLabelClass, Input } from "@/components/ui";
 import { LEAD_UNITS, leadLabel } from "@/lib/heads-ups";
 import { createClient } from "@/lib/supabase/server";
 import { addHeadsUp, removeHeadsUp } from "./actions";
@@ -47,11 +47,11 @@ export function HeadsUpEditor({
       ) : (
         <ul className="flex flex-col">
           {headsUps.map((h) => (
-            <li key={h.id} className="flex min-h-14 items-center gap-3 border-b border-panel last:border-0">
+            <li key={h.id} className="flex min-h-[3.6rem] items-center gap-[0.6rem] border-b border-frame last:border-0">
               <Emoji emoji={h.makes === "grocery" ? "🛒" : "🔔"} className="size-8" />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-lg font-semibold text-ink">{h.label}</span>
-                <span className="text-sm font-semibold text-ink-muted">
+                <span className="truncate text-[1.35rem] font-bold text-ink">{h.label}</span>
+                <span className="text-[1.15rem] font-bold text-ink-muted">
                   {leadLabel(h.minutes_before)}
                   {h.makes === "grocery" ? " · on the grocery list" : ""}
                 </span>
@@ -60,7 +60,7 @@ export function HeadsUpEditor({
                 formAction={removeHeadsUp.bind(null, h.id)}
                 formNoValidate
                 aria-label={`Remove the heads-up ${h.label}`}
-                className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-rail hover:text-ink"
+                className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
               >
                 <X size="1.5rem" aria-hidden />
               </button>
@@ -69,15 +69,15 @@ export function HeadsUpEditor({
         </ul>
       )}
       {headsUps.length < MAX_HEADS_UPS ? (
-        <div className="grid gap-3 rounded-[var(--radius-card)] bg-rail p-4">
+        <div className="grid gap-3 rounded-[var(--radius-card)] bg-rail px-[1.1rem] py-4">
           <div className="flex items-end gap-3">
-            <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <span className="text-base font-bold text-ink">New heads-up</span>
+            <label className="flex min-w-0 flex-1 flex-col gap-[0.35rem]">
+              <span className={fieldLabelClass}>New heads-up</span>
               <Input name="huLabel" maxLength={80} />
             </label>
-            <label className="flex w-24 shrink-0 flex-col gap-1.5">
-              <span className="text-base font-bold text-ink">How long</span>
-              <Input name="huAmount" type="number" min={0} max={999} defaultValue={1} />
+            <label className="flex w-28 shrink-0 flex-col gap-[0.35rem]">
+              <span className={fieldLabelClass}>How long</span>
+              <Input name="huAmount" type="number" min={0} max={999} defaultValue={1} className="tabular-nums" />
             </label>
           </div>
           <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
@@ -104,7 +104,7 @@ export function HeadsUpEditor({
           </div>
         </div>
       ) : (
-        <p className="text-base text-ink-muted">That&rsquo;s the most for one {"eventId" in source ? "event" : "chore"}.</p>
+        <p className="text-[1.25rem] font-bold text-ink-muted">That&rsquo;s the most for one {"eventId" in source ? "event" : "chore"}.</p>
       )}
     </div>
   );

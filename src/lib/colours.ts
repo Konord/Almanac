@@ -31,3 +31,12 @@ export function strong(colour: string | null | undefined): string {
 export function soft(colour: string | null | undefined): string {
   return `var(--color-person-${isPersonColour(colour ?? "") ? colour : EVERYONE_COLOUR}-soft)`;
 }
+
+/**
+ * The ink for handwritten text (Glance): the person's darkened "hand"
+ * shade, which holds 4.5:1 on their pastel tint and on white. Something
+ * nobody in particular wrote, or that isn't anyone's, is dark ink.
+ */
+export function hand(colour: string | null | undefined): string {
+  return isPersonColour(colour ?? "") ? `var(--color-person-${colour}-hand)` : "var(--color-ink)";
+}

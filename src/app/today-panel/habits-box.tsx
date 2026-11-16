@@ -75,7 +75,7 @@ export async function HabitsBox({ today, returnTo }: { today: LocalDate; returnT
                     <form action={tapHabit}>
                       {hidden}
                       <input type="hidden" name="undo" value="1" />
-                      <button aria-label={`Take ${habit.step} off ${habit.name}`} className="flex size-11 items-center justify-center rounded-full text-ink-muted">
+                      <button aria-label={`Take ${habit.step} off ${habit.name}`} className="flex size-12 items-center justify-center rounded-full text-ink-muted">
                         <Minus size="1.125rem" weight="bold" aria-hidden />
                       </button>
                     </form>

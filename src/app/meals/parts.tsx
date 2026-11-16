@@ -3,39 +3,92 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { X } from "@phosphor-icons/react/dist/ssr";
 import { Notice, ScreenHeader, Segmented } from "@/components/ui";
+import { BATCHES } from "@/lib/meals";
 import { MENU_TABS, type MealsTab } from "./menu-tabs";
 
 /*
- * Pieces shared by the Meals screens: the header with the Meals tabs, a
- * pop-up card that never scrolls, and page arrows for long lists.
+ * Pieces shared by the Meals screens: the header with the Meals tabs, the
+ * picked-row look, the ×1/×2/×3 switch, a pop-up card that never scrolls,
+ * and page arrows for long lists.
  */
 
 export type { MealsTab } from "./menu-tabs";
-const TABS = MENU_TABS;
 
+/**
+ * The Meals header: the big printed "Meals" with the tab's name on its
+ * baseline, Menu | Dishes | Backups in the tab slot, no weather, and the
+ * page's Add/Save at the far right (`children`).
+ */
 export function MealsHeader({
-  title,
   tab,
   children,
   error,
   message,
 }: {
-  title: ReactNode;
   tab: MealsTab;
   children?: ReactNode;
-  error?: string;
-  message?: string;
+  error?: string | null;
+  message?: string | null;
 }) {
   return (
     <>
-      {/* The tabs sit straight after the title on every Menu Manager screen, so they never move. */}
-      <ScreenHeader title={title}>
-        <Segmented label="Meals" options={TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />
-        {children ? <div className="flex items-center gap-4 lg:ml-auto">{children}</div> : null}
-      </ScreenHeader>
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {message ? <Notice tone="success">{message}</Notice> : null}
+      <ScreenHeader
+        title="Meals"
+        sub={MENU_TABS.find((t) => t.tab === tab)?.sub}
+        tabs={<Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === tab }))} />}
+        action={children}
+      />
+      {error ? <Notice tone="error">{error}</Notice> : message ? <Notice tone="success">{message}</Notice> : null}
     </>
+  );
+}
+
+/** A row you pick in a column (a kind of meal, a meal, a dish): the picked one is ringed in ink. */
+export function pickRowClass(active: boolean): string {
+  return `flex min-h-16 w-full min-w-0 items-center gap-[0.65rem] rounded-[var(--radius)] px-3 text-left ${
+    active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"
+  }`;
+}
+
+/** A round grey icon button (rename, remove). */
+export const roundIconClass =
+  "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink disabled:opacity-35";
+
+/**
+ * ×1 ×2 ×3. Links (`href`) on server pages, buttons (`onPick`) in the
+ * browser. `meal` is Cook mode's yellow track; the plain one is grey.
+ */
+export function BatchSwitch({
+  value,
+  href,
+  onPick,
+  tone = "plain",
+  big = false,
+}: {
+  value: number;
+  href?: (batches: number) => string;
+  onPick?: (batches: number) => void;
+  tone?: "plain" | "meal";
+  big?: boolean;
+}) {
+  const item = (on: boolean) =>
+    `flex h-12 min-w-[3.6rem] items-center justify-center rounded-[calc(var(--radius)-0.1rem)] px-2 font-extrabold tabular ${big ? "text-[1.5rem]" : "text-[1.35rem]"} ${
+      on ? "bg-board text-ink shadow-raised" : tone === "meal" ? "text-meal-ink" : "text-ink-muted"
+    }`;
+  return (
+    <div role="group" aria-label="Batches" className={`flex shrink-0 gap-1 rounded-[var(--radius)] p-1 ${tone === "meal" ? "bg-meal" : "bg-panel"}`}>
+      {BATCHES.map((b) =>
+        href ? (
+          <Link key={b} href={href(b)} scroll={false} aria-current={b === value ? "true" : undefined} aria-label={`${b} batch${b === 1 ? "" : "es"}`} className={item(b === value)}>
+            ×{b}
+          </Link>
+        ) : (
+          <button key={b} type="button" aria-pressed={b === value} aria-label={`${b} batch${b === 1 ? "" : "es"}`} onClick={() => onPick?.(b)} className={item(b === value)}>
+            ×{b}
+          </button>
+        ),
+      )}
+    </div>
   );
 }
 
@@ -60,28 +113,28 @@ export function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 lg:p-8">
-      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.32)]" />
+      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgb(35_38_43/0.18)]" />
       <section
         role="dialog"
         aria-label={typeof title === "string" ? title : "Meal"}
-        className={`relative flex max-h-full w-full flex-col overflow-hidden rounded-[var(--radius-card)] bg-board shadow-[0_0_2.5rem_rgba(30,35,45,0.25)] ${
+        className={`relative flex max-h-full w-full flex-col overflow-hidden rounded-[var(--radius-dialog)] bg-board shadow-dialog ${
           wide ? "max-w-[96rem] lg:h-[52rem]" : "max-w-[60rem]"
         }`}
       >
-        <div className="flex shrink-0 items-center gap-4 border-b border-frame px-7 py-4">
+        <div className="flex shrink-0 items-center gap-4 px-[1.65rem] pt-6 pb-2">
           {icon}
-          <h2 className="min-w-0 flex-1 truncate text-3xl font-extrabold text-ink">{title}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{title}</h2>
           {aside}
           <Link
             href={closeHref}
             scroll={false}
             aria-label="Close"
-            className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink hover:bg-panel"
+            className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
           >
-            <X size="1.75rem" weight="bold" aria-hidden />
+            <X size="1.5rem" weight="bold" aria-hidden />
           </Link>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-7 py-5">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-[1.65rem] pt-3 pb-[1.4rem]">{children}</div>
       </section>
     </div>
   );

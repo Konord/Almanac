@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, PencilSimple } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, GearSix } from "@phosphor-icons/react/dist/ssr";
 import { Pager } from "@/components/pager";
-import { AppFrame, EmptyState, firstParam, LoadingOutline, ScreenHeader, Segmented } from "@/components/ui";
+import { AppFrame, EmptyState, firstParam, LoadingOutline, ScreenHeader, Segmented, secondaryActionClass } from "@/components/ui";
 import { strong } from "@/lib/colours";
 import { monthDates, shiftMonth } from "@/lib/habits";
 import { requireHousehold } from "@/lib/household";
@@ -11,7 +11,8 @@ import { loadHabitRows } from "./data";
 import { LinesView, RINGS_PER_PAGE, RingsView, YearPopup } from "./views";
 
 /**
- * The Habits page (2026-11-12): habits from routines and the Habit
+ * The Habits page (2026-11-12; Glance look 2026-11-15, g-final-habits):
+ * habits from routines and the Habit
  * Manager, drawn as Lines (the whole family) or Rings (one person), as
  * picked in Settings. Tapping a habit's name opens its last 12 months.
  *
@@ -31,7 +32,7 @@ export default function HabitsPage(props: PageProps<"/habits">) {
   );
 }
 
-/** Habit rows on a page of Lines; they fit 1280×720 and 1920×1080 alike. */
+/** Habit rows on a page of Lines (each at least 3.5rem, so 8 fit at any 16:9 size). */
 const LINES_PER_PAGE = 8;
 
 async function Habits({ searchParams }: { searchParams: PageProps<"/habits">["searchParams"] }) {
@@ -58,7 +59,9 @@ async function Habits({ searchParams }: { searchParams: PageProps<"/habits">["se
     return s ? `/habits?${s}` : "/habits";
   };
   const popupHref = (key: string) => href({ habit: key });
-  const monthTitle = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
+  // "November" for this year's months, "November 2025" for older ones.
+  const sameYear = month.slice(0, 4) === thisMonth.slice(0, 4);
+  const monthTitle = new Intl.DateTimeFormat(locale, { month: "long", year: sameYear ? undefined : "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
   const monthLabel = (m: string) => new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC" }).format(new Date(`${m}-15T12:00:00Z`));
   const page = Math.max(0, Number(state.page) || 0);
 
@@ -95,33 +98,44 @@ async function Habits({ searchParams }: { searchParams: PageProps<"/habits">["se
     }
   }
 
-  const arrow = "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink";
+  const arrow = "flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink";
   return (
     <>
-      <ScreenHeader title="Habits">
-        <Segmented
-          label="Habits or health"
-          options={[
-            { href: "/habits", label: "Habits", active: true },
-            { href: "/habits/health", label: "Health", active: false },
-          ]}
-        />
-        <div className="flex items-center gap-2">
-          <Link href={href({ month: shiftMonth(month, -1), page: null })} aria-label={monthLabel(shiftMonth(month, -1))} className={arrow}>
-            <CaretLeft size="1.5rem" weight="bold" aria-hidden />
-          </Link>
-          <span className="min-w-56 text-center text-2xl font-extrabold text-ink">{monthTitle}</span>
-          {month < thisMonth ? (
-            <Link href={href({ month: shiftMonth(month, 1), page: null })} aria-label={monthLabel(shiftMonth(month, 1))} className={arrow}>
-              <CaretRight size="1.5rem" weight="bold" aria-hidden />
+      <ScreenHeader
+        title="Habits"
+        sub={monthTitle}
+        nav={
+          <>
+            <Link href={href({ month: shiftMonth(month, -1), page: null })} aria-label={monthLabel(shiftMonth(month, -1))} className={arrow}>
+              <CaretLeft size="1.5rem" weight="bold" aria-hidden />
             </Link>
-          ) : (
-            <span className={`${arrow} opacity-30`} aria-hidden>
-              <CaretRight size="1.5rem" weight="bold" />
-            </span>
-          )}
-        </div>
-        <span className="flex-1" />
+            {month < thisMonth ? (
+              <Link href={href({ month: shiftMonth(month, 1), page: null })} aria-label={monthLabel(shiftMonth(month, 1))} className={arrow}>
+                <CaretRight size="1.5rem" weight="bold" aria-hidden />
+              </Link>
+            ) : (
+              <span className={`${arrow} opacity-30`} aria-hidden>
+                <CaretRight size="1.5rem" weight="bold" />
+              </span>
+            )}
+          </>
+        }
+        tabs={
+          <Segmented
+            label="Habits or health"
+            options={[
+              { href: "/habits", label: "Habits", active: true },
+              { href: "/habits/health", label: "Health", active: false },
+            ]}
+          />
+        }
+        action={
+          <Link href="/habits/manage" aria-label="Habit Manager" className={secondaryActionClass}>
+            <GearSix size="1.5rem" weight="bold" aria-hidden />
+            Manage
+          </Link>
+        }
+      >
         {rings ? (
           <>
             <Pager page={ringPage} pages={ringPages} href={(p) => href({ page: p ? String(p) : null })} />
@@ -132,7 +146,7 @@ async function Habits({ searchParams }: { searchParams: PageProps<"/habits">["se
                   href={href({ member: m.id, page: null, chart: null })}
                   aria-current={m.id === member?.id ? "page" : undefined}
                   className="flex min-h-[var(--touch-target)] items-center rounded-full px-5 text-lg font-bold"
-                  style={m.id === member?.id ? { background: strong(m.colour), color: "white" } : { background: "var(--color-rail)", color: "var(--color-ink)" }}
+                  style={m.id === member?.id ? { background: strong(m.colour), color: "white" } : { background: "var(--color-panel)", color: "var(--color-ink)" }}
                 >
                   {m.name}
                 </Link>
@@ -142,9 +156,6 @@ async function Habits({ searchParams }: { searchParams: PageProps<"/habits">["se
         ) : (
           <Pager page={linePage} pages={linePages} href={(p) => href({ page: p ? String(p) : null })} />
         )}
-        <Link href="/habits/manage" aria-label="Habit Manager" title="Habit Manager" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-2xl bg-rail text-ink">
-          <PencilSimple size="1.625rem" weight="bold" aria-hidden />
-        </Link>
       </ScreenHeader>
 
       {rows.length === 0 ? (

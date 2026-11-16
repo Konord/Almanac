@@ -1,6 +1,7 @@
 import { appsProblem, type AppDraft } from "../../lib/launcher.ts";
 import { BOX_ID } from "../../lib/panel-boxes.ts";
 import { screenSaverProblem, type ScreenSaverSettings } from "../../lib/screen-saver.ts";
+import type { SoundSettings } from "../../lib/sounds.ts";
 
 /*
  * The Settings screen keeps every change here until its one Save (Connor,
@@ -43,7 +44,13 @@ export type SettingsDraft = {
   apps: AppDraft[];
   /** The art screen saver (Screen saver tab). */
   screenSaver: ScreenSaverSettings;
+  /** Christmas, Halloween and other holidays change the Today title and some colours. */
+  holidayThemes: boolean;
+  /** Mute, quiet hours and where sounds play (src/lib/sounds.ts). */
+  sounds: SoundSettings;
 };
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const isNewId = (id: string) => id.startsWith("new-");
 
@@ -54,6 +61,7 @@ export function draftProblem(d: SettingsDraft): string | null {
   if (!(Number.isInteger(d.reviewWeekday) && d.reviewWeekday >= 0 && d.reviewWeekday <= 6) || !/^\d{2}:\d{2}$/.test(d.reviewTime)) {
     return "Pick a day and a time for the Planner.";
   }
+  if (!HHMM.test(d.sounds.quietFrom) || !HHMM.test(d.sounds.quietTo)) return "Pick a start and an end for the quiet hours.";
   if (!d.panelBoxes.every((v) => BOX_ID.test(v))) return "Something went wrong with the Today panel boxes.";
   for (const m of d.members) {
     if (m.removed) continue;

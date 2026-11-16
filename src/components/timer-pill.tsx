@@ -22,7 +22,7 @@ export function TimerPill() {
         return (
           <div
             key={t.id}
-            className={`flex min-h-[var(--touch-target)] items-center gap-3 rounded-full pr-1.5 pl-5 text-lg font-bold shadow-[0_0.25rem_1rem_rgba(30,35,45,0.2)] ${
+            className={`flex min-h-[var(--touch-target)] items-center gap-3 min-h-[3.5rem] rounded-full pr-1 pl-5 text-[1.25rem] font-bold shadow-raised ${
               done ? "animate-pulse bg-now text-white" : "bg-meal text-meal-ink"
             }`}
           >
@@ -37,7 +37,7 @@ export function TimerPill() {
                 <span className="tabular-nums">{done ? "Done!" : timeLeft(t, now)}</span>
               </>
             )}
-            <button type="button" aria-label="Stop timer" onClick={() => stopTimer(t.id)} className="flex size-11 items-center justify-center rounded-full bg-board/50">
+            <button type="button" aria-label="Stop timer" onClick={() => stopTimer(t.id)} className="flex size-12 items-center justify-center rounded-full bg-board/60">
               <X size="1.25rem" weight="bold" aria-hidden />
             </button>
           </div>

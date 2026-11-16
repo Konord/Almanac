@@ -1,14 +1,16 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
+import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { emojiImage } from "@/lib/emoji";
-import { soft, strong } from "@/lib/colours";
+import { hand, soft, strong } from "@/lib/colours";
+import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
 import { TimerPill } from "./timer-pill";
 import { MenuTray, type Section } from "./menu-tray";
 
 /**
- * Small building blocks shared by every screen, in the locked "bright"
- * style. They only use theme colours (bg-board, text-ink, accent …), and
+ * Small building blocks shared by every screen, in the Glance A style
+ * (docs/glance/SPEC.md): a light grey rail behind white rounded panels. They only use theme colours (bg-board, text-ink, accent …), and
  * every tappable thing is at least the theme's touch-target size so it
  * works on the wall screen.
  *
@@ -30,8 +32,9 @@ export type { Section };
  */
 export function AppFrame({ section, children }: { section: Section; children: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-1 flex-col lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
-      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 pb-12 sm:p-6 sm:pb-12 lg:min-h-0 lg:px-8.5 lg:pt-5.5 lg:pb-9">
+    <div className="flex min-h-dvh flex-1 flex-col bg-rail lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
+      {/* 3.15rem at the bottom is the tray handle's strip (no dock, no side rail). */}
+      <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-4 pb-12 sm:p-6 sm:pb-12 lg:min-h-0 lg:gap-5 lg:px-8 lg:pt-6 lg:pb-[3.15rem]">
         {children}
       </main>
       <MenuTray section={section} />
@@ -40,33 +43,238 @@ export function AppFrame({ section, children }: { section: Section; children: Re
   );
 }
 
-/** The 72px header row: big title, then whatever the screen adds (clock, switch). */
-export function ScreenHeader({ title, children }: { title: ReactNode; children?: ReactNode }) {
-  return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-5.5 gap-y-2 lg:h-18 lg:flex-nowrap">
-      <h1 className="text-3xl font-extrabold tracking-[-0.03rem] text-ink lg:text-5xl">{title}</h1>
-      {children}
+/**
+ * The Glance header, the same 7rem band on every screen (SPEC "Global
+ * header rule"). From left to right:
+ *
+ *   - a big printed title (6.75rem, weight 800), with optional secondary
+ *     text (the date, the year) sitting on the title's baseline, and on a
+ *     holiday a big picture before it;
+ *   - `children`: any other live controls the screen still needs, if they
+ *     fit beside the title (they move into the screen bodies as each
+ *     screen is redesigned);
+ *   - the weather (calendar pages only; empty until there is a weather source);
+ *   - `nav`: prev / next arrows, just left of the tab slot;
+ *   - the tab slot, a fixed width so the right-hand end never shifts:
+ *     Today | Week | Month on the calendar pages, the page's own sub-tabs
+ *     elsewhere, or empty;
+ *   - `action`: the black Add (or Save, or "New list") at the far right.
+ *
+ * Nothing goes under the title (no chips). A screen with more live
+ * controls than fit (Today, Week, Month for now) passes them as `toolbar`:
+ * a slim row just below the header band, so the band itself is the same
+ * 7rem everywhere.
+ */
+export function ScreenHeader({
+  title,
+  sub,
+  hero,
+  nav,
+  tabs,
+  weather = false,
+  action,
+  toolbar,
+  children,
+}: {
+  title: ReactNode;
+  sub?: ReactNode;
+  /** A holiday's big picture, before the title. */
+  hero?: string | null;
+  nav?: ReactNode;
+  tabs?: ReactNode;
+  /** Calendar pages keep a place for the weather. */
+  weather?: boolean;
+  action?: ReactNode;
+  toolbar?: ReactNode;
+  children?: ReactNode;
+}) {
+  const band = (
+    <header className="flex shrink-0 flex-wrap items-center gap-x-[1.15rem] gap-y-2 lg:h-28 lg:max-h-28 lg:flex-nowrap">
+      <div className="mr-auto flex min-w-0 items-baseline gap-[0.8rem] overflow-hidden">
+        {hero ? <Emoji emoji={hero} className="size-14 self-center drop-shadow-[0_0.15rem_0.4rem_rgba(0,0,0,0.3)] lg:size-24" /> : null}
+        <h1 className="shrink-0 pb-[0.06em] text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
+        {sub && sub !== title ? <span className="tabular min-w-0 truncate text-2xl leading-none font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">{sub}</span> : null}
+      </div>
+      {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
+      <div className="flex shrink-0 items-center gap-[0.6rem]">
+        {weather ? <WeatherSlot /> : null}
+        {nav ? <div className="flex items-center gap-[0.35rem]">{nav}</div> : null}
+        <div className="flex justify-end lg:min-w-[22.5rem]">{tabs}</div>
+        {action}
+      </div>
     </header>
+  );
+  if (!toolbar) return band;
+  return (
+    <>
+      {band}
+      <div className="-mt-2 flex min-h-[var(--touch-target)] shrink-0 flex-wrap items-center gap-[0.6rem]">{toolbar}</div>
+    </>
   );
 }
 
-/** A segmented switch, like Day / Week / Month. */
+/**
+ * Where the weather (icon + temperature, tap for the forecast) goes on the
+ * calendar pages. There is no weather source yet (it needs Connor's OK for
+ * an outside service). Connor, Nov 15: keep the place but leave it empty
+ * (no icon, no text, no made-up numbers), so nothing moves when it arrives.
+ */
+function WeatherSlot() {
+  return <div data-weather-slot aria-hidden className="hidden w-[5rem] shrink-0 lg:block" />;
+}
+
+/** The track of a segmented switch, and one of its options (for switches made of buttons). */
+export const segTrackClass = "flex gap-1 rounded-[calc(var(--radius)+0.3rem)] bg-panel p-[0.3rem]";
+export function segItemClass(active: boolean): string {
+  return `flex min-h-[var(--touch-target)] min-w-[6.75rem] items-center justify-center gap-2 rounded-[var(--radius)] px-4 text-lg whitespace-nowrap ${
+    active ? "bg-tab-on font-bold text-tab-on-ink shadow-raised" : "font-semibold text-ink-muted"
+  }`;
+}
+
+/** A segmented switch, like Today / Week / Month. */
 export function Segmented({ options, label }: { options: { href: string; label: string; active: boolean }[]; label: string }) {
   return (
-    <nav aria-label={label} className="flex gap-1 rounded-2xl bg-panel p-1.25">
+    <nav aria-label={label} className={segTrackClass}>
       {options.map((o) => (
-        <Link
-          key={o.label}
-          href={o.href}
-          aria-current={o.active ? "page" : undefined}
-          className={`flex min-h-[var(--touch-target)] min-w-24 items-center justify-center rounded-xl px-4 text-base font-bold ${
-            o.active ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"
-          }`}
-        >
+        <Link key={o.label} href={o.href} aria-current={o.active ? "page" : undefined} className={segItemClass(o.active)}>
           {o.label}
         </Link>
       ))}
     </nav>
+  );
+}
+
+/** The look of the main action (Add, Save, New list): ink black, or the holiday colour. */
+export const primaryActionClass =
+  "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-primary px-[1.35rem] text-lg font-bold whitespace-nowrap text-primary-ink";
+
+/** A grey second-rank button ("+ Add a kind", "Type it in"). */
+export const secondaryActionClass =
+  "inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-[0.6rem] rounded-[var(--radius)] bg-panel px-6 text-lg font-bold whitespace-nowrap text-ink disabled:opacity-40";
+
+/** A white card on the rail (a manager's list or editor panel): the mock's `.card`. */
+export const cardClass = "flex min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised lg:min-h-0";
+
+/** A small capital heading inside a card: the mock's `.k`. */
+export const kickerClass = "shrink-0 text-[1.15rem] font-bold tracking-[0.06em] text-ink-muted uppercase";
+
+/** A big tappable choice (a month, a weekday): a round chip, ink-framed when picked. */
+export function choiceChipClass(on: boolean): string {
+  return `flex min-h-[var(--touch-target)] items-center justify-center rounded-full border-2 px-4 text-[1.25rem] font-bold ${
+    on ? "border-ink bg-rail text-ink" : "border-frame bg-board text-ink-soft"
+  }`;
+}
+
+/** A field's small label above it ("When", "Minutes"): the mock's `.fl`. */
+export const fieldLabelClass = "text-[1.15rem] font-bold text-ink-muted";
+
+/** A typed-in field in an editor card (big bold text, grey frame): the mock's `.inp`. */
+export const editorInputClass =
+  "min-h-[var(--touch-target)] w-full min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-[1.5rem] font-bold text-ink outline-none focus:border-ink disabled:opacity-40";
+
+/**
+ * A small switch of choices inside a card ("When", "Who can see it",
+ * On | Off): grey track, the picked one raised in white. For a page's
+ * own tabs use the header's segmented switch instead.
+ */
+export function Toggle<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  /** Nothing is raised when it's null (e.g. "some steps" of a routine). */
+  value: T | null;
+  options: { value: T; label: ReactNode }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex gap-[0.2rem] rounded-[var(--radius)] bg-panel p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={`flex min-h-[calc(var(--touch-target)-0.2rem)] min-w-0 flex-1 items-center justify-center rounded-[calc(var(--radius)-0.15rem)] px-3 text-center text-[1.25rem] leading-[1.15] font-bold disabled:opacity-60 ${
+            value === o.value ? "bg-board text-ink shadow-raised" : "text-ink-muted"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A person's colour as a round dot (instead of an avatar). */
+export function ColourDot({ colour, className = "size-[1.15rem]" }: { colour: string | null | undefined; className?: string }) {
+  return <span aria-hidden className={`inline-block shrink-0 rounded-full ${className}`} style={{ background: strong(colour) }} />;
+}
+
+/**
+ * An on/off setting as a whole-row switch: the words on the left, the
+ * switch at the right (blue when on, grey when off). The mock's `.tog`.
+ */
+export function Switch({ on, onChange, children }: { on: boolean; onChange: (on: boolean) => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className="flex min-h-[var(--touch-target)] w-full items-center justify-between gap-[0.7rem] text-left text-[1.25rem] leading-tight font-bold text-ink"
+    >
+      <span className="min-w-0">{children}</span>
+      <span aria-hidden className="relative h-8 w-[3.4rem] shrink-0 rounded-full" style={{ background: on ? strong("blue") : "var(--color-check-border)" }}>
+        <span className={`absolute top-[0.22rem] size-[1.55rem] rounded-full bg-board shadow-raised transition-[left] ${on ? "left-[1.6rem]" : "left-[0.22rem]"}`} />
+      </span>
+    </button>
+  );
+}
+
+/** The look of a person chip (dot + name): pastel with their ink when on, plain when off. The mock's `.who-chip`. */
+export function whoChipStyle(colour: string | null | undefined, on: boolean): { className: string; style: CSSProperties | undefined } {
+  return {
+    className: `inline-flex min-h-[var(--touch-target)] min-w-0 items-center gap-[0.4rem] rounded-full border-2 px-[1.1rem] text-[1.25rem] font-bold ${on ? "" : "border-frame bg-board text-ink"}`,
+    style: on ? { borderColor: strong(colour), background: soft(colour), color: hand(colour) } : undefined,
+  };
+}
+
+/** The header's main action as a link, e.g. "+ Add" or "+ New list". */
+export function ActionLink({
+  href,
+  children,
+  label,
+  icon: IconComponent = Plus,
+  scroll,
+}: {
+  href: string;
+  children: ReactNode;
+  /** For screen readers when the words alone aren't enough. */
+  label?: string;
+  icon?: Icon | null;
+  scroll?: boolean;
+}) {
+  return (
+    <Link href={href} aria-label={label} title={label} scroll={scroll} className={primaryActionClass}>
+      {IconComponent ? <IconComponent size="1.25rem" weight="bold" aria-hidden /> : null}
+      {children}
+    </Link>
+  );
+}
+
+/** Text someone in the family wrote: handwriting in their ink (dark ink if it isn't anyone's). */
+export function HandText({ colour, className = "", children }: { colour?: string | null; className?: string; children: ReactNode }) {
+  return (
+    <span className={`font-hand ${className}`} style={{ color: hand(colour) }}>
+      {children}
+    </span>
   );
 }
 
@@ -77,9 +285,9 @@ export function IconLink({ href, label, icon: IconComponent }: { href: string; l
       href={href}
       aria-label={label}
       title={label}
-      className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink hover:bg-panel"
+      className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink"
     >
-      <IconComponent size="1.75rem" weight="bold" aria-hidden />
+      <IconComponent size="1.5rem" weight="bold" aria-hidden />
     </Link>
   );
 }
@@ -89,7 +297,7 @@ export function SoftLink({ href, children, className = "" }: { href: string; chi
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-2xl bg-rail px-5 text-base font-bold text-ink hover:bg-panel ${className}`}
+      className={`inline-flex min-h-[var(--touch-target)] shrink-0 items-center justify-center gap-2 rounded-[var(--radius)] bg-panel px-5 text-lg font-bold text-ink ${className}`}
     >
       {children}
     </Link>
@@ -100,7 +308,7 @@ export function SoftLink({ href, children, className = "" }: { href: string; chi
 // Cards, people and pictures
 // ---------------------------------------------------------------------------
 
-/** A white card with a hairline edge and a title row with a tinted icon chip. */
+/** A white rounded panel lifted off the rail, with a title row and a tinted icon chip. */
 export function Card({
   title,
   icon: IconComponent,
@@ -119,7 +327,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`flex min-w-0 flex-col rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4.5 lg:min-h-0 ${className}`}>
+    <section className={`flex min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised lg:min-h-0 ${className}`}>
       {title === undefined && !IconComponent && !aside ? null : (
       <div className="mb-1 flex items-center gap-3">
         {IconComponent ? (
@@ -136,45 +344,6 @@ export function Card({
       )}
       {children}
     </section>
-  );
-}
-
-/** A person's round avatar: their initial on their strong colour. */
-/**
- * A person's sticker: the first letter of their name in their colour, or
- * their own picture (an emoji) on their pastel colour if they chose one.
- */
-export function Avatar({
-  name,
-  colour,
-  icon,
-  size = "md",
-}: {
-  name: string;
-  colour: string | null | undefined;
-  icon?: string | null;
-  size?: "sm" | "md" | "lg";
-}) {
-  const box = size === "sm" ? "size-7 text-[0.8125rem]" : size === "lg" ? "size-12 text-xl" : "size-11 text-sm";
-  if (icon) {
-    return (
-      <span
-        className={`flex shrink-0 items-center justify-center rounded-full border-2 ${box}`}
-        style={{ background: soft(colour), borderColor: strong(colour) }}
-        aria-hidden
-      >
-        <Emoji emoji={icon} className="size-[72%]" />
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold text-white ${box}`}
-      style={{ background: strong(colour) }}
-      aria-hidden
-    >
-      {[...name.trim()][0]?.toUpperCase() ?? "?"}
-    </span>
   );
 }
 
@@ -208,47 +377,40 @@ export function EmptyState({ emoji, title, hint }: { emoji: string; title?: Reac
   );
 }
 
-/** A thin bar in a person's colour, e.g. 3 of 5 steps done. */
-export function ProgressBar({ done, total, colour, thick = false }: { done: number; total: number; colour?: string | null; thick?: boolean }) {
-  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-  return (
-    <div
-      className={`overflow-hidden rounded-full bg-grid ${thick ? "h-2.5" : "h-2"}`}
-      role="progressbar"
-      aria-valuenow={done}
-      aria-valuemin={0}
-      aria-valuemax={total}
-    >
-      <div className="h-full rounded-full" style={{ width: `${percent}%`, background: colour ? strong(colour) : "var(--color-success)" }} />
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Forms and messages
 // ---------------------------------------------------------------------------
 
-/** A simple page for sign-in and first-time setup (no rail). */
-export function PageShell({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A simple page for sign-in and first-time setup (no menu): one centred
+ * Glance card on the grey rail, the big printed title above it.
+ */
+export function PageShell({ title, sub, children }: { title: string; sub?: ReactNode; children: ReactNode }) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-6 sm:p-10">
-      <h1 className="text-5xl font-extrabold tracking-tight text-ink">{title}</h1>
-      {children}
+    <main className="flex min-h-dvh flex-1 flex-col items-center justify-center bg-rail p-6 sm:p-10 lg:h-dvh lg:overflow-hidden">
+      <div className="flex w-full max-w-[46rem] flex-col gap-6">
+        <div className="flex items-baseline gap-[0.8rem]">
+          <h1 className="text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
+          {sub ? <span className="text-2xl leading-none font-bold tracking-[-0.02em] text-title-soft lg:text-[2rem]">{sub}</span> : null}
+        </div>
+        {children}
+      </div>
     </main>
   );
 }
 
+/** A white Glance card with an optional title (the sign-in and setup cards). */
 export function Panel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="rounded-[var(--radius-card)] border border-frame bg-board px-5.5 py-4.5">
-      {title ? <h2 className="mb-4 text-2xl font-bold text-ink">{title}</h2> : null}
+    <section className="flex flex-col gap-4 rounded-[var(--radius-card)] bg-board px-[1.65rem] pt-6 pb-[1.6rem] shadow-raised">
+      {title ? <h2 className="text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{title}</h2> : null}
       {children}
     </section>
   );
 }
 
 const buttonBase =
-  "inline-flex min-h-[var(--touch-target)] items-center justify-center gap-2 rounded-[var(--radius)] px-5 text-lg font-bold transition-opacity hover:opacity-90 disabled:opacity-50";
+  "inline-flex min-h-[var(--touch-target)] items-center justify-center gap-[0.6rem] rounded-[var(--radius)] px-[1.35rem] text-[1.25rem] font-bold whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50";
 
 export function Button({
   variant = "primary",
@@ -256,27 +418,29 @@ export function Button({
   ...props
 }: ComponentProps<"button"> & { variant?: "primary" | "secondary" | "danger" | "save" }) {
   const look = {
-    primary: "bg-ink text-board",
+    primary: "bg-primary text-primary-ink",
     // The blue of the screen-wide Save (unsaved-changes.tsx), so every Save looks the same.
     save: "bg-accent text-white",
-    secondary: "bg-rail text-ink hover:bg-panel",
+    secondary: "bg-panel text-ink",
     danger: "border-2 border-danger bg-board text-danger",
   }[variant];
   return <button className={`${buttonBase} ${look} ${className}`} {...props} />;
 }
 
+/** A labelled field: the mock's small grey `.fl` label above the box, and an optional line of help under it. */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-base font-bold text-ink">{label}</span>
+    <label className="flex min-w-0 flex-col gap-[0.35rem]">
+      <span className={fieldLabelClass}>{label}</span>
       {children}
-      {hint ? <span className="text-sm text-ink-muted">{hint}</span> : null}
+      {hint ? <span className="text-[1.15rem] font-semibold text-ink-muted">{hint}</span> : null}
     </label>
   );
 }
 
+/** The mock's `.inp` (a step smaller, since these sit in forms with many fields). */
 const inputClass =
-  "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-lg text-ink outline-none focus:border-accent";
+  "min-h-[var(--touch-target)] min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-[1.35rem] font-bold text-ink outline-none placeholder:font-semibold placeholder:text-ink-muted focus:border-ink";
 
 export function Input({ className = "", ...props }: ComponentProps<"input">) {
   return <input className={`${inputClass} ${className}`} {...props} />;
@@ -289,7 +453,7 @@ export function Select({ className = "", ...props }: ComponentProps<"select">) {
 export function Notice({ tone, children }: { tone: "error" | "success"; children: ReactNode }) {
   const look = tone === "error" ? "bg-[color-mix(in_srgb,var(--color-danger)_10%,white)] text-danger" : "bg-[color-mix(in_srgb,var(--color-success)_10%,white)] text-success";
   return (
-    <p role={tone === "error" ? "alert" : "status"} className={`shrink-0 rounded-2xl px-5 py-3 text-lg font-bold ${look}`}>
+    <p role={tone === "error" ? "alert" : "status"} className={`shrink-0 rounded-[var(--radius)] px-5 py-3 text-[1.25rem] font-bold ${look}`}>
       {children}
     </p>
   );
@@ -326,12 +490,12 @@ export function Chips({
   const chosen = new Set(Array.isArray(defaultValue) ? defaultValue : defaultValue === undefined ? [] : [defaultValue]);
   return (
     <fieldset className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      <legend className="mb-1.5 text-base font-bold text-ink">{label}</legend>
+      <legend className={`mb-[0.35rem] ${fieldLabelClass}`}>{label}</legend>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <label
             key={o.value}
-            className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-focus-visible:outline-2 has-focus-visible:outline-accent"
+            className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-[1.25rem] font-semibold text-ink-soft select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-accent"
           >
             <input
               type={multiple ? "checkbox" : "radio"}
@@ -357,15 +521,24 @@ export function Chips({
 export function LoadingOutline() {
   return (
     <div className="flex min-h-0 flex-1 animate-pulse flex-col gap-5" role="status" aria-label="Loading">
-      <div className="flex h-18 shrink-0 items-center gap-5">
+      <div className="flex h-28 shrink-0 items-center gap-5">
         <span className="h-12 w-72 rounded-2xl bg-rail" />
         <span className="h-12 w-56 rounded-2xl bg-rail" />
         <span className="ml-auto h-12 w-44 rounded-2xl bg-rail" />
       </div>
       <div className="grid min-h-[20rem] flex-1 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
-        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
-        <span className="rounded-[var(--radius-card)] border border-frame bg-rail/60" />
+        <span className="rounded-[var(--radius-card)] bg-board/70" />
+        <span className="rounded-[var(--radius-card)] bg-board/70" />
       </div>
     </div>
   );
+}
+
+/**
+ * An empty marker a screen draws when it's ready for holiday colours
+ * (Christmas, Halloween): its content sits on white panels, so a dark rail
+ * is fine. See src/lib/holiday-theme.ts.
+ */
+export function HolidayColoursHere() {
+  return <span hidden {...{ [HOLIDAY_READY_ATTR]: "" }} />;
 }

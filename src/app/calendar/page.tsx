@@ -1,48 +1,38 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, Copy, Plus, Trash, X } from "@phosphor-icons/react/dist/ssr";
-import { AppFrame, Button, Emoji, Field, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
-import { HeaderClock } from "@/components/header-clock";
+import { CaretLeft, CaretRight, Copy, ListChecks, Plus, Trash, X } from "@phosphor-icons/react/dist/ssr";
+import { ActionLink, AppFrame, Button, Emoji, Field, HolidayColoursHere, IconLink, Input, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { HeaderMenu, headerMenuItemClass } from "@/components/header-menu";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { Sheet } from "@/components/sheet";
-import { addMonths, dayOfWeek, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
+import { addMonths, dayOfWeek, daysWithPanel, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
 import { requireHousehold, type Household } from "@/lib/household";
-import { createClient } from "@/lib/supabase/server";
-import { describeRule, parseRule } from "@/lib/recurrence";
-import { addDays, isLocalDate, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
-import {
-  moveOccurrence,
-  removeEvent,
-  saveEventAsTemplate,
-  removeTemplate,
-  resetOccurrence,
-  skipOccurrence,
-  updateEvent,
-  updateTemplate,
-} from "./actions";
-import { DayKindChips, EventCardFields } from "./forms";
+import { addDays, isLocalDate, localDateOf, zonedToUtc, type LocalDate } from "@/lib/time";
+import { removeTemplate, updateTemplate } from "./actions";
+import { DayKindChips, LocationField } from "./forms";
+import { CloseLink, EditEventSheet, readEditing } from "./edit-event";
 import { LengthInput } from "./when-fields";
 import { Stickers } from "./stickers";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { PeopleButton, PeopleChooser } from "./people-filter";
 import { PlacingBar, QuickAddSheet, readAdding } from "./adding";
-import { devicePeople, EVENT_COLUMNS, itemsForPeople, toEvent, loadCalendar, rangeOf } from "./data";
+import { devicePeople, itemsForPeople, loadCalendar, rangeOf } from "./data";
 import type { CalendarEvent, CalendarItem, DayKind, EventTemplate, Member } from "./types";
 import { eventEmoji } from "@/lib/emoji";
 import { lengthLabel } from "@/lib/quick-times";
 import { loadBreaks, loadRoutines } from "../routines/data";
 import { loadSpecialDays } from "../holidays/data";
-import { PeopleRow } from "../routines/people-row";
 import { RoutineChecklist } from "../routines/routine-checklist";
 import { loadTodos } from "../chores/data";
 import { onCalendar } from "@/lib/todos";
-import { MonthView, WeekView, eventColour, eventsOnDay, isAllDayStyle, minutesIntoDay, shortTime, type WeekMeal } from "./views";
+import { MonthView, eventsOnDay, isAllDayStyle, minutesIntoDay } from "./views";
+import { WeekView, type WeekMeal } from "./week";
 import { loadMealBasics, loadMeals } from "../meals/data";
 import { cookHref, placeTodayMeals } from "../meals/today";
-import { OpenPanelTab, TodayPanel, type UpNextItem } from "../today-panel/panel";
+import { TodayPanel } from "../today-panel/panel";
+import { setPanelOpen } from "../today-panel/actions";
 import { readPanelPrefs } from "../today-panel/prefs";
-import { HeadsUpEditor, loadHeadsUps, type HeadsUp } from "../heads-ups/editor";
 import { syncEventAndChoreHeadsUps } from "../heads-ups/sync";
 import { choreSchedule } from "../chores/plan";
 
@@ -61,18 +51,14 @@ export default function CalendarPage(props: PageProps<"/calendar">) {
 
 async function CalendarContent({ searchParams }: { searchParams: PageProps<"/calendar">["searchParams"] }) {
   const household = await requireHousehold();
-  const { timeZone, weekStartsOn, locale } = household.settings;
+  const { timeZone, weekStartsOn } = household.settings;
   const params = await searchParams;
-  const supabase = await createClient();
 
   const today = localDateOf(new Date(), timeZone);
   const view: View = firstParam(params.view) === "month" ? "month" : "week";
   const rolling = household.settings.monthStyle === "rolling";
   const dateParam = firstParam(params.date);
   const anchor = dateParam && isLocalDate(dateParam) ? dateParam : today;
-  const editId = firstParam(params.edit);
-  const occParam = firstParam(params.occ);
-  const editOccurrence = occParam && isLocalDate(occParam) ? occParam : undefined;
   const panelParam = firstParam(params.panel);
   const panel = panelParam === "people" || panelParam === "templates" || panelParam === "template" ? panelParam : null;
 
@@ -88,7 +74,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // Month never gets them).
   await syncEventAndChoreHeadsUps(household);
   await choreSchedule(household, today, timeZone);
-  const [{ members, templates, dayKinds, items, exceptions }, routineData, breaks, specials] = await Promise.all([
+  const [{ members, templates, dayKinds, items }, routineData, breaks, specials] = await Promise.all([
     loadCalendar(rangeStart, rangeEnd),
     loadRoutines(today),
     loadBreaks(days[0], days[days.length - 1]),
@@ -103,16 +89,8 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const { placing, pending, templateHref } = readAdding(params, household.settings, members, templates, "/calendar");
   const memberById = new Map(members.map((m) => [m.id, m]));
 
-  // The event being edited might be outside the visible range, so fetch it on its own.
-  let editing: CalendarEvent | null = null;
-  if (editId) {
-    const { data } = await supabase
-      .from("events")
-      .select(EVENT_COLUMNS)
-      .eq("id", editId)
-      .maybeSingle();
-    editing = data ? toEvent(data) : null;
-  }
+  // The event being edited (it may be outside the visible range; the sheet loads it itself).
+  const editing = readEditing(params);
 
   // While adding, moving between weeks or views keeps you in adding mode.
   const current: Record<string, string | null> = { view, date: anchor, placing: placing ? "1" : null };
@@ -127,9 +105,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   /** Where tapping a day or time while adding goes (start and length get added for a time). */
   const addHref = (day: LocalDate, extra: Record<string, string> = {}) => href({ add: day, edit: null, panel: null, placing: null, ...extra });
 
-  // Open the edit card on the side away from the event, so it stays in view.
-  const editDay = editOccurrence ?? (editing ? localDateOf(new Date(editing.starts_at), timeZone) : today);
-  const editSide = (dayOfWeek(editDay) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
+  // Open the edit sheet on the side away from the event, so it stays in view.
+  const editSide = (event: CalendarEvent): "left" | "right" =>
+    (dayOfWeek(editing?.occ ?? localDateOf(new Date(event.starts_at), timeZone)) - weekStartsOn + 7) % 7 >= 4 ? "left" : "right";
   // Week moves a week at a time. Month moves a month: the calendar month keeps
   // the day, and the rolling 5 weeks jumps to the 1st so it sits in the top row.
   const byMonth = view === "month";
@@ -144,161 +122,19 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   const openRoutine = firstParam(params.routine) ?? "";
   const openMember = firstParam(params.member) ?? "";
   const routineOpen = Boolean(openRoutine && openMember) && !placing;
-  const now = new Date();
-  // Up next is always about today, even when the calendar shows another month.
-  let todayEvents = events;
-  if (!days.includes(today)) {
-    const todayRange = rangeOf([today], timeZone);
-    todayEvents = panelPrefs.open ? itemsForPeople((await loadCalendar(todayRange.rangeStart, todayRange.rangeEnd)).items, people) : [];
-  }
-  const upNext: UpNextItem[] = eventsOnDay(todayEvents, today, timeZone)
-    .filter((e) => !isAllDayStyle(e, timeZone) && new Date(e.ends_at) > now)
-    .sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1))
-    .map((e) => ({
-      id: `${e.id}|${e.occurrence_date ?? ""}`,
-      title: e.title,
-      emoji: eventEmoji(e.icon, e.title),
-      time: new Date(e.starts_at) <= now ? "Now" : shortTime(new Date(e.starts_at), household),
-      colour: eventColour(e, memberById),
-    }));
-
-  return (
+  const sheets = (
     <>
-      <RememberDisplay display={view} />
-      <WallRefresh timeZone={timeZone} />
-      <div className="flex flex-col gap-7 lg:min-h-0 lg:flex-1 lg:flex-row">
-      {panelPrefs.open || routineOpen ? (
-        <TodayPanel
-          household={household}
-          today={today}
-          upNext={upNext}
-          tab={panelPrefs.tab}
-          returnTo={panelReturn}
-          routine={
-            // A routine tapped in the Routines box takes over the panel until it's closed.
-            routineOpen ? (
-              <RoutineChecklist
-                data={routineData}
-                memberId={openMember}
-                templateId={openRoutine}
-                date={today}
-                today={today}
-                page={Number(firstParam(params.rpage) ?? 0) || 0}
-                closeHref={panelReturn}
-                hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
-              />
-            ) : undefined
-          }
-        />
-      ) : (
-        <OpenPanelTab returnTo={panelReturn} />
-      )}
-      <div className={`flex min-w-0 flex-1 flex-col gap-3.5 lg:min-h-0 ${panelPrefs.open ? "" : "lg:pl-5"}`}>
-      <ScreenHeader title={rangeTitle(view, days, anchor, household)}>
-        {panelPrefs.open ? null : <HeaderClock locale={locale} timeZone={timeZone} />}
-        <div className="flex items-center gap-2">
-          <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={byMonth ? "Previous month" : "Previous week"} icon={CaretLeft} />
-          <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>Today</SoftLink>
-          <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={byMonth ? "Next month" : "Next week"} icon={CaretRight} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
-          <SoftLink href="/holidays" className="px-3.5">
-            <Emoji emoji="🎉" className="size-7" />
-            Holidays
-          </SoftLink>
-          <SoftLink href={href({ panel: "templates", edit: null, add: null })} className="px-3.5">
-            <Copy size="1.5rem" aria-hidden />
-            Templates
-          </SoftLink>
-          <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
-          <Segmented
-            label="View"
-            options={[
-              { href: "/", label: "Agenda", active: false },
-              { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
-              { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
-            ]}
-          />
-        </div>
-      </ScreenHeader>
-
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {message ? <Notice tone="success">{message}</Notice> : null}
-      {placing ? (
-        <PlacingBar
-          hint="Adding an event"
-          cancelHref={closeHref}
-        />
-      ) : null}
-
-      {view === "week" ? <PeopleRow data={routineData} date={today} /> : null}
-
-      {view === "week" ? (
-        <WeekView
-          household={household}
-          days={days}
-          today={today}
-          events={events}
-          memberById={memberById}
-          href={href}
-          meals={weekMeals}
-          tasks={weekTasks}
-          adding={{ placing, pending, addHref }}
-          breaks={breaks}
-          specials={specials}
-        />
-      ) : (
-        <MonthView
-          household={household}
-          days={days}
-          today={today}
-          events={events}
-          memberById={memberById}
-          href={href}
-          anchor={anchor}
-          mode={rolling ? "weeks" : "month"}
-          adding={{ placing, pending, addHref }}
-          breaks={breaks}
-          specials={specials}
-        />
-      )}
-      </div>
-      </div>
-
-      {/* Add button, bottom right: starts adding mode, or cancels it. */}
-      <Link
-        href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
-        scroll={false}
-        aria-label={placing ? "Stop adding" : "Add an event"}
-        title={placing ? "Stop adding" : "Add an event"}
-        className={`fixed right-10 bottom-8.5 z-30 flex size-23 items-center justify-center rounded-full text-white shadow-[0_0.5rem_1.375rem_rgba(30,35,45,0.28)] ${
-          placing ? "bg-accent" : "bg-ink"
-        }`}
-      >
-        {placing ? <X size="2.625rem" weight="bold" aria-hidden /> : <Plus size="2.625rem" weight="bold" aria-hidden />}
-      </Link>
-
       {editing ? (
-        <Sheet title={editing.title} closeHref={closeHref} narrow side={editSide}>
-          <EditEventPanel
-            everyDateHref={href({ edit: editing.id, occ: editOccurrence ?? null, scope: "all", add: null, panel: null })}
-            showEveryDate={firstParam(params.scope) === "all"}
-            event={editing}
-            household={household}
-            members={members}
-            dayKinds={dayKinds}
-            returnTo={returnTo}
-            closeHref={closeHref}
-            occurrence={editOccurrence && editing.recurrence_rule ? (events.find((e) => e.series_id === editing?.id && e.occurrence_date === editOccurrence) ?? null) : null}
-            occurrenceDate={editing.recurrence_rule ? editOccurrence : undefined}
-            isException={Boolean(editOccurrence && exceptions.some((x) => x.event_id === editing?.id && x.original_date === editOccurrence))}
-            skippedDates={exceptions.filter((x) => x.event_id === editing?.id && x.skipped).map((x) => x.original_date).sort()}
-            memberName={editing.member_ids.map((id) => memberById.get(id)?.name).filter(Boolean).join(" and ") || undefined}
-            headsUps={await loadHeadsUps({ eventId: editing.id })}
-            headsUpReturn={`/calendar?${returnTo}&edit=${editing.id}&scope=all&tab=heads-ups`}
-            initialTab={firstParam(params.tab)}
-          />
-        </Sheet>
+        <EditEventSheet
+          editing={editing}
+          household={household}
+          members={members}
+          dayKinds={dayKinds}
+          here={href({ edit: null, occ: null, add: null, panel: null, placing: null })}
+          returnTo={returnTo}
+          returnPath="/calendar"
+          side={editSide}
+        />
       ) : null}
 
       {pending && !editing ? (
@@ -309,13 +145,13 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       ) : null}
 
       {panel === "templates" ? (
-        <Sheet title="Templates" closeHref={closeHref} narrow>
+        <Sheet title="Templates" closeHref={closeHref} floating>
           <TemplatesPanel templates={templates} memberById={memberById} returnTo={returnTo} />
         </Sheet>
       ) : null}
 
       {panel === "template" && templates.some((t) => t.id === firstParam(params.tpl)) ? (
-        <Sheet title="Edit template" closeHref={href({ panel: "templates", tpl: null })} narrow>
+        <Sheet title="Edit template" closeHref={href({ panel: "templates", tpl: null })} floating>
           <TemplateCard
             template={templates.find((t) => t.id === firstParam(params.tpl))!}
             members={members}
@@ -333,237 +169,170 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       ) : null}
     </>
   );
-}
 
-function EditEventPanel({
-  event,
-  household,
-  members,
-  dayKinds,
-  returnTo,
-  closeHref,
-  memberName,
-  occurrence,
-  occurrenceDate,
-  isException,
-  skippedDates,
-  everyDateHref,
-  showEveryDate,
-  headsUps,
-  headsUpReturn,
-  initialTab,
-}: {
-  headsUps: HeadsUp[];
-  headsUpReturn: string;
-  initialTab: string | undefined;
-  skippedDates: string[];
-  occurrence: CalendarItem | null;
-  occurrenceDate: string | undefined;
-  isException: boolean;
-  event: CalendarEvent;
-  household: Household;
-  members: Member[];
-  dayKinds: DayKind[];
-  returnTo: string;
-  closeHref: string;
-  memberName: string | undefined;
-  /** For a repeating event: the link that switches to changing every date. */
-  everyDateHref: string;
-  showEveryDate: boolean;
-}) {
-  const { timeZone } = household.settings;
-  const start = new Date(event.starts_at);
-  const end = new Date(event.ends_at);
-  const startDate = localDateOf(start, timeZone);
-  const endDate = event.all_day ? addDays(localDateOf(end, timeZone), -1) : localDateOf(end, timeZone);
-  const summary = (
-    <p className="shrink-0 text-lg text-ink-muted">
-      {memberName ? `For ${memberName} · ` : ""}
-      {describeRule(event.recurrence_rule)}
-    </p>
-  );
-
-  // A repeating event opens on "just this date" first; every date is one tap away.
-  if (occurrenceDate && !showEveryDate) {
-    return (
-      <div className="flex h-full flex-col gap-5">
-        {summary}
-        <OccurrenceControls
-          event={event}
-          household={household}
-          occurrence={occurrence}
-          occurrenceDate={occurrenceDate}
-          isException={isException}
-          returnTo={returnTo}
-        />
-        {skippedDates.length > 0 ? <SkippedDates event={event} dates={skippedDates} returnTo={returnTo} /> : null}
-        <div className="mt-auto flex shrink-0 gap-3">
-          <Link
-            href={everyDateHref}
-            scroll={false}
-            className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-ink px-5 text-lg font-bold text-board"
+  // Week and Month (Glance): the grid edge to edge under the header; the
+  // Daily List pushes in from the right (SPEC "Daily List panel — PUSH is
+  // locked"). On Month the grid narrows; on Week two days drop out instead
+  // (SPEC "Week view: LOCKED", REVISED), so five keep their full width.
+  const panelOpen = panelPrefs.open || routineOpen;
+  const away = !days.includes(today);
+  const unit = byMonth ? "month" : "week";
+  return (
+    <>
+      <RememberDisplay display={view} />
+      <WallRefresh timeZone={timeZone} />
+      {/* The grid is white and the header's words are on the rail, so Christmas and Halloween colours read fine. */}
+      <HolidayColoursHere />
+      <div className="flex min-h-0 flex-1 flex-col lg:-mx-8 lg:-mt-6">
+        <div className="lg:px-8">
+          <ScreenHeader
+            {...headerTitle(view, days, anchor, household)}
+            weather
+            nav={
+              <>
+                <IconLink href={href({ date: step(-1), edit: null, add: null, panel: null })} label={`Previous ${unit}`} icon={CaretLeft} />
+                <IconLink href={href({ date: step(1), edit: null, add: null, panel: null })} label={`Next ${unit}`} icon={CaretRight} />
+              </>
+            }
+            tabs={
+              <Segmented
+                label="View"
+                options={[
+                  { href: "/", label: "Today", active: false },
+                  { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
+                  { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
+                ]}
+              />
+            }
+            action={
+              // Add starts adding mode (tap a day, or a time on Week, to place it), or cancels it.
+              <ActionLink
+                href={placing ? closeHref : href({ placing: "1", edit: null, add: null, panel: null })}
+                scroll={false}
+                icon={placing ? X : Plus}
+                label={placing ? "Stop adding" : "Add an event"}
+              >
+                {placing ? "Stop" : "Add"}
+              </ActionLink>
+            }
           >
-            Change every date
-          </Link>
-          <CloseLink href={closeHref} label="Close" />
+            {/* Away from this week or month: a way straight back. */}
+            {away ? <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>{`This ${unit}`}</SoftLink> : null}
+            <PeopleButton members={members} shown={people} href={href({ panel: "people", edit: null, add: null })} />
+            <DailyListToggle open={panelOpen} returnTo={panelReturn} />
+            <HeaderMenu label="More: holidays and templates">
+              <Link href="/holidays" className={headerMenuItemClass}>
+                <Emoji emoji="🎉" className="size-7" />
+                Holidays
+              </Link>
+              <Link href={href({ panel: "templates", edit: null, add: null })} scroll={false} className={headerMenuItemClass}>
+                <Copy size="1.75rem" aria-hidden />
+                Templates
+              </Link>
+            </HeaderMenu>
+          </ScreenHeader>
+        </div>
+        {error || message || placing ? (
+          <div className="flex shrink-0 flex-col gap-2 pb-3 lg:px-8">
+            {error ? <Notice tone="error">{error}</Notice> : null}
+            {message ? <Notice tone="success">{message}</Notice> : null}
+            {placing ? <PlacingBar hint={byMonth ? "Adding an event: tap a day" : "Adding an event: tap a time, or a day's top for all day"} cancelHref={closeHref} /> : null}
+          </div>
+        ) : null}
+        <div className="flex min-h-0 flex-1">
+          <div className="relative flex min-w-0 flex-1 flex-col">
+            {view === "month" ? (
+              <MonthView
+                household={household}
+                days={days}
+                today={today}
+                events={events}
+                memberById={memberById}
+                anchor={anchor}
+                mode={rolling ? "weeks" : "month"}
+                adding={{ placing, pending, addHref }}
+                breaks={breaks}
+                specials={specials}
+                dayHref={(day) => (day === today ? "/" : `/?date=${day}`)}
+              />
+            ) : (
+              <WeekView
+                household={household}
+                // The Daily List takes two days' room (desktop only; a phone shows the panel elsewhere).
+                days={panelOpen ? daysWithPanel(days, today) : days}
+                today={today}
+                events={events}
+                memberById={memberById}
+                href={href}
+                meals={weekMeals}
+                tasks={weekTasks}
+                adding={{ placing, pending, addHref }}
+                breaks={breaks}
+                specials={specials}
+              />
+            )}
+            {panelOpen && view === "month" ? (
+              // With the Daily List open, a tap on the month grid closes it (the mock's push panel).
+              // Week keeps its cards tappable; the list button closes it there.
+              <form action={setPanelOpen} className="absolute inset-0 z-20 max-lg:hidden">
+                <input type="hidden" name="open" value="0" />
+                <input type="hidden" name="returnTo" value={panelReturn} />
+                <button aria-label="Close the Daily List" className="size-full cursor-default" />
+              </form>
+            ) : null}
+          </div>
+          {panelOpen ? (
+            <div className="flex w-[36rem] shrink-0 flex-col border-l border-frame bg-rail p-5 shadow-[-0.35rem_0_1.4rem_rgb(30_35_45/0.12)] max-lg:hidden [&>aside]:flex-1">
+              <TodayPanel
+                household={household}
+                today={today}
+                tab={panelPrefs.tab}
+                returnTo={panelReturn}
+                day
+                routine={
+                  routineOpen ? (
+                    <RoutineChecklist
+                      data={routineData}
+                      memberId={openMember}
+                      templateId={openRoutine}
+                      date={today}
+                      today={today}
+                      page={Number(firstParam(params.rpage) ?? 0) || 0}
+                      closeHref={panelReturn}
+                      hereHref={(p) => `${panelReturn}&routine=${openRoutine}&member=${openMember}${p ? `&rpage=${p}` : ""}`}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+          ) : null}
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex h-full flex-col gap-5">
-      {summary}
-      <form id="edit-event" action={updateEvent} className="group flex min-h-0 flex-1 flex-col">
-        <input type="hidden" name="id" value={event.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-        <EventCardFields
-          members={members}
-          dayKinds={dayKinds}
-          defaults={{
-            title: event.title,
-            date: startDate,
-            endDate: event.all_day ? endDate : undefined,
-            allDay: event.all_day,
-            startTime: event.all_day ? undefined : localTimeOf(start, timeZone),
-            minutes: event.all_day ? household.settings.defaultEventMinutes : Math.round((end.getTime() - start.getTime()) / 60_000),
-            memberIds: event.member_ids,
-            visibility: event.visibility,
-            notes: event.notes ?? "",
-            dayKind: event.day_kind ?? undefined,
-            icon: event.icon ?? "",
-            repeat: parseRule(event.recurrence_rule),
-          }}
-          headsUps={<HeadsUpEditor headsUps={headsUps} source={{ eventId: event.id }} returnTo={headsUpReturn} />}
-          initialTab={initialTab}
-        />
-      </form>
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <Button form="edit-event" variant="save">Save</Button>
-        <Button form="edit-event" formAction={saveEventAsTemplate} variant="secondary">
-          Save as template
-        </Button>
-        <CloseLink href={closeHref} />
-        <form action={removeEvent} className="ml-auto">
-          <input type="hidden" name="id" value={event.id} />
-          <input type="hidden" name="title" value={event.title} />
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <Button variant="danger">{event.recurrence_rule ? "Remove every date" : "Remove"}</Button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/** How many skipped dates to list before "and N more". */
-const SKIPPED_LIMIT = 6;
-
-/** Dates skipped from a repeating event, each with a way to bring it back. */
-function SkippedDates({ event, dates, returnTo }: { event: CalendarEvent; dates: string[]; returnTo: string }) {
-  const shown = dates.slice(-SKIPPED_LIMIT);
-  return (
-    <div className="shrink-0">
-      <h3 className="mb-2 text-lg font-bold text-ink">Skipped dates</h3>
-      <ul className="flex flex-wrap gap-2">
-        {shown.map((date) => (
-          <li key={date}>
-            <form action={resetOccurrence} className="flex items-center gap-2 rounded-[var(--radius)] bg-rail pl-3">
-              <input type="hidden" name="eventId" value={event.id} />
-              <input type="hidden" name="occurrenceDate" value={date} />
-              <input type="hidden" name="title" value={event.title} />
-              <input type="hidden" name="returnTo" value={returnTo} />
-              <span className="text-base text-ink">{date}</span>
-              <Button variant="secondary" className="border-0">
-                Bring back
-              </Button>
-            </form>
-          </li>
-        ))}
-      </ul>
-      {dates.length > shown.length ? <p className="mt-2 text-base text-ink-muted">and {dates.length - shown.length} earlier</p> : null}
-    </div>
-  );
-}
-
-/** "Just this one" controls for one date of a repeating event. */
-function OccurrenceControls({
-  event,
-  household,
-  occurrence,
-  occurrenceDate,
-  isException,
-  returnTo,
-}: {
-  event: CalendarEvent;
-  household: Household;
-  occurrence: CalendarItem | null;
-  occurrenceDate: string;
-  isException: boolean;
-  returnTo: string;
-}) {
-  const { timeZone, locale } = household.settings;
-  const start = occurrence ? new Date(occurrence.starts_at) : zonedToUtc(occurrenceDate, localTimeOf(new Date(event.starts_at), event.timezone), timeZone);
-  const end = occurrence ? new Date(occurrence.ends_at) : new Date(start.getTime() + (new Date(event.ends_at).getTime() - new Date(event.starts_at).getTime()));
-  const dayLabel = new Intl.DateTimeFormat(locale, { timeZone, weekday: "long", month: "long", day: "numeric" }).format(
-    zonedToUtc(occurrenceDate, "12:00", timeZone),
-  );
-  const hidden = (
-    <>
-      <input type="hidden" name="eventId" value={event.id} />
-      <input type="hidden" name="occurrenceDate" value={occurrenceDate} />
-      <input type="hidden" name="title" value={event.title} />
-      <input type="hidden" name="returnTo" value={returnTo} />
+      {sheets}
     </>
   );
-
-  return (
-    <div className="shrink-0 rounded-[var(--radius-card)] bg-rail p-5">
-      <h3 className="mb-1 text-xl font-semibold text-ink">Just {dayLabel}</h3>
-      <form action={moveOccurrence} className="grid gap-4 sm:grid-cols-3">
-        {hidden}
-        <input type="hidden" name="allDay" value={String(event.all_day)} />
-        <Field label="Move to">
-          <Input name="newDate" type="date" defaultValue={localDateOf(start, timeZone)} required />
-        </Field>
-        {event.all_day ? null : (
-          <>
-            <Field label="Starts at">
-              <Input name="newStartTime" type="time" defaultValue={localTimeOf(start, timeZone)} required />
-            </Field>
-            <Field label="Ends at">
-              <Input name="newEndTime" type="time" defaultValue={localTimeOf(end, timeZone)} required />
-            </Field>
-          </>
-        )}
-        <div className="sm:col-span-3">
-          <Button variant="secondary" className="bg-board">Move this one</Button>
-        </div>
-      </form>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <form action={skipOccurrence}>
-          {hidden}
-          <Button variant="danger">Skip this one</Button>
-        </form>
-        {isException ? (
-          <form action={resetOccurrence}>
-            {hidden}
-            <Button variant="secondary">Put back to normal</Button>
-          </form>
-        ) : null}
-      </div>
-    </div>
-  );
 }
 
-function CloseLink({ href, label = "Cancel" }: { href: string; label?: string }) {
+/**
+ * Opens or closes the Daily List on Week and Month (it pushes in from the right).
+ * Each screen remembers it (a cookie), the same as the old Today panel.
+ */
+function DailyListToggle({ open, returnTo }: { open: boolean; returnTo: string }) {
   return (
-    <Link
-      href={href}
-      scroll={false}
-      className="inline-flex min-h-[var(--touch-target)] items-center justify-center rounded-[var(--radius)] bg-rail px-5 text-lg font-bold text-ink"
-    >
-      {label}
-    </Link>
+    <form action={setPanelOpen} className="max-lg:hidden">
+      <input type="hidden" name="open" value={open ? "0" : "1"} />
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <button
+        aria-pressed={open}
+        aria-label={open ? "Hide the Daily List" : "Show the Daily List"}
+        className={`inline-flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-[var(--radius)] px-4 text-lg font-bold ${
+          open ? "bg-tab-on text-tab-on-ink shadow-raised" : "bg-panel text-ink"
+        }`}
+      >
+        <ListChecks size="1.5rem" weight="bold" aria-hidden />
+        Daily List
+      </button>
+    </form>
   );
 }
 
@@ -598,25 +367,18 @@ async function mealsFor(days: LocalDate[], events: CalendarItem[], members: Memb
   return result;
 }
 
-function rangeTitle(view: View, days: LocalDate[], anchor: LocalDate, household: Household): string {
+/**
+ * The header for Week and Month: the month's name, with the year on its
+ * baseline (Glance: no date-range text). A week that runs over two months
+ * is named for the month most of its days are in.
+ */
+function headerTitle(view: View, days: LocalDate[], anchor: LocalDate, household: Household): { title: string; sub: string } {
   const { locale, timeZone } = household.settings;
-  const noon = (d: LocalDate) => zonedToUtc(d, "12:00", timeZone);
-  // Month is titled with the month either way (today's, unless you've moved).
-  // The year only shows when it isn't this year, so the header fits on one line.
-  const thisYear = localDateOf(new Date(), timeZone).slice(0, 4);
-  if (view !== "week") {
-    return anchor.slice(0, 4) === thisYear
-      ? new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(noon(anchor))
-      : new Intl.DateTimeFormat(locale, { timeZone, month: "short", year: "numeric" }).format(noon(anchor));
-  }
-  const first = days[0];
-  const last = days[6];
-  const sameMonth = first.slice(0, 7) === last.slice(0, 7);
-  const fmt = new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric" });
-  const year = last.slice(0, 4) === thisYear ? "" : `, ${last.slice(0, 4)}`;
-  return sameMonth
-    ? `${fmt.format(noon(first))}–${Number(last.slice(8))}${year}`
-    : `${fmt.format(noon(first))} – ${fmt.format(noon(last))}${year}`;
+  const date = view === "week" ? days[3] : anchor;
+  return {
+    title: new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(zonedToUtc(date, "12:00", timeZone)),
+    sub: date.slice(0, 4),
+  };
 }
 
 /**
@@ -729,6 +491,7 @@ function TemplateCard({
         </div>
         <Stickers members={members} memberIds={template.member_ids} />
         <DayKindChips kinds={dayKinds} value={template.day_kind} />
+        <LocationField value={template.location} />
         <Field label="Notes">
           <Input name="notes" maxLength={2000} defaultValue={template.notes ?? ""} />
         </Field>

@@ -2,12 +2,25 @@
 
 import { Pager as PageArrows } from "@/components/pager";
 import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, CalendarCheck, Minus, Plus, Trash, X } from "@phosphor-icons/react";
-import { Avatar, EmptyState, Emoji, ScreenHeader } from "@/components/ui";
+import { CaretDown, CaretUp, Minus, Plus, Trash, X } from "@phosphor-icons/react";
+import {
+  ColourDot,
+  EmptyState,
+  Emoji,
+  ScreenHeader,
+  Switch,
+  Toggle,
+  fieldLabelClass,
+  primaryActionClass,
+  secondaryActionClass,
+  segItemClass,
+  segTrackClass,
+  whoChipStyle,
+} from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
-import { soft, strong } from "@/lib/colours";
+import { hand, soft } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import { CHORE_TAGS, weekdaysLabel, type ChoreTag } from "@/lib/chore-days";
 import { SEASONS, describeRule, type ChoreRule, type RepeatUnit, type Season } from "@/lib/chores";
@@ -120,8 +133,16 @@ function recall(): { day?: string; chore?: string | null } {
 let counter = 0;
 const newId = () => `${NEW_PREFIX}${Date.now().toString(36)}-${(counter += 1)}`;
 
+/** A typed-in field: the mock's `.inp` (editorInputClass, but sized by its row). */
 const control =
-  "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3.5 text-lg text-ink outline-none focus:border-accent";
+  "min-h-[var(--touch-target)] min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-[1.5rem] font-bold text-ink outline-none focus:border-ink";
+/** The same, a step smaller, for the occasional chore editor's many fields. */
+const smallControl =
+  "min-h-[var(--touch-target)] min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-[1.25rem] font-bold text-ink outline-none focus:border-ink";
+/** A small capital heading in a card: the mock's `.k`. */
+const kickerClass = "shrink-0 text-[1.15rem] font-bold tracking-[0.06em] text-ink-muted uppercase";
+/** A white card on the rail: the mock's `.card`. */
+const cardClass = "flex min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised lg:min-h-0";
 
 export function ChoreManager({
   initial,
@@ -168,7 +189,9 @@ export function ChoreManager({
   const weekdayName = (d: number) => new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 10, 1 + d)));
   const dateLabel = (d: string) =>
     d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
-  const nextLabel = (d: string) => (d < today ? "overdue" : dateLabel(d));
+  // Short, like the mock's "Fri 20", so the line fits the 22rem card.
+  const nextLabel = (d: string) =>
+    d < today ? "overdue" : d === today ? "today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const timeLabel = (t: string) => wallTime(t, locale);
 
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
@@ -225,45 +248,43 @@ export function ChoreManager({
 
   return (
     <>
-      <ScreenHeader title="Chores">
-        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-      </ScreenHeader>
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,19fr)_minmax(0,61fr)]">
+      <ScreenHeader title="Chores" sub="Setup" action={<SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />} />
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_minmax(0,1fr)]">
       {/* Left: Occasional chores on top, then the chore days */}
-      <section className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-card)] border border-frame bg-board p-4 lg:min-h-0">
+      <section aria-label="Chore days" className={`${cardClass} gap-[0.2rem]`}>
         <button
           type="button"
           onClick={() => setSelection({ kind: "occasional" })}
           aria-pressed={selection.kind === "occasional"}
-          className="flex flex-col gap-1 rounded-2xl p-3.5 text-left"
+          className="flex w-full flex-col gap-[0.2rem] rounded-[var(--radius-card)] px-4 py-[0.85rem] text-left"
           style={{
             background: soft("orange"),
             boxShadow: selection.kind === "occasional" ? "inset 0 0 0 2px var(--color-ink)" : undefined,
           }}
         >
-          <span className="flex items-center gap-3">
-            <Emoji emoji="🔁" className="size-10" />
-            <span className="min-w-0 flex-1 text-2xl leading-tight font-extrabold text-ink">Occasional chores</span>
-            <span className="text-xl font-extrabold" style={{ color: strong("orange") }}>
+          <span className="flex items-center gap-[0.7rem]">
+            <Emoji emoji="🔁" className="size-[2.4rem]" />
+            <span className="min-w-0 flex-1 text-[1.75rem] leading-[1.15] font-extrabold text-ink">Occasional chores</span>
+            <span className="text-[1.75rem] font-extrabold tabular-nums" style={{ color: hand("orange") }}>
               {draft.occasional.length}
             </span>
           </span>
-          <span className="truncate text-base font-bold" style={{ color: strong("orange") }}>
-            {nextUp ? `Next: ${nextUp.name}, ${nextLabel(info[nextUp.id].placedOn ?? info[nextUp.id].dueOn)}` : ""}
-          </span>
+          {nextUp ? (
+            <span className="line-clamp-2 text-[1.25rem] leading-tight font-bold" style={{ color: hand("orange") }}>
+              Next: {nextUp.name}, {nextLabel(info[nextUp.id].placedOn ?? info[nextUp.id].dueOn)}
+            </span>
+          ) : null}
           {hardCount > 0 ? (
-            <span className="text-base font-bold text-now">
+            <span className="text-[1.25rem] font-bold text-now-on-tint">
               {hardCount} can&rsquo;t find a day
             </span>
           ) : null}
         </button>
 
-        <h2 className="mt-2 flex items-center gap-2.5 px-1 text-xl font-bold text-ink">
-          <CalendarCheck size="1.5rem" aria-hidden className="text-ink-muted" />
-          <span className="flex-1">Chore days</span>
-          <span className="text-lg text-ink-muted">{days.length}</span>
+        <h2 className="mt-[0.8rem] flex items-baseline gap-3 text-[1.75rem] font-bold text-ink">
+          Chore days <span className="text-[1.25rem] font-semibold text-ink-muted tabular-nums">{days.length}</span>
         </h2>
-        <ul ref={daysRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+        <ul ref={daysRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {shownDays.map((d) => {
             const count = draft.regular.filter((c) => c.chore_day_id === d.id).length;
             const active = selection.kind === "day" && selection.id === d.id;
@@ -273,12 +294,12 @@ export function ChoreManager({
                   type="button"
                   onClick={() => setSelection({ kind: "day", id: d.id })}
                   aria-pressed={active}
-                  className={`flex min-h-16 w-full items-center gap-3 rounded-2xl px-3 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
+                  className={`flex min-h-16 w-full items-center gap-[0.65rem] rounded-[var(--radius)] px-[0.7rem] py-1 text-left ${active ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
                 >
-                  <Emoji emoji={eventEmoji(d.icon, d.name, DAY_PICTURE)} className="size-9" />
+                  <Emoji emoji={eventEmoji(d.icon, d.name, DAY_PICTURE)} className="size-[2.15rem]" />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-lg font-bold text-ink">{d.name || "Unnamed"}</span>
-                    <span className="truncate text-sm font-semibold text-ink-muted">
+                    <span className="truncate text-[1.5rem] leading-[1.1] font-extrabold text-ink">{d.name || "Unnamed"}</span>
+                    <span className="truncate text-[1.15rem] font-bold text-ink-muted">
                       {d.is_free ? "" : d.weekdays.length ? `${weekdaysLabel(d.weekdays)} · ` : ""}{count === 1 ? "1 chore" : `${count} chores`}
                     </span>
                   </span>
@@ -287,8 +308,8 @@ export function ChoreManager({
             );
           })}
         </ul>
-        <div className="mt-auto flex items-center gap-2 pt-1">
-          <button type="button" onClick={addDay} className="flex min-h-12 items-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel">
+        <div className="mt-auto flex items-center gap-2 pt-2">
+          <button type="button" onClick={addDay} className={`${secondaryActionClass} flex-1 text-[1.25rem]!`}>
             <Plus size="1.25rem" weight="bold" aria-hidden />
             New chore day
           </button>
@@ -297,7 +318,7 @@ export function ChoreManager({
       </section>
 
       {/* Right: what was tapped, and the one Save */}
-      <section className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board p-4 lg:min-h-0">
+      <section aria-label={selection.kind === "occasional" ? "Occasional chores" : "Chore day"} className={`${cardClass} gap-3`}>
         <div className="flex min-h-0 flex-1 flex-col">
           {selection.kind === "occasional" ? (
             <OccasionalPanel
@@ -422,20 +443,20 @@ function DayPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <EmojiPicker initial={day.icon ?? ""} fallback={DAY_PICTURE} fieldName="" nameText={day.name} onChange={(e) => setDay({ icon: e || null })} label={`Picture for ${day.name}`} className="size-14! self-center!" fullScreen />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center gap-[0.7rem]">
+        <EmojiPicker initial={day.icon ?? ""} fallback={DAY_PICTURE} fieldName="" nameText={day.name} onChange={(e) => setDay({ icon: e || null })} label={`Picture for ${day.name}`} className="size-[var(--touch-target)]! self-center!" fullScreen />
         <input
           value={day.name}
           onChange={(e) => setDay({ name: e.target.value })}
           maxLength={40}
           aria-label="Chore day name"
-          className={`${control} w-[16rem] text-2xl! font-extrabold`}
+          className={`${control} w-[16rem] text-[1.75rem]!`}
         />
         {day.is_free ? (
-          <span className="text-lg text-ink-muted lg:ml-auto">Free day</span>
+          <span className="text-[1.25rem] font-bold text-ink-muted lg:ml-auto">Free day: any day with no chore day</span>
         ) : (
-          <div className="flex flex-wrap gap-1.5 lg:ml-auto" role="group" aria-label="Days of the week">
+          <div className="flex flex-wrap gap-[0.4rem] lg:ml-auto" role="group" aria-label="Days of the week">
             {weekdays.map((w) => (
               <Chip key={w} on={day.weekdays.includes(w)} onClick={() => setDay({ weekdays: day.weekdays.includes(w) ? day.weekdays.filter((x) => x !== w) : [...day.weekdays, w].sort() })}>
                 {weekdayName(w)}
@@ -445,12 +466,12 @@ function DayPanel({
         )}
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+      <div className="mt-[0.7rem] grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         {/* Regular chores, like a list */}
-        <div className="flex min-h-0 flex-col gap-2">
-          <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">Regular chores · every {day.is_free ? "free day" : /\bday$/i.test(day.name.trim()) ? day.name.trim() : `${day.name.trim() || "chore"} day`}</h3>
-          <div className="flex items-center gap-2">
-            <EmojiPicker key={round} initial="" fallback={CHORE_PICTURE} fieldName="" nameText={name} onChange={setIcon} label="Picture for the new chore" className="size-12! self-center!" fullScreen />
+        <div className="flex min-h-0 flex-col">
+          <h3 className={kickerClass}>Regular chores · every {day.is_free ? "free day" : /\bday$/i.test(day.name.trim()) ? day.name.trim() : `${day.name.trim() || "chore"} day`}</h3>
+          <div className="mt-[0.4rem] mb-2 flex items-center gap-[0.45rem]">
+            <EmojiPicker key={round} initial="" fallback={CHORE_PICTURE} fieldName="" nameText={name} onChange={setIcon} label="Picture for the new chore" className="size-[var(--touch-target)]! self-center!" fullScreen />
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -458,10 +479,11 @@ function DayPanel({
                 if (e.key === "Enter") add();
               }}
               maxLength={80}
+              placeholder="New regular chore"
               aria-label="New regular chore"
-              className={`${control} min-w-0 flex-1`}
+              className={`${control} flex-1 placeholder:text-ink-muted`}
             />
-            <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Who does it" className={`${control} w-[9.5rem]`}>
+            <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Who does it" className={`${control} w-[11rem]`}>
               <option value="">Anyone</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -469,128 +491,142 @@ function DayPanel({
                 </option>
               ))}
             </select>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Due by" className={`${control} w-[9rem]`} />
-            <button type="button" onClick={add} disabled={!name.trim()} className="flex min-h-[var(--touch-target)] items-center gap-1.5 rounded-[var(--radius)] bg-ink px-4 text-lg font-bold text-board disabled:opacity-40">
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Due by" className={`${control} w-[11.5rem] px-3!`} />
+            <button type="button" onClick={add} disabled={!name.trim()} className={`${primaryActionClass} text-[1.25rem]! disabled:opacity-40`}>
               <Plus size="1.25rem" weight="bold" aria-hidden />
               Add
             </button>
           </div>
-          {regular.length === 0 ? <p className="py-3 text-lg text-ink-muted">No chores yet</p> : null}
+          {regular.length === 0 ? <p className="py-3 text-[1.25rem] font-bold text-ink-muted">No chores yet</p> : null}
           <ul ref={regularRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {shown.map((c) => {
               const person = c.assignee_id ? memberById.get(c.assignee_id) : undefined;
-              if (open === c.id)
+              if (open === c.id) {
+                const chip = whoChipStyle(person?.colour, Boolean(person));
                 return (
-                  <li key={c.id} className="my-1 flex flex-col gap-2 rounded-2xl bg-rail p-2.5">
+                  <li key={c.id} className="my-[0.3rem] flex flex-col gap-2 rounded-[var(--radius)] bg-rail p-[0.7rem]">
                     <div className="flex items-center gap-2">
-                      <EmojiPicker initial={c.icon ?? ""} fallback={CHORE_PICTURE} fieldName="" nameText={c.name} onChange={(e) => setChore(c.id, { icon: e || null })} label={`Picture for ${c.name}`} className="size-12! self-center!" fullScreen />
-                      <input value={c.name} onChange={(e) => setChore(c.id, { name: e.target.value })} maxLength={80} aria-label="Chore name" className={`${control} min-w-0 flex-1`} />
-                      <select value={c.assignee_id ?? ""} onChange={(e) => setChore(c.id, { assignee_id: e.target.value || null })} aria-label="Who does it" className={`${control} w-[9.5rem]`}>
-                        <option value="">Anyone</option>
-                        {members.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
-                      <input type="time" value={c.due_time ?? ""} onChange={(e) => setChore(c.id, { due_time: e.target.value || null })} aria-label="Due by" className={`${control} w-[9rem]`} />
+                      <EmojiPicker initial={c.icon ?? ""} fallback={CHORE_PICTURE} fieldName="" nameText={c.name} onChange={(e) => setChore(c.id, { icon: e || null })} label={`Picture for ${c.name}`} className="size-[var(--touch-target)]! self-center!" fullScreen />
+                      <input value={c.name} onChange={(e) => setChore(c.id, { name: e.target.value })} maxLength={80} aria-label="Chore name" className={`${control} flex-1`} />
+                      {/* Who: a colour chip that opens the list of people. */}
+                      <label className={`${chip.className} relative max-w-[12rem] shrink-0`} style={chip.style}>
+                        {person ? <ColourDot colour={person.colour} /> : null}
+                        <span className="truncate">{person?.name ?? "Anyone"}</span>
+                        <select value={c.assignee_id ?? ""} onChange={(e) => setChore(c.id, { assignee_id: e.target.value || null })} aria-label="Who does it" className="absolute inset-0 cursor-pointer opacity-0">
+                          <option value="">Anyone</option>
+                          {members.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <input type="time" value={c.due_time ?? ""} onChange={(e) => setChore(c.id, { due_time: e.target.value || null })} aria-label="Due by" className={`${control} w-[11.5rem] px-3!`} />
                     </div>
                     <div className="flex items-center gap-2">
-                      <input value={c.notes ?? ""} onChange={(e) => setChore(c.id, { notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={`${control} min-w-0 flex-1`} />
+                      <input value={c.notes ?? ""} onChange={(e) => setChore(c.id, { notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={`${control} flex-1 placeholder:text-ink-muted`} />
                       <IconButton label="Move up" onClick={() => move(c.id, -1)}>
-                        <ArrowUp size="1.25rem" aria-hidden />
+                        <CaretUp size="1.5rem" weight="bold" aria-hidden />
                       </IconButton>
                       <IconButton label="Move down" onClick={() => move(c.id, 1)}>
-                        <ArrowDown size="1.25rem" aria-hidden />
+                        <CaretDown size="1.5rem" weight="bold" aria-hidden />
                       </IconButton>
                       <IconButton label={`Remove ${c.name}`} danger onClick={() => update((d) => ({ ...d, regular: d.regular.filter((x) => x.id !== c.id) }))}>
-                        <Trash size="1.25rem" aria-hidden />
+                        <Trash size="1.5rem" aria-hidden />
                       </IconButton>
-                      <button type="button" onClick={() => setOpen(null)} className="flex min-h-12 items-center rounded-xl bg-board px-4 text-base font-bold text-ink">
+                      <button type="button" onClick={() => setOpen(null)} className={`${secondaryActionClass} bg-board! text-[1.25rem]!`}>
                         Done
                       </button>
                     </div>
                   </li>
                 );
+              }
+              const chip = person ? whoChipStyle(person.colour, false) : null;
               return (
-                <li key={c.id} className="border-b border-panel last:border-0">
-                  <button type="button" onClick={() => setOpen(c.id)} className={`flex min-h-15 w-full items-center gap-3 text-left ${c.active ? "" : "opacity-55"}`}>
-                    <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-9" />
+                <li key={c.id} className="border-b border-frame">
+                  <button type="button" onClick={() => setOpen(c.id)} className={`flex min-h-[3.6rem] w-full items-center gap-[0.6rem] py-1 text-left ${c.active ? "" : "opacity-55"}`}>
+                    <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-8" />
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-lg font-semibold text-ink">{c.name || "Unnamed"}</span>
-                      {c.notes ? <span className="truncate text-sm font-semibold text-ink-muted">{c.notes}</span> : null}
+                      <span className="truncate text-[1.35rem] font-bold text-ink">{c.name || "Unnamed"}</span>
+                      {c.notes ? <span className="truncate text-[1.15rem] font-bold text-ink-muted">{c.notes}</span> : null}
                     </span>
+                    {person && chip ? (
+                      <span className={`${chip.className} pointer-events-none max-w-[12rem] shrink-0`}>
+                        <ColourDot colour={person.colour} />
+                        <span className="truncate">{person.name}</span>
+                      </span>
+                    ) : null}
                     {c.due_time ? (
-                      <span className="shrink-0 rounded-full px-2.5 py-0.5 text-sm font-extrabold" style={{ background: soft("blue"), color: strong("blue") }}>
+                      <span className="shrink-0 rounded-full px-[0.7rem] py-[0.15rem] text-[1.15rem] font-extrabold" style={{ background: soft("blue"), color: hand("blue") }}>
                         by {timeLabel(c.due_time)}
                       </span>
                     ) : null}
-                    {person ? <Avatar name={person.name} colour={person.colour} icon={person.icon} size="sm" /> : null}
                   </button>
                 </li>
               );
             })}
           </ul>
-          <div className="mt-auto flex items-center gap-3">
-            <span className="flex-1" />
+          <div className="mt-auto flex items-center justify-end gap-3 pt-2">
             <MiniPager page={p} pages={pages} onPage={setPage} />
           </div>
         </div>
 
         {/* The day's rules and the next time it comes round */}
-        <div className="flex min-h-0 flex-col gap-2.5 rounded-2xl bg-rail p-4">
-          <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">Room for occasional chores</h3>
+        <aside className="flex min-h-0 flex-col gap-[0.7rem] rounded-[var(--radius-card)] bg-rail px-[1.1rem] py-4">
+          <h3 className={kickerClass}>Room for occasional chores</h3>
           <Stepper label="How many" value={day.max_tasks} onChange={(v) => setDay({ max_tasks: v })} />
           <Stepper label="Of those, Big" value={day.max_big} onChange={(v) => setDay({ max_big: v })} />
           {day.is_free ? null : (
             <>
-              <Toggle on={day.restrictive} onChange={(v) => setDay({ restrictive: v })}>
+              <Switch on={day.restrictive} onChange={(v) => setDay({ restrictive: v })}>
                 Only chores meant for {day.name || "this day"}
-              </Toggle>
-              <Toggle on={day.span} onChange={(v) => setDay({ span: v })}>
+              </Switch>
+              <Switch on={day.span} onChange={(v) => setDay({ span: v })}>
                 Next-door days are one stretch
-              </Toggle>
+              </Switch>
             </>
           )}
-          <Toggle on={day.errands} onChange={(v) => setDay({ errands: v })}>
+          <Switch on={day.errands} onChange={(v) => setDay({ errands: v })}>
             Good for errands
-          </Toggle>
-          <div className="my-1 h-px bg-frame" />
+          </Switch>
+          <div className="my-[0.1rem] h-px shrink-0 bg-frame" />
           {preview ? (
             <>
-              <h3 className="text-sm font-extrabold tracking-wide text-ink-muted uppercase">
+              <h3 className={kickerClass}>
                 Next {day.is_free ? "free day" : day.name} · {dateLabel(preview.date)}
               </h3>
-              <ul className="flex flex-col gap-1">
+              <ul className="flex min-h-0 flex-col gap-1 overflow-hidden">
                 {preview.items.slice(0, PREVIEW_SHOWN).map((item, i) => (
-                  <li key={i} className={`flex items-center gap-2 text-base font-semibold ${item.occasional ? "text-accent" : "text-ink"}`}>
-                    <Emoji emoji={item.occasional ? "🔁" : eventEmoji(item.icon, item.name, CHORE_PICTURE)} className="size-6" />
+                  <li key={i} className="flex min-w-0 items-center gap-2 text-[1.25rem] font-bold" style={{ color: item.occasional ? hand("orange") : "var(--color-ink)" }}>
+                    {item.occasional ? <Emoji emoji="🔁" className="size-6" /> : null}
                     <span className="truncate">{item.name}</span>
                   </li>
                 ))}
               </ul>
-              {preview.items.length > PREVIEW_SHOWN ? <p className="text-base font-bold text-ink-muted">+{preview.items.length - PREVIEW_SHOWN} more</p> : null}
+              {preview.items.length > PREVIEW_SHOWN ? <p className="text-[1.25rem] font-bold text-ink-muted">+ {preview.items.length - PREVIEW_SHOWN} more</p> : null}
             </>
-          ) : null}
+          ) : (
+            <p className="text-[1.25rem] font-bold text-ink-muted">Not coming up in the next two weeks</p>
+          )}
           {day.is_free ? null : confirmRemove ? (
             <div className="mt-auto flex flex-col gap-2">
-              <p className="text-base font-bold text-danger">Remove {day.name} and its {regular.length} regular chores?</p>
+              <p className="text-[1.25rem] font-bold text-danger">Remove {day.name} and its {regular.length} regular chores?</p>
               <div className="flex gap-2">
-                <button type="button" onClick={removeDay} className="flex min-h-12 items-center rounded-xl bg-danger px-4 text-base font-bold text-board">
+                <button type="button" onClick={removeDay} className={`${primaryActionClass} bg-danger! text-board!`}>
                   Remove
                 </button>
-                <button type="button" onClick={() => setConfirmRemove(false)} className="flex min-h-12 items-center rounded-xl bg-board px-4 text-base font-bold text-ink">
+                <button type="button" onClick={() => setConfirmRemove(false)} className={`${secondaryActionClass} bg-board!`}>
                   Keep it
                 </button>
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => setConfirmRemove(true)} className="mt-auto flex min-h-12 items-center gap-2 self-start rounded-xl px-2 text-base font-bold text-danger">
-              <Trash size="1.25rem" aria-hidden />
+            <button type="button" onClick={() => setConfirmRemove(true)} className="mt-auto flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 self-start text-[1.25rem] font-bold text-danger">
+              <Trash size="1.5rem" aria-hidden />
               Remove this chore day
             </button>
           )}
-        </div>
+        </aside>
       </div>
     </div>
   );
@@ -708,7 +744,7 @@ function OccasionalPanel({
   return (
     <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <div className="flex min-h-0 flex-col gap-2">
-        <div className="flex gap-1 rounded-2xl bg-panel p-1" role="tablist" aria-label="Seasons">
+        <div className={segTrackClass} role="tablist" aria-label="Seasons">
           {tabs.map((t) => (
             <button
               key={t.season}
@@ -719,10 +755,10 @@ function OccasionalPanel({
                 setSeason(t.season);
                 setPage(0);
               }}
-              className={`flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-xl text-lg font-bold ${t.season === tab.season ? "bg-board text-ink shadow-sm" : "text-ink-muted"}`}
+              className={`${segItemClass(t.season === tab.season)} min-w-0! flex-1 text-[1.25rem]!`}
             >
               {t.label}
-              <span className="text-base opacity-70">{t.chores.length}</span>
+              <span className="tabular-nums">{t.chores.length}</span>
             </button>
           ))}
         </div>
@@ -733,19 +769,19 @@ function OccasionalPanel({
             const hard = c.active ? i?.hard : null;
             const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : i.dueOn < today ? "Overdue" : i.dueOn === today ? "Due today" : dateLabel(i.placedOn ?? i.dueOn);
             return (
-              <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-panel last:border-0 ${c.id === choreId ? "rounded-xl bg-rail px-1.5" : ""}`}>
+              <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-frame ${c.id === choreId ? "rounded-[var(--radius)] border-transparent bg-rail px-2 shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
                 <button type="button" onClick={() => setChoreId(c.id)} className={`flex min-w-0 flex-1 items-center gap-3 self-stretch text-left ${c.active ? "" : "opacity-55"}`}>
-                  <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-9" />
+                  <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-[2.15rem]" />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-lg font-semibold text-ink">{c.name || "Unnamed"}</span>
-                    <span className={`truncate text-sm font-semibold ${hard ? "text-now" : "text-ink-muted"}`}>{!c.active ? "Paused" : (hard ?? ruleText(c))}</span>
+                    <span className="truncate text-[1.35rem] leading-tight font-bold text-ink">{c.name || "Unnamed"}</span>
+                    <span className={`truncate text-[1.15rem] font-bold ${hard ? "text-now-on-tint" : "text-ink-muted"}`}>{!c.active ? "Paused" : (hard ?? ruleText(c))}</span>
                   </span>
-                  <span className="shrink-0 text-sm font-extrabold text-ink-muted" style={due === "Overdue" || due === "Due today" ? { color: strong("orange") } : undefined}>
+                  <span className="shrink-0 text-[1.15rem] font-extrabold text-ink-muted" style={due === "Overdue" || due === "Due today" ? { color: hand("orange") } : undefined}>
                     {due}
                   </span>
                 </button>
                 {i?.onToday ? (
-                  <span className="shrink-0 rounded-full px-2.5 py-1 text-sm font-extrabold" style={{ background: soft("teal"), color: strong("teal") }}>
+                  <span className="shrink-0 rounded-full px-[0.7rem] py-1 text-[1.15rem] font-extrabold" style={{ background: soft("teal"), color: hand("teal") }}>
                     On the Daily list
                   </span>
                 ) : !isNew && c.active ? (
@@ -754,7 +790,7 @@ function OccasionalPanel({
                     onClick={() => plus(c.id)}
                     disabled={busy !== null}
                     aria-label={`Add ${c.name} to the Daily list`}
-                    className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ink text-board disabled:opacity-40"
+                    className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-primary text-primary-ink disabled:opacity-40"
                   >
                     <Plus size="1.375rem" weight="bold" aria-hidden />
                   </button>
@@ -764,7 +800,7 @@ function OccasionalPanel({
           })}
         </ul>
         <div className="mt-auto flex items-center gap-3">
-          <button type="button" onClick={addChore} className="flex min-h-12 items-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel">
+          <button type="button" onClick={addChore} className={`${secondaryActionClass} text-[1.25rem]!`}>
             <Plus size="1.25rem" weight="bold" aria-hidden />
             New occasional chore
           </button>
@@ -791,7 +827,7 @@ function OccasionalPanel({
           timeZone={timeZone}
         />
       ) : (
-        <EmptyState emoji="🧹" />
+        <EmptyState emoji="🧹" hint="Tap a chore to change how often it comes round" />
       )}
     </div>
   );
@@ -841,18 +877,42 @@ function OccasionalEditor({
     : "";
 
   return (
-    <div className="flex min-h-0 flex-col gap-2.5 rounded-2xl border border-frame p-3.5">
+    <div className="flex min-h-0 flex-col gap-[0.7rem] rounded-[var(--radius-card)] bg-rail px-[1.1rem] py-4">
       <div className="flex items-center gap-2.5">
-        <EmojiPicker initial={c.icon ?? ""} fallback={CHORE_PICTURE} fieldName="" nameText={c.name} onChange={(e) => set({ icon: e || null })} label={`Picture for ${c.name}`} className="size-13! self-center!" fullScreen />
-        <input value={c.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} aria-label="Chore name" className={`${control} min-w-0 flex-1 text-xl! font-bold`} />
+        <EmojiPicker initial={c.icon ?? ""} fallback={CHORE_PICTURE} fieldName="" nameText={c.name} onChange={(e) => set({ icon: e || null })} label={`Picture for ${c.name}`} className="size-[var(--touch-target)]! self-center!" fullScreen />
+        <input value={c.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} aria-label="Chore name" className={`${control} flex-1`} />
+        {/* Pause and Remove sit up here so the tabs below get the whole card. */}
+        <button type="button" onClick={() => set({ active: !c.active })} aria-pressed={!c.active} className={`${secondaryActionClass} bg-board! px-4! text-[1.25rem]!`}>
+          {c.active ? "Pause" : "Turn on"}
+        </button>
+        <IconButton label={`Remove ${c.name}`} danger onClick={() => setConfirmRemove(true)}>
+          <Trash size="1.5rem" aria-hidden />
+        </IconButton>
       </div>
-      {hasFirstDue(c) && c.active && (!info || info.firstTime) && firstDue ? (
+      {confirmRemove ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[1.25rem] font-bold text-danger">Remove {c.name}?</span>
+          <button
+            type="button"
+            onClick={() => {
+              update((d) => ({ ...d, occasional: d.occasional.filter((x) => x.id !== c.id) }));
+              onRemoved();
+            }}
+            className={`${primaryActionClass} bg-danger! text-board!`}
+          >
+            Remove
+          </button>
+          <button type="button" onClick={() => setConfirmRemove(false)} className={`${secondaryActionClass} bg-board!`}>
+            Keep it
+          </button>
+        </div>
+      ) : hasFirstDue(c) && c.active && (!info || info.firstTime) && firstDue ? (
         // Never done yet: its first date can be moved. New chores get a quiet day.
         <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-muted">
           <span>{info ? "Not done yet · first time" : "First time"}</span>
-          <input type="date" value={firstDue} onChange={(e) => set({ first_due: e.target.value || null })} aria-label="First time it's due" className={`${control} py-1!`} />
+          <input type="date" value={firstDue} onChange={(e) => set({ first_due: e.target.value || null })} aria-label="First time it's due" className={smallControl} />
           {info ? null : c.first_due ? (
-            <button type="button" onClick={() => set({ first_due: null })} className="flex min-h-11 items-center rounded-xl px-3 font-bold text-accent hover:bg-rail">
+            <button type="button" onClick={() => set({ first_due: null })} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-board px-4 font-bold text-ink">
               Pick a free day
             </button>
           ) : (
@@ -862,40 +922,33 @@ function OccasionalEditor({
       ) : (
         <p className="text-base font-semibold text-ink-muted">{status}</p>
       )}
-      <div className="flex gap-1 self-start rounded-2xl bg-panel p-1" role="tablist" aria-label="Chore settings">
-        {(
-          [
-            ["chore", "Chore"],
-            ["repeats", "Repeats"],
-            ["more", "More"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => setTab(value)}
-            className={`flex min-h-11 items-center rounded-xl px-5 text-lg font-bold ${tab === value ? "bg-board text-ink shadow-sm" : "text-ink-muted"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Toggle
+        label="Chore settings"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "chore", label: "Basics" },
+          { value: "repeats", label: "Repeats" },
+          { value: "more", label: "More" },
+        ]}
+      />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-[0.6rem] overflow-hidden">
         {tab === "chore" ? (
           <>
             <Group label="Who usually does it">
               <Chip on={!c.assignee_id} onClick={() => set({ assignee_id: null })}>
                 Whoever&rsquo;s free
               </Chip>
-              {members.map((m) => (
-                <Chip key={m.id} on={c.assignee_id === m.id} onClick={() => set({ assignee_id: m.id })}>
-                  <Avatar name={m.name} colour={m.colour} icon={m.icon} size="sm" />
-                  {m.name}
-                </Chip>
-              ))}
+              {members.map((m) => {
+                const chip = whoChipStyle(m.colour, c.assignee_id === m.id);
+                return (
+                  <button key={m.id} type="button" aria-pressed={c.assignee_id === m.id} onClick={() => set({ assignee_id: m.id })} className={chip.className} style={chip.style}>
+                    <ColourDot colour={m.colour} />
+                    {m.name}
+                  </button>
+                );
+              })}
             </Group>
             <Group label="Tags">
               {CHORE_TAGS.map((t) => (
@@ -912,14 +965,14 @@ function OccasionalEditor({
                 </Chip>
               ))}
             </Group>
-            {info?.hard && c.active ? <p className="text-base font-bold text-now">{info.hard}</p> : null}
+            {info?.hard && c.active ? <p className="text-[1.25rem] font-bold text-now-on-tint">{info.hard}</p> : null}
           </>
         ) : null}
 
         {tab === "repeats" ? (
           <>
             {c.only_in === "dates" ? (
-              <p className="text-base text-ink-muted">Once a year</p>
+              <p className="text-[1.25rem] font-bold text-ink-muted">Once a year</p>
             ) : (
               <>
                 <Group label="Counts from">
@@ -930,7 +983,7 @@ function OccasionalEditor({
                     A set date
                   </Chip>
                   {c.repeat_from === "date" ? (
-                    <input type="date" value={c.start_date ?? ""} onChange={(e) => set({ start_date: e.target.value || null })} aria-label="The date it counts from" className={control} />
+                    <input type="date" value={c.start_date ?? ""} onChange={(e) => set({ start_date: e.target.value || null })} aria-label="The date it counts from" className={smallControl} />
                   ) : null}
                 </Group>
                 <Group label="Every">
@@ -941,7 +994,7 @@ function OccasionalEditor({
                     value={c.repeat_every}
                     onChange={(e) => set({ repeat_every: Math.max(1, Math.min(365, Number(e.target.value) || 1)) })}
                     aria-label="How many"
-                    className={`${control} w-20 text-center`}
+                    className={`${smallControl} w-20 text-center`}
                   />
                   {UNIT_CHIPS.map((u) => (
                     <Chip key={u.value} on={c.repeat_unit === u.value} onClick={() => set({ repeat_unit: u.value })}>
@@ -950,7 +1003,7 @@ function OccasionalEditor({
                   ))}
                 </Group>
                 <Group label="Lands on">
-                  <select value={c.snap} onChange={(e) => set({ snap: e.target.value as Snap })} aria-label="Lands on" className={control}>
+                  <select value={c.snap} onChange={(e) => set({ snap: e.target.value as Snap })} aria-label="Lands on" className={smallControl}>
                     {SNAP_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
@@ -958,7 +1011,7 @@ function OccasionalEditor({
                     ))}
                   </select>
                   {c.snap !== "none" ? (
-                    <select value={String(c.preferred_weekday ?? 6)} onChange={(e) => set({ preferred_weekday: Number(e.target.value) })} aria-label="Day of the week" className={control}>
+                    <select value={String(c.preferred_weekday ?? 6)} onChange={(e) => set({ preferred_weekday: Number(e.target.value) })} aria-label="Day of the week" className={smallControl}>
                       {weekdays.map((w) => (
                         <option key={w} value={w}>
                           {weekdayName(w)}
@@ -997,7 +1050,7 @@ function OccasionalEditor({
             {c.only_in === "dates" ? (
               <Group label="From and to">
                 <MonthDay value={c.season_start} onChange={(v) => set({ season_start: v })} label="From" />
-                <span className="text-lg font-bold text-ink-muted">to</span>
+                <span className="text-[1.25rem] font-bold text-ink-muted">to</span>
                 <MonthDay value={c.season_end} onChange={(v) => set({ season_end: v })} label="To" />
               </Group>
             ) : null}
@@ -1008,9 +1061,9 @@ function OccasionalEditor({
           <>
             <div className="flex flex-wrap items-end gap-4">
               <label className="flex flex-col gap-1">
-                <span className="text-base font-bold text-ink">At an exact time (optional)</span>
+                <span className={fieldLabelClass}>At an exact time (optional)</span>
                 <span className="flex items-center gap-1.5">
-                  <input type="time" value={c.at_time ?? ""} onChange={(e) => set({ at_time: e.target.value || null })} className={control} />
+                  <input type="time" value={c.at_time ?? ""} onChange={(e) => set({ at_time: e.target.value || null })} aria-label="At an exact time" className={smallControl} />
                   {c.at_time ? (
                     <IconButton label="No set time" onClick={() => set({ at_time: null })}>
                       <X size="1.25rem" aria-hidden />
@@ -1026,43 +1079,13 @@ function OccasionalEditor({
                 ))}
               </Group>
             </div>
-            <input value={c.notes ?? ""} onChange={(e) => set({ notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={control} />
+            <input value={c.notes ?? ""} onChange={(e) => set({ notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={`${smallControl} placeholder:text-ink-muted`} />
             <HeadsUps list={c.heads_ups} onChange={(heads_ups) => set({ heads_ups })} />
-            {c.at_time ? <p className="text-sm text-ink-muted">Shows at {timeLabel(c.at_time)} on its day.</p> : null}
+            {c.at_time ? <p className="text-[1.15rem] font-bold text-ink-muted">Shows at {timeLabel(c.at_time)} on its day.</p> : null}
           </>
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-frame pt-2.5">
-        {confirmRemove ? (
-          <>
-            <span className="text-base font-bold text-danger">Remove {c.name}?</span>
-            <button
-              type="button"
-              onClick={() => {
-                update((d) => ({ ...d, occasional: d.occasional.filter((x) => x.id !== c.id) }));
-                onRemoved();
-              }}
-              className="flex min-h-11 items-center rounded-xl bg-danger px-4 text-base font-bold text-board"
-            >
-              Remove
-            </button>
-            <button type="button" onClick={() => setConfirmRemove(false)} className="flex min-h-11 items-center rounded-xl bg-rail px-4 text-base font-bold text-ink">
-              Keep it
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => set({ active: !c.active })} className="flex min-h-11 items-center rounded-xl bg-rail px-4 text-base font-bold text-ink">
-              {c.active ? "Pause it" : "Turn it back on"}
-            </button>
-            <button type="button" onClick={() => setConfirmRemove(true)} className="ml-auto flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-base font-bold text-danger">
-              <Trash size="1.25rem" aria-hidden />
-              Remove
-            </button>
-          </>
-        )}
-      </div>
     </div>
   );
 }
@@ -1081,13 +1104,13 @@ function HeadsUps({ list, onChange }: { list: DraftHeadsUp[]; onChange: (list: D
   };
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-base font-bold text-ink">Heads-ups</span>
+      <span className={fieldLabelClass}>Heads-ups</span>
       <ul className="flex flex-col">
         {list.map((h) => (
-          <li key={h.id} className="flex min-h-11 items-center gap-2.5 border-b border-panel last:border-0">
+          <li key={h.id} className="flex min-h-[var(--touch-target)] items-center gap-2.5 border-b border-frame">
             <Emoji emoji={h.makes === "grocery" ? "🛒" : "🔔"} className="size-6" />
-            <span className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{h.label}</span>
-            <span className="shrink-0 text-sm font-semibold text-ink-muted">{leadLabel(h.minutes_before)}</span>
+            <span className="min-w-0 flex-1 truncate text-[1.25rem] font-bold text-ink">{h.label}</span>
+            <span className="shrink-0 text-[1.15rem] font-bold text-ink-muted">{leadLabel(h.minutes_before)}</span>
             <IconButton label={`Remove the heads-up ${h.label}`} onClick={() => onChange(list.filter((x) => x.id !== h.id))}>
               <X size="1.125rem" aria-hidden />
             </IconButton>
@@ -1096,19 +1119,19 @@ function HeadsUps({ list, onChange }: { list: DraftHeadsUp[]; onChange: (list: D
       </ul>
       {list.length < MAX_HEADS_UPS ? (
         <div className="flex items-center gap-1.5">
-          <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="New heads-up" aria-label="New heads-up" className={`${control} min-w-0 flex-1`} />
-          <input type="number" min={0} max={60} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))} aria-label="How long before" className={`${control} w-16 text-center`} />
-          <select value={unit} onChange={(e) => setUnit(e.target.value as LeadUnit)} aria-label="Unit" className={control}>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="New heads-up" aria-label="New heads-up" className={`${smallControl} flex-1 placeholder:text-ink-muted`} />
+          <input type="number" min={0} max={60} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))} aria-label="How long before" className={`${smallControl} w-16 text-center`} />
+          <select value={unit} onChange={(e) => setUnit(e.target.value as LeadUnit)} aria-label="Unit" className={smallControl}>
             {LEAD_UNITS.map((u) => (
               <option key={u.unit} value={u.unit}>
                 {u.label}
               </option>
             ))}
           </select>
-          <button type="button" onClick={() => setGrocery((g) => !g)} aria-pressed={grocery} title="Put it on the grocery list instead" className={`flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-[var(--radius)] border-2 ${grocery ? "border-ink bg-rail" : "border-frame"}`}>
+          <button type="button" onClick={() => setGrocery((g) => !g)} aria-pressed={grocery} title="Put it on the grocery list instead" className={`flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-[var(--radius)] border-2 ${grocery ? "border-ink bg-panel" : "border-frame bg-board"}`}>
             <Emoji emoji="🛒" className="size-6" />
           </button>
-          <button type="button" onClick={add} disabled={!label.trim()} aria-label="Add the heads-up" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-[var(--radius)] bg-ink text-board disabled:opacity-40">
+          <button type="button" onClick={add} disabled={!label.trim()} aria-label="Add the heads-up" className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-[var(--radius)] bg-primary text-primary-ink disabled:opacity-40">
             <Plus size="1.25rem" weight="bold" aria-hidden />
           </button>
         </div>
@@ -1127,7 +1150,7 @@ function Chip({ on, onClick, children, small = false }: { on: boolean; onClick: 
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 text-base select-none ${small ? "px-2.5" : "px-3.5"} ${on ? "border-ink bg-rail font-bold text-ink" : "border-frame bg-board text-ink"}`}
+      className={`flex min-h-[var(--touch-target)] min-w-[3.4rem] items-center justify-center gap-[0.4rem] rounded-full border-2 text-[1.25rem] font-bold text-ink select-none ${small ? "px-[0.7rem]" : "px-4"} ${on ? "border-ink bg-rail" : "border-frame bg-board"}`}
     >
       {children}
     </button>
@@ -1136,9 +1159,9 @@ function Chip({ on, onClick, children, small = false }: { on: boolean; onClick: 
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5" role="group" aria-label={label}>
-      <span className="text-base font-bold text-ink">{label}</span>
-      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
+    <div className="flex min-w-0 flex-col gap-[0.4rem]" role="group" aria-label={label}>
+      <span className={fieldLabelClass}>{label}</span>
+      <div className="flex flex-wrap items-center gap-[0.4rem]">{children}</div>
     </div>
   );
 }
@@ -1150,7 +1173,7 @@ function IconButton({ label, onClick, children, danger = false }: { label: strin
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex size-11 shrink-0 items-center justify-center rounded-xl bg-board ${danger ? "text-danger" : "text-ink"} hover:bg-panel`}
+      className={`flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel ${danger ? "text-danger" : "text-ink"}`}
     >
       {children}
     </button>
@@ -1158,29 +1181,18 @@ function IconButton({ label, onClick, children, danger = false }: { label: strin
 }
 
 function Stepper({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  const button = "flex size-11 items-center justify-center rounded-full bg-board text-ink shadow-[inset_0_0_0_2px_var(--color-frame)] disabled:opacity-40";
+  const button = "flex size-[var(--touch-target)] items-center justify-center rounded-full bg-board text-ink disabled:opacity-40";
   return (
-    <div className="flex items-center gap-3">
-      <span className="flex-1 text-lg font-semibold text-ink">{label}</span>
+    <div className="flex items-center gap-[0.6rem]">
+      <span className="flex-1 text-[1.25rem] font-bold text-ink">{label}</span>
       <button type="button" onClick={() => onChange(Math.max(0, value - 1))} disabled={value <= 0} aria-label={`${label}: fewer`} className={button}>
-        <Minus size="1.125rem" weight="bold" aria-hidden />
+        <Minus size="1.5rem" weight="bold" aria-hidden />
       </button>
-      <span className="w-8 text-center text-xl font-extrabold text-ink tabular-nums">{value}</span>
+      <span className="min-w-8 text-center text-[1.75rem] font-extrabold text-ink tabular-nums">{value}</span>
       <button type="button" onClick={() => onChange(Math.min(20, value + 1))} disabled={value >= 20} aria-label={`${label}: more`} className={button}>
-        <Plus size="1.125rem" weight="bold" aria-hidden />
+        <Plus size="1.5rem" weight="bold" aria-hidden />
       </button>
     </div>
-  );
-}
-
-function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex min-h-11 items-center gap-3 text-left text-lg text-ink">
-      <span className={`relative h-7 w-12 shrink-0 rounded-full ${on ? "bg-success" : "bg-check-border"}`}>
-        <span className={`absolute top-1 size-5 rounded-full bg-board transition-[left] ${on ? "left-6" : "left-1"}`} />
-      </span>
-      <span className="min-w-0">{children}</span>
-    </button>
   );
 }
 
@@ -1193,14 +1205,14 @@ function MonthDay({ value, onChange, label }: { value: string; onChange: (v: str
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
     <span className="flex items-center gap-1.5">
-      <select value={m} onChange={(e) => onChange(`${pad(Number(e.target.value))}-${pad(d)}`)} aria-label={`${label}: month`} className={control}>
+      <select value={m} onChange={(e) => onChange(`${pad(Number(e.target.value))}-${pad(d)}`)} aria-label={`${label}: month`} className={smallControl}>
         {MONTHS.map((name, i) => (
           <option key={name} value={i + 1}>
             {name}
           </option>
         ))}
       </select>
-      <select value={d} onChange={(e) => onChange(`${pad(m)}-${pad(Number(e.target.value))}`)} aria-label={`${label}: day`} className={control}>
+      <select value={d} onChange={(e) => onChange(`${pad(m)}-${pad(Number(e.target.value))}`)} aria-label={`${label}: day`} className={smallControl}>
         {Array.from({ length: 31 }, (_, i) => (
           <option key={i} value={i + 1}>
             {i + 1}

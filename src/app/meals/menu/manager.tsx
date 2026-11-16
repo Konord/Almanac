@@ -2,15 +2,14 @@
 
 import { Pager as PageArrows } from "@/components/pager";
 import { useState } from "react";
-import { ArrowsLeftRight, Check, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
-import { EmptyState, Emoji, Notice, ScreenHeader, Segmented } from "@/components/ui";
+import { Check, PencilSimple, Plus, Trash, X } from "@phosphor-icons/react";
+import { EmptyState, Emoji, primaryActionClass, secondaryActionClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
-import { BATCHES } from "@/lib/meals";
-import { menuMealIcon, menuMealName, spotSummary, type DishLike, type MenuMealLike } from "@/lib/menu";
+import { menuMealIcon, menuMealName, type DishLike, type MenuMealLike } from "@/lib/menu";
 import { saveMenu, type DraftKind, type DraftMenuMeal, type KindChanges, type MenuChanges } from "../menu-actions";
-import { MENU_TABS } from "../menu-tabs";
+import { BatchSwitch, MealsHeader, pickRowClass, roundIconClass } from "../parts";
 
 /*
  * The Menu Manager's Meals tab, in the browser: every change waits for
@@ -24,13 +23,14 @@ type Category = DraftKind;
 /** The left column's "every meal" and "under no kind" rows. */
 const ALL = "all";
 const NONE = "none";
-const KINDS_PER_PAGE = 9;
-const MEALS_PER_PAGE = 7;
+const KINDS_PER_PAGE = 11;
+const MEALS_PER_PAGE = 11;
 const SPOTS_PER_PAGE = 7;
 const DISHES_PER_PAGE = 11;
 
-const card = "flex min-h-0 flex-col gap-3 rounded-[var(--radius-card)] border border-frame bg-board px-5 py-4";
-const soft = "flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl bg-rail px-4 text-base font-bold text-ink hover:bg-panel";
+/** The three white cards (g-final-meals-menu: 1.25rem × 1.4rem padding, raised). */
+const card = "flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised";
+const h2 = "flex shrink-0 items-center gap-3 text-2xl font-bold text-ink";
 
 let counter = 0;
 const newId = () => `new-${Date.now().toString(36)}-${counter++}`;
@@ -167,7 +167,8 @@ export function MenuManager({
   // Middle: that kind's meals.
   const shown = blank ? [] : pickedRow.id === ALL ? draft : pickedRow.id === NONE ? loose : draft.filter((m) => m.categoryIds.includes(pickedRow.id));
   const mealList = paged(shown, mealPage, mealsPerPage);
-  const meal = draft.find((m) => m.id === selected) ?? null;
+  // Nothing picked yet: the kind's first meal is open, like the mock.
+  const meal = draft.find((m) => m.id === selected) ?? (selected === null ? (shown[0] ?? null) : null);
 
   const addMeal = () => {
     const id = newId();
@@ -184,122 +185,88 @@ export function MenuManager({
     setMealPage(Math.floor(shown.length / mealsPerPage));
   };
 
+  const editingRow = editingKind ? rows.find((r) => r.id === editingKind) : undefined;
+
   return (
     <>
-      <ScreenHeader title="Meals">
-        <Segmented label="Meals" options={MENU_TABS.map((t) => ({ href: t.href, label: t.label, active: t.tab === "menu" }))} />
-        <div className="flex items-center gap-4 lg:ml-auto">
-          <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
-        </div>
-      </ScreenHeader>
-      {problem ? <Notice tone="error">{problem}</Notice> : message ? <Notice tone="success">{message}</Notice> : null}
+      <MealsHeader tab="menu" error={problem} message={problem ? null : message}>
+        <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save()} onUndo={undo} />
+        {blank ? null : (
+          <button type="button" onClick={addMeal} className={primaryActionClass}>
+            <Plus size="1.25rem" weight="bold" aria-hidden />
+            Add a meal
+          </button>
+        )}
+      </MealsHeader>
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,22fr)_minmax(0,30fr)_minmax(0,50fr)]">
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[18rem_22rem_minmax(0,1fr)]">
         {/* Kinds of meal */}
         <section className={card}>
-          <div className="flex shrink-0 items-center gap-2">
-            {/* No word for these (Connor, 2026-11-11): just the tiles and New. */}
-            <span className="flex-1" />
-            <button type="button" onClick={addKind} className={soft}>
-              <Plus size="1.25rem" weight="bold" aria-hidden />
-              New
-            </button>
-          </div>
-          <ul ref={kindsRef} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
-            {kindList.items.map((r) =>
-              r.id === editingKind ? (
-                <li key={r.id} className="flex items-center gap-1">
-                  {/* Renaming in place: picture, name and a tick to close it (Save still keeps it). */}
-                  <div className="flex min-h-14 min-w-0 flex-1 items-center gap-2 rounded-2xl border-2 border-meal-ink bg-meal px-2">
-                    <EmojiPicker
-                      initial={r.icon ?? ""}
-                      fieldName=""
-                      nameText={r.name}
-                      onChange={(icon) => changeKind(r.id, { icon: icon || null })}
-                      label={`Picture for ${r.name || "this one"}`}
-                      className="size-11! self-center!"
-                      fullScreen
-                    />
-                    <input
-                      value={r.name}
-                      onChange={(e) => changeKind(r.id, { name: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") setEditingKind(null);
-                      }}
-                      maxLength={40}
-                      aria-label="Name"
-                      autoFocus
-                      className="h-11 min-w-0 flex-1 border-b-2 border-meal-ink/50 bg-transparent px-1 text-xl font-bold text-ink outline-none focus:border-meal-ink"
-                    />
-                    {/* While renaming, the delete sits where the count was (Leftovers can't be deleted). */}
-                    {r.isLeftovers ? null : (
-                      <button type="button" onClick={() => removeKind(r.id)} aria-label={`Remove ${r.name || "this one"} (keeps its meals)`} className="flex size-10 shrink-0 items-center justify-center rounded-full text-danger hover:bg-board">
-                        <Trash size="1.25rem" aria-hidden />
-                      </button>
-                    )}
-                  </div>
-                  <button type="button" onClick={() => setEditingKind(null)} aria-label="Done" className="flex size-12 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
-                    <Check size="1.375rem" weight="bold" aria-hidden />
-                  </button>
-                </li>
-              ) : (
-                <li key={r.id} className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPicked(r.id);
-                      setMealPage(0);
-                      setEditingKind(null);
-                    }}
-                    aria-pressed={r.id === pickedRow.id}
-                    className={`flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-2xl border-2 px-3 text-left ${r.id === pickedRow.id ? "border-meal-ink bg-meal" : "border-transparent hover:bg-rail"} ${r.active ? "" : "opacity-55"}`}
-                  >
-                    <Emoji emoji={r.icon} className="size-9" />
-                    <span className={`min-w-0 flex-1 truncate text-xl font-bold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name"}</span>
-                    <span className="text-base text-ink-muted">{r.count ?? ""}</span>
-                  </button>
-                  {r.id === pickedRow.id && r.id !== ALL && r.id !== NONE ? (
-                    <button type="button" onClick={() => setEditingKind(r.id)} aria-label={`Rename ${r.name}`} className="flex size-12 shrink-0 items-center justify-center rounded-full bg-rail text-ink">
-                      <PencilSimple size="1.25rem" aria-hidden />
-                    </button>
-                  ) : null}
-                </li>
-              ),
-            )}
+          <h2 className={h2}>Kinds of meal</h2>
+          <ul ref={kindsRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {kindList.items.map((r) => (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPicked(r.id);
+                    setMealPage(0);
+                    setEditingKind(null);
+                  }}
+                  aria-pressed={r.id === pickedRow.id}
+                  className={`${pickRowClass(r.id === pickedRow.id)} ${r.active ? "" : "opacity-55"}`}
+                >
+                  <Emoji emoji={r.icon} className="size-[2.15rem]" />
+                  <span className={`min-w-0 flex-1 truncate text-[1.5rem] font-extrabold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name"}</span>
+                  <span className="tabular text-[1.35rem] font-extrabold text-ink-muted">{r.count ?? ""}</span>
+                </button>
+              </li>
+            ))}
           </ul>
           <Arrows page={kindList.page} pages={kindList.pages} setPage={setKindPage} />
+          <button type="button" onClick={addKind} className={`${secondaryActionClass} mt-3 w-full`}>
+            <Plus size="1.25rem" weight="bold" aria-hidden />
+            Add a kind
+          </button>
         </section>
 
         {/* That kind's meals */}
         <section className={card}>
-          <div className="flex shrink-0 items-center gap-2">
-            <Emoji emoji={pickedRow.icon} className="size-9" />
-            <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">{pickedRow.name}</h2>
-            {blank ? null : (
-              <button type="button" onClick={addMeal} className={soft}>
-                <Plus size="1.25rem" weight="bold" aria-hidden />
-                New meal
-              </button>
-            )}
-          </div>
-          <ul ref={mealsRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+          {editingRow ? (
+            <KindEditor
+              kind={editingRow}
+              onChange={(patch) => changeKind(editingRow.id, patch)}
+              onRemove={editingRow.isLeftovers ? null : () => removeKind(editingRow.id)}
+              onDone={() => setEditingKind(null)}
+            />
+          ) : (
+            <div className={`${h2} min-h-[var(--touch-target)]`}>
+              <span className="min-w-0 flex-1 truncate">{pickedRow.name || "No name"}</span>
+              {pickedRow.id !== ALL && pickedRow.id !== NONE ? (
+                <button type="button" onClick={() => setEditingKind(pickedRow.id)} aria-label={`Rename ${pickedRow.name}`} className={roundIconClass}>
+                  <PencilSimple size="1.5rem" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          )}
+          <ul ref={mealsRef} className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
             {mealList.items.map((m) => (
               <li key={m.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelected(m.id)}
-                  aria-pressed={m.id === selected}
-                  className={`flex min-h-[4.25rem] w-full items-center gap-3 rounded-2xl border-2 px-3 text-left ${m.id === selected ? "border-meal-ink bg-meal" : "border-transparent bg-rail hover:bg-panel"}`}
-                >
-                  <Emoji emoji={menuMealIcon(asLike(m), dishById) ?? "🍽️"} className="size-11" />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-xl font-bold text-ink">{nameOf(m)}</span>
-                    <span className="truncate text-base text-ink-muted">{spotSummary(asLike(m))}</span>
-                  </span>
+                <button type="button" onClick={() => setSelected(m.id)} aria-pressed={m.id === meal?.id} className={pickRowClass(m.id === meal?.id)}>
+                  <Emoji emoji={menuMealIcon(asLike(m), dishById) ?? "🍽️"} className="size-[2.15rem]" />
+                  <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{nameOf(m)}</span>
                 </button>
               </li>
             ))}
-            {shown.length === 0 && !blank ? <li className="text-lg text-ink-muted">No meals yet</li> : null}
+            {blank ? (
+              // The Leftovers kind is a blank: a night for what's already cooked, so it has no meals of its own.
+              <li className="flex flex-col gap-2 px-1 pt-1">
+                <span className="text-lg font-bold text-ink">A leftovers night</span>
+                <span className="text-lg text-ink-muted">No meals to set up: it’s for eating what’s already cooked. Plan it in the Planner like any kind.</span>
+              </li>
+            ) : shown.length === 0 ? (
+              <li className="px-1 text-lg text-ink-muted">No meals yet</li>
+            ) : null}
           </ul>
           <Arrows page={mealList.page} pages={mealList.pages} setPage={setMealPage} />
         </section>
@@ -323,13 +290,69 @@ export function MenuManager({
               }}
             />
           ) : (
-            <EmptyState emoji="🍽️" />
+            <EmptyState emoji="🍽️" title={blank ? undefined : "Pick a meal"} hint={blank ? undefined : "Its spots show here: a set dish, or one you pick on the day."} />
           )}
         </section>
       </div>
 
       {guard.leaving ? <LeaveDialog what="some meals" saving={saving} onSave={() => save(guard.leaving)} onStay={guard.stay} onLeave={guard.leaveWithoutSaving} /> : null}
     </>
+  );
+}
+
+/** Renaming a kind of meal (a new one opens this way): picture, name, remove, done. Save still keeps it. */
+function KindEditor({
+  kind,
+  onChange,
+  onRemove,
+  onDone,
+}: {
+  kind: Category;
+  onChange: (patch: Partial<Category>) => void;
+  onRemove: (() => void) | null;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col gap-2 rounded-[var(--radius)] bg-rail p-2 shadow-[inset_0_0_0_2px_var(--color-ink)]">
+      <div className="flex items-center gap-2">
+        <EmojiPicker
+          initial={kind.icon ?? ""}
+          fieldName=""
+          nameText={kind.name}
+          onChange={(icon) => onChange({ icon: icon || null })}
+          label={`Picture for ${kind.name || "this one"}`}
+          className="size-12! self-center!"
+          fullScreen
+        />
+        <input
+          value={kind.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onDone();
+          }}
+          maxLength={40}
+          aria-label="Name of this kind of meal"
+          placeholder="Name"
+          autoFocus
+          className="h-12 min-w-0 flex-1 rounded-[var(--radius-small)] border-2 border-frame bg-board px-3 text-[1.5rem] font-extrabold text-ink outline-none focus:border-ink"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        {onRemove ? (
+          // Its meals stay, under the other kinds they're in (or under no kind).
+          <button type="button" onClick={onRemove} aria-label={`Remove ${kind.name || "this one"} (keeps its meals)`} className="flex min-h-12 items-center gap-1.5 rounded-[var(--radius-small)] px-3 text-lg font-bold text-danger hover:bg-board">
+            <Trash size="1.25rem" aria-hidden />
+            Remove
+          </button>
+        ) : (
+          <span className="px-1 text-base font-bold text-ink-muted">Leftovers stays</span>
+        )}
+        <button type="button" onClick={onDone} className="ml-auto flex min-h-12 items-center gap-1.5 rounded-[var(--radius-small)] bg-ink px-4 text-lg font-bold text-board">
+          <Check size="1.25rem" weight="bold" aria-hidden />
+          Done
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -356,13 +379,15 @@ function MealEditor({
 }) {
   const [spotPage, setSpotPage] = useState(0);
   const [choosing, setChoosing] = useState<number | null>(meal.spots.length === 1 && !meal.spots[0].recipeId && meal.id.startsWith("new-") ? 0 : null);
-  const [spotsRef, spotsPerPage] = useFitRows<HTMLUListElement>(SPOTS_PER_PAGE);
+  const [spotsRef, fit] = useFitRows<HTMLUListElement>(SPOTS_PER_PAGE);
+  // The list's last row is "Add a spot", so it sits right under the spots.
+  const spotsPerPage = Math.max(1, fit - 1);
   const spots = paged(meal.spots.map((s, i) => ({ s, i })), spotPage, spotsPerPage);
   const setSpot = (i: number, changes: Partial<ManagerMeal["spots"][number]>) => onChange((m) => ({ ...m, spots: m.spots.map((s, j) => (j === i ? { ...s, ...changes } : s)) }));
 
   return (
     <>
-      <div className="flex shrink-0 items-end gap-4">
+      <div className="flex shrink-0 items-center gap-3">
         <EmojiPicker
           initial={meal.icon ?? ""}
           fallback={menuMealIcon(asLike({ ...meal, icon: null }), dishById) ?? "🍽️"}
@@ -370,26 +395,27 @@ function MealEditor({
           nameText={name}
           onChange={(e) => onChange((m) => ({ ...m, icon: e || null }))}
           label={`Picture for ${name}`}
-          className="size-16! self-center!"
+          className="size-12! self-center!"
           fullScreen
         />
-        <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="text-base font-bold text-ink">Name</span>
-          <input
-            value={meal.name}
-            maxLength={80}
-            onChange={(e) => onChange((m) => ({ ...m, name: e.target.value }))}
-            className="h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-4 text-xl text-ink outline-none focus:border-accent"
-          />
-        </label>
-        <button type="button" onClick={onRemove} className="flex min-h-[var(--touch-target)] shrink-0 items-center gap-2 rounded-2xl px-3 text-base font-bold text-danger hover:bg-rail">
-          <Trash size="1.25rem" aria-hidden />
-          Delete meal
+        {/* The name reads like the card's title; tap it to type. Left blank, the meal goes by its main dish. */}
+        <input
+          value={meal.name}
+          placeholder={name}
+          maxLength={80}
+          aria-label="Name of this meal"
+          onChange={(e) => onChange((m) => ({ ...m, name: e.target.value }))}
+          className="h-12 min-w-0 flex-1 rounded-[var(--radius-small)] border-2 border-transparent bg-transparent px-2 text-2xl font-bold text-ink outline-none placeholder:text-ink hover:border-frame focus:border-ink"
+        />
+        <button type="button" onClick={onRemove} aria-label={`Remove ${name}`} title="Remove this meal" className={roundIconClass}>
+          <Trash size="1.5rem" aria-hidden />
         </button>
       </div>
+      <p className="mt-1 shrink-0 text-[1.25rem] font-bold text-ink-muted">Spots in this meal. A set dish, or one you pick on the day.</p>
 
-      <div className="flex shrink-0 flex-col gap-1.5">
-        <div className="flex flex-wrap gap-2">
+      {categories.length ? (
+        <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2" role="group" aria-label="Kinds of meal it's in">
+          <span className="text-[1.15rem] font-bold text-ink-muted">In</span>
           {categories.slice(0, 12).map((c) => {
             const on = meal.categoryIds.includes(c.id);
             return (
@@ -398,7 +424,7 @@ function MealEditor({
                 type="button"
                 aria-pressed={on}
                 onClick={() => onChange((m) => ({ ...m, categoryIds: on ? m.categoryIds.filter((x) => x !== c.id) : [...m.categoryIds, c.id] }))}
-                className={`flex min-h-11 items-center gap-1.5 rounded-full border-2 px-3 text-base ${on ? "border-ink bg-rail font-bold text-ink" : "border-frame text-ink-soft"}`}
+                className={`flex min-h-12 items-center gap-1.5 rounded-full border-2 px-3 text-base font-bold ${on ? "border-ink bg-rail text-ink" : "border-frame text-ink-soft"}`}
               >
                 <Emoji emoji={c.icon} className="size-6" />
                 {c.name}
@@ -406,67 +432,57 @@ function MealEditor({
             );
           })}
         </div>
-      </div>
+      ) : null}
 
-      <div className="flex shrink-0 items-center gap-2 border-t border-frame pt-3">
-        <h3 className="flex-1 text-xl font-bold text-ink">Dishes</h3>
-        <button
-          type="button"
-          disabled={meal.spots.length >= 20}
-          onClick={() => {
-            const side = kinds.find((k) => k.name === "Veggie") ?? kinds[0];
-            onChange((m) => ({ ...m, spots: [...m.spots, { kindId: side?.id ?? null, recipeId: null, batches: 1 }] }));
-            setSpotPage(Math.floor(meal.spots.length / spotsPerPage));
-            setChoosing(meal.spots.length);
-          }}
-          className={soft}
-        >
-          <Plus size="1.25rem" weight="bold" aria-hidden />
-          Dish
-        </button>
-      </div>
-      <ul ref={spotsRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+      <ul ref={spotsRef} className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
         {spots.items.map(({ s, i }) => {
           const dish = s.recipeId ? dishById.get(s.recipeId) : undefined;
           const kind = s.kindId ? kindById.get(s.kindId) : undefined;
+          const what = dish ? dish.name : `any ${kind?.name ?? "dish"}`;
           return (
-            <li key={i} className="flex min-h-16 items-center gap-3 rounded-2xl bg-rail px-3">
-              <Emoji emoji={dish?.icon ?? kind?.icon ?? "🍽️"} className="size-10" />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-xl font-bold text-ink">{dish ? dish.name : `Any ${kind?.name.toLowerCase() ?? "dish"}`}</span>
-                <span className="truncate text-sm font-bold tracking-wide text-ink-muted uppercase">{dish ? (kind?.name ?? "Dish") : "On the day"}</span>
-              </span>
-              <span className="flex shrink-0 gap-1 rounded-xl bg-board p-1" role="group" aria-label="Batches">
-                {BATCHES.map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    aria-pressed={s.batches === b}
-                    onClick={() => setSpot(i, { batches: b })}
-                    className={`flex size-11 items-center justify-center rounded-lg text-base font-bold ${s.batches === b ? "bg-ink text-board" : "text-ink-soft"}`}
-                  >
-                    ×{b}
-                  </button>
-                ))}
-              </span>
-              <button type="button" onClick={() => setChoosing(i)} className="flex min-h-12 shrink-0 items-center gap-1.5 rounded-xl bg-board px-3 text-base font-bold text-ink">
-                <ArrowsLeftRight size="1.125rem" aria-hidden />
-                Change
-              </button>
+            <li key={i} className="flex min-h-[4.25rem] shrink-0 items-center gap-[0.65rem] border-b border-frame">
+              <span className="w-[6.5rem] shrink-0 truncate pl-3 text-[1.15rem] font-bold text-ink-muted">{kind?.name ?? "Dish"}</span>
+              {/* Tap the dish to change it (or to make it one you pick on the day). */}
               <button
                 type="button"
-                aria-label="Take this dish off"
+                onClick={() => setChoosing(i)}
+                aria-label={`Change ${what}`}
+                className="flex min-h-[var(--touch-target)] min-w-0 flex-1 items-center gap-[0.65rem] rounded-[var(--radius)] px-1 text-left hover:bg-rail"
+              >
+                <Emoji emoji={dish?.icon ?? kind?.icon ?? "🍽️"} className="size-[2.15rem]" />
+                <span className="min-w-0 truncate text-[1.5rem] font-extrabold text-ink">{what}</span>
+              </button>
+              <BatchSwitch value={s.batches} onPick={(b) => setSpot(i, { batches: b })} />
+              <button
+                type="button"
+                aria-label="Remove this spot"
                 disabled={meal.spots.length <= 1}
                 onClick={() => onChange((m) => ({ ...m, spots: m.spots.filter((_, j) => j !== i) }))}
-                className="flex size-12 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-board disabled:opacity-30"
+                className={roundIconClass}
               >
-                <X size="1.125rem" weight="bold" aria-hidden />
+                <Trash size="1.5rem" aria-hidden />
               </button>
             </li>
           );
         })}
+        <li className="flex min-h-[4.25rem] shrink-0 items-center gap-4">
+          <button
+            type="button"
+            disabled={meal.spots.length >= 20}
+            onClick={() => {
+              const side = kinds.find((k) => k.name === "Veggie") ?? kinds[0];
+              onChange((m) => ({ ...m, spots: [...m.spots, { kindId: side?.id ?? null, recipeId: null, batches: 1 }] }));
+              setSpotPage(Math.floor(meal.spots.length / spotsPerPage));
+              setChoosing(meal.spots.length);
+            }}
+            className={secondaryActionClass}
+          >
+            <Plus size="1.25rem" weight="bold" aria-hidden />
+            Add a spot
+          </button>
+          <Arrows page={spots.page} pages={spots.pages} setPage={setSpotPage} />
+        </li>
       </ul>
-      <Arrows page={spots.page} pages={spots.pages} setPage={setSpotPage} />
 
       {choosing !== null && meal.spots[choosing] ? (
         <DishChooser
@@ -526,7 +542,7 @@ function DishChooser({
               setTab(k.id);
               setPage(0);
             }}
-            className={`flex min-h-11 items-center gap-1.5 rounded-full px-3.5 text-base font-bold ${tab === k.id ? "bg-ink text-board" : "bg-rail text-ink-soft"}`}
+            className={`flex min-h-12 items-center gap-1.5 rounded-full px-3.5 text-base font-bold ${tab === k.id ? "bg-ink text-board" : "bg-rail text-ink-soft"}`}
           >
             {k.icon ? <Emoji emoji={k.icon} className="size-6" /> : null}
             {k.name}

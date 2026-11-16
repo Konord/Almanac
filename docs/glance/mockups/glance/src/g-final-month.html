@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Month</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<style>
+@font-face{font-family:"Atkinson Hyperlegible Next";src:url("../../fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");font-weight:200 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Almanac Digits";src:url("../../fonts/figtree-latin-wght-normal.woff2") format("woff2");font-weight:300 900;font-style:normal;font-display:swap;unicode-range:U+0030-0039;size-adjust:98%}
+@font-face{font-family:"Shantell Sans";src:url("../../fonts/shantell-sans-latin-full-normal.woff2") format("woff2-variations");font-weight:300 800;font-style:normal;font-display:swap}
+
+body{font-family:"Almanac Digits","Atkinson Hyperlegible Next",system-ui,sans-serif}
+:root{
+  --now:#A3261A;
+  --hand-blue:#2963A6;--hand-pink:#A6375E;--hand-teal:#157179;--hand-purple:#7D42A8;--hand-orange:#9C4B0C;
+  --hol:#7A2A2A;--hol-soft:#F3E6E6;--hol-ink:#7A2A2A;
+}
+
+.app{height:100%;display:flex;flex-direction:column;gap:0;padding:0 0 3.15rem;min-height:0;background:var(--rail);position:relative}
+
+/* Same locked agenda header: 7rem, title + year, weather, tabs, Add. No chips. */
+.top{display:flex;align-items:center;gap:1.15rem;min-height:7rem;max-height:7rem;padding:0 2rem;flex:none;background:var(--rail)}
+.mo{display:flex;align-items:baseline;gap:.8rem;min-width:0;margin-right:auto}
+.mo .mon{font-size:6.75rem;font-weight:800;letter-spacing:-.045em;line-height:.9}
+.mo-side{display:contents}
+.mo .sub{font-size:2rem;font-weight:700;letter-spacing:-.02em;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1}
+.tools{display:flex;align-items:center;gap:.6rem;flex:none}
+.wx{display:flex;align-items:center;gap:.35rem;min-height:var(--tt);padding:0 .4rem;border-radius:var(--r);background:transparent;border:0;color:inherit;cursor:pointer}
+.wx img{width:2.15rem;height:2.15rem}
+.wx .tp{font-size:2.15rem;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.top .seg button{min-width:6.75rem}
+.top .btn.add{min-height:var(--tt);padding:0 1.35rem}
+.top .btn.icon{width:var(--tt);height:var(--tt);min-height:var(--tt);padding:0;border-radius:50%;background:var(--panel);color:var(--ink)}
+.top .btn.icon svg{width:1.5rem;height:1.5rem}
+.navm{display:none;align-items:center;gap:.35rem}
+html[data-arrows="on"] .navm{display:flex}
+
+.body{flex:1;min-height:0;display:flex}
+.cal{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+
+/* Grid goes to the screen edges: no outer border, no rounded corners, no side padding. */
+.wds{display:grid;grid-template-columns:repeat(7,1fr);flex:none;background:var(--board);border-bottom:1px solid var(--frame)}
+.wd{padding:.35rem .55rem .3rem;font-size:1.15rem;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,1fr);background:var(--board)}
+.cell{position:relative;display:flex;flex-direction:column;gap:.2rem;padding:.28rem .32rem .2rem;border-right:1px solid var(--frame);border-bottom:1px solid var(--frame);background:var(--board);overflow:hidden;min-width:0;min-height:0}
+.cell:nth-child(7n){border-right:0}
+.grid[data-rows="5"] .cell:nth-last-child(-n+7),
+.grid[data-rows="6"] .cell:nth-last-child(-n+7){border-bottom:0}
+.cell.other{background:#F7F8F9}
+.cell.other .n{color:var(--muted)}
+.cell.today{background:#FFFCFB}
+.head{display:flex;align-items:flex-start;flex:none;min-width:0}
+.n{align-self:flex-start;min-width:1.75rem;height:1.75rem;padding:0 .15rem;display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;flex:none}
+.n.wide{min-width:auto;padding:0 .3rem}
+.cell.today .n{border:2px solid var(--now);border-radius:50%;color:var(--now);background:transparent}
+.cell.today .n.wide{border-radius:1rem}
+
+.hol{display:flex;align-items:center;gap:.28rem;font-size:1.15rem;font-weight:700;color:var(--hol-ink);line-height:1.1;min-width:0}
+.hol img{width:1.25rem;height:1.25rem}
+.cell.holiday{background:var(--hol-soft)}
+.cell.holiday.today{background:#F7EEEC}
+
+.evs{display:flex;flex-direction:column;gap:.12rem;min-width:0;flex:1}
+.ev{display:flex;align-items:center;gap:.35rem;min-height:3rem;padding:0 .4rem 0 .55rem;border-radius:var(--r-sm);background:var(--es,var(--panel));color:var(--hc,var(--ink));position:relative;overflow:hidden;min-width:0;cursor:pointer;flex:none}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--ec,var(--check))}
+.ev.split::before{background:linear-gradient(to bottom,var(--ec) 50%,var(--ec2) 50%)}
+.ev .tm{font-size:1.15rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--hc,var(--ink));flex:none;white-space:nowrap}
+.ev .ti{font-size:1.15rem;font-weight:700;line-height:1.1;min-width:0;color:var(--hc,var(--ink))}
+.ev.plain{background:var(--panel);color:var(--ink)}
+.ev.plain .tm,.ev.plain .ti{color:var(--ink)}
+.ev[hidden]{display:none!important}
+.ev:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.more{display:flex;align-items:center;min-height:0;padding:.05rem .4rem .1rem;font-size:1.15rem;font-weight:700;color:var(--soft);font-variant-numeric:tabular-nums;cursor:pointer;flex:none;border:0;background:transparent;text-align:left;line-height:1.2}
+.more[hidden]{display:none!important}
+
+/* Handwritten user event titles only */
+.ev.user .ti,.side .ev.user .ti,.side .dinner b{
+  font-family:"Shantell Sans",cursive;
+  -webkit-font-smoothing:auto;
+  font-variation-settings:"BNCE" 18,"INFM" 30,"SPAC" 0,"wght" 650;
+  font-weight:700;
+  letter-spacing:0;
+}
+
+/* V2: all-day full-width strips; timed events as dot + text in a 48px row */
+html[data-var="2"] .ev.timed{background:transparent;padding-left:.15rem;gap:.4rem}
+html[data-var="2"] .ev.timed::before{display:none}
+html[data-var="2"] .ev.timed .dot{width:.7rem;height:.7rem;border-radius:50%;background:var(--ec,var(--check));flex:none}
+html[data-var="2"] .ev.all{padding-left:.55rem}
+html[data-var="2"] .ev.plain.timed .dot{background:var(--check)}
+
+/* V3: narrower grid + agenda-style right panel for the selected day */
+.side{display:none;width:36rem;flex:none;min-height:0;padding:1rem 2rem 0 1.15rem}
+html[data-var="3"] .cal{border-right:1px solid var(--frame)}
+html[data-var="3"] .side{display:flex;flex-direction:column;gap:1.15rem;background:var(--rail)}
+.side .day-head{font-size:1.75rem;font-weight:700;letter-spacing:-.02em;flex:none}
+.side .day-head .sub{display:block;font-size:1.25rem;font-weight:600;color:var(--muted)}
+.side .allday{display:flex;flex-wrap:wrap;gap:.35rem}
+.side .chip{display:flex;align-items:center;gap:.3rem;height:2.15rem;padding:0 .65rem 0 .45rem;border-radius:var(--r-sm);background:var(--es,var(--panel));color:var(--hc,var(--ink));font-size:1.15rem;font-weight:700;position:relative;overflow:hidden}
+.side .chip.owned{padding-left:.7rem}
+.side .chip.owned::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--ec)}
+.side .chip img{width:1.4rem;height:1.4rem}
+.side .chip.user{font-family:"Shantell Sans",cursive;font-variation-settings:"BNCE" 18,"INFM" 30,"SPAC" 0,"wght" 650;letter-spacing:0}
+.side .evs-day{display:flex;flex-direction:column;gap:.55rem;min-height:0;overflow:auto;flex:none}
+.side .evs-day .ev{min-height:4.25rem;padding:.45rem .8rem .45rem 1.15rem;border-radius:var(--r-card)}
+.side .evs-day .ev::before{width:.4rem}
+.side .evs-day .tm{font-size:1.25rem}
+.side .evs-day .ti{font-size:1.35rem}
+.side .dinner{background:var(--meal);color:var(--meal-ink);display:flex;align-items:center;gap:1rem;padding:1.1rem 1.25rem;flex:none}
+.side .dinner img{width:3.5rem;height:3.5rem}
+.side .dinner .k{font-size:1.125rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--meal-ink)}
+.side .dinner b{display:block;font-size:1.5rem;line-height:1.15;color:var(--ink);font-weight:700}
+.side .empty-note{display:none}
+.cell.sel:not(.today){box-shadow:inset 0 0 0 2px var(--ink)}
+
+/* V4: past days fade like finished events; current week is taller */
+html[data-var="4"] .cell.past{background:#F4F5F7}
+html[data-var="4"] .cell.past .n{color:var(--muted)}
+html[data-var="4"] .cell.past .ev{background:var(--panel)}
+html[data-var="4"] .cell.past .ev .ti,html[data-var="4"] .cell.past .ev .tm{color:var(--muted)}
+html[data-var="4"] .cell.past .ev::before,html[data-var="4"] .cell.past .dot{opacity:.4}
+html[data-var="4"] .cell.past.holiday{background:#F4EDED}
+html[data-var="4"] .cell.past .hol{color:var(--muted)}
+
+
+/* V5 — Connor's sketched cell: top-row date + emoji stickers, list-style event rows, big holiday emoji. */
+html[data-var="5"] .cell{gap:0;padding:.16rem .32rem .1rem}
+html[data-var="5"] .cell.holiday{background:var(--board)}
+html[data-var="5"] .head{display:flex;align-items:center;gap:.15rem;flex:none;position:relative;z-index:1;min-height:1.85rem}
+html[data-var="5"] .head .n{align-self:center}
+html[data-var="5"] .stickers{flex:1;min-width:0;display:grid;align-items:center;justify-items:center}
+html[data-var="5"] .sticker{display:flex;align-items:center;justify-content:center;height:1.9rem;min-width:0;pointer-events:none}
+html[data-var="5"] .sticker img{width:1.65rem;height:1.65rem}
+html[data-var="5"] .sticker.more{font-size:1.15rem;font-weight:700;color:var(--soft);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+html[data-var="5"] .hol-bg{position:absolute;top:1.85rem;left:0;right:0;bottom:0;display:grid;place-items:center;pointer-events:none;z-index:0;background:transparent;overflow:hidden;filter:none;opacity:1}
+html[data-var="5"] .hol-bg img,
+html[data-var="5"] .hol-bg img.e{width:auto;height:auto;max-width:100%;max-height:100%;min-width:0;min-height:0;object-fit:contain;object-position:center;background:transparent;border:0;box-shadow:none;filter:none}
+html[data-var="5"] .cell.holiday.has-ev .hol-bg img{opacity:.18}
+html[data-var="5"] .cell.holiday:not(.has-ev) .hol-bg img{opacity:1}
+html[data-var="5"] .evs{position:relative;z-index:1;gap:.08rem;padding-top:.06rem;flex:1;min-height:0;justify-content:flex-start}
+html[data-var="5"] .ev,
+html[data-var="5"] .ev.plain,
+html[data-var="5"] .ev.timed,
+html[data-var="5"] .ev.all{background:transparent;border-radius:0;padding:0 .15rem 0 0;min-height:0;height:auto;gap:.45rem;overflow:hidden}
+html[data-var="5"] .ev::before{display:none}
+html[data-var="5"] .ev .ico{width:1.6rem;height:1.6rem;flex:none;display:grid;place-items:center}
+html[data-var="5"] .ev .ico img{width:1.45rem;height:1.45rem}
+html[data-var="5"] .ev .ti{color:var(--hc,var(--ink));font-size:1.15rem;line-height:1.15}
+html[data-var="5"] .ev.plain .ti{color:var(--ink)}
+html[data-var="5"] .ev .tm{font-size:1.15rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;flex:none;white-space:nowrap;letter-spacing:-.02em}
+html[data-times="off"] .ev .tm{display:none}
+html[data-var="5"] .more{min-height:0;padding:.02rem .15rem 0;font-size:1.15rem;line-height:1.15;color:var(--soft)}
+
+
+/* Daily List panel: overlay (slides over the grid) or push (grid narrows). Same 36rem column as the agenda side. */
+.scrim{display:none}
+.panel{display:none;width:36rem;box-sizing:border-box;padding:1.25rem;background:var(--rail);flex:none;min-height:0;flex-direction:column;gap:1.25rem}
+html[data-panel="overlay"] .panel,
+html[data-panel="push"] .panel{display:flex}
+html[data-panel="overlay"] .panel{position:absolute;top:7rem;right:0;bottom:3.15rem;z-index:8;box-shadow:-0.75rem 0 2.25rem rgb(30 35 45 / .20)}
+html[data-panel="overlay"] .scrim{display:block;position:absolute;top:7rem;left:0;right:36rem;bottom:3.15rem;z-index:7;border:0;padding:0;background:rgb(35 38 43 / .12);cursor:pointer}
+html[data-panel="push"] .panel{height:auto;align-self:stretch;box-shadow:-0.35rem 0 1.4rem rgb(30 35 45 / .12);border-left:1px solid var(--frame)}
+.panel .dinner{background:var(--meal);color:var(--meal-ink);display:flex;align-items:center;gap:1.25rem;flex:none}
+.panel .dinner img{width:4.5rem;height:4.5rem}
+.panel .dinner .k{font-size:1.125rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.panel .dinner b{display:block;font-size:1.75rem;line-height:1.15;color:var(--ink);font-weight:700}
+.panel .list{flex:1;display:flex;flex-direction:column;gap:.35rem;min-height:0;overflow:auto}
+.panel .list .h2{width:100%}
+.panel .list .slot{width:var(--tt);flex:none;display:grid;place-items:center;margin-left:auto}
+.panel .list .h2 .slot{margin-left:auto}
+.panel .list .h2 .btn.icon{margin-left:0}
+.panel .row{display:flex;align-items:center;gap:1rem;min-height:var(--tt);font-size:1.375rem;font-weight:600;border-bottom:1px solid var(--frame);max-height:6rem;overflow:hidden}
+.panel .row:last-child{border:0}
+.panel .cb{width:3rem;height:3rem;flex:none;display:grid;place-items:center;color:#fff;font-size:1.5rem;background:transparent;padding:0;border:0;cursor:pointer}
+.panel .cb .disc{width:2.5rem;height:2.5rem;border-radius:50%;border:.2rem solid var(--check);display:flex;align-items:center;justify-content:center}
+.panel .row .tx{flex:1;min-width:0;color:var(--ink);font-weight:700;position:relative}
+.panel .row.owned .tx{color:var(--pc)}
+.panel .row .slot img{width:2rem;height:2rem}
+.panel .row .tx,
+.panel .dinner b{
+  font-family:"Shantell Sans",cursive;
+  -webkit-font-smoothing:auto;
+  font-variation-settings:"BNCE" 18,"INFM" 30,"SPAC" 0,"wght" 650;
+  font-weight:700;
+  letter-spacing:0;
+}
+.panel .row.owned .tx{color:var(--pc)}
+
+
+.tray{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:12rem;height:3.15rem;border:0;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding-bottom:.55rem;cursor:pointer;z-index:5}
+.tray .bar{width:7.5rem;height:.45rem;border-radius:99px;background:#C5C8CE}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="../../src/common.js"></script>
+<script src="g.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const raw = params.get("variant") || "1";
+const isV5 = raw === "5" || raw === "5a" || raw === "5b";
+const variant = isV5 ? "5" : (["1","2","3","4"].includes(raw) ? raw : "1");
+const showTimes = raw === "5b";
+const panel = (isV5 && (params.get("panel") === "overlay" || params.get("panel") === "push")) ? params.get("panel") : "";
+document.documentElement.dataset.var = variant;
+document.documentElement.dataset.times = showTimes ? "on" : "off";
+document.documentElement.dataset.arrows = (variant === "1" || variant === "3" || variant === "5") ? "on" : "off";
+if (panel) document.documentElement.dataset.panel = panel;
+
+const YEAR = 2026, MONTH = 10; // November
+const TODAY = new Date(2026, 10, 14);
+const LIMIT = 4;
+
+/* Made-up November 2026 family data, reused from the locked agenda where it overlaps. */
+const EVENTS = {
+  "2026-11-03": [
+    { t: "Piano", s: 16*60, e: 16*60+45, who: ["s"], icon: "musical_note.png" },
+  ],
+  "2026-11-05": [
+    { t: "Hockey practice", s: 18*60, e: 19*60, who: ["x"], icon: "ice_hockey.png" },
+  ],
+  "2026-11-06": [
+    { t: "Costco run", s: 10*60, e: 11*60+30, who: ["c"], icon: "shopping_cart.png" },
+  ],
+  "2026-11-08": [
+    { t: "Family breakfast", s: 9*60, e: 10*60+30, who: ["c","a","s","x"], icon: "fork_and_knife_with_plate.png" },
+  ],
+  "2026-11-10": [
+    { t: "Swim lessons", s: 16*60, e: 17*60, who: ["s","x"], icon: "person_swimming.webp" },
+  ],
+  "2026-11-11": [
+    { t: "Remembrance Day", all: true, kind: "holiday", holiday: "remembrance", icon: "maple_leaf.png" },
+  ],
+  "2026-11-13": [
+    { t: "Recycling pickup", all: true, kind: "user", who: ["c"], icon: "recycling_symbol.webp" },
+    { t: "Piano", s: 16*60, e: 16*60+45, who: ["s"], icon: "musical_note.png" },
+  ],
+  "2026-11-14": [
+    { t: "PA day", all: true, kind: "printed", who: [], icon: "school.png" },
+    { t: "Leo's birthday", all: true, kind: "user", who: [], icon: "birthday_cake.png" },
+    { t: "Dentist", s: 9*60, e: 10*60, who: ["c"], icon: "tooth.png" },
+    { t: "Team standup", s: 9*60, e: 9*60+30, who: ["a"], icon: "calendar.png" },
+    { t: "Swim lessons", s: 16*60, e: 17*60, who: ["s","x"], icon: "person_swimming.webp" },
+    { t: "Parent–teacher", s: 18*60, e: 19*60, who: ["c","a"], icon: "teacher.webp" },
+  ],
+  "2026-11-15": [
+    { t: "Hockey practice", s: 7*60, e: 8*60, who: ["x"], icon: "ice_hockey.png" },
+  ],
+  "2026-11-16": [
+    { t: "Grandma's dinner", s: 17*60, e: 20*60, who: ["c","a","s","x"], icon: "birthday_cake.png" },
+  ],
+  "2026-11-17": [
+    { t: "Piano", s: 15*60, e: 16*60, who: ["s"], icon: "musical_note.png" },
+  ],
+  "2026-11-18": [
+    { t: "Library books due", all: true, kind: "user", who: ["s"], icon: "books.png" },
+  ],
+  "2026-11-20": [
+    { t: "Hockey tournament", s: 8*60, e: 12*60, who: ["x"], icon: "ice_hockey.png" },
+    { t: "Costco run", s: 10*60, e: 11*60+30, who: ["c"], icon: "shopping_cart.png" },
+    { t: "Pick up the coats", s: 13*60, e: 13*60+30, who: ["c"], icon: "coat.png" },
+    { t: "Oil change", s: 15*60, e: 16*60, who: ["c"], icon: "package.png" },
+    { t: "Book club", s: 19*60, e: 21*60, who: ["a"], icon: "books.png" },
+  ],
+  "2026-11-23": [
+    { t: "Book club", s: 19*60, e: 21*60, who: ["a"], icon: "books.png" },
+  ],
+  "2026-11-26": [
+    { t: "Piano recital", s: 18*60, e: 19*60+30, who: ["s"], icon: "musical_note.png" },
+  ],
+  "2026-11-28": [
+    { t: "Family movie night", s: 19*60, e: 21*60, who: ["c","a","s","x"], icon: "birthday_cake.png" },
+  ],
+};
+
+const DINNERS = {
+  "2026-11-14": { t: "Sheet-pan chicken fajitas", icon: "taco.png" },
+  "2026-11-15": { t: "Spaghetti and meatballs", icon: "spaghetti.webp" },
+  "2026-11-16": { t: "Grandma's birthday dinner", icon: "birthday_cake.png" },
+  "2026-11-17": { t: "Slow-cooker beef stew", icon: "pot_of_food.webp" },
+  "2026-11-18": { t: "Fish tacos", icon: "taco.png" },
+  "2026-11-19": { t: "Leftovers night", icon: "shallow_pan_of_food.webp" },
+  "2026-11-20": { t: "Homemade pizza", icon: "shallow_pan_of_food.webp" },
+};
+
+
+/* v5-only additions: Nov 1 matches the sketched cell (3 stickers + 4 event rows);
+   Nov 14 gets two more timed events so the cell shows "+ 2 more";
+   Nov 18 has 4 all-day items (only 3 stickers show; extras are hidden, no +N);
+   Nov 11 Remembrance Day is the main holiday example — empty, maple leaf at full strength;
+   Nov 25 Friendsgiving is the edge case — one event over a faded turkey
+   (Dec 25 is not in this November grid). */
+const V5_EXTRAS = {
+  "2026-11-01": [
+    { t: "Family day", all: true, kind: "user", who: [], icon: "people_hugging.webp" },
+    { t: "Meal prep", all: true, kind: "user", who: ["c"], icon: "taco.png" },
+    { t: "Bring snacks", all: true, kind: "user", who: ["s"], icon: "cookie.webp" },
+    { t: "Mop the floors", s: 10*60, e: 11*60, who: ["c"], icon: "broom.png" },
+    { t: "Work (office)", s: 11*60, e: 16*60, who: ["a"], icon: "house_with_garden.png" },
+    { t: "Prep tacos", s: 16*60, e: 17*60, who: ["c"], icon: "taco.png" },
+    { t: "Evening walk", s: 19*60, e: 19*60+45, who: ["a"], icon: "person_walking.webp" },
+  ],
+  "2026-11-14": [
+    { t: "Pick up the coats", s: 12*60+30, e: 13*60, who: ["c"], icon: "coat.png" },
+    { t: "Evening walk", s: 19*60+15, e: 20*60, who: ["a"], icon: "person_walking.webp" },
+  ],
+  "2026-11-18": [
+    { t: "Jersey day", all: true, kind: "user", who: ["x"], icon: "ice_hockey.png" },
+    { t: "School photos", all: true, kind: "printed", who: [], icon: "camera_with_flash.webp" },
+    { t: "Book fair", all: true, kind: "user", who: ["s"], icon: "books.png" },
+  ],
+  "2026-11-25": [
+    { t: "Friendsgiving", all: true, kind: "holiday", holiday: "friendsgiving", icon: "turkey.png" },
+    { t: "Bring the pie", s: 15*60, e: 16*60, who: ["a"], icon: "pie.webp" },
+  ],
+};
+if (variant === "5") {
+  for (const [k, arr] of Object.entries(V5_EXTRAS)) EVENTS[k] = [...(EVENTS[k] || []), ...arr];
+}
+
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const sameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+const monthGrid = (year, month) => {
+  const first = new Date(year, month, 1);
+  const start = new Date(first);
+  start.setDate(1 - first.getDay());
+  const last = new Date(year, month + 1, 0);
+  const end = new Date(last);
+  end.setDate(last.getDate() + (6 - last.getDay()));
+  const days = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(new Date(d));
+  return { days, rows: days.length / 7 };
+};
+
+const evStyle = (e) => {
+  if (e.kind === "holiday") return `--es:var(--hol-soft);--ec:var(--hol);--hc:var(--hol-ink);--pc:var(--hol-ink)`;
+  const who = e.who || [];
+  if (!who.length) return `--es:var(--panel);--ec:var(--check);--hc:var(--ink);--pc:var(--ink)`;
+  if (who.length === 2) {
+    const c0 = P(who[0]).col, c1 = P(who[1]).col;
+    return `--es:var(--p-${c0}-soft);--es2:var(--p-${c1}-soft);--ec:var(--p-${c0});--ec2:var(--p-${c1});--hc:var(--hand-${c0});--pc:var(--p-${c0})`;
+  }
+  const col = who.length > 2 ? "orange" : P(who[0]).col;
+  return `--es:var(--p-${col}-soft);--ec:var(--p-${col});--hc:var(--hand-${col});--pc:var(--p-${col})`;
+};
+const evClass = (e) => {
+  const who = e.who || [];
+  const parts = ["ev"];
+  if (e.all) parts.push("all"); else parts.push("timed");
+  if (e.kind === "user" || (!e.kind && who.length)) parts.push("user");
+  if (e.kind === "printed" || e.kind === "holiday" || !who.length) parts.push("plain");
+  if (who.length === 2) parts.push("split");
+  return parts.join(" ");
+};
+const evTime = (e) => e.all ? "" : `${hm(e.s)} ${ap(e.s)}`;
+
+const { days, rows } = monthGrid(YEAR, MONTH);
+let selected = iso(TODAY);
+
+const evItem = (e, opts = {}) => {
+  const time = evTime(e);
+  const tm = time ? `<span class="tm">${time}</span>` : "";
+  if (variant === "5") {
+    const ico = `<span class="ico">${e.icon ? img(e.icon) : ""}</span>`;
+    return `<div class="${evClass(e)}" style="${evStyle(e)}" role="button" tabindex="0" data-tap aria-label="Edit event: ${e.t}">${ico}${tm}<span class="ti truncate">${e.t}</span></div>`;
+  }
+  const dot = (variant === "2" && !e.all) ? `<span class="dot" aria-hidden="true"></span>` : "";
+  return `<div class="${evClass(e)}" style="${evStyle(e)}" role="button" tabindex="0" data-tap aria-label="Edit event: ${e.t}">${dot}${tm}<span class="ti truncate">${e.t}</span></div>`;
+};
+
+const renderCell = (d, i) => {
+  const key = iso(d);
+  const list = EVENTS[key] || [];
+  const holiday = list.find(e => e.kind === "holiday");
+  const evs = list.filter(e => e.kind !== "holiday");
+  const allDay = evs.filter(e => e.all);
+  const timed = evs.filter(e => !e.all);
+  const isToday = sameDay(d, TODAY);
+  const isPast = d < TODAY && !isToday;
+  const other = d.getMonth() !== MONTH;
+  const monthName = d.toLocaleString("en",{month:"short"});
+  const label = ((variant === "5" && d.getDate() === 1) || (other && d.getDate() === 1))
+    ? `${monthName} ${d.getDate()}`
+    : String(d.getDate());
+  const hol = (variant !== "5" && holiday) ? `<div class="hol">${img(holiday.icon)}<span class="truncate">${holiday.t}</span></div>` : "";
+  const holBg = (variant === "5" && holiday) ? `<div class="hol-bg" data-decor>${img(holiday.icon)}</div>` : "";
+  const STICKER_MAX = 3;
+  let stickers = "";
+  if (variant === "5" && allDay.length) {
+    const shown = allDay.slice(0, STICKER_MAX);
+    stickers = `<div class="stickers" style="grid-template-columns:repeat(3,1fr)">${shown.map(e => `<span class="sticker" title="${e.t}">${img(e.icon)}</span>`).join("")}</div>`;
+  }
+  const listed = variant === "5" ? timed : evs;
+  const cls = [
+    "cell",
+    isToday ? "today" : "",
+    isPast ? "past" : "",
+    other ? "other" : "",
+    holiday ? "holiday" : "",
+    (variant === "5" && holiday && listed.length) ? "has-ev" : "",
+    variant === "3" && key === selected ? "sel" : "",
+  ].filter(Boolean).join(" ");
+  const dayName = d.toLocaleString("en",{weekday:"long", month:"long", day:"numeric"});
+  const aria = `Open agenda for ${dayName}${holiday ? ", " + holiday.t : ""}`;
+  return `<div class="${cls}" data-date="${key}" data-tap tabindex="0" aria-label="${aria}">
+    ${holBg}
+    <div class="head"><span class="n ${label.length>2?"wide":""}">${label}</span>${stickers}</div>
+    ${hol}
+    <div class="evs">${listed.map(e => evItem(e)).join("")}</div>
+  </div>`;
+};
+
+const weekday = (d) => d.toLocaleString("en",{weekday:"long"});
+const dayDetail = (key) => {
+  const d = new Date(key + "T12:00:00");
+  const list = EVENTS[key] || [];
+  const holiday = list.find(e => e.kind === "holiday");
+  const evs = list.filter(e => e.kind !== "holiday");
+  const dinner = DINNERS[key];
+  const chips = [
+    ...(holiday ? [`<span class="chip" style="${evStyle(holiday)}">${img(holiday.icon)} ${holiday.t}</span>`] : []),
+    ...evs.filter(e => e.all).map(e => `<span class="chip ${e.kind==="user"?"user":""} ${ (e.who||[]).length?"owned":""}" style="${evStyle(e)}">${e.icon?img(e.icon):""} ${e.t}</span>`),
+  ];
+  const timed = evs.filter(e => !e.all);
+  return `
+    <div class="day-head">${weekday(d)} <span class="sub">${d.toLocaleString("en",{month:"long"})} ${d.getDate()}</span></div>
+    ${chips.length ? `<div class="allday">${chips.join("")}</div>` : ""}
+    ${dinner ? `<div class="card dinner">${img(dinner.icon)}<div><div class="k">Dinner${sameDay(d,TODAY)?" tonight":""}</div><b>${dinner.t}</b></div></div>` : ""}
+    <div class="evs evs-day">${timed.map(e => evItem(e)).join("")}</div>
+  `;
+};
+
+const panelHtml = (() => {
+  if (!panel) return "";
+  const items = todayItems().filter(it => !it.done);
+  const rows = items.map(it => {
+    const person = it.who ? P(it.who) : null;
+    const owned = person ? " owned" : "";
+    const whoStyle = person ? `style="--pc:var(--p-${person.col});--hc:var(--hand-${person.col})"` : "";
+    const icon = it.icon ? img(it.icon) : "";
+    return `<div class="row${owned}" ${whoStyle} data-tap><button class="cb" aria-label="To do: ${it.t}" aria-pressed="false"><span class="disc"></span></button><span class="tx"><span class="tx-text">${it.t}</span></span><span class="slot">${icon}</span></div>`;
+  }).join("");
+  const dinner = DINNERS["2026-11-14"] || { t: "Sheet-pan chicken fajitas", icon: "taco.png" };
+  return `${panel === "overlay" ? `<button class="scrim" id="panel-scrim" type="button" aria-label="Close the daily list"></button>` : ""}
+    <aside class="panel" id="daily-panel" aria-label="Daily List">
+      <div class="card dinner">${img(dinner.icon)}<div><div class="k">Dinner tonight · 6 pm</div><b>${dinner.t}</b></div></div>
+      <div class="card list">
+        <div class="h2">Daily List <span class="slot"><button class="btn icon" aria-label="Add to the daily list">${I.plus}</button></span></div>
+        ${rows}
+      </div>
+    </aside>`;
+})();
+
+const arrows = variant === "1" || variant === "3" || variant === "5"
+  ? `<div class="navm"><button class="btn icon" aria-label="Previous month">${I.left}</button><button class="btn icon" aria-label="Next month">${I.right}</button></div>`
+  : "";
+
+render("#app", `
+<header class="top">
+  <div class="mo" aria-label="November 2026">
+    <span class="mon">November</span>
+    <div class="mo-side"><span class="sub">2026</span></div>
+  </div>
+  <div class="tools">
+    <button class="wx" aria-label="Weather, ${D.weather.temp} degrees">${img(D.weather.icon)}<div class="tp">${D.weather.temp}°</div></button>
+    ${arrows}
+    <span class="seg"><button>Today</button><button>Week</button><button class="on">Month</button></span>
+    <button class="btn primary add" aria-label="Add an event">${I.plus} Add</button>
+  </div>
+</header>
+<div class="body">
+  <div class="cal">
+    <div class="wds">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="wd">${d}</div>`).join("")}</div>
+    <section class="grid" data-rows="${rows}" style="${variant==="4"?`grid-template-rows:${Array.from({length:rows},(_,i)=>i===1?"1.55fr":"1fr").join(" ")}`:`grid-template-rows:repeat(${rows},1fr)`}">${days.map(renderCell).join("")}</section>
+  </div>
+  ${variant==="3"?`<aside class="side" id="side">${dayDetail(selected)}</aside>`:""}
+  ${panel==="push"?panelHtml:""}
+</div>
+${panel==="overlay"?panelHtml:""}
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+`);
+
+const sizeHolidayEmoji = () => {
+  if (variant !== "5") return;
+  for (const cell of document.querySelectorAll(".cell.holiday")) {
+    const head = cell.querySelector(".head");
+    const img = cell.querySelector(".hol-bg img");
+    if (!img) continue;
+    const below = Math.max(0, cell.clientHeight - (head ? head.offsetHeight : 0));
+    const side = Math.floor(0.88 * Math.min(cell.clientWidth, below));
+    img.style.width = `${side}px`;
+    img.style.height = `${side}px`;
+  }
+};
+
+const fit = () => {
+  sizeHolidayEmoji();
+
+  for (const cell of document.querySelectorAll(".grid .cell")) {
+    const evs = [...cell.querySelectorAll(".evs > .ev")];
+    evs.forEach(e => { e.hidden = false; });
+    cell.querySelector(".more")?.remove();
+    const box = cell.querySelector(".evs");
+    const hidden = [];
+    const hideOne = () => {
+      const vis = evs.filter(e => !e.hidden);
+      if (!vis.length) return false;
+      vis.at(-1).hidden = true;
+      hidden.push(vis.at(-1));
+      return true;
+    };
+    while (evs.filter(e => !e.hidden).length > LIMIT) hideOne();
+    const overflows = () => cell.scrollHeight > cell.clientHeight + 1;
+    const paintMore = () => {
+      if (!hidden.length) { cell.querySelector(".more")?.remove(); return; }
+      let more = cell.querySelector(".more");
+      if (!more) {
+        more = document.createElement("div");
+        more.className = "more";
+        box.append(more);
+      }
+      more.textContent = variant === "5" ? `+ ${hidden.length} more` : `+${hidden.length} more`;
+      more.setAttribute("aria-label", `Show ${hidden.length} more events`);
+    };
+    if (hidden.length) paintMore();
+    while (overflows() && hideOne()) paintMore();
+    if (!hidden.length) cell.querySelector(".more")?.remove();
+  }
+};
+
+const selectDay = (key) => {
+  selected = key;
+  document.querySelectorAll(".grid .cell").forEach(c => c.classList.toggle("sel", c.dataset.date === key));
+  const side = document.getElementById("side");
+  if (side) side.innerHTML = dayDetail(key);
+};
+
+if (variant === "3") {
+  document.querySelector(".grid")?.addEventListener("click", (e) => {
+    const cell = e.target.closest(".cell");
+    if (cell?.dataset.date) selectDay(cell.dataset.date);
+  });
+  document.querySelector(".grid")?.addEventListener("click", (e) => {
+    const more = e.target.closest(".more");
+    if (more) {
+      const cell = more.closest(".cell");
+      if (cell?.dataset.date) selectDay(cell.dataset.date);
+    }
+  });
+}
+
+/* V5 spec (no edit/agenda UI in the mock): tap an event to edit it;
+   tap the day (not a sticker — stickers are not targets) to open that day's agenda. */
+if (variant === "5") {
+  document.querySelector(".grid")?.addEventListener("click", (e) => {
+    const ev = e.target.closest(".ev");
+    if (ev) { e.stopPropagation(); return; }
+  });
+  document.querySelector(".grid")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const ev = e.target.closest(".ev");
+    if (ev) { e.preventDefault(); e.stopPropagation(); }
+  });
+}
+
+if (panel) {
+  const closePanel = () => {
+    document.documentElement.removeAttribute("data-panel");
+    document.getElementById("daily-panel")?.remove();
+    document.getElementById("panel-scrim")?.remove();
+    afterLayout();
+  };
+  document.getElementById("panel-scrim")?.addEventListener("click", closePanel);
+  if (panel === "push") {
+    document.querySelector(".cal")?.addEventListener("click", closePanel);
+  }
+}
+
+const afterLayout = () => requestAnimationFrame(() => requestAnimationFrame(fit));
+document.fonts.ready.then(afterLayout);
+addEventListener("load", afterLayout);
+addEventListener("resize", afterLayout);
+</script>
+</body>
+</html>

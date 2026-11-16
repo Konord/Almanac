@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { X } from "@phosphor-icons/react";
-import { Chips, Emoji, Field, Input } from "@/components/ui";
+import { Trash } from "@phosphor-icons/react";
+import { Chips, Emoji, Field, Input, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { LeaveDialog, SaveButton } from "@/components/unsaved-changes";
-import { saveDish } from "./actions";
+import { removeRecipe, saveDish } from "./actions";
 import { BLANK_INGREDIENT, IngredientsEditor, StepsEditor, type EditingStep, type IngredientDraft, type StepDraft } from "./recipe-editors";
 
 /*
- * A dish's card in the Menu Manager's Dishes tab, with ONE Save for the
+ * A dish's card in the Meals → Dishes tab (the right-hand column), with ONE Save for the
  * whole dish (Connor, 2026-11-10: there used to be four, one per tab, and
  * edits got lost switching tabs). The tabs switch in place, so changes on
- * every tab are kept until Save, and Undo puts them all back. Closing the
- * card or leaving the screen with changes asks first.
+ * every tab are kept until Save, and Undo puts them all back. Opening
+ * another dish or leaving the screen with changes asks first.
  */
 
 export type DishTab = "recipe" | "basics" | "ingredients" | "steps" | "notes";
@@ -58,9 +57,9 @@ export function DishEditor({
   temperatureUnit,
   initialTab,
   dishHref,
-  closeHref,
+  batches,
   view,
-  remove,
+  removeTo,
 }: {
   dish: EditableDish;
   kinds: Option[];
@@ -73,11 +72,12 @@ export function DishEditor({
   initialTab: DishTab;
   /** This dish's address, without a tab. */
   dishHref: string;
-  closeHref: string;
+  /** The ×1/×2/×3 switch, beside the title on the Recipe tab. */
+  batches: ReactNode;
   /** The saved recipe, for the Recipe tab. */
   view: ReactNode;
-  /** The Remove dish button. */
-  remove: ReactNode;
+  /** Where to go once the dish is removed. */
+  removeTo: string;
 }) {
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
@@ -155,42 +155,21 @@ export function DishEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 lg:p-8">
-      <Link href={closeHref} scroll={false} aria-label="Close" className="absolute inset-0 bg-[rgba(30,35,45,0.32)]" />
-      <section
-        role="dialog"
-        aria-label={dish.name}
-        className="relative flex max-h-full w-full max-w-[96rem] flex-col overflow-hidden rounded-[var(--radius-card)] bg-board shadow-[0_0_2.5rem_rgba(30,35,45,0.25)] lg:h-[52rem]"
-      >
-        <div className="flex shrink-0 items-center gap-4 border-b border-frame px-7 py-4">
-          <Emoji emoji={dish.icon} className="size-12" />
-          <h2 className="min-w-0 flex-1 truncate text-3xl font-extrabold text-ink">{dish.name}</h2>
-          <div className="flex gap-1 rounded-2xl bg-panel p-1" role="tablist" aria-label="Dish">
-            {TABS.map((t) => (
-              <button
-                key={t.tab}
-                type="button"
-                role="tab"
-                aria-selected={t.tab === tab}
-                onClick={() => setTab(t.tab)}
-                className={`flex min-h-12 items-center rounded-xl px-5 text-base font-bold ${t.tab === tab ? "bg-board text-ink shadow-[0_1px_3px_rgba(30,35,45,0.12)]" : "text-ink-muted"}`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save(null)} onUndo={undo} />
-          <Link
-            href={closeHref}
-            scroll={false}
-            aria-label="Close"
-            className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-rail text-ink hover:bg-panel"
-          >
-            <X size="1.75rem" weight="bold" aria-hidden />
-          </Link>
+    <section aria-label={dish.name} className="flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised">
+        <div className="flex min-h-[3.5rem] shrink-0 items-center gap-[0.7rem]">
+          <Emoji emoji={dish.icon} className="size-[2.15rem]" />
+          <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-ink">{dish.name}</h2>
+          {tab === "recipe" && !dirty ? batches : <SaveButton dirty={dirty} saving={saving} error={error} onSave={() => save(null)} onUndo={undo} />}
+        </div>
+        <div className={`${segTrackClass} mt-[0.7rem] mb-2 self-start`} role="tablist" aria-label="Dish">
+          {TABS.map((t) => (
+            <button key={t.tab} type="button" role="tab" aria-selected={t.tab === tab} onClick={() => setTab(t.tab)} className={`${segItemClass(t.tab === tab)} min-w-[8rem]`}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-7 py-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {tab === "recipe" ? (
             <>
               {view}
@@ -216,7 +195,7 @@ export function DishEditor({
                   <div className="flex items-end gap-4">
                     <EmojiPicker initial={dish.icon ?? ""} nameField="name" onChange={() => setFormChanged(true)} />
                     <Field label="Name">
-                      <Input name="name" defaultValue={dish.name} required maxLength={80} className="w-[30rem]" />
+                      <Input name="name" defaultValue={dish.name} required maxLength={80} className="w-[24rem]" />
                     </Field>
                   </div>
                   <div className="flex gap-4">
@@ -267,17 +246,20 @@ export function DishEditor({
                 />
               </label>
               <Field label="Recipe link">
-                <Input name="sourceUrl" type="url" defaultValue={dish.source_url ?? ""} placeholder="https://…" className="w-[40rem]" />
+                <Input name="sourceUrl" type="url" defaultValue={dish.source_url ?? ""} placeholder="https://…" className="w-[36rem]" />
               </Field>
             </div>
           </form>
-          {/* Remove sits under Basics, outside the form (it's its own action, and asks nothing). */}
-          {tab === "basics" ? <div className="flex shrink-0 justify-end border-t border-frame pt-4">{remove}</div> : null}
+          {/* Remove sits under Basics, outside the form (it's its own action, and asks "sure?" first). */}
+          {tab === "basics" ? (
+            <div className="flex shrink-0 justify-end border-t border-frame pt-4">
+              <RemoveDish id={dish.id} name={dish.name} returnTo={removeTo} />
+            </div>
+          ) : null}
 
           {tab === "ingredients" ? <IngredientsEditor rows={rows} setRows={setRows} /> : null}
           {tab === "steps" ? <StepsEditor steps={stepList} setSteps={setStepList} temperatureUnit={temperatureUnit} /> : null}
         </div>
-      </section>
 
       {leaving ? (
         <LeaveDialog
@@ -295,6 +277,35 @@ export function DishEditor({
           }}
         />
       ) : null}
-    </div>
+    </section>
+  );
+}
+
+/** Remove dish, after a "sure?" (meals that were only this dish go too). */
+function RemoveDish({ id, name, returnTo }: { id: string; name: string; returnTo: string }) {
+  const [asking, setAsking] = useState(false);
+  const danger = "inline-flex min-h-[var(--touch-target)] items-center gap-2 rounded-[var(--radius)] px-5 text-lg font-bold";
+  if (!asking) {
+    return (
+      <button type="button" onClick={() => setAsking(true)} className={`${danger} border-2 border-danger bg-board text-danger`}>
+        <Trash size="1.375rem" aria-hidden />
+        Remove dish
+      </button>
+    );
+  }
+  return (
+    <form action={removeRecipe} className="flex items-center gap-3" role="alert">
+      <input type="hidden" name="returnTo" value={returnTo} />
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="name" value={name} />
+      <span className="text-lg font-bold text-ink">Remove {name}? Meals that are only this dish go too.</span>
+      <button type="button" onClick={() => setAsking(false)} className={`${danger} bg-panel text-ink`}>
+        Keep it
+      </button>
+      <button className={`${danger} bg-danger text-white`}>
+        <Trash size="1.375rem" aria-hidden />
+        Yes, remove
+      </button>
+    </form>
   );
 }

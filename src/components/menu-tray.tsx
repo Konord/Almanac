@@ -129,18 +129,18 @@ export function MenuTray({ section }: { section: Section }) {
         onClick={() => openTo(1)}
         onPointerDown={(e) => dragStart(e.clientY)}
         onPointerUp={(e) => dragEnd(e.clientY)}
-        className={`fixed bottom-0 left-1/2 z-40 flex h-11 w-48 -translate-x-1/2 touch-none items-center justify-center ${
+        className={`fixed bottom-0 left-1/2 z-40 flex h-[3.15rem] w-48 -translate-x-1/2 touch-none items-end justify-center pb-[0.55rem] ${
           open ? "invisible" : ""
         }`}
       >
-        <span aria-hidden className="h-2 w-30 rounded-full bg-check-border/60" />
+        <span aria-hidden className="h-[0.45rem] w-30 rounded-full bg-handle" />
       </button>
 
       {/* A see-through layer behind the tray: tapping it closes the tray. */}
       <div
         aria-hidden
         onClick={close}
-        className={`fixed inset-0 z-40 bg-ink/10 transition-opacity duration-200 ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-40 bg-ink/12 transition-opacity duration-200 ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
       />
 
       <nav
@@ -148,7 +148,7 @@ export function MenuTray({ section }: { section: Section }) {
         aria-label="Menu"
         inert={!open}
         onPointerDown={keepOpen}
-        className={`fixed bottom-0 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center rounded-t-[1.75rem] bg-board px-5 pt-2 pb-5 shadow-[0_-0.25rem_2rem_rgba(30,35,45,0.18)] transition-transform duration-200 ease-out ${
+        className={`fixed bottom-0 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center rounded-t-[1.75rem] bg-board px-5 pt-[0.35rem] pb-[1.4rem] shadow-[0_-0.25rem_2rem_rgba(30,35,45,0.18)] transition-transform duration-200 ease-out ${
           open ? "translate-y-0" : "translate-y-[calc(100%+3rem)]"
         }`}
       >
@@ -166,7 +166,7 @@ export function MenuTray({ section }: { section: Section }) {
             if (!hasApps) close();
             else setTier(tier === 2 ? 1 : 2);
           }}
-          className="flex h-11 min-w-48 touch-none items-center justify-center gap-2 px-4 text-base font-bold text-ink-muted"
+          className="flex h-12 min-w-48 touch-none items-center justify-center gap-2 px-4 text-lg font-bold text-ink-muted"
         >
           {!hasApps ? (
             <CaretDown size="1.75rem" aria-hidden />
@@ -203,13 +203,13 @@ export function MenuTray({ section }: { section: Section }) {
                 href={s === "calendar" ? calendarHref : href}
                 aria-current={active ? "page" : undefined}
                 onClick={close}
-                className={`flex min-h-24 w-30 flex-col items-center justify-start gap-1.5 rounded-[1.25rem] px-2 pt-3 pb-2 text-base font-bold ${
-                  active ? "bg-rail text-ink" : "text-ink-muted hover:bg-rail"
+                className={`flex min-h-30 w-30 flex-col items-center justify-start gap-[0.35rem] rounded-[1.25rem] px-[0.4rem] pt-3 pb-[0.45rem] text-[1.25rem] font-bold ${
+                  active ? "bg-rail text-ink" : "text-ink-soft hover:bg-rail"
                 }`}
               >
-                <IconComponent size="2.5rem" weight={active ? "fill" : "regular"} aria-hidden />
+                <IconComponent size="2.5rem" weight="regular" aria-hidden />
                 {/* Two lines kept for every label, so the icons all line up. */}
-                <span className="flex min-h-[2lh] items-start text-center leading-tight text-balance">{label}</span>
+                <span className="flex min-h-[2.4em] items-start text-center leading-[1.15] text-balance">{label}</span>
               </Link>
             );
           })}

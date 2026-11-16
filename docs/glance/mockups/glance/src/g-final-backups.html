@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Backup meals</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<link rel="stylesheet" href="g-final-chrome.css">
+<style>
+
+.bgrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem}
+.backup{display:flex;flex-direction:column;gap:.7rem}
+.backup .topr{display:flex;align-items:center;gap:.75rem}
+.backup .topr img{width:4rem;height:4rem}
+.backup .nm{font-size:2rem;font-weight:800;letter-spacing:-.02em}
+.ready{display:inline-flex;align-items:center;min-height:2.5rem;padding:0 .8rem;border-radius:99px;font-size:1.15rem;font-weight:800}
+.ready.ok{background:#D7EFE4;color:#166F77}
+.ready.no{background:#F8E4E1;color:#A3261A}
+.part{display:flex;align-items:center;gap:.7rem;min-height:3.6rem;border-bottom:1px solid var(--frame)}
+.part:last-child{border-bottom:0}
+.part .nm{font-size:1.5rem;font-weight:700;flex:1}
+.stepper{display:flex;align-items:center;gap:.25rem}
+.stepper button{width:3rem;height:3rem;min-height:3rem;border-radius:50%;border:0;background:var(--panel);font-size:1.5rem;font-weight:800;cursor:pointer}
+.stepper .n{min-width:2.2rem;text-align:center;font-size:1.75rem;font-weight:800;font-variant-numeric:tabular-nums}
+.low{color:#A3261A}
+
+</style>
+</head>
+<body>
+<div class="app " id="app">
+<header class="top">
+  <div class="mo" aria-label="Meals Backup meals">
+    <span class="mon">Meals</span>
+    <div class="mo-side"><span class="sub">Backup meals</span></div>
+  </div>
+  <div class="tools">
+    
+    <span class="seg tight" role="tablist"><button>Menu</button><button>Dishes</button><button class="on" aria-current="page">Backups</button></span>
+    <button class="btn primary add" aria-label="New backup"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New backup</button>
+  </div>
+</header>
+<div class="body"><div class="bgrid"><section class="card backup">
+          <div class="topr"><img class="e" src="../assets/shallow_pan_of_food.webp" alt=""><div><div class="nm">Frozen lasagne night</div><span class="ready ok">Ready · 2</span></div></div>
+          <div class="part"><span class="nm">Frozen lasagne</span>
+              <div class="stepper">
+                <button aria-label="One fewer Frozen lasagne" data-tap>-</button>
+                <span class="n">2</span>
+                <button aria-label="One more Frozen lasagne" data-tap>+</button>
+              </div>
+            </div><div class="part"><span class="nm">Garlic bread</span>
+              <div class="stepper">
+                <button aria-label="One fewer Garlic bread" data-tap>-</button>
+                <span class="n">1</span>
+                <button aria-label="One more Garlic bread" data-tap>+</button>
+              </div>
+            </div><div class="part"><span class="nm low">Salad bag</span>
+              <div class="stepper">
+                <button aria-label="One fewer Salad bag" data-tap>-</button>
+                <span class="n low">0</span>
+                <button aria-label="One more Salad bag" data-tap>+</button>
+              </div>
+            </div>
+        </section><section class="card backup">
+          <div class="topr"><img class="e" src="../assets/pot_of_food.webp" alt=""><div><div class="nm">Chicken and rice</div><span class="ready ok">Ready · 1</span></div></div>
+          <div class="part"><span class="nm">Frozen chicken</span>
+              <div class="stepper">
+                <button aria-label="One fewer Frozen chicken" data-tap>-</button>
+                <span class="n">2</span>
+                <button aria-label="One more Frozen chicken" data-tap>+</button>
+              </div>
+            </div><div class="part"><span class="nm">Packet rice</span>
+              <div class="stepper">
+                <button aria-label="One fewer Packet rice" data-tap>-</button>
+                <span class="n">3</span>
+                <button aria-label="One more Packet rice" data-tap>+</button>
+              </div>
+            </div><div class="part"><span class="nm">Frozen peas</span>
+              <div class="stepper">
+                <button aria-label="One fewer Frozen peas" data-tap>-</button>
+                <span class="n">1</span>
+                <button aria-label="One more Frozen peas" data-tap>+</button>
+              </div>
+            </div>
+        </section><section class="card backup">
+          <div class="topr"><img class="e" src="../assets/taco.png" alt=""><div><div class="nm">Fish finger bake</div><span class="ready no">Not ready: restock</span></div></div>
+          <div class="part"><span class="nm low">Fish fingers</span>
+              <div class="stepper">
+                <button aria-label="One fewer Fish fingers" data-tap>-</button>
+                <span class="n low">0</span>
+                <button aria-label="One more Fish fingers" data-tap>+</button>
+              </div>
+            </div><div class="part"><span class="nm">Oven chips</span>
+              <div class="stepper">
+                <button aria-label="One fewer Oven chips" data-tap>-</button>
+                <span class="n">1</span>
+                <button aria-label="One more Oven chips" data-tap>+</button>
+              </div>
+            </div><div class="part"><span class="nm">Peas</span>
+              <div class="stepper">
+                <button aria-label="One fewer Peas" data-tap>-</button>
+                <span class="n">1</span>
+                <button aria-label="One more Peas" data-tap>+</button>
+              </div>
+            </div>
+        </section></div></div>
+
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+</div>
+</body>
+</html>

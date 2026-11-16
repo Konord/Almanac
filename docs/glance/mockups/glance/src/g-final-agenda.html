@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac · Today</title>
+<link rel="stylesheet" href="../../src/base.css">
+<link rel="stylesheet" href="../../src/a.css">
+<style>
+@font-face{font-family:"Atkinson Hyperlegible Next";src:url("../../fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");font-weight:200 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Almanac Digits";src:url("../../fonts/figtree-latin-wght-normal.woff2") format("woff2");font-weight:300 900;font-style:normal;font-display:swap;unicode-range:U+0030-0039;size-adjust:98%}
+@font-face{font-family:"Shantell Sans";src:url("../../fonts/shantell-sans-latin-full-normal.woff2") format("woff2-variations");font-weight:300 800;font-style:normal;font-display:swap}
+
+body{font-family:"Almanac Digits","Atkinson Hyperlegible Next",system-ui,sans-serif}
+:root{
+  --hand-blue:#2963A6;--hand-pink:#A6375E;--hand-teal:#157179;--hand-purple:#7D42A8;--hand-orange:#9C4B0C;
+}
+
+.app{height:100%;display:grid;grid-template-rows:auto 1fr;gap:1.25rem;padding:1.5rem 2rem 3.15rem;min-height:0}
+
+/* System header: 7rem locked. Stickers sit under the date, beside Saturday. */
+.top{display:flex;align-items:center;gap:1.15rem;min-height:7rem;max-height:7rem}
+.mo{display:flex;align-items:baseline;gap:.8rem;min-width:0;margin-right:auto}
+.mo .hero-emoji{width:6rem;height:6rem;flex:none;align-self:center;filter:drop-shadow(0 .15rem .4rem rgba(0,0,0,.3))}
+.mo .mon{font-size:6.75rem;font-weight:800;letter-spacing:-.045em;line-height:.9}
+.mo-side{display:contents}
+.mo .sub{font-size:2rem;font-weight:700;letter-spacing:-.02em;color:var(--soft);white-space:nowrap;line-height:1}
+.stickers{display:flex;align-items:center;gap:.4rem;min-width:0}
+.sticker{display:flex;align-items:center;gap:.3rem;height:2.25rem;padding:0 .55rem 0 .3rem;border-radius:var(--r-sm);background:var(--panel);white-space:nowrap;font-size:1.15rem;font-weight:700;color:var(--ink);flex:none}
+.sticker img{width:1.5rem;height:1.5rem}
+.sticker.more{background:var(--panel);color:var(--muted);padding:0 .55rem;font-weight:800}
+.tools{display:flex;align-items:center;gap:.6rem;flex:none}
+.wx-wrap{position:relative}
+.wx{display:flex;align-items:center;gap:.35rem;min-height:var(--tt);padding:0 .4rem;border-radius:var(--r);background:transparent;border:0;color:inherit;cursor:pointer}
+.wx img{width:2.15rem;height:2.15rem}
+.wx .tp{font-size:2.15rem;font-weight:700;letter-spacing:-.03em;line-height:1}
+.top .seg button{min-width:6.75rem}
+.top .btn.add{min-height:var(--tt);padding:0 1.35rem}
+
+.wx-pop{position:absolute;right:0;top:calc(100% + .55rem);width:32rem;z-index:20;padding:1.25rem 1.4rem;box-shadow:var(--sh-dialog)}
+.wx-pop[hidden]{display:none!important}
+.wx-pop .tag{font-size:1.15rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.85rem}
+.wx-now{display:grid;grid-template-columns:auto 1fr;gap:.2rem 1rem;align-items:center}
+.wx-now img.big{width:4.25rem;height:4.25rem;grid-row:span 2}
+.wx-now .tp{font-size:3.25rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.wx-now .c{font-size:1.25rem;font-weight:600;color:var(--soft)}
+.wx-meta{display:flex;flex-wrap:wrap;gap:.85rem 1.35rem;margin-top:.85rem;font-size:1.15rem;font-weight:600;color:var(--soft)}
+.wx-meta span{display:flex;align-items:center;gap:.35rem}
+.wx-meta img{width:1.5rem;height:1.5rem}
+.wx-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:.35rem;margin-top:1rem;text-align:center}
+.wx-strip .h{font-size:1.15rem;font-weight:600;color:var(--muted)}
+.wx-strip img{width:1.75rem;height:1.75rem;margin:.15rem auto}
+.wx-strip .d{font-size:1.25rem;font-weight:800}
+.wx-days{display:grid;grid-template-columns:repeat(5,1fr);gap:.4rem;margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--frame);text-align:center}
+.wx-days .h{font-size:1.15rem;font-weight:700}
+.wx-days img{width:1.85rem;height:1.85rem;margin:.2rem auto}
+.wx-days .hi{font-size:1.25rem;font-weight:800}
+.wx-days .lo{font-size:1.15rem;font-weight:600;color:var(--muted)}
+.wx-scrim{position:fixed;inset:0;background:transparent;z-index:15;border:0;padding:0}
+
+.tray{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:12rem;height:3.15rem;border:0;background:transparent;display:flex;align-items:flex-end;justify-content:center;padding-bottom:.55rem;cursor:pointer;z-index:5}
+.tray .bar{width:7.5rem;height:.45rem;border-radius:99px;background:#C5C8CE}
+
+.main{display:grid;grid-template-columns:1fr 36rem;gap:1.25rem;min-height:0}
+.today{display:flex;flex-direction:column;gap:1rem;min-height:0}
+.evs{display:flex;flex-direction:column;gap:1rem;min-height:0}
+
+.ev{display:grid;grid-template-columns:8.5rem 3.5rem 1fr;align-items:center;gap:1.25rem;padding:.9rem 1.25rem .9rem 1.75rem;border-radius:var(--r-card);background:var(--es);min-height:6rem;position:relative;overflow:hidden;cursor:pointer}
+.ev:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ev-more{display:flex;align-items:center;justify-content:center;min-height:var(--tt);flex:none;width:100%;padding:0 .5rem;border:0;background:transparent;color:var(--soft);font:inherit;font-size:1.25rem;font-weight:700;letter-spacing:.01em;cursor:pointer;font-variant-numeric:tabular-nums}
+.ev-more[hidden]{display:none!important}
+.ev-more:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ev[hidden]{display:none!important}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.5rem;background:var(--ec)}
+.ev.split{background:var(--es)}
+.ev.split::before{background:linear-gradient(to bottom,var(--ec) 50%,var(--ec2) 50%)}
+.ev .tm,.nowline,.wx .tp,.wx-now .tp,.wx-strip .d,.wx-days .hi,.wx-days .lo,.dinner .k,.soon .s span,.mo .sub{font-variant-numeric:tabular-nums}
+.ev .tm{font-size:1.75rem;font-weight:800;line-height:1.05}
+.ev .tm span{display:block;font-size:1.125rem;font-weight:600;color:var(--soft)}
+.ev .tm .next-in{display:block;font-size:1.125rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#A3261A;line-height:1}
+.ev img{width:3.25rem;height:3.25rem}
+.ev .ti{font-size:1.625rem;font-weight:700;line-height:1.15}
+.ev .pl{font-size:1.125rem;color:var(--soft);font-weight:600;margin-top:.15rem;display:flex;gap:.35rem;align-items:center}
+/* Finished: muted, no strikethrough — already happened, not cancelled */
+.ev.past .ti,.ev.past .tm,.ev.past .pl{color:var(--muted)}
+.ev.past .tm{font-weight:700}
+.ev.past .tm span{color:var(--muted)}
+.ev.past::before{opacity:.4}
+.ev.past img{opacity:.65}
+.nowline{display:flex;align-items:center;gap:.75rem;color:var(--now);font-weight:800;font-size:1.25rem;margin:.1rem 0;flex:none;width:100%}
+.nowline::after{content:"";flex:1;height:.2rem;background:var(--now);border-radius:1rem;min-width:2rem}
+
+.coming{margin-top:auto;flex:none}
+.coming[hidden]{display:none!important}
+.coming .sub{font-size:1.25rem;font-weight:700;color:var(--muted);margin-bottom:.75rem}
+.soon{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.soon .s{background:var(--rail);border-radius:var(--r);padding:.9rem 1.1rem;display:flex;gap:.9rem;align-items:center;min-height:var(--tt-l)}
+.soon .s img{width:2.5rem;height:2.5rem}
+.soon .s b{font-size:1.25rem;display:block}
+.soon .s span{font-size:1.125rem;color:var(--soft);font-weight:600}
+
+.side{display:flex;flex-direction:column;gap:1.25rem;min-height:0}
+.dinner{background:var(--meal);color:var(--meal-ink);display:flex;align-items:center;gap:1.25rem}
+.dinner img{width:4.5rem;height:4.5rem}
+.dinner .k{font-size:1.125rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.dinner b{display:block;font-size:1.75rem;line-height:1.15;color:var(--ink)}
+
+.list{flex:1;display:flex;flex-direction:column;gap:.35rem;min-height:0}
+.list .h2{width:100%}
+.list .slot{width:var(--tt);flex:none;display:grid;place-items:center;margin-left:auto}
+.list .h2 .slot{margin-left:auto}
+.list .h2 .btn.icon{margin-left:0}
+.row{display:flex;align-items:center;gap:1rem;min-height:var(--tt);font-size:1.375rem;font-weight:600;border-bottom:1px solid var(--frame);max-height:6rem;overflow:hidden}
+.row:last-child{border:0}
+.cb{width:3rem;height:3rem;flex:none;display:grid;place-items:center;color:#fff;font-size:1.5rem;background:transparent;padding:0;border:0;cursor:pointer}
+.cb .disc{width:2.5rem;height:2.5rem;border-radius:50%;border:.2rem solid var(--check);display:flex;align-items:center;justify-content:center}
+.cb.on .disc{background:var(--success);border-color:var(--success)}
+.cb svg{width:1.5rem;height:1.5rem}
+.row .tx{flex:1;min-width:0;color:var(--ink);font-weight:700;position:relative}
+.row.owned .tx{color:var(--pc)}
+.row .slot img{width:2rem;height:2rem}
+html[data-emoji="none"] .row .slot{display:none}
+
+/* Scratch-off complete: wobbly marker stroke, then fade and collapse */
+.row .scratch{position:absolute;left:-.15em;right:-.15em;top:50%;height:1.15em;width:calc(100% + .3em);transform:translateY(-52%);pointer-events:none;overflow:visible;opacity:0}
+.row .scratch path{fill:none;stroke:currentColor;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;path-length:1;stroke-dasharray:1;stroke-dashoffset:1}
+.row.scratching .scratch{opacity:1}
+.row.scratching .scratch path{stroke-dashoffset:0;transition:stroke-dashoffset 400ms ease-out}
+.row.leaving{opacity:0;min-height:0;max-height:0;border-width:0;margin:0;padding:0;gap:0;transition:opacity 300ms ease,max-height 300ms ease,min-height 300ms ease,border-width 300ms ease,margin 300ms ease}
+@media (prefers-reduced-motion:reduce){
+  .row .scratch{display:none}
+  .row.scratching .scratch path{transition:none}
+  .row.leaving{transition:opacity 160ms ease,max-height 160ms ease,min-height 160ms ease}
+}
+
+
+/* Holiday themes: only tokens + header/chrome. Person tints and inks never change. */
+html[data-holiday] .mon,html[data-holiday] .wx,html[data-holiday] .wx .tp{color:var(--title)}
+html[data-holiday] .mo .sub{color:var(--title-soft)}
+html[data-holiday] .soon .s{background:var(--panel)}
+html[data-holiday] .btn.primary.add{background:var(--accent);color:var(--accent-ink)}
+html[data-holiday] .seg button.on{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+html[data-holiday] .tray .bar{background:var(--title-soft)}
+html[data-holiday] .ev .tm .next-in{color:var(--now)}
+html[data-holiday="christmas"]{
+  --rail:#1A3C2E;--board:#FBF6EE;--panel:#EFE6D6;--frame:#E0D4C2;
+  --title:#F7F1E4;--title-soft:#E8E0D0;--accent:#A31D2B;--accent-ink:#FFFFFF;--now:#A31D2B;
+}
+html[data-holiday="halloween"]{
+  --rail:#1C1524;--board:#F7F4F0;--panel:#EDE7E0;--frame:#DDD5CC;
+  --title:#F7F1E4;--title-soft:#E8D6B0;--accent:#B34800;--accent-ink:#FFFFFF;--now:#9B3A00;
+}
+
+
+/* Final all-day placement: all non-theme chips live in the event-column strip. Header is title + date only. */
+.ad-strip{display:flex;align-items:center;flex-wrap:nowrap;gap:.45rem;flex:none;min-width:0;overflow:hidden}
+.ad-chip[hidden]{display:none!important}
+.ad-strip:empty,.ad-mid:empty{display:none}
+.ad-chip{display:flex;align-items:center;gap:.3rem;height:2.15rem;padding:0 .7rem 0 .55rem;border-radius:var(--r-sm);background:var(--es,var(--panel));color:var(--ink);font-size:1.15rem;font-weight:700;white-space:nowrap;flex:none;position:relative;overflow:hidden}
+.ad-chip.owned{color:var(--hc);padding-left:.7rem}
+.ad-chip.owned::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.28rem;background:var(--ec)}
+.ad-chip img{width:1.5rem;height:1.5rem}
+.ad-chip.more{background:var(--panel);color:var(--muted);font-weight:800;padding:0 .55rem}
+
+html[data-allday="stickers"] .top{overflow:visible}
+html[data-allday="stickers"] .mo{margin-right:0}
+html[data-allday="stickers"] .ad-mid{flex:1;display:flex;align-items:center;justify-content:center;gap:.65rem;min-width:0;padding:0 .5rem}
+html[data-allday="stickers"] .ad-mid .sticker{background:var(--board);box-shadow:0 .14rem .4rem rgba(31,35,40,.18),0 .02rem .08rem rgba(31,35,40,.1);transform:rotate(var(--tilt,-4deg));border:1px solid var(--frame);color:var(--ink)}
+html[data-allday="stickers"] .ad-mid .sticker.owned{color:var(--pc)}
+html[data-allday="stickers"] .ad-mid .sticker.more{color:var(--muted)}
+
+.ev.allday{min-height:4.25rem;padding:.55rem 1.25rem .55rem 1.75rem}
+.ev.allday .tm{font-size:1.25rem;font-weight:800;letter-spacing:.02em;color:var(--muted)}
+.ev.allday img{width:2.5rem;height:2.5rem}
+.ev.allday .ti{font-size:1.5rem}
+
+html[data-bars="off"] .ev{padding-left:1.5rem}
+html[data-bars="off"] .ev::before{display:none}
+
+html[data-hand="on"] .ev .ti,
+html[data-hand="on"] .ev .pl,
+html[data-hand="on"] .row .tx,
+html[data-hand="on"] .dinner b,
+html[data-hand="on"] .soon .s b,
+html[data-hand="on"] .sticker.hand,
+html[data-hand="on"] .ad-chip.hand{
+  font-family:"Shantell Sans",cursive;
+  -webkit-font-smoothing:auto;
+  font-variation-settings:"BNCE" 18,"INFM" 30,"SPAC" 0,"wght" 650;
+  font-weight:700;
+  letter-spacing:0;
+}
+html[data-hand="on"] .ev .ti{color:var(--ink)}
+html[data-hand="on"] .ev .pl{color:var(--soft)}
+html[data-hand="on"] .ev.past .ti,html[data-hand="on"] .ev.past .pl{color:var(--muted)}
+html[data-hand="on"] .row .tx{color:var(--ink)}
+html[data-hand="on"] .row.owned .tx{color:var(--pc)}
+html[data-hand="on"] .dinner b{color:var(--ink)}
+html[data-hand="on"] .dinner.owned b{color:var(--hc)}
+html[data-hand="on"] .ad-chip.owned{color:var(--hc)}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script src="../../src/common.js"></script>
+<script src="g.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+document.documentElement.dataset.hand = params.get("hand") === "off" ? "off" : "on";
+document.documentElement.dataset.bars = params.get("bars") === "off" ? "off" : "on";
+const emoji = params.get("emoji") === "none" ? "none" : "right";
+document.documentElement.dataset.emoji = emoji;
+const busy = params.get("busy") === "1" || params.get("busy") === "on";
+const empty = params.get("empty") === "1" || params.get("empty") === "on";
+const later = params.get("later") === "1" || params.get("now") === "1120";
+const weatherOpen = params.get("weather") === "1" || params.get("weather") === "on";
+const holiday = (params.get("holiday") || "").toLowerCase();
+if (holiday) document.documentElement.dataset.holiday = holiday;
+const alldayMode = (params.get("allday") || "strip").toLowerCase();
+document.documentElement.dataset.allday = alldayMode;
+
+/* Made-up holiday-day sample data for the theme mocks. Not real family plans. */
+const HOLIDAYS = {
+  christmas: {
+    title: "Christmas", emoji: "christmas_tree.png",
+    weekday: "Friday", month: "December", day: 25,
+    nowLabel: "10:40", nowMin: 10 * 60 + 40,
+    weather: { temp: -3, icon: "cloud_with_snow.webp", cond: "Light snow", hi: 0, lo: -7 },
+    sky: { sunrise: "7:48 am", sunset: "4:43 pm" },
+    hourly: [
+      { t: "9 am", temp: -5, icon: "cloud_with_snow.webp" },
+      { t: "11 am", temp: -3, icon: "cloud_with_snow.webp" },
+      { t: "1 pm", temp: -2, icon: "cloud.webp" },
+      { t: "3 pm", temp: -3, icon: "cloud_with_snow.webp" },
+      { t: "5 pm", temp: -5, icon: "cloud.webp" },
+      { t: "7 pm", temp: -6, icon: "waxing_crescent_moon.webp" },
+    ],
+    days: [
+      { d: "Fri", hi: 0, lo: -7, icon: "cloud_with_snow.webp" },
+      { d: "Sat", hi: 1, lo: -6, icon: "cloud.webp" },
+      { d: "Sun", hi: -1, lo: -8, icon: "cloud_with_snow.webp" },
+      { d: "Mon", hi: -2, lo: -9, icon: "cloud.webp" },
+      { d: "Tue", hi: 0, lo: -6, icon: "sun_behind_cloud.png" },
+    ],
+    events: [
+      { id: 101, t: "Opening presents", day: 0, s: 8 * 60, e: 9 * 60 + 30, who: ["c","a","s","x"], icon: "wrapped_gift.png", place: "Home" },
+      { id: 102, t: "Video call with Aunt Mei", day: 0, s: 11 * 60, e: 12 * 60, who: ["a"], icon: "video_camera.webp" },
+      { id: 103, t: "Christmas lunch at Grandma's", day: 0, s: 13 * 60, e: 15 * 60, who: ["c","a","s","x"], icon: "turkey.webp", place: "Grandma's" },
+      { id: 104, t: "Walk to see the lights", day: 0, s: 16 * 60 + 30, e: 17 * 60 + 30, who: ["s","x"], icon: "snowflake.png", place: "Neighbourhood" },
+    ],
+    coming: [
+      { t: "Boxing Day skate", icon: "ice_skate.webp", when: "Sat · 10 am" },
+      { t: "Leftovers at Uncle Ben's", icon: "pie.webp", when: "Sun · 1 pm" },
+      { t: "Return the folding chairs", icon: "house_with_garden.png", when: "Mon · 11 am" },
+    ],
+    stickers: [
+      { t: "Family at ours", icon: "house_with_garden.png", kind: "user", who: ["c","a","s","x"] },
+    ],
+    items: [
+      { t: "Set the table", who: "a", icon: "fork_and_knife_with_plate.png" },
+      { t: "Charge the camera", who: null, icon: "camera_with_flash.webp" },
+      { t: "Put the ham in", who: "c", icon: "turkey.webp" },
+      { t: "Write thank-you notes", who: "s", icon: null },
+      { t: "Take out the wrapping paper", who: "x", icon: "recycling_symbol.webp" },
+    ],
+    dinner: { t: "Roast ham and vegetables", icon: "fork_and_knife_with_plate.png", cook: null },
+  },
+  halloween: {
+    title: "Halloween", emoji: "jack-o-lantern.png",
+    weekday: "Saturday", month: "October", day: 31,
+    nowLabel: "4:40", nowMin: 16 * 60 + 40,
+    weather: { temp: 8, icon: "sun_behind_cloud.png", cond: "Clear and cool", hi: 11, lo: 4 },
+    sky: { sunrise: "7:46 am", sunset: "6:05 pm" },
+    hourly: [
+      { t: "12 pm", temp: 11, icon: "sun.webp" },
+      { t: "2 pm", temp: 12, icon: "sun.webp" },
+      { t: "4 pm", temp: 8, icon: "sun_behind_cloud.png" },
+      { t: "6 pm", temp: 6, icon: "sun_behind_cloud.png" },
+      { t: "8 pm", temp: 4, icon: "waxing_crescent_moon.webp" },
+      { t: "10 pm", temp: 3, icon: "waxing_crescent_moon.webp" },
+    ],
+    days: [
+      { d: "Sat", hi: 11, lo: 4, icon: "sun_behind_cloud.png" },
+      { d: "Sun", hi: 10, lo: 3, icon: "sun.webp" },
+      { d: "Mon", hi: 8, lo: 2, icon: "cloud.webp" },
+      { d: "Tue", hi: 9, lo: 1, icon: "sun_behind_cloud.png" },
+      { d: "Wed", hi: 7, lo: 0, icon: "cloud.webp" },
+    ],
+    events: [
+      { id: 201, t: "Pumpkin carving", day: 0, s: 11 * 60, e: 12 * 60 + 30, who: ["s","x"], icon: "jack-o-lantern.png", place: "Kitchen" },
+      { id: 202, t: "Costume photos", day: 0, s: 14 * 60, e: 15 * 60, who: ["a"], icon: "camera_with_flash.webp", place: "Front porch" },
+      { id: 203, t: "Trick-or-treating", day: 0, s: 17 * 60, e: 18 * 60 + 30, who: ["c","s","x"], icon: "candy.webp", place: "Neighbourhood" },
+      { id: 204, t: "Party at the Patels'", day: 0, s: 19 * 60, e: 20 * 60 + 30, who: ["c","a"], icon: "lollipop.webp", place: "The Patels'" },
+    ],
+    coming: [
+      { t: "Pancake breakfast", icon: "cookie.webp", when: "Sun · 10 am" },
+      { t: "Return the costumes", icon: "shopping_cart.png", when: "Mon · 11 am" },
+      { t: "Soccer practice", icon: "soccer_ball.png", when: "Tue · 4 pm" },
+    ],
+    stickers: [
+      { t: "Porch display", icon: "candle.png", kind: "user", who: "c" },
+      { t: "Costume day", icon: "jack-o-lantern.png", kind: "user", who: "s" },
+    ],
+    items: [
+      { t: "Put out the candy bowl", who: "c", icon: "candy.webp" },
+      { t: "Charge the flashlight", who: null, icon: "flashlight.webp" },
+      { t: "Pack extra gloves", who: "a", icon: null },
+      { t: "Light the porch pumpkins", who: "s", icon: "candle.png" },
+      { t: "Check the walk route", who: null, icon: null },
+    ],
+    dinner: { t: "Chili and cornbread", icon: "fork_and_knife_with_plate.png", cook: null },
+  },
+};
+const theme = HOLIDAYS[holiday] || null;
+
+const nowLabel = theme ? theme.nowLabel : (later ? "11:20" : D.now);
+const nowMin = theme ? theme.nowMin : (later ? 11 * 60 + 20 : D.nowMin);
+
+const extras = [
+  { id: 11, t: "Costco run", day: 0, s: 630, e: 690, who: ["c"], icon: "shopping_cart.png", place: "Costco" },
+  { id: 12, t: "Emma's birthday party", day: 0, s: 660, e: 780, who: ["s"], icon: "birthday_cake.png", place: "Community centre" },
+  { id: 13, t: "Piano lesson", day: 0, s: 840, e: 885, who: ["s"], icon: "musical_note.png" },
+  { id: 14, t: "Hockey game", day: 0, s: 870, e: 960, who: ["x"], icon: "ice_hockey.png", place: "Arena" },
+  { id: 15, t: "Pick up the coats", day: 0, s: 750, e: 780, who: ["c"], icon: "coat.png", place: "Cleaners" },
+  { id: 16, t: "Evening walk", day: 0, s: 19 * 60 + 15, e: 20 * 60, who: ["a"], icon: "person_walking.webp", place: "Neighbourhood" },
+];
+const today = empty ? [] : (theme ? theme.events.slice() : D.events.filter(e => e.day === 0).concat(busy ? extras : [])).sort((a,b)=>a.s-b.s);
+const next = today.find(e => e.s > nowMin);
+const evStyle = (e) => {
+  const cols = e.who.map(id => P(id).col);
+  if (cols.length === 2) {
+    return `--es:var(--p-${cols[0]}-soft);--es2:var(--p-${cols[1]}-soft);--ec:var(--p-${cols[0]});--ec2:var(--p-${cols[1]});--hc:var(--hand-${cols[0]})`;
+  }
+  const p = colOf(e);
+  return `--es:var(--p-${p}-soft);--ec:var(--p-${p});--hc:var(--hand-${p})`;
+};
+const evCard = (e) => {
+  const isNext = next && e.id === next.id && e.s > nowMin;
+  const minsTo = isNext ? e.s - nowMin : 0;
+  const soon = isNext && minsTo > 0 && minsTo <= 30 ? `<div class="next-in">in ${minsTo} min</div>` : "";
+  const split = e.who.length === 2 ? " split" : "";
+  const past = e.e <= nowMin ? " past" : "";
+  return `<div class="ev${split}${past} ${isNext?"next":""}" style="${evStyle(e)}" role="button" tabindex="0" data-tap aria-label="Edit event: ${e.t}">
+    <div class="tm">${soon}${hm(e.s)} ${ap(e.s)}<span>until ${hm(e.e)}</span></div>${img(e.icon)}
+    <div><div class="ti clamp2">${e.t}</div>${e.place?`<div class="pl">${I.pin}${e.place}</div>`:""}</div>
+  </div>`;
+};
+let evs = "";
+const finished = today.filter(e => e.e <= nowMin);
+const rest = today.filter(e => e.e > nowMin);
+for (const e of finished) evs += evCard(e);
+evs += `<div class="nowline">Now ${nowLabel}${later || nowMin >= 720 ? "" : ""}</div>`;
+for (const e of rest) evs += evCard(e);
+
+/* Sample-data overrides for this page only (common.js is unchanged). */
+const unassignedTitles = new Set(["Return library books", "Book summer camp"]);
+const items = theme
+  ? theme.items
+  : todayItems()
+      .map(it => unassignedTitles.has(it.t) ? { ...it, who: null } : it)
+      .filter(it => !it.done);
+const cook = theme ? theme.dinner.cook : null;
+const dinnerTitle = theme ? theme.dinner.t : "Sheet-pan chicken fajitas";
+const dinnerIcon = theme ? theme.dinner.icon : "taco.png";
+
+/* Made-up all-day items. Themed holidays are expressed only by the header title/emoji/colours — no redundant holiday chips. Printed non-holiday items (PA day) join the strip. */
+const stickers = empty ? [] : (theme ? theme.stickers : [
+  { t: "PA day", icon: "school.png", kind: "printed", who: null },
+  { t: "Leo's birthday", icon: "birthday_cake.png", kind: "user", who: null },
+  { t: "Recycling pickup", icon: "recycling_symbol.webp", kind: "user", who: "c" },
+  { t: "Library books due", icon: "books.png", kind: "user", who: "s" },
+]);
+/* Header never has chips. Theme-holiday chips are omitted from data. Remaining items (printed official + user) go in the strip. */
+const headerStickers = [];
+const STICKER_MAX = 3;
+const shownStickers = [];
+const stickerMore = 0;
+const userAllDay = stickers.filter(s => s.kind === "user");
+const whoList = (s) => !s.who ? [] : (Array.isArray(s.who) ? s.who : [s.who]);
+const chipStyle = (s) => {
+  const who = whoList(s);
+  if (who.length === 2) {
+    const c0 = P(who[0]).col, c1 = P(who[1]).col;
+    return `--es:var(--p-${c0}-soft);--ec:var(--p-${c0});--ec2:var(--p-${c1});--hc:var(--hand-${c0});--pc:var(--p-${c0})`;
+  }
+  if (who.length > 2) return `--es:var(--p-orange-soft);--ec:var(--p-orange);--hc:var(--hand-orange);--pc:var(--p-orange)`;
+  if (who.length === 1) {
+    const c = P(who[0]).col;
+    return `--es:var(--p-${c}-soft);--ec:var(--p-${c});--hc:var(--hand-${c});--pc:var(--p-${c})`;
+  }
+  return `--es:var(--panel);--ec:var(--check);--hc:var(--ink);--pc:var(--ink)`;
+};
+const chipClass = (s) => `${s.kind === "user" ? "hand" : "printed"}${whoList(s).length ? " owned" : ""}`;
+const midTilts = ["-6deg", "4.5deg", "-3.5deg", "2deg"];
+const midItems = alldayMode === "stickers" ? stickers : [];
+const midShown = midItems.slice(0, STICKER_MAX);
+const midMore = midItems.length - midShown.length;
+const stripItems = alldayMode === "strip" ? stickers.filter(s => s.kind !== "holiday") : [];
+const agendaAllDay = alldayMode === "agenda" ? userAllDay : [];
+const allDayCards = agendaAllDay.map(s => {
+  const who = whoList(s);
+  const split = who.length === 2 ? " split" : "";
+  return `<div class="ev allday${split}${who.length ? "" : " plain"}" style="${chipStyle(s)}"><div class="tm">All day</div>${img(s.icon)}<div><div class="ti clamp2">${s.t}</div></div></div>`;
+}).join("");
+
+const weather = theme ? theme.weather : D.weather;
+const sky = theme ? theme.sky : D.sky;
+const hourly = theme ? theme.hourly : [
+  { t: "9 am", temp: 4, icon: "cloud.webp" },
+  { t: "11 am", temp: 6, icon: "sun_behind_cloud.png" },
+  { t: "1 pm", temp: 8, icon: "sun_behind_small_cloud.webp" },
+  { t: "3 pm", temp: 7, icon: "sun.webp" },
+  { t: "5 pm", temp: 4, icon: "cloud.webp" },
+  { t: "7 pm", temp: 2, icon: "waxing_crescent_moon.webp" },
+];
+const days = theme ? theme.days : [
+  { d: "Sat", hi: 9, lo: 2, icon: "sun_behind_cloud.png" },
+  { d: "Sun", hi: 8, lo: 1, icon: "sun.webp" },
+  { d: "Mon", hi: 5, lo: -1, icon: "cloud_with_rain.png" },
+  { d: "Tue", hi: 4, lo: -2, icon: "cloud.webp" },
+  { d: "Wed", hi: 6, lo: -1, icon: "sun.webp" },
+];
+const comingItems = theme ? theme.coming : [[5,"Sun"],[6,"Mon"],[7,"Tue"]].map(([id,d]) => {
+  const e = D.events.find(x => x.id === id);
+  return { t: e.t, icon: e.icon, when: `${d} · ${hm(e.s)} ${ap(e.s)}` };
+});
+const heroTitle = theme ? theme.title : D.weekday;
+const heroSub = theme ? `${theme.weekday}, ${theme.month} ${theme.day}` : `${D.month} ${D.day}`;
+const heroAria = theme ? `${theme.title}, ${theme.weekday}, ${theme.month} ${theme.day}` : `${D.weekday}, ${D.month} ${D.day}`;
+const heroEmoji = theme ? img(theme.emoji, "hero-emoji") : "";
+
+const scratchSvg = `<svg class="scratch" viewBox="0 0 200 16" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 9.2 C 22 5.2, 38 12.4, 58 8.1 S 96 13.2, 118 7.4 S 158 12.6, 197 8.3"/></svg>`;
+
+render("#app", `
+<header class="top">
+  <div class="mo" aria-label="${heroAria}">
+    ${heroEmoji}<span class="mon">${heroTitle}</span>
+    <div class="mo-side">
+      <span class="sub">${heroSub}</span>
+    </div>
+  </div>
+  ${alldayMode === "stickers" ? `<div class="ad-mid" aria-label="All day">
+    ${midShown.map((s,i) => `<span class="sticker ${chipClass(s)}" style="${chipStyle(s)};--tilt:${midTilts[i]}">${img(s.icon)} ${s.t}</span>`).join("")}
+    ${midMore > 0 ? `<span class="sticker more" style="--tilt:${midTilts[Math.min(midShown.length, midTilts.length-1)]}" title="${midItems.slice(STICKER_MAX).map(s => s.t).join(", ")}">+${midMore}</span>` : ""}
+  </div>` : ""}
+  <div class="tools">
+    <div class="wx-wrap">
+      <button class="wx" id="wx-btn" aria-expanded="${weatherOpen?"true":"false"}" aria-controls="wx-pop" aria-label="Weather, ${weather.temp} degrees. Open the forecast.">${img(weather.icon)}<div class="tp">${weather.temp}°</div></button>
+      <div class="wx-pop card" id="wx-pop" role="dialog" aria-label="Forecast, sample data" ${weatherOpen?"":"hidden"}>
+        <div class="tag">Sample forecast</div>
+        <div class="wx-now">${img(weather.icon,"e big")}<div class="tp">${weather.temp}°</div><div class="c">${weather.cond}</div></div>
+        <div class="wx-meta"><span>H ${weather.hi}° · L ${weather.lo}°</span><span>${img("sunrise.webp")}${sky.sunrise}</span><span>${img("sunset.webp")}${sky.sunset}</span></div>
+        <div class="wx-strip">${hourly.map(h => `<div><div class="h">${h.t}</div>${img(h.icon)}<div class="d">${h.temp}°</div></div>`).join("")}</div>
+        <div class="wx-days">${days.map(d => `<div><div class="h">${d.d}</div>${img(d.icon)}<div class="hi">${d.hi}°</div><div class="lo">${d.lo}°</div></div>`).join("")}</div>
+      </div>
+    </div>
+    <span class="seg"><button class="on">Today</button><button>Week</button><button>Month</button></span>
+    <button class="btn primary add" aria-label="Add an event">${I.plus} Add</button>
+  </div>
+</header>
+<section class="main">
+  <div class="card today">
+    ${stripItems.length ? `<div class="ad-strip" aria-label="All day">${stripItems.map(s => `<span class="ad-chip ${chipClass(s)}" style="${chipStyle(s)}">${img(s.icon)} ${s.t}</span>`).join("")}<span class="ad-chip more" hidden>+0</span></div>` : ""}
+    <div class="evs">${allDayCards}${evs}</div>
+    <button class="ev-more" type="button" hidden aria-label="Show more events">+0 more</button>
+    <div class="coming">
+      <div class="sub">Coming up</div>
+      <div class="soon">${comingItems.map(e => `<div class="s">${img(e.icon)}<div style="min-width:0"><b class="truncate">${e.t}</b><span>${e.when}</span></div></div>`).join("")}</div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="card dinner${cook?" owned":""}">${img(dinnerIcon)}<div><div class="k">Dinner tonight · 6 pm</div><b${cook?` style="--hc:var(--hand-${cook.col})"`:""}>${dinnerTitle}</b></div></div>
+    <div class="card list">
+      <div class="h2">Daily List <span class="slot"><button class="btn icon" aria-label="Add to the daily list">${I.plus}</button></span></div>
+      ${items.map(it => {
+        const p = it.who ? P(it.who) : null;
+        const owned = p ? " owned" : "";
+        const whoStyle = p ? `style="--pc:var(--p-${p.col});--hc:var(--hand-${p.col})"` : "";
+        const icon = (emoji !== "none" && it.icon) ? img(it.icon) : "";
+        return `<div class="row${owned}" ${whoStyle} data-tap><button class="cb" aria-label="To do: ${it.t}" aria-pressed="false"><span class="disc"></span></button><span class="tx"><span class="tx-text">${it.t}</span>${scratchSvg}</span><span class="slot">${icon}</span></div>`;
+      }).join("")}
+    </div>
+  </div>
+</section>
+<button class="tray" aria-label="Open the menu"><span class="bar"></span></button>
+${weatherOpen ? `<button class="wx-scrim" id="wx-scrim" aria-label="Close the forecast"></button>` : `<button class="wx-scrim" id="wx-scrim" hidden aria-label="Close the forecast"></button>`}
+`);
+
+function layoutAgenda() {
+  const panel = document.querySelector(".today");
+  const coming = document.querySelector(".coming");
+  const evBox = document.querySelector(".evs");
+  if (!panel || !evBox) return;
+  const layoutStrip = () => {
+    const strip = document.querySelector(".ad-strip");
+    if (!strip) return;
+    const chips = [...strip.querySelectorAll(".ad-chip:not(.more)")];
+    const more = strip.querySelector(".ad-chip.more");
+    chips.forEach(c => { c.hidden = false; });
+    if (more) more.hidden = true;
+    const fits = () => strip.scrollWidth <= strip.clientWidth + 1;
+    if (fits()) return;
+    if (more) { more.hidden = false; more.textContent = "+0"; }
+    let hidden = 0;
+    const overflow = [];
+    for (let i = chips.length - 1; i >= 0; i--) {
+      if (fits()) break;
+      chips[i].hidden = true;
+      overflow.unshift(chips[i].textContent.trim());
+      hidden++;
+      if (more) {
+        more.textContent = `+${hidden}`;
+        more.title = overflow.join(", ");
+      }
+    }
+    if (hidden === 0 && more) more.hidden = true;
+  };
+  layoutStrip();
+  evBox.querySelectorAll(".ev").forEach(el => { el.hidden = false; });
+  if (coming) coming.hidden = false;
+  evBox.style.overflow = "visible";
+  evBox.style.flex = "0 0 auto";
+  const cs = getComputedStyle(panel);
+  const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const inner = panel.clientHeight - pad;
+  const gap = parseFloat(cs.rowGap || cs.gap) || 0;
+  const strip = document.querySelector(".ad-strip");
+  const stripH = strip ? strip.offsetHeight + gap : 0;
+  const evBudget = inner - stripH;
+  const past = [...evBox.querySelectorAll(".ev.past")];
+  // If the day's events don't all fit, drop finished ones first (all of them),
+  // then scroll if the remaining still overflow. All-day cards are kept.
+  if (evBox.scrollHeight > evBudget + 1) {
+    for (const ev of past) ev.hidden = true;
+  }
+  const moreBtn = document.querySelector(".ev-more");
+  if (moreBtn) moreBtn.hidden = true;
+  if (coming) {
+    const evsH = evBox.scrollHeight;
+    const need = coming.offsetHeight;
+    if (evsH + gap + need > evBudget + 1) coming.hidden = true;
+  }
+  const leftover = evBudget - ((coming && !coming.hidden) ? coming.offsetHeight + gap : 0);
+  if (evBox.scrollHeight > leftover + 1) {
+    evBox.style.overflow = "auto";
+    evBox.style.flex = "1 1 auto";
+    evBox.style.minHeight = "0";
+    if (moreBtn) {
+      moreBtn.hidden = false;
+      moreBtn.textContent = "+0 more";
+    }
+    // Count events not fully visible now that the +X more row is reserved.
+    const box = evBox.getBoundingClientRect();
+    const clipped = [...evBox.querySelectorAll(".ev:not([hidden])")].filter(el => {
+      const r = el.getBoundingClientRect();
+      return r.bottom > box.bottom + 2;
+    });
+    if (moreBtn) {
+      if (clipped.length) {
+        moreBtn.textContent = `+${clipped.length} more`;
+        moreBtn.hidden = false;
+        moreBtn.dataset.count = String(clipped.length);
+        moreBtn.setAttribute("aria-label", `Show ${clipped.length} more event${clipped.length === 1 ? "" : "s"}`);
+      } else {
+        moreBtn.hidden = true;
+      }
+    }
+  }
+}
+layoutAgenda();
+addEventListener("resize", layoutAgenda);
+
+document.querySelector(".ev-more")?.addEventListener("click", () => {
+  const evBox = document.querySelector(".evs");
+  if (!evBox) return;
+  const box = evBox.getBoundingClientRect();
+  const clipped = [...evBox.querySelectorAll(".ev:not([hidden])")].find(el => el.getBoundingClientRect().bottom > box.bottom + 2)
+    || evBox.querySelector(".ev:not([hidden]):last-of-type");
+  if (!clipped) return;
+  evBox.scrollTo({ top: clipped.offsetTop, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+});
+// Tap-to-edit is specified for the final build; the mock has no edit screen.
+document.querySelectorAll(".ev").forEach(el => {
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") e.preventDefault();
+  });
+});
+
+const wxBtn = document.getElementById("wx-btn");
+const wxPop = document.getElementById("wx-pop");
+const wxScrim = document.getElementById("wx-scrim");
+function setWeather(open) {
+  if (!wxPop || !wxBtn) return;
+  wxPop.hidden = !open;
+  wxBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (wxScrim) wxScrim.hidden = !open;
+}
+wxBtn?.addEventListener("click", (e) => { e.stopPropagation(); setWeather(wxPop.hidden); });
+wxScrim?.addEventListener("click", () => setWeather(false));
+
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+function completeItem(row) {
+  if (row.dataset.busy) return;
+  row.dataset.busy = "1";
+  const cb = row.querySelector(".cb");
+  const disc = cb?.querySelector(".disc");
+  if (cb) {
+    cb.classList.add("on");
+    cb.setAttribute("aria-pressed", "true");
+    cb.setAttribute("aria-label", (cb.getAttribute("aria-label") || "").replace(/^To do: /, "Done: "));
+    if (disc && !disc.innerHTML.trim()) disc.innerHTML = I.check;
+  }
+  const finish = (ms) => {
+    row.classList.add("leaving");
+    setTimeout(() => row.remove(), ms);
+  };
+  if (reduced()) { finish(160); return; }
+  // force a layout so the stroke transition runs
+  row.querySelector(".scratch path")?.getBoundingClientRect();
+  row.classList.add("scratching");
+  setTimeout(() => finish(300), 400 + 180);
+}
+document.querySelectorAll(".list .row").forEach((row) => {
+  row.addEventListener("click", (e) => {
+    e.preventDefault();
+    completeItem(row);
+  });
+});
+</script>
+</body>
+</html>

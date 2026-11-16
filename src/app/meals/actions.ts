@@ -528,6 +528,60 @@ export async function adjustOnHand(formData: FormData) {
   backQuietly(formData);
 }
 
+type BackupPart = { id: string; item_id: string; on_hand: number | string; keep_at_least: number | string };
+
+/**
+ * A backup part below its minimum goes on the grocery list (source
+ * "backup", "Restock Frozen lasagne night"), for what's missing, unless
+ * it's already there and not ticked. Shared by the swap (parts count down)
+ * and the Backups tab's "Put low parts on the grocery list". Returns
+ * whether a line was added.
+ */
+async function suggestRestock(householdId: string, part: BackupPart, backupName: string, week: LocalDate, status: "suggested" | "approved"): Promise<boolean> {
+  const left = Number(part.on_hand);
+  if (left >= Number(part.keep_at_least)) return false;
+  const supabase = await createClient();
+  const { count } = await supabase.from("shopping_list").select("id", { count: "exact", head: true }).eq("backup_part_id", part.id).eq("checked", false);
+  if (count) return false;
+  const { error } = await supabase.from("shopping_list").insert({
+    household_id: householdId,
+    item_id: part.item_id,
+    amount: Math.ceil(Number(part.keep_at_least) - left),
+    source: "backup",
+    detail: `Restock ${backupName}`,
+    backup_part_id: part.id,
+    week_of: week,
+    status,
+  });
+  // Like before, a line that can't be written doesn't stop a swap.
+  return !error;
+}
+
+/**
+ * The Backups tab's "Put low parts on the grocery list": every part below
+ * its minimum, through the same restock path as a swap. You asked for it,
+ * so the lines go straight on (approved).
+ */
+export async function putLowPartsOnList(formData: FormData) {
+  const household = await requireHousehold();
+  const supabase = await createClient();
+  const [{ data: parts, error }, { data: backups }] = await Promise.all([
+    supabase.from("backup_parts").select("id, item_id, recipe_id, on_hand, keep_at_least"),
+    supabase.from("recipes").select("id, name").eq("is_backup", true),
+  ]);
+  if (error) back(formData, "error", error.message);
+  const nameOf = new Map((backups ?? []).map((b) => [b.id, b.name]));
+  const week = weekStartOf(localDateOf(new Date(), household.settings.timeZone), household.settings.weekStartsOn);
+  let added = 0;
+  for (const p of parts ?? []) {
+    if (await suggestRestock(household.id, p, nameOf.get(p.recipe_id) ?? "a backup meal", week, "approved")) added++;
+  }
+  if (added) await log(household.id, "backup_restock_listed", "household", household.id, { added: String(added) });
+  refresh();
+  revalidatePath("/lists");
+  back(formData, "message", added ? `Put ${added} part${added === 1 ? "" : "s"} on the grocery list.` : "Low parts are already on the grocery list.");
+}
+
 /**
  * Swaps a planned meal for a backup meal: the backup takes its place, the
  * original is kept as "swapped" (and can move to the next free night), its
@@ -634,21 +688,7 @@ async function swapCore(household: Household, mealId: string, backupId: string, 
   for (const p of parts ?? []) {
     const left = Math.max(0, Number(p.on_hand) - Number(p.uses));
     await supabase.from("backup_parts").update({ on_hand: left }).eq("id", p.id);
-    if (left < Number(p.keep_at_least)) {
-      const { count } = await supabase.from("shopping_list").select("id", { count: "exact", head: true }).eq("backup_part_id", p.id).eq("checked", false);
-      if (!count) {
-        await supabase.from("shopping_list").insert({
-          household_id: household.id,
-          item_id: p.item_id,
-          amount: Math.ceil(Number(p.keep_at_least) - left),
-          source: "backup",
-          detail: `Restock ${backup.name}`,
-          backup_part_id: p.id,
-          week_of: week,
-          status: "suggested",
-        });
-      }
-    }
+    await suggestRestock(household.id, { ...p, on_hand: left }, backup.name, week, "suggested");
   }
   await log(household.id, "meal_swapped", "meal", mealId, { backup: backup.name });
   return { backupName: backup.name, originalName, movedTo };

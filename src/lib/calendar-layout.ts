@@ -216,3 +216,14 @@ export function layoutBars(bars: DayBar[], columns: number, maxLanes: number): {
   }
   return { placed, hidden };
 }
+
+/**
+ * With the Daily List open, Week drops two days (SPEC "REVISED"): past
+ * days first, oldest first; if fewer than two have passed, the last days
+ * of the week go. The other five keep their full width.
+ */
+export function daysWithPanel(days: string[], today: string, drop = 2): string[] {
+  const past = days.filter((d) => d < today).slice(0, drop);
+  const kept = days.filter((d) => !past.includes(d));
+  return kept.slice(0, kept.length - (drop - past.length));
+}
