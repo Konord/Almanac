@@ -67,7 +67,7 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
             <input type="hidden" name="returnTo" value={returnTo} />
             <button className={secondaryActionClass}>
               <ShoppingCart size="1.25rem" weight="bold" aria-hidden />
-              Add what's low to groceries
+              Add what&rsquo;s low to groceries
             </button>
           </form>
         ) : null}
