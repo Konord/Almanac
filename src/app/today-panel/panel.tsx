@@ -407,7 +407,6 @@ export async function TodayPanel({
                 heading={heading}
                 rows={sideRows}
                 fallback={7}
-                paging="more"
                 className="mt-1"
               />
             ) : (

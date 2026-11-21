@@ -95,7 +95,6 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
             key={picked}
             heading={pickedName}
             fallback={DISH_PAGE}
-            paging="more"
             focus={openRecipe ? list.indexOf(openRecipe) : undefined}
             empty={<li className="px-1 text-lg text-ink-muted">No dishes yet</li>}
             rows={list.map((r) => (
