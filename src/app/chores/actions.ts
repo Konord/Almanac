@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 import { DEFAULT_SETTINGS, requireHousehold, type Household } from "@/lib/household";
 import { allBoxes, panelBoxes } from "@/lib/panel-boxes";
 import { createClient } from "@/lib/supabase/server";
-import { isLocalDate, isLocalTime, localDateOf } from "@/lib/time";
-import { isChoreTag } from "@/lib/chore-days";
+import { localDateOf } from "@/lib/time";
 import { skipChoreNow } from "./skip";
+import { readChore, readIcon, readTodo, type Fail } from "./read-task";
 
 /*
  * Like the other screens: each action re-checks the signed-in household,
@@ -28,6 +28,11 @@ function back(formData: FormData, kind: "error" | "message", text: string): neve
   params.delete("message");
   params.set(kind, text);
   redirect(`${base}?${params.toString()}`);
+}
+
+/** Sends a reading problem back to the screen the form came from. */
+function problem(formData: FormData): Fail {
+  return (message) => back(formData, "error", message);
 }
 
 function text(formData: FormData, key: string): string {
@@ -51,11 +56,6 @@ function refresh() {
   revalidatePath("/");
 }
 
-function readIcon(formData: FormData): string | null {
-  const icon = text(formData, "icon");
-  if (icon && [...icon].length > 4) back(formData, "error", "The picture should be one emoji, like 🧹.");
-  return icon || null;
-}
 
 // ---------------------------------------------------------------------------
 // Doing and skipping chores
@@ -122,56 +122,6 @@ export async function undoRound(formData: FormData) {
 // To-dos and lists
 // ---------------------------------------------------------------------------
 
-function readTodo(formData: FormData) {
-  const title = text(formData, "title");
-  const dueDate = text(formData, "dueDate");
-  if (!title) back(formData, "error", "Write what needs doing.");
-  if (title.length > 120) back(formData, "error", "Keep it under 120 letters.");
-  if (dueDate && !isLocalDate(dueDate)) back(formData, "error", "That date doesn't look right.");
-  const dateKind = text(formData, "dateKind") === "start" ? "start" : "due";
-  const atTime = text(formData, "atTime");
-  if (atTime && !isLocalTime(atTime)) back(formData, "error", "The time should look like 9:30 am.");
-  const leadText = text(formData, "leadDays");
-  const leadDays = leadText === "" ? null : Number(leadText);
-  if (leadDays !== null && !(Number.isInteger(leadDays) && leadDays >= 0 && leadDays <= 60)) back(formData, "error", "Show it between 0 and 60 days before.");
-  return {
-    title,
-    icon: readIcon(formData),
-    due_date: dueDate || null,
-    date_kind: dateKind,
-    // Only a to-do with a day can have a time ("by 3 pm" or "at 3 pm").
-    at_time: dueDate && atTime ? atTime : null,
-    lead_days: dateKind === "due" ? leadDays : null,
-    // Tasks no longer open a part of the app (Connor, 2026-11-10).
-    link: null,
-    assignee_id: text(formData, "assigneeId") || null,
-    notes: text(formData, "notes") || null,
-  };
-}
-
-/**
- * A one-off chore's fields (Connor, 2026-11-10): anything on the Chores
- * list. It has tags and maybe a chore day, and the chore planner picks its
- * day, so it has no day fields of its own.
- */
-function readChore(formData: FormData) {
-  const title = text(formData, "title");
-  if (!title) back(formData, "error", "Write what needs doing.");
-  if (title.length > 120) back(formData, "error", "Keep it under 120 letters.");
-  const tags = formData.getAll("tags").map(String).filter(isChoreTag);
-  return {
-    title,
-    icon: readIcon(formData),
-    // Tasks no longer open a part of the app (Connor, 2026-11-10).
-    link: null,
-    assignee_id: text(formData, "assigneeId") || null,
-    notes: text(formData, "notes") || null,
-    tags,
-    must_do: tags.includes("essential"),
-    chore_day_id: text(formData, "choreDayId") || null,
-  };
-}
-
 /** Whether a list is the household's Chores list. */
 async function isChoresList(listId: string): Promise<boolean> {
   const supabase = await createClient();
@@ -183,7 +133,7 @@ export async function addTodo(formData: FormData) {
   const household = await requireHousehold();
   const listId = text(formData, "listId");
   if (!listId) back(formData, "error", "Choose a list.");
-  const todo = (await isChoresList(listId)) ? readChore(formData) : readTodo(formData);
+  const todo = (await isChoresList(listId)) ? readChore(formData, problem(formData)) : readTodo(formData, problem(formData));
   const supabase = await createClient();
   const { error } = await supabase.from("task_instances").insert({ ...todo, list_id: listId, household_id: household.id });
   if (error) back(formData, "error", error.message);
@@ -198,7 +148,7 @@ export async function updateTodo(formData: FormData) {
   const { data: before } = await supabase.from("task_instances").select("list_id").eq("id", id).maybeSingle();
   if (!before?.list_id) back(formData, "error", "That to-do no longer exists.");
   const chore = await isChoresList(before.list_id);
-  const todo = chore ? readChore(formData) : readTodo(formData);
+  const todo = chore ? readChore(formData, problem(formData)) : readTodo(formData, problem(formData));
   // Tasks move between lists, but never on or off the Chores list (delete and remake instead).
   const listId = text(formData, "listId");
   const move = listId && listId !== before.list_id && !chore && !(await isChoresList(listId));
@@ -341,7 +291,7 @@ export async function addList(formData: FormData) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("task_lists")
-    .insert({ household_id: household.id, name, icon: readIcon(formData), sort_order: 100 })
+    .insert({ household_id: household.id, name, icon: readIcon(formData, problem(formData)), sort_order: 100 })
     .select("id")
     .single();
   if (error) back(formData, "error", error.message);
@@ -356,7 +306,7 @@ export async function updateList(formData: FormData) {
   const name = text(formData, "name");
   if (!name || name.length > 40) back(formData, "error", "A list needs a short name.");
   const supabase = await createClient();
-  const { error } = await supabase.from("task_lists").update({ name, icon: readIcon(formData) }).eq("id", id);
+  const { error } = await supabase.from("task_lists").update({ name, icon: readIcon(formData, problem(formData)) }).eq("id", id);
   if (error) back(formData, "error", error.message);
   await setInRotation(household, id, formData.get("inRotation") === "on");
   refresh();
