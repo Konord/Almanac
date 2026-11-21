@@ -120,8 +120,10 @@ export function HolidayManager({
     setSelection({ kind: "birthday", id });
   };
 
-  const selectedHoliday = selection?.kind === "holiday" ? draft.holidays.find((h) => h.id === selection.id) : undefined;
-  const selectedBirthday = selection?.kind === "birthday" ? draft.birthdays.find((b) => b.id === selection.id) : undefined;
+  // Nothing tapped yet: the soonest one on show is open, so the right side isn't just a hint (UI audit M3).
+  const shown = selection ?? (tab === "holidays" ? (holidays[p * perPage] ? { kind: "holiday" as const, id: holidays[p * perPage].h.id } : null) : birthdays[p * perPage] ? { kind: "birthday" as const, id: birthdays[p * perPage].b.id } : null);
+  const selectedHoliday = shown?.kind === "holiday" ? draft.holidays.find((h) => h.id === shown.id) : undefined;
+  const selectedBirthday = shown?.kind === "birthday" ? draft.birthdays.find((b) => b.id === shown.id) : undefined;
 
   return (
     <>
@@ -158,7 +160,7 @@ export function HolidayManager({
                     emoji={h.icon || "🎉"}
                     name={h.name || "Unnamed"}
                     detail={dateLabel(next)}
-                    active={selection?.kind === "holiday" && selection.id === h.id}
+                    active={shown?.kind === "holiday" && shown.id === h.id}
                     onClick={() => setSelection({ kind: "holiday", id: h.id })}
                   />
                 ))
@@ -168,7 +170,7 @@ export function HolidayManager({
                     emoji={b.icon || "🎂"}
                     name={b.name || "New birthday"}
                     detail={`${dateLabel(next)}${b.birth_year && next ? ` · turns ${Number(next.slice(0, 4)) - b.birth_year}` : ""}`}
-                    active={selection?.kind === "birthday" && selection.id === b.id}
+                    active={shown?.kind === "birthday" && shown.id === b.id}
                     onClick={() => setSelection({ kind: "birthday", id: b.id })}
                   />
                 ))}
@@ -419,12 +421,13 @@ function BirthdayEditor({ birthday, thisYear, art, onChange, onRemove }: { birth
         <label className="flex flex-col gap-[0.35rem]">
           <span className={fieldLabelClass}>Born in (optional)</span>
           <input
-            type="number"
             inputMode="numeric"
-            min={1900}
-            max={thisYear}
+            maxLength={4}
             value={birthday.birth_year ?? ""}
-            onChange={(e) => onChange({ birth_year: e.target.value === "" ? null : Number(e.target.value) })}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "");
+              onChange({ birth_year: digits ? Number(digits) : null });
+            }}
             className={`${editorInputClass} w-44! tabular-nums`}
           />
         </label>

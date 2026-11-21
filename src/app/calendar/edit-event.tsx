@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Button, editorInputClass } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
+import { DayField, TimeField } from "@/components/touch-pickers";
 import type { Household } from "@/lib/household";
 import { describeRule, parseRule } from "@/lib/recurrence";
 import { createClient } from "@/lib/supabase/server";
@@ -276,15 +277,15 @@ function OccurrenceControls({
         {hidden}
         <input type="hidden" name="allDay" value={String(event.all_day)} />
         <SheetField label="Move to">
-          <input name="newDate" type="date" defaultValue={localDateOf(start, timeZone)} required className={editorInputClass} />
+          <DayField name="newDate" defaultValue={localDateOf(start, timeZone)} required aria-label="Move to" />
         </SheetField>
         {event.all_day ? null : (
           <>
             <SheetField label="Starts">
-              <input name="newStartTime" type="time" defaultValue={localTimeOf(start, timeZone)} required className={editorInputClass} />
+              <TimeField name="newStartTime" defaultValue={localTimeOf(start, timeZone)} step={5} required aria-label="Starts" />
             </SheetField>
             <SheetField label="Ends">
-              <input name="newEndTime" type="time" defaultValue={localTimeOf(end, timeZone)} required className={editorInputClass} />
+              <TimeField name="newEndTime" defaultValue={localTimeOf(end, timeZone)} step={5} required aria-label="Ends" />
             </SheetField>
           </>
         )}

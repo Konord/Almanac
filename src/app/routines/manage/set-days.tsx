@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Bell, CaretLeft, Car, Check, Plus, Trash, X } from "@phosphor-icons/react";
 import { ColourDot, Emoji, ScreenHeader, Toggle, fieldLabelClass, secondaryActionClass, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { DayField, NumberStepper, TimeField } from "@/components/touch-pickers";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { soft, strong } from "@/lib/colours";
@@ -365,8 +366,8 @@ function WeeksPanel({
           value={rotate ? "turns" : "one"}
           disabled={plans.length < 2}
           options={[
-            { value: "turns", label: "Take turns" },
-            { value: "one", label: "Use one" },
+            { value: "turns", label: "Swap each week" },
+            { value: "one", label: "Keep one" },
           ]}
           onChange={(v) => {
             if (v === "turns" && !rotate) update((d) => takeTurns(d, member.id, row.plan.id, today));
@@ -526,8 +527,8 @@ function KindsTab({ draft, update, members, setError }: TabProps & { setError: (
                   </button>
                   {mine ? (
                     <>
-                      <input type="time" value={mine.wake} onChange={(e) => setType(mine.id, { wake: e.target.value })} aria-label={`${m.name} wakes up`} className={timeClass} />
-                      <input type="time" value={mine.bed} onChange={(e) => setType(mine.id, { bed: e.target.value })} aria-label={`${m.name} goes to bed`} className={timeClass} />
+                      <TimeField value={mine.wake} onChange={(t) => setType(mine.id, { wake: t })} step={5} aria-label={`${m.name} wakes up`} className={timeClass} />
+                      <TimeField value={mine.bed} onChange={(t) => setType(mine.id, { bed: t })} step={5} aria-label={`${m.name} goes to bed`} className={timeClass} />
                     </>
                   ) : (
                     <span className="col-span-2" aria-hidden />
@@ -580,10 +581,10 @@ function KindHeadsUps({
   onClose: () => void;
 }) {
   const [label, setLabel] = useState("");
-  const [amount, setAmount] = useState("12");
+  const [amount, setAmount] = useState(12);
   const [unit, setUnit] = useState<LeadUnit>("hours");
   const [makes, setMakes] = useState<"todo" | "grocery">("todo");
-  const minutes = leadMinutes(Number(amount), unit);
+  const minutes = leadMinutes(amount, unit);
   const add = () => {
     if (!label.trim() || minutes === null) return;
     onAdd({ label: label.trim().slice(0, 80), minutes_before: minutes, makes });
@@ -641,16 +642,9 @@ function KindHeadsUps({
                   className="min-h-12 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-ink"
                 />
               </label>
-              <label className="flex w-28 shrink-0 flex-col gap-1.5">
+              <label className="flex shrink-0 flex-col gap-1.5">
                 <span className="text-lg font-bold text-ink">How long</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={999}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="min-h-12 rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-ink"
-                />
+                <NumberStepper value={amount} onChange={(n) => setAmount(n ?? 0)} min={0} max={999} aria-label="How long" />
               </label>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -688,7 +682,7 @@ function KindHeadsUps({
   );
 }
 
-const timeClass = "min-h-12 w-full min-w-0 rounded-[var(--radius)] border-2 border-frame bg-board px-1.5 text-lg text-ink outline-none focus:border-ink";
+const timeClass = "px-2! text-lg!";
 
 // ---------------------------------------------------------------------------
 // Breaks: a list on the left, the one picked on the right
@@ -855,20 +849,17 @@ function BreakEditor({
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           <span className="text-lg font-bold text-ink-muted">From</span>
-          <input
-            type="date"
+          <DayField
             value={item.start}
             min={item.start < today ? item.start : today}
-            onChange={(e) => {
-              const start = e.target.value;
-              set({ start, end: item.end < start ? start : item.end });
-            }}
+            onChange={(start) => set({ start, end: item.end < start ? start : item.end })}
+            aria-label="From"
             className={dateClass}
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-lg font-bold text-ink-muted">To</span>
-          <input type="date" value={item.end} min={item.start} onChange={(e) => set({ end: e.target.value })} className={dateClass} />
+          <DayField value={item.end} min={item.start} onChange={(end) => set({ end })} aria-label="To" className={dateClass} />
         </label>
         <span className="pb-3 text-lg font-semibold text-ink-muted">{dayCount(item.start, item.end)}</span>
         <label className="ml-auto flex min-h-[var(--touch-target)] cursor-pointer items-center gap-2.5 text-lg font-bold text-ink">
@@ -938,7 +929,7 @@ function BreakEditor({
   );
 }
 
-const dateClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-ink";
+const dateClass = "w-auto! px-3! text-lg!";
 
 function dayCount(start: string, end: string): string {
   const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;

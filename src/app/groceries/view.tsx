@@ -111,7 +111,20 @@ export function GroceryView({
   const all = lines ?? [];
   const toGet = all.filter((l) => !l.checked).length;
   const got = all.length - toGet;
-  const pages = groceryPages(all, rows, compact ? 1 : columns);
+  // A list that fits on one page is spread over all the columns, shortest first, so it
+  // uses the width instead of leaving the last columns empty (UI audit M3).
+  const cols = compact ? 1 : columns;
+  let fit = rows;
+  if (!compact && groceryPages(all, rows, cols).length === 1) {
+    const aisles = new Set(all.map((l) => l.aisle)).size;
+    for (let r = Math.max(2, Math.ceil((all.length + aisles) / cols)); r < rows; r++) {
+      if (groceryPages(all, r, cols).length === 1) {
+        fit = r;
+        break;
+      }
+    }
+  }
+  const pages = groceryPages(all, fit, cols);
   const p = Math.min(page, pages.length - 1);
   const openLine = all.find((l) => l.id === open);
 

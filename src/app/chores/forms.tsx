@@ -1,5 +1,6 @@
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Chips, Field, Input, Select } from "@/components/ui";
+import { DayField, NumberStepper, TimeField } from "@/components/touch-pickers";
 import { CHORE_TAGS, isChoreTag, type ChoreDay } from "@/lib/chore-days";
 import type { ChoreMember } from "./data";
 
@@ -51,7 +52,7 @@ export function TodoFields({
       ) : (
       <>
         <Field label="Day">
-          <Input name="dueDate" type="date" defaultValue={todo?.due_date ?? ""} />
+          <DayField name="dueDate" defaultValue={todo?.due_date ?? ""} allowEmpty emptyText="No day" aria-label="Day" />
         </Field>
         <Chips
           name="dateKind"
@@ -63,10 +64,10 @@ export function TodoFields({
           defaultValue={todo?.date_kind ?? "due"}
         />
         <Field label="Time">
-          <Input name="atTime" type="time" defaultValue={todo?.at_time?.slice(0, 5) ?? ""} />
+          <TimeField name="atTime" defaultValue={todo?.at_time?.slice(0, 5) ?? ""} step={5} allowEmpty emptyText="No time" aria-label="Time" />
         </Field>
-        <Field label="Show it ahead (days)">
-          <Input name="leadDays" type="number" min={0} max={60} defaultValue={todo?.lead_days ?? ""} />
+        <Field label="Show it ahead">
+          <NumberStepper name="leadDays" min={0} max={60} defaultValue={todo?.lead_days ?? null} allowEmpty unit="days" aria-label="Show it ahead" />
         </Field>
       </>
       )}

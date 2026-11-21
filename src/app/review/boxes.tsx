@@ -194,7 +194,8 @@ export function ChecksMenu({ problems, onFix, onLeave }: { problems: Problem[]; 
         className="flex min-h-13 max-w-full min-w-0 items-center gap-[0.6rem] rounded-[var(--radius)] px-3 text-2xl font-bold tracking-[-0.02em] text-accent lg:text-[2rem]"
       >
         <WarningCircle size="0.9em" weight="fill" className="shrink-0" aria-hidden />
-        <span className="min-w-0 truncate">{problems.length === 1 ? problems[0].text : `${problems.length} things to check`}</span>
+        {/* A short count, never a sentence cut in half: the full wording is in the list it opens (UI audit H6). */}
+        <span className="whitespace-nowrap">{problems.length === 1 ? "1 thing to check" : `${problems.length} things to check`}</span>
         <CaretDown size="0.7em" weight="bold" className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} aria-hidden />
       </button>
       {isOpen ? (

@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { HouseLine, Plus, SignOut } from "@phosphor-icons/react";
 import { ColourDot, EmptyState, ScreenHeader, SoftLink, Toggle, editorInputClass, secondaryActionClass, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { TimeField } from "@/components/touch-pickers";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { PERSON_COLOURS, strong } from "@/lib/colours";
@@ -52,7 +53,7 @@ const PER_PAGE = 7;
 const COLUMN_ROWS = 4;
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** A time field a little smaller than other fields, so two fit side by side. */
-const timeInputClass = `${editorInputClass} !px-3 !text-[1.25rem]`;
+const timePickClass = "px-3! text-[1.25rem]!";
 
 let counter = 0;
 const newId = () => `new-${Date.now()}-${counter++}`;
@@ -299,7 +300,7 @@ export function SettingsEditor({
                     <Toggle label="Planner on" value={String(draft.reviewWeekday)} onChange={(v) => set({ reviewWeekday: Number(v) })} options={WEEKDAYS.map((d, i) => ({ value: String(i), label: d }))} />
                   </Field>
                   <Field label="At">
-                    <input type="time" value={draft.reviewTime} onChange={(e) => set({ reviewTime: e.target.value })} aria-label="Planner time" className={timeInputClass} />
+                    <TimeField value={draft.reviewTime} onChange={(t) => set({ reviewTime: t })} step={5} aria-label="Planner time" className={timePickClass} />
                   </Field>
                 </div>
                 <Field label="Write to-dos, meals and notes in" className="mt-[0.6rem]">
@@ -345,9 +346,9 @@ export function SettingsEditor({
                 <div className="mt-[0.6rem] grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-x-4">
                   <Field label="Quiet hours">
                     <div className="flex items-center gap-2">
-                      <input type="time" value={draft.sounds.quietFrom} onChange={(e) => setSounds({ quietFrom: e.target.value })} aria-label="Quiet hours start" className={timeInputClass} />
+                      <TimeField value={draft.sounds.quietFrom} onChange={(t) => setSounds({ quietFrom: t })} step={5} aria-label="Quiet hours start" className={timePickClass} />
                       <span aria-hidden className="text-[1.25rem] font-bold text-ink-muted">–</span>
-                      <input type="time" value={draft.sounds.quietTo} onChange={(e) => setSounds({ quietTo: e.target.value })} aria-label="Quiet hours end" className={timeInputClass} />
+                      <TimeField value={draft.sounds.quietTo} onChange={(t) => setSounds({ quietTo: t })} step={5} aria-label="Quiet hours end" className={timePickClass} />
                     </div>
                   </Field>
                   <Field label="Output device">
@@ -453,13 +454,15 @@ function PersonFields({ member, onChange }: { member: MemberDraft; onChange: (c:
         </Field>
         <Field label="Born in">
           <input
-            type="number"
-            min={1900}
-            max={2100}
+            inputMode="numeric"
+            maxLength={4}
             value={member.birthYear ?? ""}
             placeholder="Year"
             aria-label="Born in"
-            onChange={(e) => onChange({ birthYear: e.target.value ? Number(e.target.value) : null })}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "");
+              onChange({ birthYear: digits ? Number(digits) : null });
+            }}
             className={`${editorInputClass} !px-3`}
           />
         </Field>

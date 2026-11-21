@@ -5,6 +5,7 @@ import { PencilSimple, Plus } from "@phosphor-icons/react/dist/ssr";
 import { ActionLink, AppFrame, Button, Card, Emoji, Input, Notice, ScreenHeader, Select, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
 import { Sheet } from "@/components/sheet";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { DayField, TimeField } from "@/components/touch-pickers";
 import { requireHousehold } from "@/lib/household";
 import { createClient } from "@/lib/supabase/server";
 import { localDateOf, type LocalDate } from "@/lib/time";
@@ -108,12 +109,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 </li>
               );
             })}
-            footer={
-              <SoftLink href={here("&newList=1")} className="w-full">
-                <Plus size="1.25rem" weight="bold" aria-hidden />
-                New list
-              </SoftLink>
-            }
           />
         </Card>
 
@@ -174,8 +169,8 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                         <option value="due">Done by</option>
                         <option value="start">On</option>
                       </Select>
-                      <Input name="dueDate" type="date" aria-label="Day (optional)" className="min-w-44 flex-1" />
-                      <Input name="atTime" type="time" aria-label="Time (optional)" title="Time (optional): with a day, it shows on the calendar" className="min-w-32 flex-1" />
+                      <DayField name="dueDate" allowEmpty emptyText="Any day" aria-label="Day (optional)" className="min-w-44 flex-1" />
+                      <TimeField name="atTime" step={5} allowEmpty emptyText="Any time" aria-label="Time (optional)" className="min-w-40 flex-1" />
                       <Select name="assigneeId" aria-label="For someone (optional)" defaultValue="" className="min-w-36 flex-1">
                         <option value="">Anyone</option>
                         {members.map((m) => (

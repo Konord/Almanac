@@ -214,17 +214,25 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   ];
 
   // --- Coming up: the next few timed things after today ----------------------
+  // In the evening, with two things or fewer left today, Coming up grows and
+  // leads with tomorrow: that's the question then (UI audit M4).
+  const quiet = isToday && ahead.length <= 2;
+  const tomorrow = addDays(day, 1);
   const coming: ComingUpItem[] = shown
     .filter((e) => !isAllDayStyle(e, timeZone) && localDateOf(new Date(e.starts_at), timeZone) > day)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-    .slice(0, 3)
-    .map((e) => ({
-      key: e.id,
-      title: e.title,
-      emoji: eventEmoji(e.icon, e.title),
-      when: `${new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(new Date(e.starts_at))} · ${time(e.starts_at)}`,
-      href: editLink(e),
-    }));
+    .slice(0, quiet ? 9 : 3)
+    .map((e) => {
+      const isTomorrow = localDateOf(new Date(e.starts_at), timeZone) === tomorrow;
+      return {
+        key: e.id,
+        title: e.title,
+        emoji: eventEmoji(e.icon, e.title),
+        when: quiet && isTomorrow ? time(e.starts_at) : `${new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(new Date(e.starts_at))} · ${time(e.starts_at)}`,
+        href: editLink(e),
+        tomorrow: isTomorrow,
+      };
+    });
 
   // Add opens the quick-add card for the day, starting at the next half hour (9 am on another day).
   const nextSlot = isToday ? Math.min(Math.ceil((nowMin + 1) / 30) * 30, 23 * 60) : 9 * 60;
@@ -291,7 +299,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             hidden
             className="tabular flex min-h-[var(--touch-target)] w-full shrink-0 items-center justify-center text-[1.25rem] font-bold text-ink-soft"
           />
-          <ComingUp items={coming} />
+          <ComingUp items={coming} lead={quiet} />
         </AgendaFit>
 
         <TodayPanel

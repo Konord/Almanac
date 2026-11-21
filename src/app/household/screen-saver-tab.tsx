@@ -9,6 +9,7 @@ import { BACK_AFTER_CHOICES, IDLE_CHOICES, MAX_SET_TIMES, dinnerBlocks, type Mat
 import { LEVEL_CHOICES, type BrightnessSettings, type Warmth } from "@/lib/brightness";
 import { useLauncher } from "@/components/launcher-store";
 import { Choice } from "./fields";
+import { TimeField } from "@/components/touch-pickers";
 
 /*
  * Settings › Screen saver (2026-11-12): when the art screen saver comes on,
@@ -27,7 +28,6 @@ const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const FOLDERS_PER_PAGE = 18;
 
-const inputClass = "min-h-[var(--touch-target)] rounded-[var(--radius)] border-2 border-frame bg-board px-3 text-lg text-ink outline-none focus:border-accent";
 
 function Toggle({ on, onClick, children, label }: { on: boolean; onClick: () => void; children: ReactNode; label?: string }) {
   return (
@@ -161,9 +161,9 @@ export function ScreenSaverTab({
                       ))}
                     </div>
                     <div className="flex items-center gap-2 text-lg text-ink">
-                      <input type="time" aria-label="From" value={t.start} onChange={(e) => e.target.value && setTime(i, { start: e.target.value })} className={`${inputClass} w-44`} />
+                      <TimeField aria-label="From" value={t.start} step={5} onChange={(v) => setTime(i, { start: v })} className="w-44! text-lg!" />
                       to
-                      <input type="time" aria-label="Until" value={t.end} onChange={(e) => e.target.value && setTime(i, { end: e.target.value })} className={`${inputClass} w-44`} />
+                      <TimeField aria-label="Until" value={t.end} step={5} onChange={(v) => setTime(i, { end: v })} className="w-44! text-lg!" />
                       <button type="button" aria-label="Take this time away" onClick={() => set({ times: value.times.filter((_, k) => k !== i) })} className="ml-auto flex size-[var(--touch-target)] items-center justify-center rounded-full text-ink-muted hover:bg-board">
                         <X size="1.375rem" weight="bold" aria-hidden />
                       </button>
@@ -287,9 +287,9 @@ function Overnight({ value, set }: { value: ScreenSaverSettings; set: (c: Partia
       />
       {value.overnight.mode !== "none" ? (
         <div className="flex items-center gap-2 text-lg text-ink">
-          <input type="time" aria-label="Overnight from" value={value.overnight.start} onChange={(e) => e.target.value && set({ overnight: { ...value.overnight, start: e.target.value } })} className={`${inputClass} w-44`} />
+          <TimeField aria-label="Overnight from" value={value.overnight.start} step={5} onChange={(t) => set({ overnight: { ...value.overnight, start: t } })} className="w-44! text-lg!" />
           to
-          <input type="time" aria-label="Overnight until" value={value.overnight.end} onChange={(e) => e.target.value && set({ overnight: { ...value.overnight, end: e.target.value } })} className={`${inputClass} w-44`} />
+          <TimeField aria-label="Overnight until" value={value.overnight.end} step={5} onChange={(t) => set({ overnight: { ...value.overnight, end: t } })} className="w-44! text-lg!" />
         </div>
       ) : null}
     </div>
@@ -321,11 +321,12 @@ function BrightnessView({
     <>
       <label className="flex flex-col gap-1.5">
         <span className="text-base font-bold text-ink">{label}</span>
-        <input
-          type="time"
+        <TimeField
+          aria-label={label}
           value={value[which].start}
-          onChange={(e) => e.target.value && set({ [which]: { ...value[which], start: e.target.value } })}
-          className={`${inputClass} w-44`}
+          step={5}
+          onChange={(t) => set({ [which]: { ...value[which], start: t } })}
+          className="w-44! text-lg!"
         />
       </label>
       <Choice label="Brightness" value={value[which].percent} onChange={(percent) => set({ [which]: { ...value[which], percent } })} options={levels} />

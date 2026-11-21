@@ -86,8 +86,21 @@ function layout(panel: HTMLElement) {
   // 2. Too many: the finished ones go first, all of them.
   if (cards.scrollHeight > budget + 1) cards.querySelectorAll<HTMLElement>("[data-past]").forEach((el) => (el.hidden = true));
 
-  // 3. Coming up only with room to spare.
-  if (coming && cards.scrollHeight + gap + coming.offsetHeight > budget + 1) coming.hidden = true;
+  // 3. Coming up only with room to spare. A big evening one first drops its
+  //    last items (down to three), then goes like any other.
+  if (coming) {
+    const fits = () => cards.scrollHeight + gap + coming.offsetHeight <= budget + 1;
+    const items = [...coming.querySelectorAll<HTMLElement>("[data-coming-item]")];
+    items.forEach((el) => (el.hidden = false));
+    coming.querySelectorAll<HTMLElement>("h2").forEach((h) => (h.hidden = false));
+    for (let i = items.length - 1; i >= 3 && !fits(); i--) items[i].hidden = true;
+    // A heading whose items are all hidden goes too.
+    coming.querySelectorAll<HTMLElement>("h2").forEach((h) => {
+      const grid = h.nextElementSibling;
+      if (grid && [...grid.children].every((c) => (c as HTMLElement).hidden)) h.hidden = true;
+    });
+    if (!fits()) coming.hidden = true;
+  }
 
   // 4. Still too many: "+X more", and the cards scroll inside the panel.
   const left = budget - (coming && !coming.hidden ? coming.offsetHeight + gap : 0);
