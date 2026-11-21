@@ -36,7 +36,7 @@ export type PhoneEvent = {
   repeats: boolean;
 };
 
-type Mode = "agenda" | "3day";
+type Mode = "agenda" | "3day" | "month";
 
 const MODE_KEY = "almanac-phone-calendar";
 /** How tall one hour is on the 3-day grid. */
@@ -96,7 +96,7 @@ export function CalendarView({
     try {
       const saved = window.localStorage.getItem(MODE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after the first paint (no storage on the server)
-      if (saved === "3day") setMode("3day");
+      if (saved === "3day" || saved === "month") setMode(saved);
     } catch {
       // Private browsing: always Agenda.
     }
@@ -113,7 +113,8 @@ export function CalendarView({
 
   /** Moves to a day: here when it's loaded, otherwise loads the days around it. */
   const goTo = (d: LocalDate) => {
-    if (d < from || d > to || (mode === "3day" && addDays(d, 2) > to)) {
+    const grid = mode === "month" ? monthGridDays(d, weekStartsOn) : [d];
+    if (d < from || d > to || (mode === "3day" && addDays(d, 2) > to) || grid[0] < from || grid.at(-1)! > to) {
       router.push(`/m?date=${d}`);
       return;
     }
@@ -143,13 +144,13 @@ export function CalendarView({
         <header className="flex min-h-[4.5rem] items-center gap-2 px-4 pt-3 pb-1">
           <button
             type="button"
-            onClick={() => setMonthOpen((o) => !o)}
-            aria-expanded={monthOpen}
+            onClick={() => mode !== "month" && setMonthOpen((o) => !o)}
+            aria-expanded={mode === "month" ? undefined : monthOpen}
             className="flex min-h-12 min-w-0 flex-1 items-baseline gap-2 text-left"
           >
             <h1 className="truncate text-[clamp(1.6rem,7.6vw,2rem)] leading-none font-extrabold tracking-[-0.045em] text-title">{month}</h1>
             <span className="tabular hidden shrink-0 text-[1.1rem] leading-none font-bold text-title-soft min-[360px]:inline">{year}</span>
-            {monthOpen ? <CaretUp size="1.2rem" weight="bold" className="self-center text-ink-muted" aria-hidden /> : <CaretDown size="1.2rem" weight="bold" className="self-center text-ink-muted" aria-hidden />}
+            {mode === "month" ? null : monthOpen ? <CaretUp size="1.2rem" weight="bold" className="self-center text-ink-muted" aria-hidden /> : <CaretDown size="1.2rem" weight="bold" className="self-center text-ink-muted" aria-hidden />}
           </button>
           {focus !== today ? (
             <button type="button" onClick={() => goTo(today)} className={phoneSecondaryClass}>
@@ -161,7 +162,7 @@ export function CalendarView({
             Add
           </Link>
         </header>
-        <div className="px-3 pb-2">
+        <div className="px-3 pb-2" hidden={mode === "month"}>
           {monthOpen ? (
             <MonthGrid
               focus={focus}
@@ -187,12 +188,26 @@ export function CalendarView({
             options={[
               { value: "agenda", label: "Agenda" },
               { value: "3day", label: "3 Day" },
+              { value: "month", label: "Month" },
             ]}
           />
         </div>
       </div>
 
-      {mode === "agenda" ? (
+      {mode === "month" ? (
+        <MonthView
+          focus={focus}
+          today={today}
+          locale={locale}
+          weekStartsOn={weekStartsOn}
+          byDay={byDay}
+          onPick={setFocus}
+          onMonth={(n) => {
+            const [y, m] = focus.split("-").map(Number);
+            goTo(new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10));
+          }}
+        />
+      ) : mode === "agenda" ? (
         <Agenda days={days} byDay={byDay} today={today} locale={locale} to={to} scrollToRef={scrollToRef} onFocus={setFocus} onMore={() => router.push(`/m?date=${addDays(to, 1)}`)} />
       ) : (
         <ThreeDay start={focus} today={today} locale={locale} byDay={byDay} scrollToRef={scrollToRef} onMove={(n) => goTo(addDays(focus, n))} />
@@ -647,4 +662,106 @@ function NowLine() {
   }, []);
   if (minute === null) return null;
   return <span aria-hidden className="pointer-events-none absolute inset-x-0 h-0.5 bg-now" style={{ top: `${(minute / 60) * HOUR_REM}rem` }} />;
+}
+
+// ---------------------------------------------------------------------------
+// Month: the whole month with what's on each day, and the picked day below
+// ---------------------------------------------------------------------------
+
+/** How many events a day square names before "+N". */
+const MONTH_CHIPS = 3;
+
+function MonthView({
+  focus,
+  today,
+  locale,
+  weekStartsOn,
+  byDay,
+  onPick,
+  onMonth,
+}: {
+  focus: LocalDate;
+  today: LocalDate;
+  locale: string;
+  weekStartsOn: 0 | 1;
+  byDay: Map<LocalDate, PhoneEvent[]>;
+  onPick: (d: LocalDate) => void;
+  onMonth: (n: 1 | -1) => void;
+}) {
+  const grid = monthGridDays(focus, weekStartsOn);
+  const swipe = useSwipe(onMonth);
+  const picked = byDay.get(focus) ?? [];
+  return (
+    <div className="flex flex-col gap-3 pt-2">
+      <div {...swipe} className="flex flex-col">
+        <div className="flex items-center justify-between px-2">
+          <button type="button" onClick={() => onMonth(-1)} aria-label="Last month" className="flex size-12 items-center justify-center rounded-full text-ink">
+            <CaretLeft size="1.3rem" weight="bold" aria-hidden />
+          </button>
+          <span className="text-[1.15rem] font-bold text-ink">{fmt(focus, locale, { month: "long", year: "numeric" })}</span>
+          <button type="button" onClick={() => onMonth(1)} aria-label="Next month" className="flex size-12 items-center justify-center rounded-full text-ink">
+            <CaretRight size="1.3rem" weight="bold" aria-hidden />
+          </button>
+        </div>
+        <div className="px-1">
+          <Weekdays start={grid[0]} locale={locale} />
+        </div>
+        <div className="grid grid-cols-7 border-t border-frame bg-board">
+          {grid.map((d) => {
+            const list = byDay.get(d) ?? [];
+            const other = d.slice(0, 7) !== focus.slice(0, 7);
+            const on = d === focus;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => onPick(d)}
+                aria-pressed={on}
+                aria-label={`${fmt(d, locale, { weekday: "long", month: "long", day: "numeric" })}, ${dayCount(list)}`}
+                className={`flex min-h-[5.75rem] min-w-0 flex-col items-stretch gap-0.5 border-r border-b border-frame px-0.5 pt-1 pb-1 text-left ${
+                  other || d < today ? "bg-rail" : ""
+                } ${on ? "outline-2 -outline-offset-2 outline-ink" : ""}`}
+              >
+                <span
+                  className={`tabular mx-auto flex size-7 items-center justify-center rounded-full text-[1rem] leading-none font-bold ${
+                    d === today ? "bg-primary text-primary-ink" : other ? "text-ink-muted" : "text-ink"
+                  }`}
+                >
+                  {Number(d.slice(8))}
+                </span>
+                {list.slice(0, list.length > MONTH_CHIPS ? MONTH_CHIPS - 1 : MONTH_CHIPS).map((e) => (
+                  <span
+                    key={e.key}
+                    className="block truncate rounded-[0.3rem] px-1 text-[0.75rem] leading-[1.15rem] font-bold"
+                    style={{ background: e.colour ? soft(e.colour) : "var(--color-panel)" }}
+                  >
+                    <HandText colour={e.colour}>{e.title}</HandText>
+                  </span>
+                ))}
+                {list.length > MONTH_CHIPS ? (
+                  <span className="px-1 text-[0.75rem] leading-[1.15rem] font-bold text-ink-muted">+{list.length - (MONTH_CHIPS - 1)}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <section className="px-3">
+        <h2 className={`flex items-baseline gap-2 px-1 pb-1.5 text-[1.05rem] font-bold ${focus === today ? "text-accent" : "text-ink-soft"}`}>
+          {focus === today ? <span className="uppercase">Today</span> : null}
+          <span>{fmt(focus, locale, { weekday: "long", month: "long", day: "numeric" })}</span>
+        </h2>
+        {picked.length === 0 ? (
+          <p className="px-1 pb-1 text-[1rem] font-semibold text-ink-muted">Nothing planned</p>
+        ) : (
+          <div className="divide-y divide-frame overflow-hidden rounded-[var(--radius-card)] bg-board shadow-raised">
+            {picked.map((e) => (
+              <EventRow key={e.key} e={e} day={focus} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
