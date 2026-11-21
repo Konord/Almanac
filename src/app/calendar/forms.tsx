@@ -6,6 +6,7 @@ import { VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
 import { CardTabs, ToggleChips, choiceChipClass } from "./quick-controls";
 import { WhenFields } from "./when-fields";
+import { DayField, NumberStepper } from "@/components/touch-pickers";
 import { PendingSync } from "./pending-sync";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { Stickers } from "./stickers";
@@ -63,9 +64,9 @@ export function ChoiceChips({
 function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
   return (
     <>
-      <div className="grid grid-cols-[8rem_1fr] items-end gap-[0.8rem]">
+      <div className="grid grid-cols-[11rem_1fr] items-end gap-[0.8rem]">
         <SheetField label="Every">
-          <input name="repeatInterval" type="number" min={1} max={52} defaultValue={repeat?.interval ?? 1} className={editorInputClass} />
+          <NumberStepper name="repeatInterval" min={1} max={52} defaultValue={repeat?.interval ?? 1} aria-label="Every" />
         </SheetField>
         <ChoiceChips
           name="repeatEnd"
@@ -87,10 +88,10 @@ function RepeatDetails({ repeat }: { repeat?: RepeatOptions }) {
       />
       <div className="grid grid-cols-2 gap-[0.8rem]">
         <SheetField label="Stop date">
-          <input name="repeatUntil" type="date" defaultValue={repeat?.until ?? ""} className={editorInputClass} />
+          <DayField name="repeatUntil" defaultValue={repeat?.until ?? ""} allowEmpty emptyText="No date" aria-label="Stop date" />
         </SheetField>
         <SheetField label="How many times">
-          <input name="repeatCount" type="number" min={1} max={500} defaultValue={repeat?.count ?? ""} className={editorInputClass} />
+          <NumberStepper name="repeatCount" min={1} max={500} defaultValue={repeat?.count ?? null} allowEmpty aria-label="How many times" />
         </SheetField>
       </div>
     </>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash } from "@phosphor-icons/react";
 import { Chips, Emoji, Field, Input, segItemClass, segTrackClass } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { NumberStepper } from "@/components/touch-pickers";
 import { LeaveDialog, SaveButton } from "@/components/unsaved-changes";
 import { removeRecipe, saveDish } from "./actions";
 import { BLANK_INGREDIENT, IngredientsEditor, StepsEditor, type EditingStep, type IngredientDraft, type StepDraft } from "./recipe-editors";
@@ -200,13 +201,13 @@ export function DishEditor({
                   </div>
                   <div className="flex gap-4">
                     <Field label="Serves">
-                      <Input name="serves" type="number" min={1} max={50} defaultValue={dish.serves} className="w-28" />
+                      <NumberStepper name="serves" min={1} max={50} defaultValue={dish.serves} onChange={() => setFormChanged(true)} aria-label="Serves" />
                     </Field>
-                    <Field label="Hands-on minutes">
-                      <Input name="handsOnMinutes" type="number" min={0} max={1440} defaultValue={dish.hands_on_minutes ?? ""} className="w-36" />
+                    <Field label="Hands-on time">
+                      <NumberStepper name="handsOnMinutes" min={0} max={1440} step={5} defaultValue={dish.hands_on_minutes ?? null} allowEmpty unit="min" onChange={() => setFormChanged(true)} aria-label="Hands-on time" />
                     </Field>
-                    <Field label="Total minutes">
-                      <Input name="totalMinutes" type="number" min={0} max={2880} defaultValue={dish.total_minutes ?? ""} className="w-36" />
+                    <Field label="Total time">
+                      <NumberStepper name="totalMinutes" min={0} max={2880} step={5} defaultValue={dish.total_minutes ?? null} allowEmpty unit="min" onChange={() => setFormChanged(true)} aria-label="Total time" />
                     </Field>
                   </div>
                 </div>

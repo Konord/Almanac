@@ -19,6 +19,7 @@ import {
   whoChipStyle,
 } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { NumberStepper, TimeField } from "@/components/touch-pickers";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { hand, soft, strong } from "@/lib/colours";
@@ -764,14 +765,14 @@ export function RoutineManager({
                   ) : null}
                   {routine.anchor === "clock" ? (
                     <Field label="Starts at" className="w-[10.5rem]">
-                      <input type="time" value={routine.usual_start ?? ""} onChange={(e) => setRoutine({ usual_start: e.target.value || null })} className={inputClass} />
+                      <TimeField value={routine.usual_start ?? ""} onChange={(t) => setRoutine({ usual_start: t || null })} step={5} aria-label="Starts at" className="px-3!" />
                     </Field>
                   ) : (
-                    <Field label={routine.anchor === "bed" ? "Before bed (min)" : "Gap (min)"} className="w-[10rem]">
+                    <Field label={routine.anchor === "bed" ? "Before bed" : "Gap"} className="w-[13rem]">
                       <NumberField value={routine.anchor_offset} min={0} max={240} onChange={(v) => setRoutine({ anchor_offset: v })} />
                     </Field>
                   )}
-                  <Field label="Minutes" className="w-[7rem]">
+                  <Field label="Takes" className="w-[13rem]">
                     <NumberField value={routine.usual_minutes} min={5} max={240} onChange={(v) => setRoutine({ usual_minutes: v })} />
                   </Field>
                   <span className="ml-auto flex gap-[0.6rem]">
@@ -828,7 +829,6 @@ export function RoutineManager({
 // Small pieces
 // ---------------------------------------------------------------------------
 
-const fieldClass = inputClass;
 /** A round grey icon button in the editor's title row (save as template, delete). */
 const iconButtonClass = "flex size-12 shrink-0 items-center justify-center rounded-full bg-panel text-ink";
 
@@ -880,17 +880,8 @@ function Field({ label, className = "", children }: { label: string; className?:
 }
 
 function NumberField({ value, min, max, onChange }: { value: number; min: number; max: number; onChange: (v: number) => void }) {
-  return (
-    <input
-      type="number"
-      inputMode="numeric"
-      value={Number.isFinite(value) ? value : ""}
-      min={min}
-      max={max}
-      onChange={(e) => onChange(e.target.value === "" ? Number.NaN : Number(e.target.value))}
-      className={`${fieldClass} tabular`}
-    />
-  );
+  // Minutes, in fives: big − and + instead of the browser's tiny spinner.
+  return <NumberStepper value={Number.isFinite(value) ? value : min} min={min} max={max} step={5} unit="min" onChange={(v) => onChange(v ?? min)} />;
 }
 
 function Switch({ on, partly = false, onClick, label, hint }: { on: boolean; partly?: boolean; onClick: () => void; label: string; hint?: string }) {
@@ -1342,9 +1333,9 @@ function MealEditor({
 
       <div className="mt-4 flex items-end gap-[0.8rem]">
         <Field label="Usually at" className="w-[11rem]">
-          <input type="time" value={meal.usual_time} onChange={(e) => e.target.value && onChange({ usual_time: e.target.value })} className={fieldClass} />
+          <TimeField value={meal.usual_time} onChange={(t) => onChange({ usual_time: t })} step={5} aria-label="Usually at" className="px-3!" />
         </Field>
-        <Field label="Eating takes (min)" className="w-[11rem]">
+        <Field label="Eating takes" className="w-[13rem]">
           <NumberField value={meal.minutes} min={MEAL_MINUTES.min} max={MEAL_MINUTES.max} onChange={(v) => onChange({ minutes: v })} />
         </Field>
       </div>

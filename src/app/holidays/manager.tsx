@@ -419,12 +419,13 @@ function BirthdayEditor({ birthday, thisYear, art, onChange, onRemove }: { birth
         <label className="flex flex-col gap-[0.35rem]">
           <span className={fieldLabelClass}>Born in (optional)</span>
           <input
-            type="number"
             inputMode="numeric"
-            min={1900}
-            max={thisYear}
+            maxLength={4}
             value={birthday.birth_year ?? ""}
-            onChange={(e) => onChange({ birth_year: e.target.value === "" ? null : Number(e.target.value) })}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "");
+              onChange({ birth_year: digits ? Number(digits) : null });
+            }}
             className={`${editorInputClass} w-44! tabular-nums`}
           />
         </label>

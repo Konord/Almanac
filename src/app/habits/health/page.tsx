@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { CaretLeft, CaretRight, GearSix, X } from "@phosphor-icons/react/dist/ssr";
 import { Sheet } from "@/components/sheet";
+import { TimeField } from "@/components/touch-pickers";
 import { FitList } from "@/components/fit-list";
 import {
   ActionLink,
@@ -608,7 +609,7 @@ function EntryDialog({ log, tracker, closeHref, returnTo, timeValue }: { log: He
         <div className="flex flex-wrap gap-4">
           <label className="flex flex-col gap-1.5">
             <span className={fieldLabelClass}>When</span>
-            <input type="time" name="time" defaultValue={timeValue} className={`${editorInputClass} w-52`} />
+            <TimeField name="time" defaultValue={timeValue} step={5} aria-label="When" className="w-52!" />
           </label>
           {log.choice_id !== null || log.amount !== null ? (
             <label className="flex flex-col gap-1.5">

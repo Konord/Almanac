@@ -18,6 +18,7 @@ import {
   whoChipStyle,
 } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { DayField, NumberStepper, TimeField } from "@/components/touch-pickers";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { hand, soft } from "@/lib/colours";
@@ -491,7 +492,7 @@ function DayPanel({
                 </option>
               ))}
             </select>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Due by" className={`${control} w-[11.5rem] px-3!`} />
+            <TimeField value={time} onChange={setTime} step={5} allowEmpty emptyText="Any time" aria-label="Due by" className="w-[12rem]! shrink-0 px-3!" />
             <button type="button" onClick={add} disabled={!name.trim()} className={`${primaryActionClass} text-[1.25rem]! disabled:opacity-40`}>
               <Plus size="1.25rem" weight="bold" aria-hidden />
               Add
@@ -521,7 +522,7 @@ function DayPanel({
                           ))}
                         </select>
                       </label>
-                      <input type="time" value={c.due_time ?? ""} onChange={(e) => setChore(c.id, { due_time: e.target.value || null })} aria-label="Due by" className={`${control} w-[11.5rem] px-3!`} />
+                      <TimeField value={c.due_time ?? ""} onChange={(t) => setChore(c.id, { due_time: t || null })} step={5} allowEmpty emptyText="Any time" aria-label="Due by" className="w-[12rem]! shrink-0 px-3!" />
                     </div>
                     <div className="flex items-center gap-2">
                       <input value={c.notes ?? ""} onChange={(e) => setChore(c.id, { notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={`${control} flex-1 placeholder:text-ink-muted`} />
@@ -910,7 +911,7 @@ function OccasionalEditor({
         // Never done yet: its first date can be moved. New chores get a quiet day.
         <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-muted">
           <span>{info ? "Not done yet · first time" : "First time"}</span>
-          <input type="date" value={firstDue} onChange={(e) => set({ first_due: e.target.value || null })} aria-label="First time it's due" className={smallControl} />
+          <DayField value={firstDue} onChange={(d) => set({ first_due: d || null })} aria-label="First time it's due" className="w-auto! px-3! text-[1.25rem]!" />
           {info ? null : c.first_due ? (
             <button type="button" onClick={() => set({ first_due: null })} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-board px-4 font-bold text-ink">
               Pick a free day
@@ -983,19 +984,11 @@ function OccasionalEditor({
                     A set date
                   </Chip>
                   {c.repeat_from === "date" ? (
-                    <input type="date" value={c.start_date ?? ""} onChange={(e) => set({ start_date: e.target.value || null })} aria-label="The date it counts from" className={smallControl} />
+                    <DayField value={c.start_date ?? ""} onChange={(d) => set({ start_date: d || null })} aria-label="The date it counts from" className="w-auto! px-3! text-[1.25rem]!" />
                   ) : null}
                 </Group>
                 <Group label="Every">
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={c.repeat_every}
-                    onChange={(e) => set({ repeat_every: Math.max(1, Math.min(365, Number(e.target.value) || 1)) })}
-                    aria-label="How many"
-                    className={`${smallControl} w-20 text-center`}
-                  />
+                  <NumberStepper value={c.repeat_every} onChange={(n) => set({ repeat_every: n ?? 1 })} min={1} max={365} aria-label="How many" />
                   {UNIT_CHIPS.map((u) => (
                     <Chip key={u.value} on={c.repeat_unit === u.value} onClick={() => set({ repeat_unit: u.value })}>
                       {u.label}
@@ -1063,7 +1056,7 @@ function OccasionalEditor({
               <label className="flex flex-col gap-1">
                 <span className={fieldLabelClass}>At an exact time (optional)</span>
                 <span className="flex items-center gap-1.5">
-                  <input type="time" value={c.at_time ?? ""} onChange={(e) => set({ at_time: e.target.value || null })} aria-label="At an exact time" className={smallControl} />
+                  <TimeField value={c.at_time ?? ""} onChange={(t) => set({ at_time: t || null })} step={5} allowEmpty emptyText="No set time" aria-label="At an exact time" className="w-auto! px-3! text-[1.25rem]!" />
                   {c.at_time ? (
                     <IconButton label="No set time" onClick={() => set({ at_time: null })}>
                       <X size="1.25rem" aria-hidden />
@@ -1120,7 +1113,7 @@ function HeadsUps({ list, onChange }: { list: DraftHeadsUp[]; onChange: (list: D
       {list.length < MAX_HEADS_UPS ? (
         <div className="flex items-center gap-1.5">
           <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="New heads-up" aria-label="New heads-up" className={`${smallControl} flex-1 placeholder:text-ink-muted`} />
-          <input type="number" min={0} max={60} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))} aria-label="How long before" className={`${smallControl} w-16 text-center`} />
+          <NumberStepper value={amount} onChange={(n) => setAmount(n ?? 0)} min={0} max={60} aria-label="How long before" className="shrink-0" />
           <select value={unit} onChange={(e) => setUnit(e.target.value as LeadUnit)} aria-label="Unit" className={smallControl}>
             {LEAD_UNITS.map((u) => (
               <option key={u.unit} value={u.unit}>

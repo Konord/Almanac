@@ -1,3 +1,4 @@
+import { TimeField } from "@/components/touch-pickers";
 import { Suspense } from "react";
 import Link from "next/link";
 import { Trash } from "@phosphor-icons/react/dist/ssr";
@@ -154,7 +155,7 @@ function TemplateCard({
         <div className="flex items-end gap-3">
           <div className="min-w-0 flex-1 group-has-[input[name=allDay]:checked]:invisible">
             <Field label="Usually starts at">
-              <Input name="startTime" type="time" step={900} defaultValue={template.start_time ?? ""} />
+              <TimeField name="startTime" defaultValue={template.start_time?.slice(0, 5) ?? ""} allowEmpty emptyText="No set time" aria-label="Usually starts at" />
             </Field>
           </div>
           <label className="mb-7 flex min-h-[var(--touch-target)] shrink-0 cursor-pointer items-center gap-2 rounded-full border-2 border-frame bg-board px-4 text-lg text-ink select-none has-checked:border-ink has-checked:bg-rail has-checked:font-bold">
