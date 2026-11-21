@@ -411,7 +411,7 @@ function MealEditor({
           <Trash size="1.5rem" aria-hidden />
         </button>
       </div>
-      <p className="mt-1 shrink-0 text-[1.25rem] font-bold text-ink-muted">Spots in this meal. A set dish, or one you pick on the day.</p>
+      <p className="mt-1 shrink-0 text-[1.25rem] font-bold text-ink-muted">What goes in this meal: a set dish, or one you pick on the day.</p>
 
       {categories.length ? (
         <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2" role="group" aria-label="Kinds of meal it's in">

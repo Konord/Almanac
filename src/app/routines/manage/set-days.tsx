@@ -366,8 +366,8 @@ function WeeksPanel({
           value={rotate ? "turns" : "one"}
           disabled={plans.length < 2}
           options={[
-            { value: "turns", label: "Take turns" },
-            { value: "one", label: "Use one" },
+            { value: "turns", label: "Swap each week" },
+            { value: "one", label: "Keep one" },
           ]}
           onChange={(v) => {
             if (v === "turns" && !rotate) update((d) => takeTurns(d, member.id, row.plan.id, today));

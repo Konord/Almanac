@@ -20,7 +20,7 @@ import { BLANK_INGREDIENT, IngredientsEditor, StepsEditor, type EditingStep, typ
 
 export type DishTab = "recipe" | "basics" | "ingredients" | "steps" | "notes";
 const TABS: { tab: DishTab; label: string }[] = [
-  { tab: "recipe", label: "Recipe" },
+  { tab: "recipe", label: "Read" },
   { tab: "basics", label: "Basics" },
   { tab: "ingredients", label: "Ingredients" },
   { tab: "steps", label: "Steps" },

@@ -67,7 +67,7 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
             <input type="hidden" name="returnTo" value={returnTo} />
             <button className={secondaryActionClass}>
               <ShoppingCart size="1.25rem" weight="bold" aria-hidden />
-              Put low parts on the grocery list
+              Add what's low to groceries
             </button>
           </form>
         ) : null}
@@ -98,7 +98,7 @@ async function Backups({ searchParams }: { searchParams: PageProps<"/meals/backu
                         ready > 0 ? "bg-[color-mix(in_srgb,var(--color-success)_16%,white)] text-success" : "bg-alert-soft text-now-on-tint"
                       }`}
                     >
-                      {ready > 0 ? `Ready · ${ready}` : "Not ready: restock"}
+                      {ready > 0 ? `Enough for ${ready} ${ready === 1 ? "time" : "times"}` : "Needs restocking"}
                     </span>
                   </div>
                   <Link href={here({ edit: b.id })} scroll={false} aria-label={`Edit ${b.name}`} className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-panel text-ink">

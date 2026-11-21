@@ -777,7 +777,7 @@ export function RoutineManager({
                       <TimeField value={routine.usual_start ?? ""} onChange={(t) => setRoutine({ usual_start: t || null })} step={5} aria-label="Starts at" className="px-3!" />
                     </Field>
                   ) : (
-                    <Field label={routine.anchor === "bed" ? "Before bed" : "Gap"} className="w-[13rem]">
+                    <Field label={routine.anchor === "bed" ? "Before bed" : "Starts after"} className="w-[13rem]">
                       <NumberField value={routine.anchor_offset} min={0} max={240} onChange={(v) => setRoutine({ anchor_offset: v })} />
                     </Field>
                   )}
@@ -785,8 +785,8 @@ export function RoutineManager({
                     <NumberField value={routine.usual_minutes} min={5} max={240} onChange={(v) => setRoutine({ usual_minutes: v })} />
                   </Field>
                   <span className="ml-auto flex gap-[0.6rem]">
-                    <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Loose" hint="A loose routine can move to fit the day" />
-                    <Switch on={Boolean(routine.habit_since)} onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })} label="Track" hint="Track it as a habit" />
+                    <Switch on={routine.loose} onClick={() => setRoutine({ loose: !routine.loose })} label="Can move" hint="It can move to fit the day" />
+                    <Switch on={Boolean(routine.habit_since)} onClick={() => setRoutine({ habit_since: routine.habit_since ? null : today })} label="Habit" hint="Track it as a habit" />
                   </span>
                 </div>
                 <div className="flex items-end gap-[0.8rem]">
