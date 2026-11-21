@@ -3,7 +3,7 @@
 import { Pager } from "@/components/pager";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CaretDown, CaretUp, ChartLineUp, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
+import { ChartLineUp, DotsSixVertical, Copy, GearSix, ListChecks, Plus, Trash, Users, X } from "@phosphor-icons/react";
 import {
   ColourDot,
   EmptyState,
@@ -21,6 +21,7 @@ import {
 import { EmojiPicker } from "@/components/emoji-picker";
 import { NumberStepper, TimeField } from "@/components/touch-pickers";
 import { useFitRows } from "@/components/use-fit-rows";
+import { useDragReorder } from "@/components/use-drag-reorder";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { hand, soft, strong } from "@/lib/colours";
 import { MEAL_MINUTES, NEW_PREFIX, copyRoutine, noPresets, dailyListState, draftProblem, joinRuns, routinePeople, sameDraft, stepPeople, type GridRun, type DraftMealBlock, type DraftRoutine, type DraftStep, type DraftUse, type ManagerDraft } from "@/lib/routine-manager";
@@ -215,15 +216,16 @@ export function RoutineManager({
     update((d) => ({ ...d, routines: d.routines.map((r) => (r.id === routine.id ? { ...r, ...patch } : r)) }));
   };
   const setStep = (id: string, patch: Partial<DraftStep>) => update((d) => ({ ...d, steps: d.steps.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
-  const moveStep = (id: string, by: -1 | 1) =>
+  /** Puts a routine's step at a new place in its list (from and to count this routine's steps only). */
+  const moveStep = (routineId: string, from: number, to: number) =>
     update((d) => {
+      const at = d.steps.flatMap((s, i) => (s.routine_id === routineId ? [i] : []));
+      const mine = at.map((i) => d.steps[i]);
+      const [moved] = mine.splice(from, 1);
+      if (!moved) return d;
+      mine.splice(to, 0, moved);
       const list = [...d.steps];
-      const i = list.findIndex((s) => s.id === id);
-      const mine = list.map((s, at) => ({ s, at })).filter((x) => x.s.routine_id === list[i].routine_id);
-      const here = mine.findIndex((x) => x.at === i);
-      const other = mine[here + by];
-      if (!other) return d;
-      [list[i], list[other.at]] = [list[other.at], list[i]];
+      at.forEach((i, k) => (list[i] = mine[k]));
       return { ...d, steps: list };
     });
   const removeStep = (id: string) => update((d) => ({ ...d, steps: d.steps.filter((s) => s.id !== id) }));
@@ -470,6 +472,10 @@ export function RoutineManager({
   const listState = dailyListState(steps);
   const pages = Math.max(1, Math.ceil(steps.length / stepsPerPage));
   const page = Math.min(stepPage, pages - 1);
+  // Steps are dragged by their number (rows on this page; the moves count from the page's first step).
+  const stepDrag = useDragReorder((from, to) => {
+    if (routine) moveStep(routine.id, page * stepsPerPage + from, page * stepsPerPage + to);
+  });
 
   return (
     <>
@@ -666,8 +672,17 @@ export function RoutineManager({
                 {steps.slice(page * stepsPerPage, page * stepsPerPage + stepsPerPage).map((step, i) => {
                   const index = page * stepsPerPage + i;
                   return (
-                    <li key={step.id} className="relative flex min-h-[3.15rem] shrink-0 items-center gap-[0.35rem] border-b border-frame py-0.5">
-                      <span className="tabular flex size-[1.85rem] shrink-0 items-center justify-center rounded-full bg-panel text-[1.15rem] font-extrabold text-ink">{index + 1}</span>
+                    <li key={step.id} style={stepDrag.rowStyle(i)} className="relative flex min-h-[3.15rem] shrink-0 items-center gap-[0.35rem] rounded-[var(--radius)] border-b border-frame py-0.5">
+                      {/* Hold the number and drag to put the step somewhere else. */}
+                      <span
+                        {...stepDrag.handle(i)}
+                        role="img"
+                        aria-label={`Step ${index + 1}: drag to move`}
+                        className="flex h-12 shrink-0 cursor-grab touch-none items-center gap-0.5 rounded-[var(--radius)] pr-1 text-ink-muted active:cursor-grabbing"
+                      >
+                        <DotsSixVertical size="1.4rem" weight="bold" aria-hidden />
+                        <span className="tabular flex size-[1.85rem] items-center justify-center rounded-full bg-panel text-[1.15rem] font-extrabold text-ink">{index + 1}</span>
+                      </span>
                       <EmojiPicker
                         initial={step.icon ?? ""}
                         fieldName=""
@@ -713,12 +728,6 @@ export function RoutineManager({
                           <ChartLineUp size="1.375rem" weight="bold" aria-hidden />
                         </SmallButton>
                       )}
-                      <SmallButton label={`Move ${step.text} up`} disabled={index === 0} onClick={() => moveStep(step.id, -1)}>
-                        <CaretUp size="1.375rem" weight="bold" aria-hidden />
-                      </SmallButton>
-                      <SmallButton label={`Move ${step.text} down`} disabled={index === steps.length - 1} onClick={() => moveStep(step.id, 1)}>
-                        <CaretDown size="1.375rem" weight="bold" aria-hidden />
-                      </SmallButton>
                       <SmallButton label={`Delete ${step.text}`} onClick={() => removeStep(step.id)}>
                         <Trash size="1.375rem" weight="bold" aria-hidden />
                       </SmallButton>
