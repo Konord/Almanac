@@ -134,6 +134,54 @@ body {
 }
 
 /*
+ * Touch (UI audit H3, 2026-11-21). A swipe or a long press on the wall
+ * screen must never select words, show the browser's own press menu, or
+ * zoom on a double tap. Typing places still let you select their text.
+ */
+html {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+img {
+  -webkit-user-drag: none;
+}
+
+/*
+ * The pressed look (UI audit H2, 2026-11-21). A finger never hovers, so
+ * every button, link, tab and tick shows it was pressed the moment it is
+ * touched: a little darker, and a little smaller (big cards shrink less).
+ * PressFeedback (src/components/press-feedback.tsx) sets data-pressed and
+ * holds it long enough to see, even on a quick tap.
+ */
+[data-pressed] {
+  filter: brightness(0.9);
+  transform: scale(var(--press-scale, 0.96));
+}
+[data-press-out] {
+  transition:
+    transform 120ms ease-out,
+    filter 120ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-pressed] {
+    transform: none;
+  }
+}
+
+
+/*
  * Handwriting: Shantell Sans with a little bounce. The writer's ink comes
  * from hand() in src/lib/colours.ts (dark ink when nobody is assigned).
  * With handwriting off, --almanac-font-hand is the printed font and the

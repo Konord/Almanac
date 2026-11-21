@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { emojiImage } from "@/lib/emoji";
+import { PendingTab } from "./pending-tab";
 import { hand, soft, strong } from "@/lib/colours";
 import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
 import { TimerPill } from "./timer-pill";
@@ -131,8 +132,9 @@ export function Segmented({ options, label }: { options: { href: string; label: 
   return (
     <nav aria-label={label} className={segTrackClass}>
       {options.map((o) => (
-        <Link key={o.label} href={o.href} aria-current={o.active ? "page" : undefined} className={segItemClass(o.active)}>
-          {o.label}
+        <Link key={o.label} href={o.href} aria-current={o.active ? "page" : undefined} className={`relative ${segItemClass(o.active)}`}>
+          {o.active ? null : <PendingTab />}
+          <span className="relative">{o.label}</span>
         </Link>
       ))}
     </nav>
