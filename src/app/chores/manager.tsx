@@ -693,6 +693,8 @@ function OccasionalPanel({
   const p = Math.min(page, pages - 1);
   const shown = tab.chores.slice(p * occasionalPerPage, (p + 1) * occasionalPerPage);
   const dayById = new Map(draft.days.map((d) => [d.id, d]));
+  // Nothing tapped yet: the first chore on show is open, so the editor's room isn't spent on a hint (UI audit M3).
+  const current = selected ?? shown[0]?.chore ?? null;
 
   const ruleText = (c: DraftOccasional) => {
     const cols = ruleColumns(c);
@@ -770,7 +772,7 @@ function OccasionalPanel({
             const hard = c.active ? i?.hard : null;
             const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : i.dueOn < today ? "Overdue" : i.dueOn === today ? "Due today" : dateLabel(i.placedOn ?? i.dueOn);
             return (
-              <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-frame ${c.id === choreId ? "rounded-[var(--radius)] border-transparent bg-rail px-2 shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
+              <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-frame ${c.id === current?.id ? "rounded-[var(--radius)] border-transparent bg-rail px-2 shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
                 <button type="button" onClick={() => setChoreId(c.id)} className={`flex min-w-0 flex-1 items-center gap-3 self-stretch text-left ${c.active ? "" : "opacity-55"}`}>
                   <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-[2.15rem]" />
                   <span className="flex min-w-0 flex-1 flex-col">
@@ -810,12 +812,12 @@ function OccasionalPanel({
         </div>
       </div>
 
-      {selected ? (
+      {current ? (
         <OccasionalEditor
-          key={selected.id}
-          chore={selected}
-          info={info[selected.id]}
-          firstDue={selected.first_due ?? picked.get(selected.id) ?? info[selected.id]?.dueOn ?? null}
+          key={current.id}
+          chore={current}
+          info={info[current.id]}
+          firstDue={current.first_due ?? picked.get(current.id) ?? info[current.id]?.dueOn ?? null}
           draft={draft}
           update={update}
           members={members}
@@ -828,7 +830,7 @@ function OccasionalPanel({
           timeZone={timeZone}
         />
       ) : (
-        <EmptyState emoji="🧹" hint="Tap a chore to change how often it comes round" />
+        <EmptyState emoji="🧹" hint="No occasional chores yet" />
       )}
     </div>
   );
