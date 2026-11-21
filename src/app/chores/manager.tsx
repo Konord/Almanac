@@ -76,6 +76,15 @@ export type DayPreview = { date: string; items: { icon: string | null; name: str
 type Selection = { kind: "occasional" } | { kind: "day"; id: string };
 type Tab = "chore" | "repeats" | "more";
 
+/**
+ * When an occasional chore comes next, in one wording everywhere (UI audit M7):
+ * the day it's put on (or due), "Today", or "Overdue".
+ */
+function whenText(i: OccasionalInfo, today: string, dateLabel: (d: string) => string): string {
+  const on = i.placedOn ?? i.dueOn;
+  return on < today ? "Overdue" : on === today ? "Today" : dateLabel(on);
+}
+
 const DAYS_PER_PAGE = 8;
 const OCCASIONAL_PER_PAGE = 9;
 const REGULAR_PER_PAGE = 9;
@@ -191,9 +200,8 @@ export function ChoreManager({
   const dateLabel = (d: string) =>
     d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   // Short, like the mock's "Fri 20", so the line fits the 22rem card.
-  const nextLabel = (d: string) =>
-    d < today ? "overdue" : d === today ? "today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const timeLabel = (t: string) => wallTime(t, locale);
+  const whenLabel = (i: OccasionalInfo) => whenText(i, today, dateLabel);
 
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
   const dayPages = Math.max(1, Math.ceil(days.length / daysPerPage));
@@ -269,7 +277,7 @@ export function ChoreManager({
           </span>
           {nextUp ? (
             <span className="line-clamp-2 text-[1.25rem] leading-tight font-bold" style={{ color: hand("orange") }}>
-              Next: {nextUp.name}, {nextLabel(info[nextUp.id].placedOn ?? info[nextUp.id].dueOn)}
+              Next: {nextUp.name} · {whenLabel(info[nextUp.id])}
             </span>
           ) : null}
           {hardCount > 0 ? (
@@ -673,7 +681,8 @@ function OccasionalPanel({
   // New chores (not saved yet) show under their first date: the one set, or a quiet day picked for them.
   const picked = autoFirstDues(draft.occasional, dueOnOf(info), today);
   const firstOf = (c: DraftOccasional) => c.first_due ?? picked.get(c.id) ?? today;
-  const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id] ? (c.first_due && info[c.id].firstTime ? c.first_due : info[c.id].dueOn) : firstOf(c) }));
+  // In the order they come up: the day each is put on (or due), the same day the row shows (UI audit M7).
+  const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id] ? (c.first_due && info[c.id].firstTime ? c.first_due : (info[c.id].placedOn ?? info[c.id].dueOn)) : firstOf(c) }));
   const tabs = seasonTabs(withDue, today);
   const selected = draft.occasional.find((c) => c.id === choreId) ?? null;
   const selectedSeason = selected ? tabs.find((t) => t.chores.some((x) => x.chore.id === selected.id))?.season : undefined;
@@ -690,6 +699,7 @@ function OccasionalPanel({
   const p = Math.min(page, pages - 1);
   const shown = tab.chores.slice(p * occasionalPerPage, (p + 1) * occasionalPerPage);
   const dayById = new Map(draft.days.map((d) => [d.id, d]));
+  const whenLabel = (i: OccasionalInfo) => whenText(i, today, dateLabel);
   // Nothing tapped yet: the first chore on show is open, so the editor's room isn't spent on a hint (UI audit M3).
   const current = selected ?? shown[0]?.chore ?? null;
 
@@ -767,7 +777,7 @@ function OccasionalPanel({
             const i = info[c.id];
             const isNew = c.id.startsWith(NEW_PREFIX);
             const hard = c.active ? i?.hard : null;
-            const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : i.dueOn < today ? "Overdue" : i.dueOn === today ? "Due today" : dateLabel(i.placedOn ?? i.dueOn);
+            const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : whenLabel(i);
             return (
               <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-frame ${c.id === current?.id ? "rounded-[var(--radius)] border-transparent bg-rail px-2 shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
                 <button type="button" onClick={() => setChoreId(c.id)} className={`flex min-w-0 flex-1 items-center gap-3 self-stretch text-left ${c.active ? "" : "opacity-55"}`}>
@@ -776,7 +786,7 @@ function OccasionalPanel({
                     <span className="truncate text-[1.35rem] leading-tight font-bold text-ink">{c.name || "Unnamed"}</span>
                     <span className={`truncate text-[1.15rem] font-bold ${hard ? "text-now-on-tint" : "text-ink-muted"}`}>{!c.active ? "Paused" : (hard ?? ruleText(c))}</span>
                   </span>
-                  <span className="shrink-0 text-[1.15rem] font-extrabold text-ink-muted" style={due === "Overdue" || due === "Due today" ? { color: hand("orange") } : undefined}>
+                  <span className="shrink-0 text-[1.15rem] font-extrabold text-ink-muted" style={due === "Overdue" || due === "Today" ? { color: hand("orange") } : undefined}>
                     {due}
                   </span>
                 </button>
@@ -789,10 +799,10 @@ function OccasionalPanel({
                     type="button"
                     onClick={() => plus(c.id)}
                     disabled={busy !== null}
-                    aria-label={`Add ${c.name} to the Daily list`}
-                    className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-primary text-primary-ink disabled:opacity-40"
+                    aria-label={`Do ${c.name} today: put it on the Daily list`}
+                    className="flex min-h-[var(--touch-target)] shrink-0 items-center rounded-full px-3 text-[1.15rem] font-bold text-accent hover:bg-rail disabled:opacity-40"
                   >
-                    <Plus size="1.375rem" weight="bold" aria-hidden />
+                    Do today
                   </button>
                 ) : null}
               </li>
