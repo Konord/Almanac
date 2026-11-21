@@ -42,5 +42,19 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // A phone opening the app lands on the phone version (/m). The wall
+  // screens' pages still open on a phone by their own address.
+  if (signedIn && request.nextUrl.pathname === "/" && isPhone(request.headers.get("user-agent") ?? "")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/m";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   return response;
+}
+
+/** An iPhone or an Android phone (not a tablet: an iPad says it's a Mac, Android tablets leave out "Mobile"). */
+export function isPhone(userAgent: string): boolean {
+  return /iPhone|iPod|Android.+Mobile/i.test(userAgent);
 }

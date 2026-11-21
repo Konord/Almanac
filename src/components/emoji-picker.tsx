@@ -37,7 +37,10 @@ export function EmojiPicker({
   label,
   className = "",
   fallback,
+  bare = false,
 }: {
+  /** Pictures only, no names under them (a phone's narrow screen). */
+  bare?: boolean;
   initial?: string;
   /** For screens that keep their own changes (no form): called with each pick. */
   onChange?: (emoji: string) => void;
@@ -114,7 +117,7 @@ export function EmojiPicker({
       </button>
 
       {open ? (
-        <div role="dialog" aria-label="Pick a picture" className={`${fullScreen ? "fixed inset-y-0 right-0 z-50 w-full max-w-[46rem] shadow-2xl" : "absolute inset-0 z-20"} flex flex-col gap-4 bg-board px-8 py-6`}>
+        <div role="dialog" aria-label="Pick a picture" className={`${fullScreen ? "fixed inset-y-0 right-0 z-50 w-full max-w-[46rem] shadow-2xl" : "absolute inset-0 z-20"} flex flex-col gap-4 bg-board ${bare ? "px-4 py-4" : "px-8 py-6"}`}>
           <div className="flex items-center gap-3">
             <h3 className="flex-1 text-2xl font-extrabold text-ink">Pick a picture</h3>
             <button
@@ -158,7 +161,7 @@ export function EmojiPicker({
                 }`}
               >
                 <Picture emoji={t.emoji} className="size-7" />
-                <span className="w-full truncate text-center text-xs font-bold">{t.label}</span>
+                {bare ? null : <span className="w-full truncate text-center text-xs font-bold">{t.label}</span>}
               </button>
             ))}
           </div>
@@ -168,12 +171,13 @@ export function EmojiPicker({
               <Grid
                 label={`Matching "${q}"`}
                 choices={found.slice(shownPage * PER_PAGE, (shownPage + 1) * PER_PAGE)}
+                bare={bare}
                 current={icon}
                 onPick={pick}
                 empty="Nothing found"
               />
             ) : browsing ? (
-              <Grid label={EMOJI_GROUPS[tab - 1]} choices={browsing.choices} current={icon} onPick={pick} />
+              <Grid label={EMOJI_GROUPS[tab - 1]} choices={browsing.choices} current={icon} onPick={pick} bare={bare} />
             ) : (
               <Grid
                 label={title.trim() ? `Suggested for "${title.trim()}"` : "Suggested"}
@@ -181,6 +185,7 @@ export function EmojiPicker({
                 current={icon}
                 onPick={pick}
                 showWhy
+                bare={bare}
               />
             )}
           </div>
@@ -219,7 +224,9 @@ function Grid({
   onPick,
   showWhy = false,
   empty,
+  bare = false,
 }: {
+  bare?: boolean;
   label: string;
   choices: (EmojiChoice & { why?: string })[];
   current: string;
@@ -244,7 +251,7 @@ function Grid({
             }`}
           >
             <Picture emoji={c.emoji} className="size-10" />
-            <span className="line-clamp-2 min-h-[2lh] w-full text-center text-xs leading-tight break-words text-ink-soft">{showWhy && c.why && c.why !== "everyday" ? c.why : c.name}</span>
+            {bare ? null : <span className="line-clamp-2 min-h-[2lh] w-full text-center text-xs leading-tight break-words text-ink-soft">{showWhy && c.why && c.why !== "everyday" ? c.why : c.name}</span>}
           </button>
         ))}
       </div>
