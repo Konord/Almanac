@@ -24,12 +24,30 @@ export function useFitRows<T extends HTMLElement>(fallback: number): [(el: T | n
       const style = getComputedStyle(el);
       const gap = parseFloat(style.rowGap) || 0;
       const room = el.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0);
-      setCount(Math.max(1, Math.floor((room + gap) / (row + gap))));
+      // Rows can be taller than the shortest one (a name on two lines, UI
+      // audit H6): count the rows showing that fit whole, then add as many
+      // usual rows as the room left over takes.
+      let used = 0;
+      let fitted = 0;
+      for (const h of heights) {
+        const next = used + (fitted > 0 ? gap : 0) + h;
+        if (next > room + 0.5) break;
+        used = next;
+        fitted += 1;
+      }
+      const extra = fitted < heights.length ? 0 : Math.floor((room - used) / (row + gap));
+      setCount(Math.max(1, fitted + Math.max(0, extra)));
     };
     measure();
     const watcher = new ResizeObserver(measure);
     watcher.observe(el);
-    return () => watcher.disconnect();
+    // Different rows (another page, a longer name) can need a new count.
+    const rows = new MutationObserver(measure);
+    rows.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => {
+      watcher.disconnect();
+      rows.disconnect();
+    };
   }, [el]);
 
   return [ref, count];

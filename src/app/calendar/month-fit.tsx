@@ -57,7 +57,16 @@ function fitCell(cell: HTMLElement) {
     more.textContent = `+ ${hidden} more`;
   };
   paint();
+  // Titles may take two lines (UI audit H6, 2026-11-21). Start with every
+  // title free to wrap; if the square spills, squeeze titles back to one
+  // line, last first, before any event is hidden.
+  const titles = rows.map((row) => row.querySelector<HTMLElement>("[data-month-title]"));
+  titles.forEach((t) => t?.style.removeProperty("-webkit-line-clamp"));
   const overflows = () => cell.scrollHeight > cell.clientHeight + 1;
+  for (let i = titles.length - 1; i >= 0 && overflows(); i--) {
+    const t = titles[i];
+    if (t && !rows[i].hidden) t.style.setProperty("-webkit-line-clamp", "1");
+  }
   while (overflows()) {
     const last = rows.filter((row) => !row.hidden).at(-1);
     if (!last) break;

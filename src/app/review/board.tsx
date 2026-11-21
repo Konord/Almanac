@@ -612,7 +612,8 @@ function Tile({
   const body = (
     <>
       {icon && !empty ? <Emoji emoji={icon} className="size-[1.6rem]" /> : null}
-      <span className={`min-w-0 truncate text-[1.25rem] leading-[1.15] font-bold ${empty ? "" : "flex-1"}`}>{title}</span>
+      {/* Two lines rather than a cut-off name (UI audit H6). */}
+      <span className={`line-clamp-2 min-w-0 text-[1.25rem] leading-[1.15] font-bold hyphens-auto ${empty ? "" : "flex-1"}`}>{title}</span>
       {who.length > 0 ? (
         <span className="flex shrink-0 gap-[0.2rem]">
           {who.map((p) => (

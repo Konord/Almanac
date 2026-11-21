@@ -273,9 +273,14 @@ export function ActionLink({
 }
 
 /** Text someone in the family wrote: handwriting in their ink (dark ink if it isn't anyone's). */
-export function HandText({ colour, className = "", children }: { colour?: string | null; className?: string; children: ReactNode }) {
+export function HandText({
+  colour,
+  className = "",
+  children,
+  ...rest
+}: { colour?: string | null; className?: string; children: ReactNode } & Omit<ComponentProps<"span">, "className" | "children" | "style" | "color">) {
   return (
-    <span className={`font-hand ${className}`} style={{ color: hand(colour) }}>
+    <span {...rest} className={`font-hand ${className}`} style={{ color: hand(colour) }}>
       {children}
     </span>
   );
