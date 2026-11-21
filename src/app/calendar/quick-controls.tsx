@@ -38,7 +38,7 @@ export function ToggleChips({
             type="button"
             aria-pressed={value === o.value}
             onClick={() => setValue(value === o.value ? "" : o.value)}
-            className={chipButtonClass(value === o.value)}
+            className={`${chipButtonClass(value === o.value)} ${o.leading ? "gap-[0.3rem]! pl-[0.65rem]! pr-[0.9rem]!" : ""}`}
           >
             {o.leading}
             {o.label}

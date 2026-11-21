@@ -257,11 +257,8 @@ export function ChoreManager({
           type="button"
           onClick={() => setSelection({ kind: "occasional" })}
           aria-pressed={selection.kind === "occasional"}
-          className="flex w-full flex-col gap-[0.2rem] rounded-[var(--radius-card)] px-4 py-[0.85rem] text-left"
-          style={{
-            background: soft("orange"),
-            boxShadow: selection.kind === "occasional" ? "inset 0 0 0 2px var(--color-ink)" : undefined,
-          }}
+          // The same picked look as every other list (UI audit M6): grey with a dark ring.
+          className={`flex w-full flex-col gap-[0.2rem] rounded-[var(--radius)] px-3 py-[0.85rem] text-left ${selection.kind === "occasional" ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
         >
           <span className="flex items-center gap-[0.7rem]">
             <Emoji emoji="🔁" className="size-[2.4rem]" />

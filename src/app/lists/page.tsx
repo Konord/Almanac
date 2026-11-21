@@ -109,12 +109,6 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
                 </li>
               );
             })}
-            footer={
-              <SoftLink href={here("&newList=1")} className="w-full">
-                <Plus size="1.25rem" weight="bold" aria-hidden />
-                New list
-              </SoftLink>
-            }
           />
         </Card>
 

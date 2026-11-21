@@ -427,8 +427,8 @@ export function Button({
 }: ComponentProps<"button"> & { variant?: "primary" | "secondary" | "danger" | "save" }) {
   const look = {
     primary: "bg-primary text-primary-ink",
-    // The blue of the screen-wide Save (unsaved-changes.tsx), so every Save looks the same.
-    save: "bg-accent text-white",
+    // The same black as the header's Save (unsaved-changes.tsx), so every Save looks the same (UI audit M6).
+    save: "bg-primary text-primary-ink",
     secondary: "bg-panel text-ink",
     danger: "border-2 border-danger bg-board text-danger",
   }[variant];

@@ -37,7 +37,7 @@ export type CalendarData = {
 export async function loadCalendar(rangeStart: Date, rangeEnd: Date): Promise<CalendarData> {
   const supabase = await createClient();
   const [membersResult, eventsResult, seriesResult, templatesResult, kindsResult] = await Promise.all([
-    supabase.from("members").select("id, name, colour, icon").order("role", { ascending: false }).order("name"),
+    supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
     supabase
       .from("events")
       .select(EVENT_COLUMNS)

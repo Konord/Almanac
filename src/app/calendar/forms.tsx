@@ -116,8 +116,8 @@ export function DayKindChips({ kinds, value }: { kinds: DayKind[]; value?: strin
       name="dayKind"
       label="Kind of day"
       initial={chosen}
-      // Words only, as in the mock, so the kinds fit on one row.
-      options={shown.map((k) => ({ value: k.name, label: k.name }))}
+      // With their pictures, as on Set days and the Planner (UI audit M6).
+      options={shown.map((k) => ({ value: k.name, label: k.name, leading: k.icon ? <Emoji emoji={k.icon} className="size-5" /> : undefined }))}
     />
   );
 }
