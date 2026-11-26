@@ -13,8 +13,6 @@ import {
   fieldLabelClass,
   primaryActionClass,
   secondaryActionClass,
-  segItemClass,
-  segTrackClass,
   whoChipStyle,
 } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
@@ -24,7 +22,7 @@ import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved
 import { hand, soft } from "@/lib/colours";
 import { eventEmoji } from "@/lib/emoji";
 import { CHORE_TAGS, weekdaysLabel, type ChoreTag } from "@/lib/chore-days";
-import { SEASONS, describeRule, type ChoreRule, type RepeatUnit, type Season } from "@/lib/chores";
+import { SEASONS, describeRule, type ChoreRule, type RepeatUnit } from "@/lib/chores";
 import {
   MAX_HEADS_UPS,
   NEW_PREFIX,
@@ -33,7 +31,6 @@ import {
   hasFirstDue,
   ruleColumns,
   sameDraft,
-  seasonTabs,
   type ChoreManagerDraft,
   type DraftChoreDay,
   type DraftHeadsUp,
@@ -50,7 +47,7 @@ import { wallTime } from "@/lib/time-text";
  * The Chore Manager (2026-11-09). Left: Occasional chores on top, then the
  * chore days. Right: whatever you tapped. A chore day shows its regular
  * chores (added like a list) and its rules; Occasional chores shows every
- * occasional chore in due order on season tabs beside the editor. Every
+ * occasional chore in one list, next one up first, beside the editor. Every
  * change stays on this screen until Save; leaving with changes asks first.
  * Nothing scrolls: long lists page.
  */
@@ -201,15 +198,10 @@ export function ChoreManager({
     d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   // Short, like the mock's "Fri 20", so the line fits the 22rem card.
   const timeLabel = (t: string) => wallTime(t, locale);
-  const whenLabel = (i: OccasionalInfo) => whenText(i, today, dateLabel);
-
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
   const dayPages = Math.max(1, Math.ceil(days.length / daysPerPage));
   const shownDays = days.slice(Math.min(dayPage, dayPages - 1) * daysPerPage, (Math.min(dayPage, dayPages - 1) + 1) * daysPerPage);
   const hardCount = draft.occasional.filter((c) => info[c.id]?.hard && c.active).length;
-  const nextUp = draft.occasional
-    .filter((c) => c.active && info[c.id] && !info[c.id].hard && !info[c.id].onToday)
-    .toSorted((a, b) => (info[a.id].placedOn ?? info[a.id].dueOn).localeCompare(info[b.id].placedOn ?? info[b.id].dueOn))[0];
 
   // --- Saving ---------------------------------------------------------------------
   const save = async (then?: string | null) => {
@@ -275,11 +267,6 @@ export function ChoreManager({
               {draft.occasional.length}
             </span>
           </span>
-          {nextUp ? (
-            <span className="line-clamp-2 text-[1.25rem] leading-tight font-bold" style={{ color: hand("orange") }}>
-              Next: {nextUp.name} · {whenLabel(info[nextUp.id])}
-            </span>
-          ) : null}
           {hardCount > 0 ? (
             <span className="text-[1.25rem] font-bold text-now-on-tint">
               {hardCount} can&rsquo;t find a day
@@ -683,21 +670,18 @@ function OccasionalPanel({
   const firstOf = (c: DraftOccasional) => c.first_due ?? picked.get(c.id) ?? today;
   // In the order they come up: the day each is put on (or due), the same day the row shows (UI audit M7).
   const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id] ? (c.first_due && info[c.id].firstTime ? c.first_due : (info[c.id].placedOn ?? info[c.id].dueOn)) : firstOf(c) }));
-  const tabs = seasonTabs(withDue, today);
+  // One list of every occasional chore, the next one up first (Connor, 2026-11-26: no season tabs).
+  const sorted = withDue.toSorted((a, b) => a.dueOn.localeCompare(b.dueOn));
   const selected = draft.occasional.find((c) => c.id === choreId) ?? null;
-  const selectedSeason = selected ? tabs.find((t) => t.chores.some((x) => x.chore.id === selected.id))?.season : undefined;
-  const [season, setSeason] = useState<Season>(() => selectedSeason ?? tabs[0].season);
   const [page, setPage] = useState(() => {
-    const t = tabs.find((x) => x.season === (selectedSeason ?? tabs[0].season));
-    const at = t && selected ? t.chores.findIndex((x) => x.chore.id === selected.id) : -1;
+    const at = selected ? sorted.findIndex((x) => x.chore.id === selected.id) : -1;
     return at > 0 ? Math.floor(at / OCCASIONAL_PER_PAGE) : 0;
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [occasionalRef, occasionalPerPage] = useFitRows<HTMLUListElement>(OCCASIONAL_PER_PAGE);
-  const tab = tabs.find((t) => t.season === season) ?? tabs[0];
-  const pages = Math.max(1, Math.ceil(tab.chores.length / occasionalPerPage));
+  const pages = Math.max(1, Math.ceil(sorted.length / occasionalPerPage));
   const p = Math.min(page, pages - 1);
-  const shown = tab.chores.slice(p * occasionalPerPage, (p + 1) * occasionalPerPage);
+  const shown = sorted.slice(p * occasionalPerPage, (p + 1) * occasionalPerPage);
   const dayById = new Map(draft.days.map((d) => [d.id, d]));
   const whenLabel = (i: OccasionalInfo) => whenText(i, today, dateLabel);
   // Nothing tapped yet: the first chore on show is open, so the editor's room isn't spent on a hint (UI audit M3).
@@ -740,8 +724,8 @@ function OccasionalPanel({
     };
     update((d) => ({ ...d, occasional: [...d.occasional, chore] }));
     setChoreId(id);
-    setSeason(tabs[0].season);
-    setPage(Math.floor(tabs[0].chores.length / occasionalPerPage));
+    // A new chore with no date yet goes on today's date: near the top.
+    setPage(0);
   };
 
   const plus = async (id: string) => {
@@ -754,24 +738,6 @@ function OccasionalPanel({
   return (
     <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <div className="flex min-h-0 flex-col gap-2">
-        <div className={segTrackClass} role="tablist" aria-label="Seasons">
-          {tabs.map((t) => (
-            <button
-              key={t.season}
-              type="button"
-              role="tab"
-              aria-selected={t.season === tab.season}
-              onClick={() => {
-                setSeason(t.season);
-                setPage(0);
-              }}
-              className={`${segItemClass(t.season === tab.season)} min-w-0! flex-1 text-[1.25rem]!`}
-            >
-              {t.label}
-              <span className="tabular-nums">{t.chores.length}</span>
-            </button>
-          ))}
-        </div>
         <ul ref={occasionalRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {shown.map(({ chore: c }) => {
             const i = info[c.id];
