@@ -18,7 +18,7 @@ import {
   type ViewProps,
 } from "./views";
 import { DraggableEvent } from "@/components/draggable-event";
-import { PendingOutline, PlaceTap, WeekScroller } from "./week-scroll";
+import { DrawLayer, PendingOutline, WeekScroller } from "./week-scroll";
 
 /*
  * Week (docs/glance/SPEC.md "LOCKED style: week view", "Week view: LOCKED"
@@ -367,11 +367,12 @@ export function WeekView({
                       );
                     })}
                     <PendingOutline day={c.day} minRem={(MIN_MINUTES / 60) * HOUR_REM} hourRem={HOUR_REM} />
-                    {placing && adding ? (
-                      <PlaceTap
+                    {adding ? (
+                      <DrawLayer
                         day={c.day}
                         href={adding.addHref(c.day)}
                         defaultMinutes={household.settings.defaultEventMinutes}
+                        placing={placing}
                         label={`Add an event on ${fmt(c.day, { weekday: "long" })}`}
                       />
                     ) : null}
