@@ -93,6 +93,12 @@ Either way it needs:
      `"http://192.168.2.42:3001"` (the Home Hub server). Only pages from these addresses can ask the
      helper to do anything.
    - `browser`: `["chromium"]`, or `["google-chrome"]` if you use Chrome.
+     Actual Budget only runs on a secure (https) page, and the server serves
+     it over plain http, so the example adds
+     `--unsafely-treat-insecure-origin-as-secure=http://192.168.2.42:5006`:
+     it tells the browser to treat just that one address as secure. Without
+     it Actual shows "Fatal Error … SharedArrayBuffer". If Actual's address
+     changes, change it here too (several addresses: separate them with commas).
    - `programs`: one entry for each program on this PC. The name before the
      colon (like `steam`) is what you pick in Almanac's Settings › Apps. The
      `command` is what you'd type in a terminal, split into words.
