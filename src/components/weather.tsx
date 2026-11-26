@@ -90,7 +90,7 @@ export function WeatherSlot() {
           className="hidden min-h-13 max-w-[26rem] min-w-0 shrink items-center gap-[0.5rem] rounded-full bg-alert-soft px-5 text-[1.5rem] font-bold text-now-on-tint lg:flex"
         >
           <WarningCircle size="0.9em" weight="fill" className="shrink-0" aria-hidden />
-          <span className="truncate">{alert.name}</span>
+          <span className="truncate">{alert.short ?? alert.name}</span>
           {forecast.alerts.length > 1 ? <span className="shrink-0">+{forecast.alerts.length - 1}</span> : null}
         </button>
       ) : null}

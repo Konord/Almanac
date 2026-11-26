@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   alertsUrl,
+  alertTopic,
   dayName,
   degrees,
   describeWeather,
@@ -170,4 +171,14 @@ test("weather alerts: one per name, worst first, cancelled and run-out ones left
   );
   assert.equal(parseAlerts({ nope: true }, now), null);
   assert.ok(alertsUrl({ name: "Toronto", latitude: 43.7, longitude: -79.4 }).includes("bbox=-79.4100%2C43.6900%2C-79.3900%2C43.7100"));
+});
+
+test("a special weather statement's pill says what it's about", () => {
+  const alerts = parseAlerts(
+    { features: [{ properties: { alert_name_en: "special weather statement", alert_type: "statement", status_en: "issued", expiration_datetime: "2026-11-27T11:00:00Z", alert_text_en: "### Snow squalls are possible tonight east of the lake, with local blowing snow." } }] },
+    new Date("2026-11-26T17:00:00Z"),
+  );
+  assert.equal(alerts?.[0].name, "Special weather statement");
+  assert.equal(alerts?.[0].short, "Snow squalls");
+  assert.equal(alertTopic("Nothing much to say."), null);
 });

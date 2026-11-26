@@ -98,6 +98,12 @@ export type WeatherAlert = {
   text: string;
   /** When it runs out (ISO), or null. */
   until: string | null;
+  /**
+   * What the header pill says: the alert's name, or for a vague one ("Special
+   * weather statement", "Weather advisory") what it's about, found in its
+   * words ("Snow squalls"). Connor, 2026-11-26.
+   */
+  short: string;
 };
 
 /** What /api/weather answers. */
@@ -361,6 +367,34 @@ export function inCanadaArea(place: WeatherPlace): boolean {
 }
 
 const ALERT_ORDER = ["warning", "watch", "advisory", "statement"];
+
+/** Names that don't say what the weather is. */
+const VAGUE = /^(special weather statement|weather advisory|special air quality statement)$/i;
+
+/** What a vague alert is about, by the first of these its words mention (most specific first). */
+const TOPICS: [RegExp, string][] = [
+  [/snow squall/i, "Snow squalls"],
+  [/freezing rain/i, "Freezing rain"],
+  [/freezing drizzle/i, "Freezing drizzle"],
+  [/blizzard/i, "Blizzard"],
+  [/blowing snow/i, "Blowing snow"],
+  [/ice pellets/i, "Ice pellets"],
+  [/snowfall|heavy snow|snow\b/i, "Snow"],
+  [/thunderstorm/i, "Thunderstorms"],
+  [/tornado/i, "Tornado risk"],
+  [/rainfall|heavy rain|\brain\b/i, "Heavy rain"],
+  [/flash flood|flood/i, "Flooding"],
+  [/wind chill|extreme cold|cold/i, "Extreme cold"],
+  [/\bheat\b|humidex/i, "Heat"],
+  [/wind/i, "Strong winds"],
+  [/fog/i, "Fog"],
+  [/frost/i, "Frost"],
+  [/smoke|air quality/i, "Air quality"],
+];
+
+export function alertTopic(text: string): string | null {
+  return TOPICS.find(([re]) => re.test(text))?.[1] ?? null;
+}
 const COLOUR_ORDER = ["red", "orange", "yellow"];
 
 /**
@@ -383,12 +417,15 @@ export function parseAlerts(raw: unknown, now: Date): WeatherAlert[] | null {
     const until = str("expiration_datetime") ?? str("event_end_datetime");
     if (until && !Number.isNaN(Date.parse(until)) && Date.parse(until) <= now.getTime()) continue;
     const colour = str("risk_colour_en")?.toLowerCase() ?? null;
+    const full = name.charAt(0).toUpperCase() + name.slice(1);
+    const text = str("alert_text_en") ?? "";
     const alert: WeatherAlert = {
       kind: (str("alert_type") ?? "").toLowerCase(),
-      name: name.charAt(0).toUpperCase() + name.slice(1),
+      name: full,
       colour: colour && COLOUR_ORDER.includes(colour) ? colour : null,
-      text: str("alert_text_en") ?? "",
+      text,
       until,
+      short: VAGUE.test(full) ? (alertTopic(text) ?? full) : full,
     };
     const key = alert.name.toLowerCase();
     const had = out.get(key);
