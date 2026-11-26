@@ -244,8 +244,8 @@ export async function TodayPanel({
     `${returnTo}${returnTo.includes("?") ? "&" : "?"}routine=${templateId}&member=${memberId}`;
 
   // The chore bucket: occasional and one-off chores the planner has put on the coming days.
-  const bucket = showing === "bucket" ? await bucketRows(household, today, todos) : null;
   const choresList = lists.find((l) => l.is_chores);
+  const bucket = showing === "bucket" ? await bucketRows(household, today, todos, choresList?.id ?? null) : null;
   // Where the add box puts things: the list showing (not the grocery list,
   // which has its own). The Daily List has no add box (Connor, 2026-11-16):
   // things are added on To-do, Chores or another list.
@@ -443,8 +443,8 @@ export async function TodayPanel({
                           {rows.map((row) => (
                             <li key={row.key} className="flex min-h-16 items-center gap-3 border-b border-frame last:border-0">
                               <span className="min-w-0 flex-1 truncate font-hand text-[1.375rem] text-ink">{row.title}</span>
-                              <span className={`tabular shrink-0 text-lg font-bold ${row.date ? "text-ink-soft" : "text-danger"}`}>
-                                {row.date ? weekdayShort(row.date, household) : "No room"}
+                              <span className={`tabular shrink-0 text-lg font-bold text-ink-soft`}>
+                                {row.date ? weekdayShort(row.date, household) : ""}
                               </span>
                               <Emoji emoji={row.icon} className="size-8" />
                             </li>
@@ -485,11 +485,15 @@ function pagesOf<T>(items: T[], size: number): T[][] {
   return pages.length ? pages : [[]];
 }
 
-/** One chore waiting in the bucket, and the day the planner has it on (null: no room in the next two weeks). */
+/** One chore in the Chores box, and the day the planner has it on (null: an item on the Chores list with no day yet). */
 type BucketRow = { key: string; title: string; icon: string; date: LocalDate | null };
 
-/** The chore bucket: chores the planner has placed after today, soonest first, then the ones with no room. */
-async function bucketRows(household: Household, today: LocalDate, todos: Todo[]): Promise<BucketRow[]> {
+/**
+ * The Chores box (Connor, 2026-11-26): the chores coming up over the next
+ * seven days, soonest first, then whatever else is waiting on the Chores
+ * list.
+ */
+async function bucketRows(household: Household, today: LocalDate, todos: Todo[], choresListId: string | null): Promise<BucketRow[]> {
   const { chores, plan } = await choreSchedule(household, today, household.settings.timeZone, false);
   const choreById = new Map(chores.map((c) => [c.id, c]));
   const todoById = new Map(todos.map((t) => [t.id, t]));
@@ -503,8 +507,9 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[])
   };
   const rows: BucketRow[] = [];
   const seen = new Set<string>();
+  const lastDay = addDays(today, 7);
   for (const day of plan.days) {
-    if (day.date <= today) continue;
+    if (day.date <= today || day.date > lastDay) continue;
     for (const item of day.items) {
       if (seen.has(item.id)) continue;
       const named = nameOf(item.id, item.kind);
@@ -513,10 +518,12 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[])
       rows.push({ key: `${item.kind}:${item.id}`, ...named, date: day.date });
     }
   }
-  for (const id of plan.unplaced) {
-    if (seen.has(id)) continue;
-    const named = nameOf(id, "generated") ?? nameOf(id, "one-off");
-    if (named) rows.push({ key: `unplaced:${id}`, ...named, date: null });
+  // Then the Chores list itself: what's on it and not already shown above or due today.
+  for (const t of todos) {
+    if (t.list_id !== choresListId || t.status !== "open" || seen.has(t.id) || !onItsList(t)) continue;
+    if (t.due_date && t.due_date <= today) continue;
+    seen.add(t.id);
+    rows.push({ key: `list:${t.id}`, title: t.title, icon: t.icon ?? "🧹", date: null });
   }
   return rows;
 }
