@@ -1,10 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  alertsUrl,
   dayName,
   degrees,
   describeWeather,
   forecastUrl,
+  parseAlerts,
   parseOpenMeteo,
   parsePlaces,
   parsePollen,
@@ -141,4 +143,31 @@ test("degrees round and never show minus zero", () => {
 test("forecast columns are named Today, then short weekdays", () => {
   assert.equal(dayName("2026-11-16", "2026-11-16"), "Today");
   assert.equal(dayName("2026-11-17", "2026-11-16"), "Tue");
+});
+
+test("weather alerts: one per name, worst first, cancelled and run-out ones left out", () => {
+  const now = new Date("2026-11-26T17:00:00Z");
+  const feature = (p: Record<string, string>) => ({ type: "Feature", geometry: null, properties: p });
+  const alerts = parseAlerts(
+    {
+      features: [
+        feature({ alert_short_name_en: "snowfall warning", alert_type: "warning", risk_colour_en: "yellow", status_en: "issued", expiration_datetime: "2026-11-27T05:00:00Z" }),
+        feature({ alert_short_name_en: "snowfall warning", alert_type: "warning", risk_colour_en: "yellow", status_en: "continued", expiration_datetime: "2026-11-27T11:00:00Z" }),
+        feature({ alert_short_name_en: "wind warning", alert_type: "warning", risk_colour_en: "orange", status_en: "issued", expiration_datetime: "2026-11-27T05:00:00Z" }),
+        feature({ alert_short_name_en: "fog advisory", alert_type: "advisory", status_en: "issued", expiration_datetime: "2026-11-26T12:00:00Z" }),
+        feature({ alert_short_name_en: "frost advisory", alert_type: "advisory", status_en: "cancelled", expiration_datetime: "2026-11-27T12:00:00Z" }),
+        { properties: null },
+      ],
+    },
+    now,
+  );
+  assert.deepEqual(
+    alerts?.map((a) => [a.name, a.until]),
+    [
+      ["Wind warning", "2026-11-27T05:00:00Z"],
+      ["Snowfall warning", "2026-11-27T11:00:00Z"],
+    ],
+  );
+  assert.equal(parseAlerts({ nope: true }, now), null);
+  assert.ok(alertsUrl({ name: "Toronto", latitude: 43.7, longitude: -79.4 }).includes("bbox=-79.4100%2C43.6900%2C-79.3900%2C43.7100"));
 });

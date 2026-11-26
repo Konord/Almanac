@@ -84,6 +84,20 @@ export type Forecast = {
   days: WeatherDay[];
   /** Null when there's no pollen key; [] when Google didn't answer. */
   pollen: PollenDay[] | null;
+  /** Environment Canada's warnings, watches and advisories for the place (none outside Canada). */
+  alerts: WeatherAlert[];
+};
+
+/** A government weather alert: "Snowfall warning", in force until `until`. */
+export type WeatherAlert = {
+  /** "warning", "watch", "advisory", "statement"… */
+  kind: string;
+  name: string;
+  /** Environment Canada's colour for how serious it is: "yellow", "orange", "red", or null. */
+  colour: string | null;
+  text: string;
+  /** When it runs out (ISO), or null. */
+  until: string | null;
 };
 
 /** What /api/weather answers. */
@@ -326,4 +340,68 @@ export function dayName(date: string, today: string): string {
   if (date === today) return "Today";
   const [y, mo, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString("en-CA", { weekday: "short", timeZone: "UTC" }).replace(/\.$/, "");
+}
+
+// ---------------------------------------------------------------------------
+// Weather alerts (Environment Canada, free, no key; Connor, 2026-11-26)
+// ---------------------------------------------------------------------------
+
+export const EC_ALERTS = "https://api.weather.gc.ca/collections/weather-alerts/items";
+
+/** The alerts whose areas cover the place: a tiny box around it. */
+export function alertsUrl(place: WeatherPlace): string {
+  const d = 0.01;
+  const bbox = [place.longitude - d, place.latitude - d, place.longitude + d, place.latitude + d].map((n) => n.toFixed(4)).join(",");
+  return `${EC_ALERTS}?${new URLSearchParams({ f: "json", lang: "en", bbox, limit: "50" }).toString()}`;
+}
+
+/** Whether a place is somewhere Environment Canada covers (its alerts' extent). */
+export function inCanadaArea(place: WeatherPlace): boolean {
+  return place.longitude >= -145.3 && place.longitude <= -48.1 && place.latitude >= 37.3 && place.latitude <= 87.7;
+}
+
+const ALERT_ORDER = ["warning", "watch", "advisory", "statement"];
+const COLOUR_ORDER = ["red", "orange", "yellow"];
+
+/**
+ * Environment Canada's answer → the alerts in force, worst first, one per
+ * name (an alert covers several areas, so it comes back once per area).
+ * Cancelled and run-out ones are left out. Null if the answer is the wrong shape.
+ */
+export function parseAlerts(raw: unknown, now: Date): WeatherAlert[] | null {
+  if (!raw || typeof raw !== "object" || !Array.isArray((raw as { features?: unknown }).features)) return null;
+  const out = new Map<string, WeatherAlert>();
+  for (const f of (raw as { features: unknown[] }).features) {
+    const p = (f as { properties?: Record<string, unknown> } | null)?.properties;
+    if (!p) continue;
+    const str = (k: string) => (typeof p[k] === "string" && (p[k] as string).trim() ? (p[k] as string).trim() : null);
+    const name = str("alert_short_name_en") ?? str("alert_name_en");
+    if (!name) continue;
+    const status = (str("status_en") ?? "").toLowerCase();
+    if (status.includes("cancel") || status.includes("ended")) continue;
+    const until = str("expiration_datetime") ?? str("event_end_datetime");
+    if (until && !Number.isNaN(Date.parse(until)) && Date.parse(until) <= now.getTime()) continue;
+    const colour = str("risk_colour_en")?.toLowerCase() ?? null;
+    const alert: WeatherAlert = {
+      kind: (str("alert_type") ?? "").toLowerCase(),
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      colour: colour && COLOUR_ORDER.includes(colour) ? colour : null,
+      text: str("alert_text_en") ?? "",
+      until,
+    };
+    const key = alert.name.toLowerCase();
+    const had = out.get(key);
+    if (!had || (had.until ?? "") < (alert.until ?? "")) out.set(key, alert);
+  }
+  const rank = (a: WeatherAlert) => {
+    const c = a.colour ? COLOUR_ORDER.indexOf(a.colour) : 9;
+    const k = ALERT_ORDER.indexOf(a.kind);
+    return c * 10 + (k < 0 ? 9 : k);
+  };
+  return [...out.values()].sort((a, b) => rank(a) - rank(b));
+}
+
+/** An alert's text colour: red and orange ones in the danger red, the rest in the accent. */
+export function alertTone(alert: WeatherAlert): string {
+  return alert.colour === "red" || alert.colour === "orange" || (!alert.colour && alert.kind === "warning") ? "text-danger" : "text-accent";
 }
