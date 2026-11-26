@@ -104,6 +104,9 @@ export type WeatherAlert = {
    * words ("Snow squalls"). Connor, 2026-11-26.
    */
   short: string;
+  level: AlertLevel;
+  /** Its weather as a picture: ❄️, 🌧️, 🥶 … */
+  emoji: string;
 };
 
 /** What /api/weather answers. */
@@ -372,29 +375,49 @@ const ALERT_ORDER = ["warning", "watch", "advisory", "statement"];
 const VAGUE = /^(special weather statement|weather advisory|special air quality statement)$/i;
 
 /** What a vague alert is about, by the first of these its words mention (most specific first). */
-const TOPICS: [RegExp, string][] = [
-  [/snow squall/i, "Snow squalls"],
-  [/freezing rain/i, "Freezing rain"],
-  [/freezing drizzle/i, "Freezing drizzle"],
-  [/blizzard/i, "Blizzard"],
-  [/blowing snow/i, "Blowing snow"],
-  [/ice pellets/i, "Ice pellets"],
-  [/snowfall|heavy snow|snow\b/i, "Snow"],
-  [/thunderstorm/i, "Thunderstorms"],
-  [/tornado/i, "Tornado risk"],
-  [/rainfall|heavy rain|\brain\b/i, "Heavy rain"],
-  [/flash flood|flood/i, "Flooding"],
-  [/wind chill|extreme cold|cold/i, "Extreme cold"],
-  [/\bheat\b|humidex/i, "Heat"],
-  [/wind/i, "Strong winds"],
-  [/fog/i, "Fog"],
-  [/frost/i, "Frost"],
-  [/smoke|air quality/i, "Air quality"],
+const TOPICS: [RegExp, string, string][] = [
+  [/snow squall/i, "Snow squalls", "🌨️"],
+  [/freezing rain/i, "Freezing rain", "🧊"],
+  [/freezing drizzle/i, "Freezing drizzle", "🧊"],
+  [/blizzard/i, "Blizzard", "🌬️"],
+  [/blowing snow/i, "Blowing snow", "🌬️"],
+  [/ice pellets/i, "Ice pellets", "🧊"],
+  [/snowfall|heavy snow|winter storm|snow\b/i, "Snow", "❄️"],
+  [/thunderstorm/i, "Thunderstorms", "⛈️"],
+  [/tornado/i, "Tornado risk", "🌪️"],
+  [/rainfall|heavy rain|\brain\b/i, "Heavy rain", "🌧️"],
+  [/flash flood|flood|storm surge/i, "Flooding", "🌊"],
+  [/wind chill|extreme cold|arctic|cold/i, "Extreme cold", "🥶"],
+  [/\bheat\b|humidex/i, "Heat", "🥵"],
+  [/wind/i, "Strong winds", "💨"],
+  [/fog/i, "Fog", "🌫️"],
+  [/frost/i, "Frost", "❄️"],
+  [/smoke|air quality/i, "Air quality", "😷"],
 ];
 
+/** What a vague alert is about ("Snow squalls"), or null. */
 export function alertTopic(text: string): string | null {
   return TOPICS.find(([re]) => re.test(text))?.[1] ?? null;
 }
+
+/** The picture for an alert: its weather, by name then words (⚠️ if neither says). */
+export function alertEmoji(name: string, text: string): string {
+  return (TOPICS.find(([re]) => re.test(name)) ?? TOPICS.find(([re]) => re.test(text)))?.[2] ?? "⚠️";
+}
+
+/**
+ * How serious, for how it looks from across the room (Connor, 2026-11-26:
+ * "i and ! are hard to tell apart from a distance"): a statement or advisory
+ * is soft red, a watch orange, a warning solid red.
+ */
+export type AlertLevel = "statement" | "watch" | "warning";
+export function alertLevel(kind: string, name: string): AlertLevel {
+  const k = `${kind} ${name}`.toLowerCase();
+  if (/warning/.test(k)) return "warning";
+  if (/watch/.test(k)) return "watch";
+  return "statement";
+}
+
 const COLOUR_ORDER = ["red", "orange", "yellow"];
 
 /**
@@ -426,6 +449,8 @@ export function parseAlerts(raw: unknown, now: Date): WeatherAlert[] | null {
       text,
       until,
       short: VAGUE.test(full) ? (alertTopic(text) ?? full) : full,
+      level: alertLevel(str("alert_type") ?? "", full),
+      emoji: alertEmoji(VAGUE.test(full) ? "" : full, text),
     };
     const key = alert.name.toLowerCase();
     const had = out.get(key);

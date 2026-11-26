@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { WarningCircle, X } from "@phosphor-icons/react";
+import { X } from "@phosphor-icons/react";
 import { Emoji, kickerClass } from "@/components/ui";
 import { wallTime } from "@/lib/time-text";
-import { dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherHour } from "@/lib/weather";
+import { alertLevel, dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherAlert, type WeatherHour } from "@/lib/weather";
 
 /*
  * The forecast pop-up: tap the weather in a calendar header (Connor,
@@ -77,6 +77,34 @@ function summary(text: string): string {
     .join(" ");
 }
 
+/**
+ * An alert's look, so it can be told from across the room by colour
+ * (Connor, 2026-11-26): a statement or advisory is just its weather picture
+ * on sky blue (its words stay in the pop-up); a warning is solid in
+ * Environment Canada's own colour (yellow, orange or red; red if it gives
+ * none); a watch has its own colour, violet.
+ */
+type AlertTone = "statement" | "watch" | "yellow" | "orange" | "red";
+export function toneOf(a: WeatherAlert): AlertTone {
+  const level = a.level ?? alertLevel(a.kind, a.name);
+  if (level !== "warning") return level;
+  return a.colour === "yellow" || a.colour === "orange" ? a.colour : "red";
+}
+export const ALERT_PILL: Record<AlertTone, string> = {
+  statement: "bg-alert-info text-ink",
+  watch: "bg-alert-watch text-white",
+  yellow: "bg-alert-yellow text-alert-yellow-ink",
+  orange: "bg-alert-orange text-alert-orange-ink",
+  red: "bg-danger text-white",
+};
+const ALERT_EDGE: Record<AlertTone, string> = {
+  statement: "border-alert-info-edge bg-alert-info",
+  watch: "border-alert-watch bg-[color-mix(in_srgb,var(--color-alert-watch)_12%,white)]",
+  yellow: "border-alert-yellow bg-[color-mix(in_srgb,var(--color-alert-yellow)_25%,white)]",
+  orange: "border-alert-orange bg-[color-mix(in_srgb,var(--color-alert-orange)_25%,white)]",
+  red: "border-danger bg-alert-soft",
+};
+
 /** Government weather alerts, under sunrise and sunset (Connor, 2026-11-26): the worst two, and how many more. */
 function Alerts({ forecast }: { forecast: Forecast }) {
   const alerts = forecast.alerts ?? [];
@@ -90,10 +118,10 @@ function Alerts({ forecast }: { forecast: Forecast }) {
   return (
     <div className="flex shrink-0 flex-col gap-2">
       {alerts.slice(0, 2).map((a) => (
-        <div key={a.name} className="flex items-start gap-2 rounded-[var(--radius)] bg-alert-soft px-3 py-2 text-now-on-tint">
-          <WarningCircle size="1.6rem" weight="fill" className="mt-[0.1rem] shrink-0" aria-hidden />
+        <div key={a.name} className={`flex items-start gap-3 rounded-[var(--radius)] border-l-[0.5rem] px-3 py-2 ${ALERT_EDGE[toneOf(a)]}`}>
+          <Emoji emoji={a.emoji ?? "⚠️"} className="mt-[0.1rem] size-[2.2rem]" />
           <span className="flex min-w-0 flex-col">
-            <b className="text-[1.35rem] leading-tight">{a.name}</b>
+            <b className="text-[1.35rem] leading-tight text-ink">{a.name}</b>
             {until(a.until) ? <span className="text-[1.125rem] text-ink-muted">{until(a.until)}</span> : null}
             {/* What it says, in Environment Canada's words (the first lines; the rest is on weather.gc.ca). */}
             {a.text ? <span className={`${alerts.length > 1 ? "line-clamp-2" : "line-clamp-4"} text-[1.125rem] leading-snug text-ink`}>{summary(a.text)}</span> : null}

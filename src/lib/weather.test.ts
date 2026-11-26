@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  alertLevel,
   alertsUrl,
   alertTopic,
   dayName,
@@ -181,4 +182,26 @@ test("a special weather statement's pill says what it's about", () => {
   assert.equal(alerts?.[0].name, "Special weather statement");
   assert.equal(alerts?.[0].short, "Snow squalls");
   assert.equal(alertTopic("Nothing much to say."), null);
+});
+
+test("an alert's colour level and picture", () => {
+  const alerts = parseAlerts(
+    {
+      features: [
+        { properties: { alert_name_en: "special weather statement", alert_type: "statement", status_en: "issued", alert_text_en: "Snow squalls tonight." } },
+        { properties: { alert_name_en: "snowfall warning", alert_type: "warning", risk_colour_en: "yellow", status_en: "issued", alert_text_en: "Strong winds too." } },
+        { properties: { alert_name_en: "severe thunderstorm watch", alert_type: "watch", status_en: "issued", alert_text_en: "" } },
+      ],
+    },
+    new Date("2026-11-26T17:00:00Z"),
+  );
+  assert.deepEqual(
+    alerts?.map((a) => [a.name, a.level, a.emoji]),
+    [
+      ["Snowfall warning", "warning", "❄️"],
+      ["Severe thunderstorm watch", "watch", "⛈️"],
+      ["Special weather statement", "statement", "🌨️"],
+    ],
+  );
+  assert.equal(alertLevel("", "Weather advisory"), "statement");
 });

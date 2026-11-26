@@ -63,6 +63,13 @@
   --color-missed: var(--color-missed, #d9533f);
   --color-missed-soft: var(--color-missed-soft, #f2a79a);
   --color-alert-soft: var(--color-alert-soft, #fdece8);
+  --color-alert-info: var(--color-alert-info, #d4eaf7);
+  --color-alert-info-edge: var(--color-alert-info-edge, #5b9fcb);
+  --color-alert-watch: var(--color-alert-watch, #6a44a8);
+  --color-alert-orange: var(--color-alert-orange, #f4a340);
+  --color-alert-orange-ink: var(--color-alert-orange-ink, #3d2200);
+  --color-alert-yellow: var(--color-alert-yellow, #f6d44c);
+  --color-alert-yellow-ink: var(--color-alert-yellow-ink, #3a2e00);
   --color-handle: var(--color-handle, #c5c8ce);
   --color-mat-white: var(--color-mat-white, #f7f6f2);
   --color-mat-cream: var(--color-mat-cream, #ece5d6);
