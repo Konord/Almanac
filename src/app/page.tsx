@@ -6,7 +6,6 @@ import { specialLabel } from "@/lib/holidays";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { eventEmoji } from "@/lib/emoji";
-import { comingDayText, onePerSeries } from "@/lib/coming-up";
 import { requireHousehold } from "@/lib/household";
 import { addDays, isLocalDate, localDateOf, zonedToUtc } from "@/lib/time";
 import { nowText, shortClockTime, untilText } from "@/lib/time-text";
@@ -238,27 +237,20 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   ];
 
   // --- Coming up: the next few timed things after today ----------------------
-  // In the evening, with two things or fewer left today, Coming up grows and
-  // leads with tomorrow: that's the question then (UI audit M4).
-  const quiet = isToday && ahead.length <= 2;
+  // Always one row of three at the bottom (Connor, 2026-11-26: the bigger
+  // "quiet evening" version with up to nine is gone).
   const tomorrow = addDays(day, 1);
-  // A repeating thing shows once, at its next time; past the coming week the date shows too.
-  const coming: ComingUpItem[] = onePerSeries(
-    shown
-      .filter((e) => !isAllDayStyle(e, timeZone) && localDateOf(new Date(e.starts_at), timeZone) > day)
-      .sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
-  )
-    .slice(0, quiet ? 9 : 3)
+  const coming: ComingUpItem[] = shown
+    .filter((e) => !isAllDayStyle(e, timeZone) && localDateOf(new Date(e.starts_at), timeZone) > day)
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+    .slice(0, 3)
     .map((e) => {
-      const at = new Date(e.starts_at);
-      const date = localDateOf(at, timeZone);
-      const isTomorrow = date === tomorrow;
-      const dayText = comingDayText(date, day, at, locale, timeZone);
+      const isTomorrow = localDateOf(new Date(e.starts_at), timeZone) === tomorrow;
       return {
         key: e.id,
         title: e.title,
         emoji: eventEmoji(e.icon, e.title),
-        when: quiet && isTomorrow ? time(e.starts_at) : `${dayText} · ${time(e.starts_at)}`,
+        when: `${new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(new Date(e.starts_at))} · ${time(e.starts_at)}`,
         // Tapping opens that day's Agenda, not the event's edit sheet (Connor, 2026-11-26).
         href: `/?date=${localDateOf(new Date(e.starts_at), timeZone)}`,
         tomorrow: isTomorrow,
@@ -337,7 +329,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             hidden
             className="tabular flex min-h-[var(--touch-target)] w-full shrink-0 items-center justify-center text-[1.25rem] font-bold text-ink-soft"
           />
-          <ComingUp items={coming} lead={quiet} />
+          <ComingUp items={coming} />
         </AgendaFit>
 
         <TodayPanel
