@@ -91,7 +91,7 @@ export function WeatherSlot() {
             aria-label={`${alert.name}: ${alert.short}`}
             className={`relative hidden size-13 shrink-0 items-center justify-center rounded-full lg:flex ${ALERT_PILL.statement}`}
           >
-            <AlertSign alert={alert} size="3rem" />
+            <AlertSign alert={alert} />
             {forecast.alerts.length > 1 ? (
               <span className="absolute -top-1 -right-1 rounded-full bg-board px-1.5 text-[1.125rem] font-bold leading-tight text-ink shadow-raised">+{forecast.alerts.length - 1}</span>
             ) : null}
@@ -102,7 +102,7 @@ export function WeatherSlot() {
             onClick={() => setOpen(true)}
             className={`hidden min-h-13 max-w-[26rem] min-w-0 shrink items-center gap-[0.5rem] rounded-full px-5 text-[1.5rem] font-bold lg:flex ${ALERT_PILL[toneOf(alert)]}`}
           >
-            <AlertSign alert={alert} size="2.2rem" />
+            <AlertSign alert={alert} className="-ml-1" />
             <span className="truncate">{alert.short ?? alert.name}</span>
             {forecast.alerts.length > 1 ? <span className="shrink-0">+{forecast.alerts.length - 1}</span> : null}
           </button>
@@ -123,8 +123,8 @@ export function WeatherSlot() {
   );
 }
 
-/** The level's Phosphor sign: circle, diamond or triangle. */
-function AlertSign({ alert, size }: { alert: Forecast["alerts"][number]; size: string }) {
+/** The level's Phosphor sign, outlined and all one size: circle, diamond or triangle (Connor, 2026-11-26). */
+function AlertSign({ alert, className = "" }: { alert: Forecast["alerts"][number]; className?: string }) {
   const Sign = ALERT_ICON[levelOf(alert)];
-  return <Sign size={size} weight="fill" aria-hidden className="shrink-0" />;
+  return <Sign size="2.6rem" weight="bold" aria-hidden className={`shrink-0 ${className}`} />;
 }
