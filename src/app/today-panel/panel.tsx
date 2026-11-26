@@ -20,7 +20,7 @@ import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
 import { PanelPages } from "@/components/panel-pages";
 import { boxedHref, panelBoxes } from "@/lib/panel-boxes";
-import { addTodo, toggleTodo } from "../chores/actions";
+import { addTodo, markChoreDone, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
 import { shortClockTime } from "@/lib/time-text";
 import { HabitsBox } from "./habits-box";
@@ -66,7 +66,9 @@ type Row =
       /** "2/5" on a whole-routine row; null on a single step. */
       count: string | null;
     }
-  | { kind: "start"; key: string; title: string; colour: string | null; time: string; href: string };
+  | { kind: "start"; key: string; title: string; colour: string | null; time: string; href: string }
+  /** A chore the planner has on a coming day (the Agenda on a day ahead): ticking it marks it done now. */
+  | { kind: "chore"; key: string; title: string; icon: string | null; colour: null; time: null; templateId: string };
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
@@ -80,6 +82,7 @@ export async function TodayPanel({
   returnTo: pageHref,
   day = false,
   routine,
+  date,
 }: {
   household: Household;
   today: LocalDate;
@@ -91,15 +94,23 @@ export async function TodayPanel({
   day?: boolean;
   /** A routine's checklist (from tapping its block), shown instead of the list. */
   routine?: ReactNode;
+  /**
+   * The day the Agenda is showing. A day ahead turns the Daily List into
+   * that day's: "Daily List for September 23rd", with what's expected that
+   * day, still tickable (Connor, 2026-11-26).
+   */
+  date?: LocalDate;
 }) {
   const { locale, timeZone } = household.settings;
   const supabase = await createClient();
+  const listDay = date && date > today ? date : today;
+  const ahead = listDay > today;
   const [{ lists, todos }, basics, meals, { data: memberRows }, routineData, { data: spotify }, { count: habitCount }, { count: trackerCount }] = await Promise.all([
     loadTodos(),
     loadMealBasics(),
-    loadMeals(today, addDays(today, 1)),
+    loadMeals(today, addDays(listDay, 1)),
     supabase.from("members").select("id, colour"),
-    loadRoutines(today),
+    loadRoutines(listDay),
     supabase.from("spotify_connections").select("household_id").maybeSingle(),
     supabase.from("habits").select("id", { count: "exact", head: true }),
     supabase.from("health_trackers").select("id", { count: "exact", head: true }),
@@ -133,6 +144,15 @@ export async function TodayPanel({
     basics,
     [],
   );
+  const dayMeals = ahead ? placeTodayMeals(meals.filter((m) => m.date === listDay), basics, []) : todayMeals;
+  // A day ahead: the chores the planner has on it (made into tasks only on the day).
+  const planned =
+    ahead && showing === "today"
+      ? await (async () => {
+          const { chores, plan } = await choreSchedule(household, today, timeZone, false);
+          return { chores: new Map(chores.map((c) => [c.id, c])), items: plan.days.find((d) => d.date === listDay)?.items ?? [] };
+        })()
+      : null;
   const extras: Row[] =
     showing === "today"
       ? [
@@ -140,11 +160,11 @@ export async function TodayPanel({
             floatingRoutines(
               routineData,
               m.id,
-              today,
+              listDay,
               [],
               timeZone,
               household.settings.routineFlexMinutes,
-              mealsForRoutines(todayMeals),
+              mealsForRoutines(dayMeals),
             )
               .filter((r) => !r.progress.complete && !routineData.ended.has(`${m.id}:${r.template.id}`))
               .flatMap((r): Row[] => {
@@ -180,9 +200,14 @@ export async function TodayPanel({
                 }));
               }),
           ),
+          ...(planned?.items ?? []).flatMap((item): Row[] => {
+            if (item.kind !== "generated") return [];
+            const c = planned?.chores.get(item.id);
+            return c ? [{ kind: "chore", key: `chore:${c.id}`, title: c.name, icon: c.icon ?? "🧹", colour: null, time: null, templateId: c.id }] : [];
+          }),
           ...todayMeals.flatMap((m): Row[] => {
             const start = startCooking(m);
-            if (!start || m.eatEnd <= nowMinutes) return [];
+            if (ahead || !start || m.eatEnd <= nowMinutes) return [];
             return [
               {
                 kind: "start",
@@ -198,10 +223,20 @@ export async function TodayPanel({
       : [];
   const tasks: Row[] = (
     showing === "today"
-      ? dailyOrder(
-          todos.filter((t) => t.status === "open" && onDailyList(t, today)),
-          today,
-        )
+      ? ahead
+        ? // A day ahead: tasks dated that day, and one-offs the planner put on it.
+          dailyOrder(
+            todos.filter(
+              (t) =>
+                t.status === "open" &&
+                (t.due_date === listDay || (planned?.items ?? []).some((i) => i.kind === "one-off" && i.id === t.id)),
+            ),
+            listDay,
+          )
+        : dailyOrder(
+            todos.filter((t) => t.status === "open" && onDailyList(t, today)),
+            today,
+          )
       : list
         ? todos.filter((t) => t.list_id === list.id && t.status === "open" && onItsList(t))
         : []
@@ -209,7 +244,7 @@ export async function TodayPanel({
     kind: "todo",
     key: todo.id,
     todo,
-    time: todo.at_time && timedToday(todo, today) ? todo.at_time.slice(0, 5) : null,
+    time: todo.at_time && timedToday(todo, listDay) ? todo.at_time.slice(0, 5) : null,
   }));
   // Timed things first, by time; then the rest in the daily list's order.
   const open: Row[] = [
@@ -217,6 +252,7 @@ export async function TodayPanel({
       .filter((r) => r.time !== null)
       .sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     ...tasks.filter((r) => r.time === null),
+    ...extras.filter((r) => r.time === null),
   ];
 
   // The next meal: today's still to come (or under way), else tomorrow's first.
@@ -334,6 +370,26 @@ export async function TodayPanel({
         />
       );
     }
+    if (row.kind === "chore") {
+      return (
+        <ListRow
+          key={row.key}
+          tick={{
+            action: markChoreDone,
+            fields: [
+              ["templateId", row.templateId],
+              ["name", row.title],
+              ["returnTo", returnTo],
+            ],
+          }}
+          title={title}
+          ink={hand(null)}
+          icon={icon ? <Emoji emoji={icon} className="size-8" /> : null}
+          meta={null}
+          slot
+        />
+      );
+    }
     const fields: [string, string][] =
       row.kind === "todo"
         ? [
@@ -344,7 +400,7 @@ export async function TodayPanel({
             ["memberId", row.memberId],
             ...row.stepIds.map((id): [string, string] => ["stepId", id]),
             ["templateId", row.templateId],
-            ["date", today],
+            ["date", listDay],
             ["returnTo", returnTo],
           ];
     return (
@@ -362,7 +418,7 @@ export async function TodayPanel({
 
   const heading = (
     <Link href={boxHref} className="flex min-h-12 items-center truncate text-[1.75rem] font-bold text-ink">
-      {box.name}
+      {ahead && showing === "today" ? `Daily List for ${longDay(listDay, household)}` : box.name}
     </Link>
   );
   // Flipping boxes: the boxes either side, by name ("‹ Chores", "Groceries ›"),
@@ -526,6 +582,17 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[],
     rows.push({ key: `list:${t.id}`, title: t.title, icon: t.icon ?? "🧹", date: null });
   }
   return rows;
+}
+
+/** "September 23rd" (English ordinals; other languages get the plain day). */
+function longDay(date: LocalDate, household: Household): string {
+  const { locale, timeZone } = household.settings;
+  const at = zonedToUtc(date, "12:00", timeZone);
+  const month = new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(at);
+  const day = Number(date.slice(8, 10));
+  if (!locale.startsWith("en")) return new Intl.DateTimeFormat(locale, { timeZone, month: "long", day: "numeric" }).format(at);
+  const suffix = ({ one: "st", two: "nd", few: "rd", other: "th" } as Record<string, string>)[new Intl.PluralRules("en", { type: "ordinal" }).select(day)] ?? "th";
+  return `${month} ${day}${suffix}`;
 }
 
 function weekdayShort(date: LocalDate, household: Household): string {

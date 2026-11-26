@@ -338,6 +338,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
           today={today}
           tab={panelTab}
           returnTo={here}
+          date={day}
           day
           routine={
             routineOpen ? (
