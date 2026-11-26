@@ -466,6 +466,7 @@ export async function TodayPanel({
                 rows={sideRows}
                 fallback={7}
                 className="mt-1"
+                empty={showing === "today" ? await AllDone(today, ahead) : undefined}
               />
             ) : (
               <>
@@ -582,6 +583,55 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[],
     rows.push({ key: `list:${t.id}`, title: t.title, icon: t.icon ?? "🧹", date: null });
   }
   return rows;
+}
+
+/**
+ * What an empty Daily List shows (Connor, 2026-11-26, look A): 🎉 "All done
+ * for today" and how many things each person ticked off. Nothing was on it
+ * at all: a calm "Nothing on the list today".
+ */
+async function AllDone(today: LocalDate, ahead: boolean) {
+  const supabase = await createClient();
+  const [{ data: done }, { data: people }] = await Promise.all([
+    ahead
+      ? Promise.resolve({ data: [] as { completed_by: string | null; assignee_id: string | null }[] })
+      : supabase.from("task_instances").select("completed_by, assignee_id").eq("status", "done").eq("completed_on", today),
+    supabase.from("members").select("id, name, colour").order("sort_order"),
+  ]);
+  const count = new Map<string, number>();
+  for (const d of done ?? []) {
+    const who = d.completed_by ?? d.assignee_id;
+    if (who) count.set(who, (count.get(who) ?? 0) + 1);
+  }
+  const total = (done ?? []).length;
+  if (total === 0) {
+    return (
+      <div className="m-auto flex flex-col items-center gap-3 p-4 text-center">
+        <Emoji emoji="🌿" className="size-24" />
+        <p className="text-[1.75rem] font-bold text-ink">{ahead ? "Nothing on the list that day" : "Nothing on the list today"}</p>
+      </div>
+    );
+  }
+  const tally = (people ?? []).filter((p) => count.has(p.id));
+  return (
+    <div className="m-auto flex flex-col items-center gap-3 p-4 text-center">
+      <Emoji emoji="🎉" className="size-28" />
+      <p className="text-[2rem] leading-tight font-extrabold text-ink">All done for today</p>
+      <p className="text-[1.25rem] text-ink-soft">
+        {total} {total === 1 ? "thing" : "things"} ticked off
+      </p>
+      {tally.length ? (
+        <div className="flex flex-wrap justify-center gap-2">
+          {tally.map((p) => (
+            <span key={p.id} className="flex min-h-12 items-center gap-2 rounded-full bg-panel px-4 text-[1.25rem] font-bold" style={{ color: strong(p.colour) }}>
+              <span aria-hidden className="size-3 rounded-full" style={{ background: p.colour }} />
+              {p.name} <span className="tabular text-ink">{count.get(p.id)}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /** "September 23rd" (English ordinals; other languages get the plain day). */
