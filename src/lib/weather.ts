@@ -375,7 +375,8 @@ export function parseAlerts(raw: unknown, now: Date): WeatherAlert[] | null {
     const p = (f as { properties?: Record<string, unknown> } | null)?.properties;
     if (!p) continue;
     const str = (k: string) => (typeof p[k] === "string" && (p[k] as string).trim() ? (p[k] as string).trim() : null);
-    const name = str("alert_short_name_en") ?? str("alert_name_en");
+    // The full name ("special weather statement"); the short one can be just "special weather".
+    const name = str("alert_name_en") ?? str("alert_short_name_en");
     if (!name) continue;
     const status = (str("status_en") ?? "").toLowerCase();
     if (status.includes("cancel") || status.includes("ended")) continue;

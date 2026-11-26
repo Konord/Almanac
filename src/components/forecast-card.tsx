@@ -68,6 +68,15 @@ function SunTimes({ forecast, row = false }: { forecast: Forecast; row?: boolean
   );
 }
 
+/** An alert's words without its boilerplate: drops the "### " markers and the issuing lines, joins the rest. */
+function summary(text: string): string {
+  return text
+    .split(/\n+/)
+    .map((l) => l.replace(/^#+\s*/, "").trim())
+    .filter((l) => l && !/^(issued|en|fr|please continue to monitor|for more information)/i.test(l))
+    .join(" ");
+}
+
 /** Government weather alerts, under sunrise and sunset (Connor, 2026-11-26): the worst two, and how many more. */
 function Alerts({ forecast }: { forecast: Forecast }) {
   const alerts = forecast.alerts ?? [];
@@ -86,6 +95,8 @@ function Alerts({ forecast }: { forecast: Forecast }) {
           <span className="flex min-w-0 flex-col">
             <b className="text-[1.35rem] leading-tight">{a.name}</b>
             {until(a.until) ? <span className="text-[1.125rem] text-ink-muted">{until(a.until)}</span> : null}
+            {/* What it says, in Environment Canada's words (the first lines; the rest is on weather.gc.ca). */}
+            {a.text ? <span className={`${alerts.length > 1 ? "line-clamp-2" : "line-clamp-4"} text-[1.125rem] leading-snug text-ink`}>{summary(a.text)}</span> : null}
           </span>
         </div>
       ))}
