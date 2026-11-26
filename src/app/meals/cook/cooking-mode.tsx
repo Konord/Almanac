@@ -10,7 +10,6 @@ import { bothTemperatures, DONENESS, minutesText, type Helper } from "@/lib/meal
 import { batchAmount } from "@/lib/meals";
 import { measureText, type Measures } from "@/lib/units";
 import { UnitPill } from "../unit-pill";
-import { NumberStepper } from "@/components/touch-pickers";
 import { addMinute, startTimer, stopTimer, timeLeft, useAlarm, useNow, useTimers } from "@/components/timer-store";
 import { BatchSwitch } from "../parts";
 
@@ -60,8 +59,11 @@ function useWakeLock() {
   }, []);
 }
 
-/** The quick timer buttons, in minutes (Connor, 2026-11-26: the old 1 to 15 were too short). */
-const QUICK_TIMERS = [5, 10, 15, 20, 30, 45, 60];
+/**
+ * The timer buttons, in minutes. Taps add up, so 1 hr then 15 min makes a
+ * 1 hr 15 min timer, and Start sets it going (Connor, 2026-11-26).
+ */
+const QUICK_TIMERS = [5, 15, 60];
 
 export type CookDish = { recipeId: string; name: string; icon: string | null; batches: number; notes: string | null; ingredients: CookIngredient[]; steps: CookStep[] };
 
@@ -91,9 +93,7 @@ export function CookingMode({
   const [ticked, setTicked] = useState<string[]>([]);
   const [ingredientPage, setIngredientPage] = useState(0);
   const [ingredientsRef, ingredientsPerPage] = useFitRows<HTMLUListElement>(INGREDIENT_PAGE);
-  const [custom, setCustom] = useState(false);
-  const [customHours, setCustomHours] = useState(0);
-  const [customMinutes, setCustomMinutes] = useState(25);
+  const [building, setBuilding] = useState(0);
   const dish = dishes[active];
   const { name, icon, notes, ingredients, steps } = dish;
   const step = stepOf[active] ?? 0;
@@ -270,17 +270,31 @@ export function CookingMode({
               {h.label ? ` · ${h.label.toLowerCase()}` : ""}
             </button>
           ))}
-          {/* Quick timers, longer ones too, and a custom one (Connor, 2026-11-26). */}
-          <div className="grid grid-cols-4 gap-1.5">
+          {/* Timer buttons that add up, then Start (Connor, 2026-11-26). */}
+          <div className="grid grid-cols-3 gap-1.5">
             {QUICK_TIMERS.map((m) => (
-              <button key={m} type="button" onClick={() => startTimer(minutesText(m), m, mealId)} className="tabular min-h-12 rounded-[var(--radius-small)] bg-panel text-lg font-bold text-ink">
-                {m < 60 ? `${m} min` : `${m / 60} hr`}
+              <button key={m} type="button" onClick={() => setBuilding((t) => Math.min(t + m, 12 * 60))} className="tabular min-h-12 rounded-[var(--radius-small)] bg-panel text-lg font-bold text-ink">
+                + {m < 60 ? `${m} min` : `${m / 60} hr`}
               </button>
             ))}
-            <button type="button" onClick={() => setCustom(true)} className="min-h-12 rounded-[var(--radius-small)] bg-ink text-lg font-bold text-board">
-              Custom
-            </button>
           </div>
+          {building > 0 ? (
+            <div className="flex gap-1.5">
+              <button type="button" onClick={() => setBuilding(0)} className="min-h-12 flex-1 rounded-[var(--radius-small)] bg-rail text-lg font-bold text-ink">
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  startTimer(minutesText(building), building, mealId);
+                  setBuilding(0);
+                }}
+                className="tabular min-h-12 flex-[2] rounded-[var(--radius-small)] bg-primary text-lg font-bold text-primary-ink"
+              >
+                Start {minutesText(building)}
+              </button>
+            </div>
+          ) : null}
 
           {oven ? (
             <>
@@ -312,38 +326,6 @@ export function CookingMode({
         </aside>
       </div>
 
-      {custom ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(30,35,45,0.32)] p-8">
-          <div role="dialog" aria-label="Custom timer" className="flex w-full max-w-[34rem] flex-col gap-5 rounded-[var(--radius-dialog)] bg-board p-8 shadow-dialog">
-            <h2 className="text-[2.25rem] font-extrabold text-ink">Custom timer</h2>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-[1.5rem] font-bold text-ink">Hours</span>
-              <NumberStepper value={customHours} onChange={(n) => setCustomHours(n ?? 0)} min={0} max={12} aria-label="hours" />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-[1.5rem] font-bold text-ink">Minutes</span>
-              <NumberStepper value={customMinutes} onChange={(n) => setCustomMinutes(n ?? 0)} min={0} max={55} step={5} aria-label="minutes" />
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setCustom(false)} className="min-h-[var(--touch-target)] flex-1 rounded-[var(--radius)] bg-rail text-xl font-bold text-ink">
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={customHours * 60 + customMinutes === 0}
-                onClick={() => {
-                  const total = customHours * 60 + customMinutes;
-                  startTimer(minutesText(total), total, mealId);
-                  setCustom(false);
-                }}
-                className="min-h-[var(--touch-target)] flex-[2] rounded-[var(--radius)] bg-primary text-xl font-bold text-primary-ink disabled:opacity-40"
-              >
-                Start {minutesText(customHours * 60 + customMinutes)}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
