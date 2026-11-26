@@ -6,6 +6,7 @@ import { addDays, type LocalDate } from "@/lib/time";
 import { dayFor } from "@/lib/day-types";
 import { loadDaysBetween } from "../routines/data";
 import { loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
+import { homeListId } from "./home-list";
 
 /*
  * The chore generator on the server (tasks rework, step 2). Each time a
@@ -230,7 +231,8 @@ async function makeToday(
   const have = new Set(openChores.filter((t) => !stale.includes(t.id)).map((t) => t.template_id));
   const missing = [...wanted].filter(([id]) => !have.has(id));
   if (missing.length > 0) {
-    const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").order("name").limit(1).maybeSingle();
+    const listId = await homeListId(supabase);
+    const list = listId ? { id: listId } : null;
     if (list) {
       for (const [id, date] of missing) {
         const c = byId.get(id) as ChoreWithTiming;

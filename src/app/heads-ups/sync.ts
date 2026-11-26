@@ -9,6 +9,7 @@ import { loadChores } from "../chores/data";
 import { loadDaysBetween } from "../routines/data";
 import { dayFor, sameKind } from "@/lib/day-types";
 import { findOrCreateItem } from "../meals/shared";
+import { homeListId } from "../chores/home-list";
 
 /*
  * Turns heads-ups into to-dos and grocery lines. It runs when Today or the
@@ -174,7 +175,8 @@ async function syncTodos(household: Household, today: LocalDate, wanted: Wanted[
   }
   if (wanted.length === 0) return;
 
-  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").order("name").limit(1).maybeSingle();
+  const listId = await homeListId(supabase);
+    const list = listId ? { id: listId } : null;
   if (!list) return;
   const rows = wanted.map((w) => ({
     household_id: household.id,

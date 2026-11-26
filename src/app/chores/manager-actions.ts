@@ -7,6 +7,7 @@ import { draftProblem, isNewId, ruleColumns, type ChoreManagerDraft } from "@/li
 import { addDays, localDateOf } from "@/lib/time";
 import { spreadFirstDue, upcomingDue, type ChoreRule } from "@/lib/chores";
 import { loadChores } from "./data";
+import { homeListId } from "./home-list";
 
 /** On success, the saved id of each new thing ("new-…" → its real id). */
 export type SaveResult = { ok: true; ids: Record<string, string> } | { ok: false; error: string };
@@ -314,8 +315,9 @@ export async function doChoreToday(choreId: string): Promise<{ ok: true } | { ok
   const { data: open } = await supabase.from("task_instances").select("id, due_date").eq("template_id", choreId).eq("status", "open");
   if ((open ?? []).some((t) => t.due_date === today)) return { ok: true };
   if ((open ?? []).length > 0) await supabase.from("task_instances").delete().eq("template_id", choreId).eq("status", "open");
-  const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").order("name").limit(1).maybeSingle();
-  if (!list) return { ok: false, error: "Make a list first, on Lists." };
+  const listId = await homeListId(supabase);
+    const list = listId ? { id: listId } : null;
+  if (!list) return { ok: false, error: "There's no list to put it on." };
   const { error: insertError } = await supabase.from("task_instances").insert({
     household_id: household.id,
     template_id: chore.id,
