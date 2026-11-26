@@ -62,3 +62,16 @@ export function stepBox(boxes: PanelBox[], current: string, by: 1 | -1): string 
  * list is already out (or not) when the page arrives.
  */
 export const DAILY_OPEN_COOKIE = "almanac-daily-open";
+
+/**
+ * A page address with the panel's box in it (?box=), or without it for the
+ * Daily List, which is what every calendar page shows when you arrive.
+ */
+export function boxedHref(href: string, box: string): string {
+  const [path, query = ""] = href.split("?");
+  const params = new URLSearchParams(query);
+  if (box === "today") params.delete("box");
+  else params.set("box", box);
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
+}

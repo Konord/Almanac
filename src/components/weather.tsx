@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { WarningCircle } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import { ForecastCard } from "./forecast-card";
-import { degrees, describeWeather, type Forecast, type WeatherAnswer } from "@/lib/weather";
+import { alertTone, degrees, describeWeather, type Forecast, type WeatherAnswer } from "@/lib/weather";
 
 /*
  * The weather in the calendar screens' header (2026-11-16): a picture and
@@ -72,22 +73,36 @@ export function WeatherSlot() {
   const forecast = useForecast();
   const [open, setOpen] = useState(false);
 
-  if (!forecast) return <div data-weather-slot aria-hidden className="hidden w-[7.5rem] shrink-0 lg:block" />;
+  if (!forecast) return <div data-weather-slot aria-hidden className="hidden w-[10rem] shrink-0 lg:block" />;
 
   const { now } = forecast;
   const look = describeWeather(now.code, now.isDay);
 
+  // A government weather alert goes to the left of the weather, in the
+  // Planner's warning look (Connor, 2026-11-26). Tap it for the forecast.
+  const alert = forecast.alerts?.[0];
   return (
     <>
+      {alert ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`hidden min-h-13 max-w-[24rem] min-w-0 shrink items-center gap-[0.6rem] rounded-[var(--radius)] px-3 text-[2rem] font-bold tracking-[-0.02em] lg:flex ${alertTone(alert)}`}
+        >
+          <WarningCircle size="0.9em" weight="fill" className="shrink-0" aria-hidden />
+          <span className="truncate">{alert.name}</span>
+          {forecast.alerts.length > 1 ? <span className="shrink-0 text-[1.5rem]">+{forecast.alerts.length - 1}</span> : null}
+        </button>
+      ) : null}
       <button
         type="button"
         data-weather-slot
         onClick={() => setOpen(true)}
         aria-label={`${look.label}, ${degrees(now.temp)}. Show the forecast`}
-        className="hidden h-[var(--touch-target)] min-w-[7.5rem] shrink-0 items-center gap-[0.45rem] rounded-[var(--radius)] px-[0.4rem] lg:flex"
+        className="hidden h-[5.5rem] min-w-[10rem] shrink-0 items-center gap-[0.6rem] rounded-[var(--radius)] px-[0.4rem] lg:flex"
       >
-        <Emoji emoji={look.emoji} className="size-[3.25rem] shrink-0" />
-        <span className="text-[2.5rem] leading-none font-extrabold tracking-[-0.03em] text-title">{degrees(now.temp)}</span>
+        <Emoji emoji={look.emoji} className="size-[4.75rem] shrink-0" />
+        <span className="text-[3.5rem] leading-none font-extrabold tracking-[-0.03em] text-title">{degrees(now.temp)}</span>
       </button>
       {open ? <ForecastCard forecast={forecast} onClose={() => setOpen(false)} /> : null}
     </>

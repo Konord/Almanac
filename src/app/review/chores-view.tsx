@@ -46,6 +46,7 @@ export function useChorePlan(data: ReviewData, draft: ReviewDraft): Map<string, 
       keptToday: new Set(input.keptToday.filter((id) => !delays[id])),
       moves,
       errandDates: new Set(input.errandDates),
+      doneToday: input.doneToday,
     });
     return new Map(plan.days.map((d) => [d.date, d]));
   }, [data, draft]);

@@ -13,9 +13,9 @@ import { useFitRows } from "./use-fit-rows";
  * the page arrows sit at the right of it, so they don't take a row of
  * their own (Connor, 2026-11-11).
  *
- * `paging="more"` is the quieter Glance version (the Today panel): no
- * arrows in the title row; only when the list is full, one small row under
- * it with "+ N more" (the next page) and, past the first page, "Back".
+ * `paging="more"` is a quieter version: one small "+ N more" row under the
+ * list. No screen uses it now: the Daily List and Dishes use the same
+ * "1 of 2" arrows as everywhere else (UI audit M10, 2026-11-21).
  */
 export function FitList({
   rows,

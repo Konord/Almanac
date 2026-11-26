@@ -6,7 +6,8 @@ import { clock, toMinutes } from "@/components/timeline-drag";
 import { endOf, MAX_EVENT_MINUTES, setEnd, setLength, setStart, type When } from "@/lib/event-times";
 import { lengthLabel } from "@/lib/quick-times";
 import { addDays, isLocalDate, isLocalTime } from "@/lib/time";
-import { editorInputClass, fieldLabelClass } from "@/components/ui";
+import { fieldLabelClass } from "@/components/ui";
+import { DayField, TimeField } from "@/components/touch-pickers";
 
 /*
  * When an event happens, on the add and edit cards: the day, the start, a
@@ -112,21 +113,13 @@ export function WhenFields({
         <>
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-[0.7rem]">
             <Labelled label="Starts">
-              <input type="time" step={STEP * 60} value={clock(when.start)} onChange={(e) => changeStart(e.target.value)} className={editorInputClass} />
+              <TimeField value={clock(when.start)} onChange={changeStart} aria-label="Starts" />
             </Labelled>
             {allDayChip}
             <div className="flex min-w-0 flex-col gap-[0.35rem]">
               <span className={fieldLabelClass}>Ends</span>
               <div className="flex gap-[0.45rem]">
-                <input
-                  type="time"
-                  step={STEP * 60}
-                  value={clock(end.minute)}
-                  disabled={point}
-                  onChange={(e) => changeEndTime(e.target.value)}
-                  aria-label="End time"
-                  className={`${editorInputClass} min-w-0 flex-1`}
-                />
+                <TimeField value={clock(end.minute)} disabled={point} onChange={changeEndTime} aria-label="End time" className="flex-1" />
                 <button
                   type="button"
                   onClick={() => changeLength(point ? 60 : 0)}
@@ -141,36 +134,22 @@ export function WhenFields({
           </div>
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-[0.7rem]">
             <Labelled label="Day">
-              <input type="date" value={core.date} onChange={(e) => changeDate(e.target.value)} required className={editorInputClass} />
+              <DayField value={core.date} onChange={changeDate} aria-label="Day" />
             </Labelled>
             <LengthDial minutes={core.length} onChange={changeLength} compact />
             <Labelled label="End day">
-              <input
-                type="date"
-                value={end.date}
-                min={core.date}
-                disabled={point}
-                onChange={(e) => changeEndDate(e.target.value)}
-                aria-label="End day"
-                className={editorInputClass}
-              />
+              <DayField value={end.date} min={core.date} disabled={point} onChange={changeEndDate} aria-label="End day" />
             </Labelled>
           </div>
         </>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-[0.7rem]">
           <Labelled label={lastDay !== core.date ? "First day" : "Day"}>
-            <input type="date" value={core.date} onChange={(e) => changeDate(e.target.value)} required className={editorInputClass} />
+            <DayField value={core.date} onChange={changeDate} aria-label="First day" />
           </Labelled>
           {allDayChip}
           <Labelled label="Last day">
-            <input
-              type="date"
-              value={lastDay}
-              min={core.date}
-              onChange={(e) => isLocalDate(e.target.value) && setLastDay(e.target.value < core.date ? core.date : e.target.value)}
-              className={editorInputClass}
-            />
+            <DayField value={lastDay} min={core.date} onChange={(d) => isLocalDate(d) && setLastDay(d < core.date ? core.date : d)} aria-label="Last day" />
           </Labelled>
         </div>
       )}
@@ -285,14 +264,20 @@ export function LengthDial({
     <div className={compact ? "flex min-w-0 flex-col items-center gap-[0.35rem]" : "contents"}>
     {compact ? (
       <span className={`${fieldLabelClass} whitespace-nowrap`} aria-hidden>
-        How long: <span className="text-ink">{point ? "no end" : lengthLabel(minutes)}</span>
+        How long
       </span>
     ) : null}
     <div className="flex items-center gap-2" role="group" aria-label="Length">
       <button type="button" onClick={() => nudge(-STEP)} className={button} aria-label="15 minutes shorter">
         −
       </button>
-      <div className={`relative ${compact ? "size-[var(--touch-target)]" : "size-40"}`}>
+      {compact ? (
+        // On the event card, just the length between − and + (UI audit H4: the tiny dial looked like a loading spinner).
+        <span className="tabular min-w-[4.5rem] text-center text-[1.35rem] font-bold whitespace-nowrap text-ink" aria-live="polite">
+          {point ? "No end" : lengthLabel(minutes)}
+        </span>
+      ) : (
+      <div className="relative size-40">
         <svg
           ref={ring}
           viewBox="0 0 100 100"
@@ -337,13 +322,12 @@ export function LengthDial({
           {arc && !point ? <path d={arc} fill="none" stroke="var(--color-accent)" strokeWidth="12" strokeLinecap="round" /> : null}
           {point ? null : <circle cx={knob.x} cy={knob.y} r="8" fill="var(--color-board)" stroke="var(--color-accent)" strokeWidth="3" />}
         </svg>
-        {compact ? null : (
-          <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center leading-tight" aria-hidden>
-            <span className={`font-extrabold text-ink ${minutes >= 24 * 60 ? "max-w-24 text-lg" : "text-2xl"}`}>{point ? "No" : lengthLabel(minutes)}</span>
-            <span className="text-sm font-bold text-ink-muted">{point ? "length" : "long"}</span>
-          </span>
-        )}
+        <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center leading-tight" aria-hidden>
+          <span className={`font-extrabold text-ink ${minutes >= 24 * 60 ? "max-w-24 text-lg" : "text-2xl"}`}>{point ? "No" : lengthLabel(minutes)}</span>
+          <span className="text-sm font-bold text-ink-muted">{point ? "length" : "long"}</span>
+        </span>
       </div>
+      )}
       <button type="button" onClick={() => nudge(STEP)} className={button} aria-label="15 minutes longer">
         +
       </button>

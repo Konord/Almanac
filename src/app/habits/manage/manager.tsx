@@ -206,7 +206,7 @@ function HabitsTab({
     <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
       <nav aria-label="Habits" className={`${cardClass} gap-1`}>
         <div className="flex min-h-[var(--touch-target)] items-center gap-2">
-          <h2 className="flex-1 text-[1.75rem] font-bold text-ink">Made here</h2>
+          <h2 className="flex-1 text-[1.75rem] font-bold text-ink">Habits</h2>
           <Pager page={shownPage} pages={pages} onPage={setPage} />
         </div>
         <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">

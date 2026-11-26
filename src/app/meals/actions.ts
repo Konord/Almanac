@@ -534,7 +534,7 @@ type BackupPart = { id: string; item_id: string; on_hand: number | string; keep_
  * A backup part below its minimum goes on the grocery list (source
  * "backup", "Restock Frozen lasagne night"), for what's missing, unless
  * it's already there and not ticked. Shared by the swap (parts count down)
- * and the Backups tab's "Put low parts on the grocery list". Returns
+ * and the Backups tab's "Add what's low to groceries". Returns
  * whether a line was added.
  */
 async function suggestRestock(householdId: string, part: BackupPart, backupName: string, week: LocalDate, status: "suggested" | "approved"): Promise<boolean> {
@@ -558,7 +558,7 @@ async function suggestRestock(householdId: string, part: BackupPart, backupName:
 }
 
 /**
- * The Backups tab's "Put low parts on the grocery list": every part below
+ * The Backups tab's "Add what's low to groceries": every part below
  * its minimum, through the same restock path as a swap. You asked for it,
  * so the lines go straight on (approved).
  */

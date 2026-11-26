@@ -19,8 +19,8 @@ import { pickPanelTab } from "./actions";
 import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
 import { PanelPages } from "@/components/panel-pages";
-import { panelBoxes } from "@/lib/panel-boxes";
-import { addTodo, toggleTodo } from "../chores/actions";
+import { boxedHref, panelBoxes } from "@/lib/panel-boxes";
+import { addTodo, markChoreDone, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
 import { shortClockTime } from "@/lib/time-text";
 import { HabitsBox } from "./habits-box";
@@ -66,7 +66,9 @@ type Row =
       /** "2/5" on a whole-routine row; null on a single step. */
       count: string | null;
     }
-  | { kind: "start"; key: string; title: string; colour: string | null; time: string; href: string };
+  | { kind: "start"; key: string; title: string; colour: string | null; time: string; href: string }
+  /** A chore the planner has on a coming day (the Agenda on a day ahead): ticking it marks it done now. */
+  | { kind: "chore"; key: string; title: string; icon: string | null; colour: null; time: null; templateId: string };
 
 /** How many rows fit in the working part without anything scrolling. */
 const ROWS = 6;
@@ -77,37 +79,54 @@ export async function TodayPanel({
   household,
   today,
   tab,
-  returnTo,
+  returnTo: pageHref,
   day = false,
   routine,
+  date,
 }: {
   household: Household;
   today: LocalDate;
-  /** "upnext" or a list's id: what this screen showed last. */
-  tab: string;
+  /** The box to show (the page's ?box=): "upnext", a list's id…; the Daily List if missing. */
+  tab: string | undefined;
   /** This page's address, to come back to after a tap. */
   returnTo: string;
   /** On the Agenda view the timeline already shows today, so the panel has no "Up next". */
   day?: boolean;
   /** A routine's checklist (from tapping its block), shown instead of the list. */
   routine?: ReactNode;
+  /**
+   * The day the Agenda is showing. A day ahead turns the Daily List into
+   * that day's: "Daily List for September 23rd", with what's expected that
+   * day, still tickable (Connor, 2026-11-26).
+   */
+  date?: LocalDate;
 }) {
   const { locale, timeZone } = household.settings;
   const supabase = await createClient();
-  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData, { data: spotify }] = await Promise.all([
+  const listDay = date && date > today ? date : today;
+  const ahead = listDay > today;
+  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData, { data: spotify }, { count: habitCount }, { count: trackerCount }] = await Promise.all([
     loadTodos(),
     loadMealBasics(),
-    loadMeals(today, addDays(today, 1)),
+    loadMeals(today, addDays(listDay, 1)),
     supabase.from("members").select("id, colour"),
-    loadRoutines(today),
+    loadRoutines(listDay),
     supabase.from("spotify_connections").select("household_id").maybeSingle(),
+    supabase.from("habits").select("id", { count: "exact", head: true }),
+    supabase.from("health_trackers").select("id", { count: "exact", head: true }),
   ]);
   const colourOf = new Map((memberRows ?? []).map((m) => [m.id, m.colour]));
 
   // The boxes this household flips between (Settings), and the one this screen showed last.
-  const boxes = panelBoxes(household.settings.panelBoxes, lists, day);
+  // Habits and Health only show once there's something set up in them (Connor, 2026-11-26).
+  const wanted = panelBoxes(household.settings.panelBoxes, lists, day).filter(
+    (b) => !(b.id === "habits" && !habitCount) && !(b.id === "health" && !trackerCount),
+  );
+  const boxes = wanted.length ? wanted : [{ id: "today", name: "Daily List" }];
   const box = boxes.find((b) => b.id === tab) ?? boxes[0];
   const showing = box.id;
+  // Ticks and adds come back to this page with the same box showing.
+  const returnTo = boxedHref(pageHref, showing);
   const list = lists.find((l) => l.id === showing);
   // The grocery list shows its own lines (quick adds while you cook or plan).
   const groceries = list?.is_groceries ? await loadGroceries(household) : null;
@@ -125,6 +144,15 @@ export async function TodayPanel({
     basics,
     [],
   );
+  const dayMeals = ahead ? placeTodayMeals(meals.filter((m) => m.date === listDay), basics, []) : todayMeals;
+  // A day ahead: the chores the planner has on it (made into tasks only on the day).
+  const planned =
+    ahead && showing === "today"
+      ? await (async () => {
+          const { chores, plan } = await choreSchedule(household, today, timeZone, false);
+          return { chores: new Map(chores.map((c) => [c.id, c])), items: plan.days.find((d) => d.date === listDay)?.items ?? [] };
+        })()
+      : null;
   const extras: Row[] =
     showing === "today"
       ? [
@@ -132,11 +160,11 @@ export async function TodayPanel({
             floatingRoutines(
               routineData,
               m.id,
-              today,
+              listDay,
               [],
               timeZone,
               household.settings.routineFlexMinutes,
-              mealsForRoutines(todayMeals),
+              mealsForRoutines(dayMeals),
             )
               .filter((r) => !r.progress.complete && !routineData.ended.has(`${m.id}:${r.template.id}`))
               .flatMap((r): Row[] => {
@@ -172,9 +200,14 @@ export async function TodayPanel({
                 }));
               }),
           ),
+          ...(planned?.items ?? []).flatMap((item): Row[] => {
+            if (item.kind !== "generated") return [];
+            const c = planned?.chores.get(item.id);
+            return c ? [{ kind: "chore", key: `chore:${c.id}`, title: c.name, icon: c.icon ?? "🧹", colour: null, time: null, templateId: c.id }] : [];
+          }),
           ...todayMeals.flatMap((m): Row[] => {
             const start = startCooking(m);
-            if (!start || m.eatEnd <= nowMinutes) return [];
+            if (ahead || !start || m.eatEnd <= nowMinutes) return [];
             return [
               {
                 kind: "start",
@@ -190,10 +223,20 @@ export async function TodayPanel({
       : [];
   const tasks: Row[] = (
     showing === "today"
-      ? dailyOrder(
-          todos.filter((t) => t.status === "open" && onDailyList(t, today)),
-          today,
-        )
+      ? ahead
+        ? // A day ahead: tasks dated that day, and one-offs the planner put on it.
+          dailyOrder(
+            todos.filter(
+              (t) =>
+                t.status === "open" &&
+                (t.due_date === listDay || (planned?.items ?? []).some((i) => i.kind === "one-off" && i.id === t.id)),
+            ),
+            listDay,
+          )
+        : dailyOrder(
+            todos.filter((t) => t.status === "open" && onDailyList(t, today)),
+            today,
+          )
       : list
         ? todos.filter((t) => t.list_id === list.id && t.status === "open" && onItsList(t))
         : []
@@ -201,7 +244,7 @@ export async function TodayPanel({
     kind: "todo",
     key: todo.id,
     todo,
-    time: todo.at_time && timedToday(todo, today) ? todo.at_time.slice(0, 5) : null,
+    time: todo.at_time && timedToday(todo, listDay) ? todo.at_time.slice(0, 5) : null,
   }));
   // Timed things first, by time; then the rest in the daily list's order.
   const open: Row[] = [
@@ -209,14 +252,13 @@ export async function TodayPanel({
       .filter((r) => r.time !== null)
       .sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     ...tasks.filter((r) => r.time === null),
+    ...extras.filter((r) => r.time === null),
   ];
 
   // The next meal: today's still to come (or under way), else tomorrow's first.
   const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
   const categories = new Map(basics.categories.map((c) => [c.id, c]));
   const times = new Map(basics.mealTimes.map((t) => [t.id, t]));
-  const nowTime = localTimeOf(new Date(), timeZone);
-  const hourAgo = `${String(Math.max(0, Number(nowTime.slice(0, 2)) - 1)).padStart(2, "0")}${nowTime.slice(2, 5)}`;
   const taskTime = (time: string) =>
     shortClockTime(zonedToUtc(today, time.slice(0, 5), timeZone), locale, timeZone);
 
@@ -238,8 +280,8 @@ export async function TodayPanel({
     `${returnTo}${returnTo.includes("?") ? "&" : "?"}routine=${templateId}&member=${memberId}`;
 
   // The chore bucket: occasional and one-off chores the planner has put on the coming days.
-  const bucket = showing === "bucket" ? await bucketRows(household, today, todos) : null;
   const choresList = lists.find((l) => l.is_chores);
+  const bucket = showing === "bucket" ? await bucketRows(household, today, todos, choresList?.id ?? null) : null;
   // Where the add box puts things: the list showing (not the grocery list,
   // which has its own). The Daily List has no add box (Connor, 2026-11-16):
   // things are added on To-do, Chores or another list.
@@ -262,22 +304,23 @@ export async function TodayPanel({
                 ? listHref(lists.find((l) => !l.is_chores && !l.is_groceries)?.id)
                 : listHref(showing);
 
-  // The dinner card: tonight's dinner (or the next meal once it's eaten),
-  // with today's other meals still to come as a small line under it.
+  // The dinner card: only the next meal (Connor, 2026-11-26). A meal stays
+  // on it until its time is over (the end of its eating time), whether or
+  // not anyone said it was cooked; then the next one takes its place.
+  const endOf = new Map(todayMeals.map((m) => [m.id, m.eatEnd]));
   const upcoming = meals
-    .filter((m) => m.status === "planned")
+    .filter((m) => m.status === "planned" || m.status === "cooked")
     .map((m) => ({ meal: m, at: m.eat_at ?? times.get(m.meal_time_id)?.usual_time ?? "18:00", timeName: times.get(m.meal_time_id)?.name ?? "Meal" }))
-    .filter((m) => m.meal.date > today || m.at >= hourAgo)
+    .filter((m) => m.meal.date > today || (endOf.get(m.meal.id) ?? 0) > nowMinutes)
     .sort((a, b) => (a.meal.date === b.meal.date ? a.at.localeCompare(b.at) : a.meal.date.localeCompare(b.meal.date)));
-  const main = upcoming.find((m) => m.meal.date === today && m.timeName.toLowerCase() === "dinner") ?? upcoming[0];
-  const others = upcoming.filter((m) => m !== main && m.meal.date === today);
+  const main = upcoming[0];
   const at = (m: (typeof upcoming)[number]) => shortClockTime(zonedToUtc(m.meal.date, m.at, timeZone), locale, timeZone);
   const label = (m: (typeof upcoming)[number]) =>
     m.meal.date > today ? `${m.timeName} tomorrow` : m.timeName.toLowerCase() === "dinner" ? "Dinner tonight" : m.timeName;
   const dinnerCard = (
     <Link
       href={main ? cookHref({ id: main.meal.id, canCook: Boolean(main.meal.recipe_id) || main.meal.dishes.some((d) => d.recipe_id) }) : `/review?week=${today}`}
-      className="flex shrink-0 items-center gap-5 rounded-[var(--radius-card)] bg-meal px-[1.4rem] py-5 text-meal-ink shadow-raised"
+      className="flex h-[8.75rem] shrink-0 items-center gap-5 overflow-hidden rounded-[var(--radius-card)] bg-meal px-[1.4rem] text-meal-ink shadow-raised"
     >
       <Emoji emoji={main ? mealIcon(main.meal, recipes, categories) : "🍽️"} className="size-18" />
       <span className="flex min-w-0 flex-col">
@@ -289,11 +332,6 @@ export async function TodayPanel({
             <b className="line-clamp-2 font-hand text-[1.75rem] leading-[1.15]" style={{ color: hand(main.meal.cook_id ? colourOf.get(main.meal.cook_id) : null) }}>
               {mealName(main.meal, recipes, categories)}
             </b>
-            {others.map((m) => (
-              <span key={m.meal.id} className="tabular mt-1 truncate text-[1.125rem] font-semibold">
-                {m.timeName} · {at(m)} · <span className="font-hand">{mealName(m.meal, recipes, categories)}</span>
-              </span>
-            ))}
           </>
         ) : (
           <b className="text-[1.75rem] leading-[1.15] text-ink">Plan dinner</b>
@@ -332,6 +370,26 @@ export async function TodayPanel({
         />
       );
     }
+    if (row.kind === "chore") {
+      return (
+        <ListRow
+          key={row.key}
+          tick={{
+            action: markChoreDone,
+            fields: [
+              ["templateId", row.templateId],
+              ["name", row.title],
+              ["returnTo", returnTo],
+            ],
+          }}
+          title={title}
+          ink={hand(null)}
+          icon={icon ? <Emoji emoji={icon} className="size-8" /> : null}
+          meta={null}
+          slot
+        />
+      );
+    }
     const fields: [string, string][] =
       row.kind === "todo"
         ? [
@@ -342,7 +400,7 @@ export async function TodayPanel({
             ["memberId", row.memberId],
             ...row.stepIds.map((id): [string, string] => ["stepId", id]),
             ["templateId", row.templateId],
-            ["date", today],
+            ["date", listDay],
             ["returnTo", returnTo],
           ];
     return (
@@ -360,7 +418,7 @@ export async function TodayPanel({
 
   const heading = (
     <Link href={boxHref} className="flex min-h-12 items-center truncate text-[1.75rem] font-bold text-ink">
-      {box.name}
+      {ahead && showing === "today" ? `Daily List for ${longDay(listDay, household)}` : box.name}
     </Link>
   );
   // Flipping boxes: the boxes either side, by name ("‹ Chores", "Groceries ›"),
@@ -407,7 +465,6 @@ export async function TodayPanel({
                 heading={heading}
                 rows={sideRows}
                 fallback={7}
-                paging="more"
                 className="mt-1"
               />
             ) : (
@@ -442,8 +499,8 @@ export async function TodayPanel({
                           {rows.map((row) => (
                             <li key={row.key} className="flex min-h-16 items-center gap-3 border-b border-frame last:border-0">
                               <span className="min-w-0 flex-1 truncate font-hand text-[1.375rem] text-ink">{row.title}</span>
-                              <span className={`tabular shrink-0 text-lg font-bold ${row.date ? "text-ink-soft" : "text-danger"}`}>
-                                {row.date ? weekdayShort(row.date, household) : "No room"}
+                              <span className={`tabular shrink-0 text-lg font-bold text-ink-soft`}>
+                                {row.date ? weekdayShort(row.date, household) : ""}
                               </span>
                               <Emoji emoji={row.icon} className="size-8" />
                             </li>
@@ -484,11 +541,15 @@ function pagesOf<T>(items: T[], size: number): T[][] {
   return pages.length ? pages : [[]];
 }
 
-/** One chore waiting in the bucket, and the day the planner has it on (null: no room in the next two weeks). */
+/** One chore in the Chores box, and the day the planner has it on (null: an item on the Chores list with no day yet). */
 type BucketRow = { key: string; title: string; icon: string; date: LocalDate | null };
 
-/** The chore bucket: chores the planner has placed after today, soonest first, then the ones with no room. */
-async function bucketRows(household: Household, today: LocalDate, todos: Todo[]): Promise<BucketRow[]> {
+/**
+ * The Chores box (Connor, 2026-11-26): the chores coming up over the next
+ * seven days, soonest first, then whatever else is waiting on the Chores
+ * list.
+ */
+async function bucketRows(household: Household, today: LocalDate, todos: Todo[], choresListId: string | null): Promise<BucketRow[]> {
   const { chores, plan } = await choreSchedule(household, today, household.settings.timeZone, false);
   const choreById = new Map(chores.map((c) => [c.id, c]));
   const todoById = new Map(todos.map((t) => [t.id, t]));
@@ -502,8 +563,9 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[])
   };
   const rows: BucketRow[] = [];
   const seen = new Set<string>();
+  const lastDay = addDays(today, 7);
   for (const day of plan.days) {
-    if (day.date <= today) continue;
+    if (day.date <= today || day.date > lastDay) continue;
     for (const item of day.items) {
       if (seen.has(item.id)) continue;
       const named = nameOf(item.id, item.kind);
@@ -512,12 +574,25 @@ async function bucketRows(household: Household, today: LocalDate, todos: Todo[])
       rows.push({ key: `${item.kind}:${item.id}`, ...named, date: day.date });
     }
   }
-  for (const id of plan.unplaced) {
-    if (seen.has(id)) continue;
-    const named = nameOf(id, "generated") ?? nameOf(id, "one-off");
-    if (named) rows.push({ key: `unplaced:${id}`, ...named, date: null });
+  // Then the Chores list itself: what's on it and not already shown above or due today.
+  for (const t of todos) {
+    if (t.list_id !== choresListId || t.status !== "open" || seen.has(t.id) || !onItsList(t)) continue;
+    if (t.due_date && t.due_date <= today) continue;
+    seen.add(t.id);
+    rows.push({ key: `list:${t.id}`, title: t.title, icon: t.icon ?? "🧹", date: null });
   }
   return rows;
+}
+
+/** "September 23rd" (English ordinals; other languages get the plain day). */
+function longDay(date: LocalDate, household: Household): string {
+  const { locale, timeZone } = household.settings;
+  const at = zonedToUtc(date, "12:00", timeZone);
+  const month = new Intl.DateTimeFormat(locale, { timeZone, month: "long" }).format(at);
+  const day = Number(date.slice(8, 10));
+  if (!locale.startsWith("en")) return new Intl.DateTimeFormat(locale, { timeZone, month: "long", day: "numeric" }).format(at);
+  const suffix = ({ one: "st", two: "nd", few: "rd", other: "th" } as Record<string, string>)[new Intl.PluralRules("en", { type: "ordinal" }).select(day)] ?? "th";
+  return `${month} ${day}${suffix}`;
 }
 
 function weekdayShort(date: LocalDate, household: Household): string {

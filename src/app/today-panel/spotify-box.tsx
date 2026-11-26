@@ -102,18 +102,19 @@ export function SpotifyBox({ meal }: { meal: ReactNode }) {
   const percent = now.durationMs > 0 ? (progress / now.durationMs) * 100 : 0;
 
   return (
-    <section aria-label="Now playing on Spotify" className="mt-4 flex min-h-22 items-center gap-3 rounded-[1.375rem] border border-frame bg-board px-3.5 py-2.5">
+    <section aria-label="Now playing on Spotify" // The same size and shape as the dinner card it stands in for, so the list below doesn't jump (Connor, 2026-11-26).
+      className="flex h-[8.75rem] shrink-0 items-center gap-4 overflow-hidden rounded-[var(--radius-card)] bg-board px-[1.4rem] shadow-raised">
       {now.art ? (
         // eslint-disable-next-line @next/next/no-img-element -- Spotify's album cover, already small
-        <img src={now.art} alt="" aria-hidden className="size-14 shrink-0 rounded-xl object-cover" />
+        <img src={now.art} alt="" aria-hidden className="size-18 shrink-0 rounded-xl object-cover" />
       ) : (
-        <span className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-rail">
-          <Emoji emoji="🎵" className="size-10" />
+        <span className="flex size-18 shrink-0 items-center justify-center rounded-xl bg-rail">
+          <Emoji emoji="🎵" className="size-12" />
         </span>
       )}
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="line-clamp-2 text-lg leading-tight font-extrabold text-ink">{now.title}</span>
-        <span className="truncate text-base text-ink-muted">{now.artist}</span>
+        <span className="line-clamp-2 text-[1.375rem] leading-tight font-extrabold text-ink">{now.title}</span>
+        <span className="truncate text-[1.125rem] text-ink-muted">{now.artist}</span>
         <span className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-rail" aria-hidden>
           <span className="block h-full rounded-full bg-ink" style={{ width: `${percent}%` }} />
         </span>

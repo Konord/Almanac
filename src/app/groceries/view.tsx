@@ -111,14 +111,28 @@ export function GroceryView({
   const all = lines ?? [];
   const toGet = all.filter((l) => !l.checked).length;
   const got = all.length - toGet;
-  const pages = groceryPages(all, rows, compact ? 1 : columns);
+  // A list that fits on one page is spread over all the columns, shortest first, so it
+  // uses the width instead of leaving the last columns empty (UI audit M3).
+  const cols = compact ? 1 : columns;
+  let fit = rows;
+  if (!compact && groceryPages(all, rows, cols).length === 1) {
+    const aisles = new Set(all.map((l) => l.aisle)).size;
+    for (let r = Math.max(2, Math.ceil((all.length + aisles) / cols)); r < rows; r++) {
+      if (groceryPages(all, r, cols).length === 1) {
+        fit = r;
+        break;
+      }
+    }
+  }
+  const pages = groceryPages(all, fit, cols);
   const p = Math.min(page, pages.length - 1);
   const openLine = all.find((l) => l.id === open);
 
-  return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-3">
+  // The add box: at the top of the Groceries page, at the bottom of the Today
+  // panel like every other list there (Connor, 2026-11-26).
+  const addForm = (
       <form
-        className="flex shrink-0 items-center gap-2.5"
+        className={`flex shrink-0 items-center gap-2.5 ${compact ? "border-t border-frame pt-2" : ""}`}
         onSubmit={(e) => {
           e.preventDefault();
           add();
@@ -146,6 +160,11 @@ export function GroceryView({
           </>
         )}
       </form>
+  );
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col gap-3">
+      {compact ? null : addForm}
 
       <div className="flex shrink-0 items-center gap-3">
         <span className="tabular text-[1.25rem] font-bold text-ink-muted">{lines === null ? "Getting the list…" : `${toGet} to get${got ? ` · ${got} got` : ""}`}</span>
@@ -220,6 +239,8 @@ export function GroceryView({
           </div>
         ))}
       </div>
+
+      {compact ? addForm : null}
 
       {repeatsOpen ? (
         <div className="absolute top-[7.5rem] right-0 left-0">

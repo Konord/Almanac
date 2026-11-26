@@ -182,6 +182,12 @@ export function planChoreDays(input: {
   moves?: ChoreDayMove[];
   /** Dates when someone has a kind of day good for errands (an office day). */
   errandDates?: Set<LocalDate>;
+  /**
+   * Chores already ticked off (or skipped) today: they still use up today's
+   * room, so finishing one doesn't pull another onto the list (Connor,
+   * 2026-11-26: the day's chores are made once).
+   */
+  doneToday?: { big: boolean }[];
 }): ChorePlan {
   const { choreDays, chores, today } = input;
   const count = input.days ?? PLAN_DAYS;
@@ -211,13 +217,14 @@ export function planChoreDays(input: {
     }
   }
 
+  const done = input.doneToday ?? [];
   const room = (day: PlanDay, item: PlanItem) => {
     const maxTasks = day.choreDays.reduce((s, cd) => s + cd.max_tasks, 0);
     const maxBig = day.choreDays.reduce((s, cd) => s + cd.max_big, 0);
-    const placed = day.items.filter((i) => !i.pinned);
+    const placed: { big: boolean }[] = [...day.items.filter((i) => !i.pinned), ...(day.date === today ? done : [])];
     return placed.length < maxTasks && (!item.big || placed.filter((i) => i.big).length < maxBig);
   };
-  const load = (day: PlanDay) => day.items.filter((i) => !i.pinned).length;
+  const load = (day: PlanDay) => day.items.filter((i) => !i.pinned).length + (day.date === today ? done.length : 0);
   const takes = (day: PlanDay, ids: string[]) => !day.away && day.choreDays.some((cd) => accepts(cd, ids));
 
   const unplaced: string[] = [];

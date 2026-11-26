@@ -1,6 +1,10 @@
 import type { HouseholdSettings } from "@/lib/household";
 import {
+  alertsUrl,
   forecastUrl,
+  inCanadaArea,
+  parseAlerts,
+  type WeatherAlert,
   OPEN_METEO_PLACES,
   parseOpenMeteo,
   parsePlaces,
@@ -21,6 +25,7 @@ import {
  * every tablet shares one ask:
  *
  *   - the weather for 15 minutes,
+ *   - Environment Canada's weather alerts for 10 minutes,
  *   - the pollen for 3 hours (Google updates it about once a day, and
  *     each ask counts toward the free 5,000 a month).
  *
@@ -30,12 +35,14 @@ import {
 
 const WEATHER_FOR = 15 * 60_000;
 const POLLEN_FOR = 3 * 60 * 60_000;
+const ALERTS_FOR = 10 * 60_000;
 const KEEP_OLD_FOR = 12 * 60 * 60_000;
 const ASK_TIMEOUT = 10_000;
 
 type Kept<T> = { value: T; at: number };
 const weatherKept = new Map<string, Kept<{ now: WeatherNow; hours: WeatherHour[]; days: WeatherDay[] }>>();
 const pollenKept = new Map<string, Kept<PollenDay[]>>();
+const alertsKept = new Map<string, Kept<WeatherAlert[]>>();
 /** When an ask last failed, so a broken service isn't asked on every screen load. */
 const failedAt = new Map<string, number>();
 const RETRY_AFTER = 5 * 60_000;
@@ -80,13 +87,16 @@ export async function getForecast(place: WeatherPlace, settings: HouseholdSettin
 
   const url = forecastUrl(place, settings.timeZone, imperial, fahrenheit);
   const key = pollenKey();
-  const [weather, pollen] = await Promise.all([
+  const [weather, pollen, alerts] = await Promise.all([
     kept(weatherKept, `weather ${where} ${settings.timeZone} ${imperial} ${fahrenheit}`, WEATHER_FOR, async () => parseOpenMeteo(await askJson(url))),
     key
       ? kept(pollenKept, `pollen ${where}`, POLLEN_FOR, async () => {
           const days = parsePollen(await askJson(pollenUrl(place), { "X-Goog-Api-Key": key }));
           return days.length ? days : null;
         })
+      : Promise.resolve(null),
+    inCanadaArea(place)
+      ? kept(alertsKept, `alerts ${where}`, ALERTS_FOR, async () => parseAlerts(await askJson(alertsUrl(place)), new Date()))
       : Promise.resolve(null),
   ]);
   if (!weather) return null;
@@ -99,6 +109,8 @@ export async function getForecast(place: WeatherPlace, settings: HouseholdSettin
     hours: weather.hours,
     days: weather.days,
     pollen: key ? (pollen ?? []) : null,
+    // A remembered alert that has since run out drops off.
+    alerts: (alerts ?? []).filter((a) => !a.until || Date.parse(a.until) > Date.now()),
   };
 }
 

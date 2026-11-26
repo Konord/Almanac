@@ -14,8 +14,8 @@ import { CombinedMark, groceryPages } from "../groceries/view";
  * would put on the grocery list, by aisle. Tap anything already in the
  * house: it gets a red X, its name struck through and muted, and it won't
  * go on the list (tap again to undo). "Put the rest on the grocery list"
- * saves the week and sends the rest; "Not now" goes back to the week
- * without saving.
+ * saves the week and sends the rest; "Save, skip groceries" saves the week
+ * and sends nothing; "Not now" goes back to the week without saving.
  *
  * Nothing scrolls: aisles fill four columns, balanced like the mock, and a
  * long week goes on pages.
@@ -170,6 +170,10 @@ export function BuySheet({
           {pages.length > 1 ? <Pager page={p} pages={pages.length} onPage={setPage} /> : null}
           <button type="button" onClick={onClose} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-panel px-6 text-[1.25rem] font-bold text-ink">
             Not now
+          </button>
+          {/* Save the week but put none of it on the list (Connor, 2026-11-26: no tapping every line off). */}
+          <button type="button" onClick={() => onConfirm(lines.map((l) => l.itemId))} disabled={saving} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-panel px-6 text-[1.25rem] font-bold text-ink">
+            Save, skip groceries
           </button>
           <button type="button" onClick={() => onConfirm(skipped)} disabled={saving} className={`${primaryActionClass} text-[1.25rem] disabled:opacity-70`}>
             {saving ? "Saving…" : "Put the rest on the grocery list"}

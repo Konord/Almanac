@@ -18,7 +18,7 @@ import {
   type ViewProps,
 } from "./views";
 import { DraggableEvent } from "@/components/draggable-event";
-import { PendingOutline, PlaceTap, WeekScroller } from "./week-scroll";
+import { DrawLayer, PendingOutline, WeekScroller } from "./week-scroll";
 
 /*
  * Week (docs/glance/SPEC.md "LOCKED style: week view", "Week view: LOCKED"
@@ -134,7 +134,7 @@ export function WeekView({
         <>
           <span aria-hidden className="absolute inset-y-0 left-0 w-[0.35rem]" style={{ background: bar }} />
           <CardBody box={box} time={timeText(startMin, box.short)} emoji={<Emoji emoji={eventEmoji(e.icon, e.title)} className={emojiClass(box)} />}>
-            <HandText colour={monthInk(e, memberById)} className={titleClass()}>
+            <HandText colour={monthInk(e, memberById)} className={titleClass(box)}>
               {e.recurrence_rule ? <span className="sr-only">Repeats: </span> : null}
               {e.title}
             </HandText>
@@ -171,7 +171,7 @@ export function WeekView({
         draw: (box) => (
           <Link href={m.href} aria-label={`${m.name}: start cooking`} className={`${cardClass(box)} bg-meal`}>
             <CardBody box={box} time={timeText(m.startMin, box.short)} emoji={<Emoji emoji={m.icon} className={emojiClass(box)} />} meal>
-              <span className={`font-hand text-meal-ink ${titleClass()}`}>{m.name}</span>
+              <span className={`font-hand text-meal-ink ${titleClass(box)}`}>{m.name}</span>
             </CardBody>
           </Link>
         ),
@@ -197,7 +197,7 @@ export function WeekView({
               time={`${t.date_kind === "due" ? "by " : ""}${timeText(startMin, box.short || t.date_kind === "due")}`}
               emoji={<span aria-hidden className={`${box.short ? "size-[1.35rem]" : "size-[1.75rem] justify-self-center"} shrink-0 rounded-full border-[0.2rem] bg-board`} style={{ borderColor: colour ? strong(colour) : "var(--color-check-border)" }} />}
             >
-              <span className={`font-hand ${titleClass()}`} style={{ color: hand(colour) }}>
+              <span className={`font-hand ${titleClass(box)}`} style={{ color: hand(colour) }}>
                 {t.title}
               </span>
             </CardBody>
@@ -240,10 +240,14 @@ export function WeekView({
   const hours = Array.from({ length: 24 }, (_, h) => h);
 
   return (
-    <div className="flex min-h-[40rem] flex-col bg-board max-lg:overflow-x-auto lg:min-h-0 lg:flex-1" style={colVars}>
+    <div className="flex min-h-[40rem] flex-col max-lg:overflow-x-auto lg:min-h-0 lg:flex-1" style={colVars}>
       <div className="flex min-h-0 flex-1 flex-col max-lg:min-w-[56rem]">
-        {/* Day tops: weekday, date, and a sticker row every column keeps (so the hours line up). */}
-        <div className="week-cols grid shrink-0">
+        {/*
+          Day tops, one slim row: weekday and date, then the stickers (Connor,
+          2026-11-26: the dates took a lot of room). A solid line under them
+          stays put while the hours scroll.
+        */}
+        <div className="week-cols grid shrink-0 border-b-2 border-frame">
           {columns.map((c, i) => (
             <Link
               key={c.day}
@@ -254,22 +258,20 @@ export function WeekView({
                   ? `Add an all-day event on ${fmt(c.day, { weekday: "long", month: "long", day: "numeric" })}`
                   : `Open ${fmt(c.day, { weekday: "long" })}'s agenda, ${fmt(c.day, { month: "long", day: "numeric" })}`
               }
-              className={`flex min-w-0 flex-col items-start gap-[0.2rem] px-[0.55rem] pt-[0.5rem] pb-[0.3rem] ${i < columns.length - 1 ? "border-r border-frame" : ""} ${drops(c.day)}`}
+              className={`flex h-[3.6rem] min-w-0 items-center gap-[0.55rem] px-[0.7rem] ${i < columns.length - 1 ? "border-r border-frame" : ""} ${drops(c.day)}`}
               style={{ background: wash(c) }}
             >
               <span className="text-[1.15rem] leading-none font-bold tracking-[0.08em] text-ink-muted uppercase">
                 {fmt(c.day, { weekday: "short" })}
               </span>
-              <span className="flex h-[2.85rem] items-center">
-                <span
-                  className={`tabular inline-flex items-center justify-center text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] ${
-                    c.isToday ? "size-[2.85rem] rounded-full border-2 border-now-on-tint text-now-on-tint" : c.pastDay ? "text-ink-muted" : "text-ink"
-                  }`}
-                >
-                  {Number(c.day.slice(8))}
-                </span>
+              <span
+                className={`tabular inline-flex shrink-0 items-center justify-center text-[1.9rem] leading-none font-extrabold tracking-[-0.03em] ${
+                  c.isToday ? "size-[2.6rem] rounded-full bg-now-on-tint text-board" : c.pastDay ? "text-ink-muted" : "text-ink"
+                }`}
+              >
+                {Number(c.day.slice(8))}
               </span>
-              <span className="flex h-[1.85rem] min-w-0 items-center gap-[0.35rem] overflow-hidden pt-[0.1rem]">
+              <span className="ml-auto flex min-w-0 items-center gap-[0.35rem] overflow-hidden">
                 {c.stickers.map((s) => (
                   <span key={s.key} title={s.title} className="pointer-events-none flex">
                     <Emoji emoji={s.emoji} className="size-[1.75rem]" />
@@ -365,11 +367,12 @@ export function WeekView({
                       );
                     })}
                     <PendingOutline day={c.day} minRem={(MIN_MINUTES / 60) * HOUR_REM} hourRem={HOUR_REM} />
-                    {placing && adding ? (
-                      <PlaceTap
+                    {adding ? (
+                      <DrawLayer
                         day={c.day}
                         href={adding.addHref(c.day)}
                         defaultMinutes={household.settings.defaultEventMinutes}
+                        placing={placing}
                         label={`Add an event on ${fmt(c.day, { weekday: "long" })}`}
                       />
                     ) : null}
@@ -393,13 +396,21 @@ function emojiClass({ short }: { short: boolean; tall: boolean }): string {
   return short ? "size-[1.5rem]" : "size-[2.15rem]";
 }
 
-function titleClass(): string {
-  return "line-clamp-2 min-w-0 text-[1.25rem] leading-[1.15] font-bold";
+/**
+ * As many lines as the card has room for (UI audit H6, 2026-11-21): an
+ * hour-long card has room for three under its height, or two when it is
+ * squeezed beside another card (its time and picture take a line). A
+ * longer card adds one more.
+ */
+function titleClass(box: { short: boolean; tall: boolean }): string {
+  const lines = (box.short ? 2 : 3) + (box.tall ? 1 : 0);
+  const clamp = { 2: "line-clamp-2", 3: "line-clamp-3", 4: "line-clamp-4" }[lines];
+  return `${clamp} min-w-0 text-[1.25rem] leading-[1.15] font-bold break-words hyphens-auto`;
 }
 
 /**
- * Inside a card: printed start time, picture, handwritten title (two lines
- * at most). Full width it's one row like the agenda; squeezed beside
+ * Inside a card: printed start time, picture, handwritten title (as many
+ * lines as fit, see titleClass). Full width it's one row like the agenda; squeezed beside
  * others the time and picture go on a line above the title.
  */
 function CardBody({

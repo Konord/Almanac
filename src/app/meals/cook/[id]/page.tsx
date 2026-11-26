@@ -37,10 +37,7 @@ async function Cook({ params }: { params: PageProps<"/meals/cook/[id]">["params"
     if (!recipe) notFound();
     rows = [{ position: 0, recipe_id: recipe.id, batches: 1, recipes: recipe }];
   }
-  const [details, { data: lunch }] = await Promise.all([
-    Promise.all(rows.map((d) => loadRecipeDetail(d.recipes!.id))),
-    supabase.from("meal_times").select("id").ilike("name", "lunch").limit(1).maybeSingle(),
-  ]);
+  const details = await Promise.all(rows.map((d) => loadRecipeDetail(d.recipes!.id)));
   const menuName = (meal.menu_meals as unknown as { name: string | null } | null)?.name;
 
   return (
@@ -50,7 +47,6 @@ async function Cook({ params }: { params: PageProps<"/meals/cook/[id]">["params"
       title={menuName || rows[0].recipes!.name}
       temperatureUnit={household.settings.temperatureUnit}
       measures={household.settings.measures}
-      canPlanLeftovers={Boolean(lunch)}
       dishes={rows.map((d, i) => ({
         recipeId: d.recipes!.id,
         name: d.recipes!.name,

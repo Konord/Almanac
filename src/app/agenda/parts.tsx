@@ -115,6 +115,45 @@ export function RoutineCard({ routine }: { routine: AgendaRoutine }) {
   );
 }
 
+export type AgendaMeal = {
+  key: string;
+  /** "Dinner" */
+  label: string;
+  title: string;
+  emoji: string;
+  start: string;
+  /** The cook's colour, for the title's ink; null: nobody picked. */
+  colour: string | null;
+  href: string;
+  past: boolean;
+};
+
+/**
+ * A planned meal at its eating time (Connor, 2026-11-26: meals belong on
+ * the Agenda too). The meal-yellow of the dinner card and the Week view's
+ * meal blocks; tapping it opens cooking.
+ */
+export function MealCard({ meal }: { meal: AgendaMeal }) {
+  return (
+    <Link
+      href={meal.href}
+      data-card
+      {...(meal.past ? { "data-past": "" } : {})}
+      aria-label={`${meal.label}: ${meal.title}. Open cooking`}
+      className="grid min-h-[4.25rem] shrink-0 grid-cols-[8.5rem_3.5rem_minmax(0,1fr)] items-center gap-5 rounded-[var(--radius-card)] bg-meal py-[0.4rem] pr-5 pl-7 text-meal-ink"
+    >
+      <span className={`tabular text-[1.25rem] font-extrabold ${meal.past ? "opacity-70" : ""}`}>{meal.start}</span>
+      <Emoji emoji={meal.emoji} className={`size-10 justify-self-center ${meal.past ? "opacity-65" : ""}`} />
+      <span className="flex min-w-0 items-baseline gap-3">
+        <span className="shrink-0 text-[1.125rem] font-bold tracking-[0.06em] uppercase">{meal.label}</span>
+        <span className={`min-w-0 truncate font-hand text-[1.5rem] ${meal.past ? "opacity-70" : ""}`} style={meal.colour ? { color: hand(meal.colour) } : undefined}>
+          {meal.title}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 export type AllDayChip = {
   key: string;
   label: string;
@@ -166,25 +205,49 @@ export function AllDayStrip({ chips }: { chips: AllDayChip[] }) {
   );
 }
 
-export type ComingUpItem = { key: string; title: string; emoji: string; when: string; href: string };
+export type ComingUpItem = { key: string; title: string; emoji: string; when: string; href: string; tomorrow?: boolean };
 
-/** The next few things after today, at the bottom of the panel when there's room. */
-export function ComingUp({ items }: { items: ComingUpItem[] }) {
+/**
+ * The next few things after today, at the bottom of the panel when there's room.
+ * With `lead` (a quiet evening), it moves up under today's last cards, gets
+ * bigger, and starts with "Tomorrow"; the rest follow under "Later". Items that
+ * don't fit are dropped from the end (data-coming-item).
+ */
+export function ComingUp({ items, lead = false }: { items: ComingUpItem[]; lead?: boolean }) {
   if (items.length === 0) return null;
+  const card = (e: ComingUpItem) => (
+    <Link key={e.key} href={e.href} data-coming-item className={`flex min-w-0 items-center gap-[0.9rem] rounded-[var(--radius)] bg-panel px-[1.1rem] py-[0.9rem] ${lead ? "min-h-22" : "min-h-18"}`}>
+      <Emoji emoji={e.emoji} className={lead ? "size-12" : "size-10"} />
+      <span className="min-w-0">
+        <b className={`block truncate font-hand leading-[1.25] text-ink ${lead ? "text-[1.5rem]" : "text-[1.25rem]"}`}>{e.title}</b>
+        <span className={`tabular block truncate leading-[1.25] font-semibold text-ink-soft ${lead ? "text-[1.25rem]" : "text-[1.125rem]"}`}>{e.when}</span>
+      </span>
+    </Link>
+  );
+  if (!lead) {
+    return (
+      <section data-coming aria-label="Coming up" className="mt-auto shrink-0">
+        <h2 className="mb-3 text-[1.25rem] leading-[1.25] font-bold text-ink-muted">Coming up</h2>
+        <div className="grid grid-cols-3 gap-4">{items.map(card)}</div>
+      </section>
+    );
+  }
+  const first = items.filter((e) => e.tomorrow);
+  const later = items.filter((e) => !e.tomorrow);
   return (
-    <section data-coming aria-label="Coming up" className="mt-auto shrink-0">
-      <h2 className="mb-3 text-[1.25rem] leading-[1.25] font-bold text-ink-muted">Coming up</h2>
-      <div className="grid grid-cols-3 gap-4">
-        {items.map((e) => (
-          <Link key={e.key} href={e.href} className="flex min-h-18 min-w-0 items-center gap-[0.9rem] rounded-[var(--radius)] bg-panel px-[1.1rem] py-[0.9rem]">
-            <Emoji emoji={e.emoji} className="size-10" />
-            <span className="min-w-0">
-              <b className="block truncate font-hand text-[1.25rem] leading-[1.25] text-ink">{e.title}</b>
-              <span className="tabular block truncate text-[1.125rem] leading-[1.25] font-semibold text-ink-soft">{e.when}</span>
-            </span>
-          </Link>
-        ))}
-      </div>
+    <section data-coming aria-label="Coming up" className="flex shrink-0 flex-col gap-3 border-t-2 border-frame pt-4">
+      {first.length > 0 ? (
+        <>
+          <h2 className="text-[1.75rem] leading-[1.2] font-bold text-ink">Tomorrow</h2>
+          <div className="grid grid-cols-3 gap-4">{first.map(card)}</div>
+        </>
+      ) : null}
+      {later.length > 0 ? (
+        <>
+          <h2 className={`leading-[1.25] font-bold ${first.length > 0 ? "mt-2 text-[1.25rem] text-ink-muted" : "text-[1.75rem] text-ink"}`}>{first.length > 0 ? "Later" : "Coming up"}</h2>
+          <div className="grid grid-cols-3 gap-4">{later.map(card)}</div>
+        </>
+      ) : null}
     </section>
   );
 }

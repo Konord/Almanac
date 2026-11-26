@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { TimeField } from "@/components/touch-pickers";
 import { Minus, Plus, X } from "@phosphor-icons/react";
 import { Pager } from "@/components/pager";
 import { ColourDot, Emoji } from "@/components/ui";
@@ -283,7 +284,7 @@ function LogForm({
           </button>
         ))}
         {picking ? (
-          <input type="time" value={at} onChange={(e) => setAt(e.target.value)} aria-label="Time" className="min-h-11 flex-1 rounded-xl border-2 border-ink bg-board px-1 text-sm font-bold text-ink" />
+          <TimeField value={at} onChange={setAt} step={5} defaultOpen aria-label="Time" className="min-h-11! flex-1 rounded-xl! border-ink! px-1! text-sm!" />
         ) : (
           <button type="button" onClick={() => setPicking(true)} className="flex min-h-11 flex-1 items-center justify-center rounded-xl bg-rail px-1 text-sm font-bold text-ink">
             Pick…

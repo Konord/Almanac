@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { brightTheme, themeToCssVariables } from "@/theme/tokens";
 import { HouseholdTheme } from "@/theme/HouseholdTheme";
 import { ScreenSaver } from "@/components/screen-saver";
+import { PressFeedback } from "@/components/press-feedback";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <HouseholdTheme />
         </Suspense>
         {children}
+        {/* Every tap shows a pressed look straight away (UI audit H2). */}
+        <PressFeedback />
         {/* The art screen saver covers every screen when it comes on (kitchen screen only). */}
         <ScreenSaver />
       </body>

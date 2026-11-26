@@ -6,6 +6,7 @@ import { addDays, type LocalDate } from "@/lib/time";
 import { dayFor } from "@/lib/day-types";
 import { loadDaysBetween } from "../routines/data";
 import { loadChoreDays, loadChores, type ChoreMember, type ChoreWithTiming, type Round } from "./data";
+import { homeListId } from "./home-list";
 
 /*
  * The chore generator on the server (tasks rework, step 2). Each time a
@@ -44,6 +45,8 @@ export type PlanInput = {
   keptToday: string[];
   moves: ChoreDayMove[];
   errandDates: LocalDate[];
+  /** Placed chores already done (or skipped) today: they keep using today's room. */
+  doneToday: { big: boolean }[];
 };
 
 /** Days marked away (a break marked "away") from today through the plan. */
@@ -111,6 +114,21 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     ...oneOffs.filter((t) => t.due_date === today).map((t) => t.id),
   ]);
 
+  // Chores the planner placed on today that are already ticked off or
+  // skipped. They still count against today's room, so ticking one off
+  // doesn't bring another one in (Connor, 2026-11-26). Chores with a set
+  // time and presets never used room, so they don't count here either.
+  const choreById = new Map(chores.map((c) => [c.id, c]));
+  const doneToday = tasks.data
+    .filter((t) => t.status !== "open" && t.due_date === today && !t.heads_up_id)
+    .flatMap((t) => {
+      if (t.template_id) {
+        const c = choreById.get(t.template_id);
+        return c && c.kind === "generated" && c.at_time === null ? [{ big: c.tags.includes("big") }] : [];
+      }
+      return [{ big: t.tags.includes("big") }];
+    });
+
   const input: PlanInput = {
     today,
     choreDays,
@@ -137,6 +155,7 @@ export async function choreSchedule(household: Household, today: LocalDate, time
     keptToday: [...keptToday],
     moves,
     errandDates: [...errandDates],
+    doneToday,
   };
   const plan = planChoreDays({ ...input, away, keptToday, errandDates });
 
@@ -212,7 +231,8 @@ async function makeToday(
   const have = new Set(openChores.filter((t) => !stale.includes(t.id)).map((t) => t.template_id));
   const missing = [...wanted].filter(([id]) => !have.has(id));
   if (missing.length > 0) {
-    const { data: list } = await supabase.from("task_lists").select("id").eq("is_chores", false).eq("is_groceries", false).order("sort_order").order("name").limit(1).maybeSingle();
+    const listId = await homeListId(supabase);
+    const list = listId ? { id: listId } : null;
     if (list) {
       for (const [id, date] of missing) {
         const c = byId.get(id) as ChoreWithTiming;

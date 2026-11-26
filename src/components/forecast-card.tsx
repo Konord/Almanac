@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { X } from "@phosphor-icons/react";
+import { WarningCircle, X } from "@phosphor-icons/react";
 import { Emoji, kickerClass } from "@/components/ui";
 import { wallTime } from "@/lib/time-text";
-import { dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherHour } from "@/lib/weather";
+import { alertTone, dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherHour } from "@/lib/weather";
 
 /*
  * The forecast pop-up: tap the weather in a calendar header (Connor,
@@ -35,7 +35,7 @@ function Shell({ forecast, onClose, width, tabs, children }: { forecast: Forecas
         role="dialog"
         aria-label={`Weather for ${forecast.place}`}
         style={{ width }}
-        className="absolute top-[8.5rem] right-2 flex max-h-[calc(100dvh-9.5rem)] max-w-[calc(100vw-1rem)] flex-col gap-5 overflow-hidden rounded-[var(--radius-dialog)] bg-board px-[1.65rem] pt-6 pb-[1.4rem] shadow-dialog lg:right-12"
+        className="absolute top-1/2 left-1/2 flex max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-hidden rounded-[var(--radius-dialog)] bg-board px-[1.65rem] pt-6 pb-[1.4rem] shadow-dialog"
       >
         <div className="flex shrink-0 items-center gap-4">
           <h2 className="min-w-0 flex-1 truncate text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{forecast.place}</h2>
@@ -45,7 +45,7 @@ function Shell({ forecast, onClose, width, tabs, children }: { forecast: Forecas
           </button>
         </div>
         {children}
-        <p className="shrink-0 text-right text-[1.125rem] text-ink-muted">Weather by Open-Meteo{forecast.pollen?.length ? " · Pollen by Google" : ""}</p>
+        <p className="shrink-0 text-right text-[1.125rem] text-ink-muted">Weather by Open-Meteo{forecast.alerts?.length ? " · Alerts by Environment Canada" : ""}{forecast.pollen?.length ? " · Pollen by Google" : ""}</p>
       </section>
     </div>
   );
@@ -64,6 +64,32 @@ function SunTimes({ forecast, row = false }: { forecast: Forecast; row?: boolean
         <Emoji emoji="🌇" className="size-8" />
         {wallTime(today.sunset, forecast.locale)}
       </span>
+    </div>
+  );
+}
+
+/** Government weather alerts, under sunrise and sunset (Connor, 2026-11-26): the worst two, and how many more. */
+function Alerts({ forecast }: { forecast: Forecast }) {
+  const alerts = forecast.alerts ?? [];
+  if (alerts.length === 0) return null;
+  const until = (iso: string | null) => {
+    if (!iso) return "";
+    const at = new Date(iso);
+    if (Number.isNaN(at.getTime())) return "";
+    return `Until ${new Intl.DateTimeFormat(forecast.locale, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(at)}`;
+  };
+  return (
+    <div className="flex shrink-0 flex-col gap-2">
+      {alerts.slice(0, 2).map((a) => (
+        <div key={a.name} className="flex items-start gap-2 rounded-[var(--radius)] bg-board px-3 py-2">
+          <WarningCircle size="1.6rem" weight="fill" className={`mt-[0.1rem] shrink-0 ${alertTone(a)}`} aria-hidden />
+          <span className="flex min-w-0 flex-col">
+            <b className={`text-[1.35rem] leading-tight ${alertTone(a)}`}>{a.name}</b>
+            {until(a.until) ? <span className="text-[1.125rem] text-ink-muted">{until(a.until)}</span> : null}
+          </span>
+        </div>
+      ))}
+      {alerts.length > 2 ? <p className="text-[1.125rem] text-ink-muted">and {alerts.length - 2} more</p> : null}
     </div>
   );
 }
@@ -113,6 +139,7 @@ export function ForecastCard({ forecast, onClose }: { forecast: Forecast; onClos
             </p>
           </div>
           <SunTimes forecast={forecast} row />
+          <Alerts forecast={forecast} />
           {forecast.pollen === null ? (
             <p className="mt-auto border-t border-frame pt-4 text-[1.125rem] text-ink-muted">Pollen shows here once the Google pollen key is added.</p>
           ) : forecast.pollen.length === 0 ? (
