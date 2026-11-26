@@ -177,9 +177,9 @@ export function ChecksMenu({ problems, onFix, onLeave }: { problems: Problem[]; 
   const at = Math.min(page, pages - 1);
   if (problems.length === 0) {
     return (
-      // In the header's quiet second-line type (Connor, 2026-11-16: like "Coming week" was).
-      <span className="flex min-h-13 items-center gap-[0.6rem] px-3 text-2xl font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">
-        <CheckCircle size="0.9em" weight="fill" aria-hidden />
+      // A pill right after the title: green All clear, soft red to check (Connor, 2026-11-26, look A).
+      <span className="flex min-h-13 items-center gap-[0.5rem] rounded-full bg-met-soft px-5 text-[1.5rem] font-bold whitespace-nowrap text-ink">
+        <CheckCircle size="1em" weight="fill" className="text-met" aria-hidden />
         All clear
       </span>
     );
@@ -191,7 +191,7 @@ export function ChecksMenu({ problems, onFix, onLeave }: { problems: Problem[]; 
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={isOpen}
-        className="flex min-h-13 max-w-full min-w-0 items-center gap-[0.6rem] rounded-[var(--radius)] px-3 text-2xl font-bold tracking-[-0.02em] text-accent lg:text-[2rem]"
+        className="flex min-h-13 max-w-full min-w-0 items-center gap-[0.5rem] rounded-full bg-alert-soft px-5 text-[1.5rem] font-bold text-now-on-tint"
       >
         <WarningCircle size="0.9em" weight="fill" className="shrink-0" aria-hidden />
         {/* A short count, never a sentence cut in half: the full wording is in the list it opens (UI audit H6). */}
@@ -201,7 +201,7 @@ export function ChecksMenu({ problems, onFix, onLeave }: { problems: Problem[]; 
       {isOpen ? (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
-          <div role="dialog" aria-label="Things to check" className="absolute top-full left-1/2 z-40 mt-2 flex w-[60rem] -translate-x-1/2 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-[1.5rem] bg-board p-4 shadow-[0_0_0_2px_var(--color-frame),0_18px_40px_rgba(20,30,50,0.16)]">
+          <div role="dialog" aria-label="Things to check" className="absolute top-full left-0 z-40 mt-2 flex w-[60rem] max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-[1.5rem] bg-board p-4 shadow-[0_0_0_2px_var(--color-frame),0_18px_40px_rgba(20,30,50,0.16)]">
             {problems.slice(at * CHECKS_SHOWN, (at + 1) * CHECKS_SHOWN).map((p) => (
               <div key={p.id} className="flex min-h-[var(--touch-target)] items-center gap-3 rounded-2xl bg-rail px-4 py-2">
                 <p className="min-w-0 flex-1 text-lg text-ink">{p.text}</p>

@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { WarningCircle } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
 import { ForecastCard } from "./forecast-card";
-import { alertTone, degrees, describeWeather, type Forecast, type WeatherAnswer } from "@/lib/weather";
+import { degrees, describeWeather, type Forecast, type WeatherAnswer } from "@/lib/weather";
 
 /*
  * The weather in the calendar screens' header (2026-11-16): a picture and
@@ -87,11 +87,11 @@ export function WeatherSlot() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`hidden min-h-13 max-w-[24rem] min-w-0 shrink items-center gap-[0.6rem] rounded-[var(--radius)] px-3 text-[2rem] font-bold tracking-[-0.02em] lg:flex ${alertTone(alert)}`}
+          className="hidden min-h-13 max-w-[26rem] min-w-0 shrink items-center gap-[0.5rem] rounded-full bg-alert-soft px-5 text-[1.5rem] font-bold text-now-on-tint lg:flex"
         >
           <WarningCircle size="0.9em" weight="fill" className="shrink-0" aria-hidden />
           <span className="truncate">{alert.name}</span>
-          {forecast.alerts.length > 1 ? <span className="shrink-0 text-[1.5rem]">+{forecast.alerts.length - 1}</span> : null}
+          {forecast.alerts.length > 1 ? <span className="shrink-0">+{forecast.alerts.length - 1}</span> : null}
         </button>
       ) : null}
       <button

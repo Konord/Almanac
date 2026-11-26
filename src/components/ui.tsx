@@ -79,7 +79,7 @@ export function ScreenHeader({
   middle,
   children,
 }: {
-  /** Something centred between the title and the right-hand controls (the Planner's checks). */
+  /** Something right after the title (the Planner's checks pill). */
   middle?: ReactNode;
   title: ReactNode;
   sub?: ReactNode;
@@ -100,7 +100,7 @@ export function ScreenHeader({
         <h1 className="shrink-0 pb-[0.06em] text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
         {sub && sub !== title ? <span className="tabular min-w-0 truncate text-2xl leading-none font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">{sub}</span> : null}
       </div>
-      {middle ? <div className="flex min-w-0 flex-1 items-center justify-center gap-[0.6rem]">{middle}</div> : null}
+      {middle ? <div className="flex min-w-0 flex-1 items-center justify-start gap-[0.6rem]">{middle}</div> : null}
       {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
       <div className="flex shrink-0 items-center gap-[0.6rem]">
         {weather ? <WeatherSlot /> : null}

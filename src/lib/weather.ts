@@ -401,7 +401,3 @@ export function parseAlerts(raw: unknown, now: Date): WeatherAlert[] | null {
   return [...out.values()].sort((a, b) => rank(a) - rank(b));
 }
 
-/** An alert's text colour: red and orange ones in the danger red, the rest in the accent. */
-export function alertTone(alert: WeatherAlert): string {
-  return alert.colour === "red" || alert.colour === "orange" || (!alert.colour && alert.kind === "warning") ? "text-danger" : "text-accent";
-}
