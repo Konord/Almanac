@@ -1,6 +1,6 @@
 {
   "almanacOrigins": ["http://192.168.2.42:3001"],
-  "browser": ["chromium"],
+  "browser": ["chromium", "--unsafely-treat-insecure-origin-as-secure=http://192.168.2.42:5006"],
   "profiles": "~/almanac-launcher/profiles",
   "almanacWindowClass": "almanac",
   "touchscreen": "auto",
