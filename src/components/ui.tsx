@@ -2,7 +2,7 @@ import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
-import { emojiImage } from "@/lib/emoji";
+import { emojiFlatImage, emojiImage } from "@/lib/emoji";
 import { PendingTab } from "./pending-tab";
 import { hand, soft, strong } from "@/lib/colours";
 import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
@@ -356,9 +356,10 @@ export function Card({
 }
 
 /** A Fluent 3D picture for an emoji (or the plain emoji if we don't have one). */
-export function Emoji({ emoji, className = "size-10", faded = false }: { emoji: string | null | undefined; className?: string; faded?: boolean }) {
+export function Emoji({ emoji, className = "size-10", faded = false, flat = false }: { emoji: string | null | undefined; className?: string; faded?: boolean; flat?: boolean }) {
   if (!emoji) return null;
-  const src = emojiImage(emoji);
+  // `flat`: the 2D picture, for holidays only (Connor, 2026-11-26).
+  const src = (flat ? emojiFlatImage(emoji) : null) ?? emojiImage(emoji);
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element -- small local pictures; no resizing needed
     return <img src={src} alt="" aria-hidden className={`shrink-0 ${className} ${faded ? "opacity-55" : ""}`} />;

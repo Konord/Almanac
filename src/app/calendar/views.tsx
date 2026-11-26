@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Emoji, HandText } from "@/components/ui";
 import { EVERYONE_COLOUR } from "@/lib/colours";
-import { eventEmoji } from "@/lib/emoji";
+import { eventEmoji, holidayWash } from "@/lib/emoji";
 import type { Household } from "@/lib/household";
 import { monthOf } from "@/lib/calendar-layout";
 import { addDays, localDateOf, localTimeOf, zonedToUtc, type LocalDate } from "@/lib/time";
@@ -119,7 +119,7 @@ function weekdayLabel(day: LocalDate, household: Household, style: "short" | "lo
 
 /** How many events a month cell lists before "+ N more" (fewer if they don't fit). */
 export const MONTH_CELL_LIMIT = 4;
-/** All-day things show as up to three stickers beside the date; any more are hidden (no "+N"). */
+/** All-day things show as up to three stickers beside the date; Month adds "+N" for the rest. */
 export const MONTH_STICKER_LIMIT = 3;
 
 /** One sticker beside the date: an all-day thing, a birthday or days off. */
@@ -164,8 +164,8 @@ export function monthInk(event: CalendarItem, memberById: Map<string, Member>): 
  *   - then its timed events as rows: picture, and the title handwritten in
  *     the person's ink, no times, four at most then "+ N more" (fewer when
  *     the square is short; MonthFit works that out);
- *   - a holiday is a big picture filling the square, faded to 18% behind
- *     any events.
+ *   - a holiday is a big flat picture filling the square on a soft wash
+ *     of its colour, faded to 38% behind any events.
  *
  * Tapping anywhere in a day opens that day's agenda (or, while adding,
  * places the new event on it). Events are edited from the agenda.
@@ -237,7 +237,9 @@ export function MonthView({
                 lastRow ? "" : "border-b"
               } ${pendingHere ? "outline-3 -outline-offset-3 outline-accent" : ""} ${placing ? "hover:bg-[color-mix(in_srgb,var(--color-accent)_6%,var(--color-board))]" : ""}`}
               style={{
-                background: isToday
+                background: holiday && !past && !other
+                  ? holidayWash(holiday.icon)
+                  : isToday
                   ? "color-mix(in srgb, var(--color-now) 1.5%, var(--color-board))"
                   : past || other
                     ? "color-mix(in srgb, var(--color-rail) 60%, var(--color-board))"
@@ -245,26 +247,35 @@ export function MonthView({
               }}
             >
               {holiday ? (
-                // The picture fills 88% of the square below the date row (cqmin: the smaller of its width and height).
-                <span aria-hidden className="pointer-events-none absolute inset-x-0 top-[1.85rem] bottom-0 grid place-items-center overflow-hidden" style={{ containerType: "size" }}>
-                  <Emoji emoji={holiday.icon} className={`size-[88cqmin] ${timed.length > 0 ? "opacity-[0.18]" : ""}`} />
+                // Flat, big and centred on a soft wash of the holiday's colour (Connor, 2026-11-26, look A):
+                // the picture fills 94% of the square below the date row (cqmin: the smaller of its width and height).
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-[2.4rem] bottom-0 grid place-items-center overflow-hidden"
+                  style={{ containerType: "size" }}
+                >
+                  <Emoji emoji={holiday.icon} flat className={`size-[94cqmin] ${timed.length > 0 ? "opacity-[0.38]" : ""}`} />
                 </span>
               ) : null}
-              <span className="relative z-[1] flex min-h-[1.85rem] shrink-0 items-center gap-[0.15rem]">
+              <span className="relative z-[1] flex min-h-[2.4rem] shrink-0 items-center gap-[0.35rem]">
                 <span
-                  className={`tabular flex h-[1.75rem] shrink-0 items-center justify-center text-[1.5rem] leading-none font-bold tracking-[-0.02em] ${
-                    wide ? "px-[0.3rem]" : "min-w-[1.75rem] px-[0.15rem]"
+                  className={`tabular flex h-[2.25rem] shrink-0 items-center justify-center text-[1.9rem] leading-none font-bold tracking-[-0.02em] ${
+                    wide ? "px-[0.35rem]" : "min-w-[2.25rem] px-[0.15rem]"
                   } ${isToday ? `border-2 border-now-on-tint text-now-on-tint ${wide ? "rounded-[1rem]" : "rounded-full"}` : other || past ? "text-ink-muted" : "text-ink"}`}
                 >
                   {label}
                 </span>
+                {/* Stickers tucked right after the date, a little overlapped, then "+2" (Connor, 2026-11-26, look A). */}
                 {stickers.length > 0 ? (
-                  <span className="grid min-w-0 flex-1 grid-cols-3 items-center justify-items-center">
-                    {stickers.slice(0, MONTH_STICKER_LIMIT).map((s) => (
-                      <span key={s.key} title={s.title} className="pointer-events-none flex h-[1.9rem] min-w-0 items-center justify-center">
-                        <Emoji emoji={s.emoji} className="size-[1.65rem]" />
+                  <span className="flex min-w-0 items-center">
+                    {stickers.slice(0, MONTH_STICKER_LIMIT).map((s, n) => (
+                      <span key={s.key} title={s.title} className={`pointer-events-none flex shrink-0 items-center justify-center ${n > 0 ? "-ml-[0.45rem]" : ""}`} style={{ zIndex: MONTH_STICKER_LIMIT - n }}>
+                        <Emoji emoji={s.emoji} className="size-[2.15rem]" />
                       </span>
                     ))}
+                    {stickers.length > MONTH_STICKER_LIMIT ? (
+                      <span className="tabular shrink-0 pl-[0.2rem] text-[1.125rem] font-bold text-ink-soft">+{stickers.length - MONTH_STICKER_LIMIT}</span>
+                    ) : null}
                   </span>
                 ) : null}
               </span>
