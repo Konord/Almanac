@@ -138,8 +138,13 @@ export async function loadChoreDays(): Promise<(ChoreDay & { sort_order: number;
   return data;
 }
 
-/** The to-do lists and their to-dos (open ones, plus the last few done). */
-export async function loadTodos() {
+/**
+ * The to-do lists and their to-dos (open ones, plus the last few done).
+ * Adults-only lists stay off the kitchen screen (Connor, 2026-11-26): they
+ * and their to-dos are left out unless `adults` (the phones); `hiddenLists`
+ * names the ones left out.
+ */
+export async function loadTodos({ adults = false }: { adults?: boolean } = {}) {
   const supabase = await createClient();
   const [lists, todos] = await Promise.all([
     supabase.from("task_lists").select("id, name, icon, visibility, is_chores, is_groceries").order("sort_order").order("name"),
@@ -152,9 +157,12 @@ export async function loadTodos() {
   ]);
   for (const r of [lists, todos]) if (r.error) throw r.error;
   const choreLists = new Set((lists.data ?? []).filter((l) => l.is_chores).map((l) => l.id));
+  const shows = (l: { visibility: string }) => adults || l.visibility === "everyone";
+  const hidden = new Set((lists.data ?? []).filter((l) => !shows(l)).map((l) => l.id));
   return {
-    lists: (lists.data ?? []) as TaskList[],
-    todos: (todos.data ?? []).map((t) => ({
+    lists: (lists.data ?? []).filter(shows) as TaskList[],
+    hiddenLists: (lists.data ?? []).filter((l) => !shows(l)) as TaskList[],
+    todos: (todos.data ?? []).filter((t) => !hidden.has(t.list_id as string)).map((t) => ({
       ...t,
       is_chore: choreLists.has(t.list_id as string) && t.template_id === null && t.heads_up_id === null,
     })) as Todo[],

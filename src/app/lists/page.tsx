@@ -12,7 +12,7 @@ import { localDateOf, type LocalDate } from "@/lib/time";
 import { onItsList } from "@/lib/todos";
 import { panelBoxes } from "@/lib/panel-boxes";
 import { CHORE_TAGS } from "@/lib/chore-days";
-import { addList, addTodo, clearDone, removeList, removeTodo, updateList, updateTodo } from "../chores/actions";
+import { addList, addTodo, clearDone, removeList, removeTodo, showListOnScreen, updateList, updateTodo } from "../chores/actions";
 import { loadTodos, type ChoreMember } from "../chores/data";
 import { choreSchedule } from "../chores/plan";
 import { TodoFields } from "../chores/forms";
@@ -51,7 +51,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const plannedOn = new Map<string, LocalDate>();
   for (const day of plan.days) for (const item of day.items) if (item.kind === "one-off" && !plannedOn.has(item.id)) plannedOn.set(item.id, day.date);
   const supabase = await createClient();
-  const [{ lists, todos: allTodos }, { data: memberRows }, groceries] = await Promise.all([
+  const [{ lists, hiddenLists, todos: allTodos }, { data: memberRows }, groceries] = await Promise.all([
     loadTodos(),
     supabase.from("members").select("id, name, colour, icon").order("sort_order").order("name"),
     loadGroceries(household),
@@ -70,6 +70,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   const editing = editId ? todos.find((t) => t.id === editId) : undefined;
   const editingList = firstParam(params.editList) === "1" && list;
   const addingList = firstParam(params.newList) === "1";
+  const showingAdults = firstParam(params.adults) === "1";
   const error = firstParam(params.error);
   const message = firstParam(params.message);
   const showingDone = firstParam(params.done) === "1";
@@ -110,6 +111,12 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               );
             })}
           />
+          {hiddenLists.length ? (
+            // Only the count: adults-only lists live on the phones.
+            <Link href={here("&adults=1")} scroll={false} className="mt-2 flex min-h-12 shrink-0 items-center gap-2 px-3 text-[1.25rem] font-bold text-ink-muted">
+              🔒 {hiddenLists.length} adults-only {hiddenLists.length === 1 ? "list" : "lists"}
+            </Link>
+          ) : null}
         </Card>
 
         {/* The list itself */}
@@ -260,7 +267,12 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
           <form action={updateList} className="grid gap-4 sm:grid-cols-2">
             <input type="hidden" name="id" value={list.id} />
             <input type="hidden" name="returnTo" value={returnTo} />
-            <ListFields name={list.name} icon={list.icon} inRotation={rotation.includes(list.is_chores ? "bucket" : list.id)} />
+            <ListFields
+              name={list.name}
+              icon={list.icon}
+              inRotation={rotation.includes(list.is_chores ? "bucket" : list.id)}
+              canBeAdults={!list.is_chores && !list.is_groceries}
+            />
             <div className="sm:col-span-2">
               <Button variant="save">Save</Button>
             </div>
@@ -273,6 +285,25 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
               <Button variant="danger">Remove the list and its to-dos</Button>
             </form>
           )}
+        </Sheet>
+      ) : null}
+
+      {showingAdults && hiddenLists.length ? (
+        <Sheet title="Adults-only lists" closeHref={returnTo}>
+          <p className="text-lg text-ink-muted">These stay off this screen and show on the phones. Their to-dos aren&apos;t shown here.</p>
+          <ul className="mt-4 flex flex-col gap-2">
+            {hiddenLists.map((l) => (
+              <li key={l.id} className="flex min-h-16 items-center gap-3 rounded-[var(--radius)] bg-rail px-3">
+                <Emoji emoji={l.icon ?? "📝"} className="size-[2.15rem]" />
+                <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{l.name}</span>
+                <form action={showListOnScreen}>
+                  <input type="hidden" name="id" value={l.id} />
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <Button>Show it here</Button>
+                </form>
+              </li>
+            ))}
+          </ul>
         </Sheet>
       ) : null}
 
@@ -291,7 +322,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/lists">["sear
   );
 }
 
-function ListFields({ name, icon, inRotation }: { name?: string; icon?: string | null; inRotation: boolean }) {
+function ListFields({ name, icon, inRotation, adultsOnly = false, canBeAdults = true }: { name?: string; icon?: string | null; inRotation: boolean; adultsOnly?: boolean; canBeAdults?: boolean }) {
   return (
     <>
       <label className="flex flex-col gap-1.5">
@@ -307,6 +338,13 @@ function ListFields({ name, icon, inRotation }: { name?: string; icon?: string |
         <input type="checkbox" name="inRotation" defaultChecked={inRotation} className="size-6 accent-ink" />
         Show it beside the Daily List (flip to it with the arrows)
       </label>
+      {canBeAdults ? (
+        // Off the kitchen screen; it shows on the grown-ups' phones (Connor, 2026-11-26).
+        <label className="flex min-h-[var(--touch-target)] cursor-pointer items-center gap-3 text-lg font-bold text-ink select-none sm:col-span-2">
+          <input type="checkbox" name="adultsOnly" defaultChecked={adultsOnly} className="size-6 accent-ink" />
+          🔒 Adults only: keep it off this screen (it shows on the phones)
+        </label>
+      ) : null}
     </>
   );
 }

@@ -284,6 +284,22 @@ async function setInRotation(household: Household, listId: string, on: boolean) 
   if (error) throw error;
 }
 
+/** "Adults only" on a list: off the kitchen screen, on the phones (Connor, 2026-11-26). */
+function listVisibility(formData: FormData): { visibility: "adults" | "everyone" } {
+  return { visibility: formData.get("adultsOnly") === "on" ? "adults" : "everyone" };
+}
+
+/** Puts an adults-only list back on the kitchen screen. */
+export async function showListOnScreen(formData: FormData) {
+  await requireHousehold();
+  const id = text(formData, "id");
+  const supabase = await createClient();
+  const { error } = await supabase.from("task_lists").update({ visibility: "everyone" }).eq("id", id);
+  if (error) back(formData, "error", error.message);
+  refresh();
+  redirect(`/lists?list=${id}`);
+}
+
 export async function addList(formData: FormData) {
   const household = await requireHousehold();
   const name = text(formData, "name");
@@ -291,13 +307,14 @@ export async function addList(formData: FormData) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("task_lists")
-    .insert({ household_id: household.id, name, icon: readIcon(formData, problem(formData)), sort_order: 100 })
+    .insert({ household_id: household.id, name, icon: readIcon(formData, problem(formData)), sort_order: 100, ...listVisibility(formData) })
     .select("id")
     .single();
   if (error) back(formData, "error", error.message);
   await setInRotation(household, data.id, formData.get("inRotation") === "on");
   refresh();
-  redirect(`/lists?list=${data.id}&message=${encodeURIComponent(`Made the ${name} list.`)}`);
+  const adults = listVisibility(formData).visibility === "adults";
+  redirect(adults ? `/lists?message=${encodeURIComponent(`Made the ${name} list. It's adults-only, so it shows on the phones.`)}` : `/lists?list=${data.id}&message=${encodeURIComponent(`Made the ${name} list.`)}`);
 }
 
 export async function updateList(formData: FormData) {
@@ -306,10 +323,17 @@ export async function updateList(formData: FormData) {
   const name = text(formData, "name");
   if (!name || name.length > 40) back(formData, "error", "A list needs a short name.");
   const supabase = await createClient();
-  const { error } = await supabase.from("task_lists").update({ name, icon: readIcon(formData, problem(formData)) }).eq("id", id);
+  // The Chores and Groceries lists can't be adults-only (they're the whole house's).
+  const { data: kind } = await supabase.from("task_lists").select("is_chores, is_groceries").eq("id", id).maybeSingle();
+  const houseList = Boolean(kind?.is_chores || kind?.is_groceries);
+  const { error } = await supabase
+    .from("task_lists")
+    .update({ name, icon: readIcon(formData, problem(formData)), ...(houseList ? {} : listVisibility(formData)) })
+    .eq("id", id);
   if (error) back(formData, "error", error.message);
   await setInRotation(household, id, formData.get("inRotation") === "on");
   refresh();
+  if (!houseList && listVisibility(formData).visibility === "adults") redirect(`/lists?message=${encodeURIComponent(`Saved. ${name} is adults-only now, so it shows on the phones.`)}`);
   back(formData, "message", `Saved the ${name} list.`);
 }
 

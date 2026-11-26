@@ -22,7 +22,7 @@ async function Lists({ searchParams }: { searchParams: PageProps<"/m/lists">["se
   const household = await requireHousehold();
   const today = localDateOf(new Date(), household.settings.timeZone);
   const supabase = await createClient();
-  const [{ lists, todos }, members] = await Promise.all([loadTodos(), supabase.from("members").select("id, name, colour, icon").order("role", { ascending: false }).order("name")]);
+  const [{ lists, todos }, members] = await Promise.all([loadTodos({ adults: true }), supabase.from("members").select("id, name, colour, icon").order("role", { ascending: false }).order("name")]);
   if (members.error) throw members.error;
   // The grocery list has its own tab; chores made by the chore planner live on the Daily List.
   const shown = lists.filter((l) => !l.is_groceries);
