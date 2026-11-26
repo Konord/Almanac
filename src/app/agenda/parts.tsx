@@ -115,6 +115,45 @@ export function RoutineCard({ routine }: { routine: AgendaRoutine }) {
   );
 }
 
+export type AgendaMeal = {
+  key: string;
+  /** "Dinner" */
+  label: string;
+  title: string;
+  emoji: string;
+  start: string;
+  /** The cook's colour, for the title's ink; null: nobody picked. */
+  colour: string | null;
+  href: string;
+  past: boolean;
+};
+
+/**
+ * A planned meal at its eating time (Connor, 2026-11-26: meals belong on
+ * the Agenda too). The meal-yellow of the dinner card and the Week view's
+ * meal blocks; tapping it opens cooking.
+ */
+export function MealCard({ meal }: { meal: AgendaMeal }) {
+  return (
+    <Link
+      href={meal.href}
+      data-card
+      {...(meal.past ? { "data-past": "" } : {})}
+      aria-label={`${meal.label}: ${meal.title}. Open cooking`}
+      className="grid min-h-[4.25rem] shrink-0 grid-cols-[8.5rem_3.5rem_minmax(0,1fr)] items-center gap-5 rounded-[var(--radius-card)] bg-meal py-[0.4rem] pr-5 pl-7 text-meal-ink"
+    >
+      <span className={`tabular text-[1.25rem] font-extrabold ${meal.past ? "opacity-70" : ""}`}>{meal.start}</span>
+      <Emoji emoji={meal.emoji} className={`size-10 justify-self-center ${meal.past ? "opacity-65" : ""}`} />
+      <span className="flex min-w-0 items-baseline gap-3">
+        <span className="shrink-0 text-[1.125rem] font-bold tracking-[0.06em] uppercase">{meal.label}</span>
+        <span className={`min-w-0 truncate font-hand text-[1.5rem] ${meal.past ? "opacity-70" : ""}`} style={meal.colour ? { color: hand(meal.colour) } : undefined}>
+          {meal.title}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 export type AllDayChip = {
   key: string;
   label: string;

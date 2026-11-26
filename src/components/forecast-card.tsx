@@ -35,7 +35,7 @@ function Shell({ forecast, onClose, width, tabs, children }: { forecast: Forecas
         role="dialog"
         aria-label={`Weather for ${forecast.place}`}
         style={{ width }}
-        className="absolute top-[8.5rem] right-2 flex max-h-[calc(100dvh-9.5rem)] max-w-[calc(100vw-1rem)] flex-col gap-5 overflow-hidden rounded-[var(--radius-dialog)] bg-board px-[1.65rem] pt-6 pb-[1.4rem] shadow-dialog lg:right-12"
+        className="absolute top-1/2 left-1/2 flex max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-5 overflow-hidden rounded-[var(--radius-dialog)] bg-board px-[1.65rem] pt-6 pb-[1.4rem] shadow-dialog"
       >
         <div className="flex shrink-0 items-center gap-4">
           <h2 className="min-w-0 flex-1 truncate text-[2.25rem] leading-none font-extrabold tracking-[-0.03em] text-ink">{forecast.place}</h2>

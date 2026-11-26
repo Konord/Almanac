@@ -48,7 +48,8 @@ export function DailyListDrawer({
 
   return (
     <div data-daily-open={open} className="flex min-h-0 flex-1">
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      {/* The grid sits in the same white rounded card as the Agenda's (Connor, 2026-11-26). */}
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-card)] bg-board shadow-raised">
         {children}
         {open && closeOnTap ? (
           <button type="button" aria-label="Put the Daily List away" onClick={() => setOpen(false)} className="absolute inset-0 z-20 cursor-default max-lg:hidden" />
@@ -57,9 +58,9 @@ export function DailyListDrawer({
       <div
         inert={!open}
         className="shrink-0 overflow-hidden transition-[width] duration-300 ease-out max-lg:hidden"
-        style={{ width: open ? "36rem" : "0rem" }}
+        style={{ width: open ? "37.25rem" : "0rem" }}
       >
-        <div {...swipeAway} className="flex h-full w-[36rem] flex-col bg-rail p-5 [&>aside]:flex-1">
+        <div {...swipeAway} className="flex h-full w-[37.25rem] flex-col pl-5 [&>aside]:flex-1">
           {panel}
         </div>
       </div>
@@ -67,7 +68,7 @@ export function DailyListDrawer({
       {/* With a mouse: a tab at the edge (or at the list's edge while it's out) when the pointer comes near. */}
       <div
         className="group fixed top-1/2 z-30 hidden h-[24rem] w-[2.5rem] -translate-y-1/2 items-center justify-end transition-[right] duration-300 ease-out pointer-fine:flex max-lg:!hidden"
-        style={{ right: open ? "36rem" : "0rem" }}
+        style={{ right: open ? "39.25rem" : "2rem" }}
       >
         <button
           type="button"

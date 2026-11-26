@@ -19,7 +19,7 @@ import { pickPanelTab } from "./actions";
 import { loadGroceries } from "../groceries/data";
 import { GroceryView } from "../groceries/view";
 import { PanelPages } from "@/components/panel-pages";
-import { panelBoxes } from "@/lib/panel-boxes";
+import { boxedHref, panelBoxes } from "@/lib/panel-boxes";
 import { addTodo, toggleTodo } from "../chores/actions";
 import { choreSchedule } from "../chores/plan";
 import { shortClockTime } from "@/lib/time-text";
@@ -77,14 +77,14 @@ export async function TodayPanel({
   household,
   today,
   tab,
-  returnTo,
+  returnTo: pageHref,
   day = false,
   routine,
 }: {
   household: Household;
   today: LocalDate;
-  /** "upnext" or a list's id: what this screen showed last. */
-  tab: string;
+  /** The box to show (the page's ?box=): "upnext", a list's id…; the Daily List if missing. */
+  tab: string | undefined;
   /** This page's address, to come back to after a tap. */
   returnTo: string;
   /** On the Agenda view the timeline already shows today, so the panel has no "Up next". */
@@ -94,20 +94,28 @@ export async function TodayPanel({
 }) {
   const { locale, timeZone } = household.settings;
   const supabase = await createClient();
-  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData, { data: spotify }] = await Promise.all([
+  const [{ lists, todos }, basics, meals, { data: memberRows }, routineData, { data: spotify }, { count: habitCount }, { count: trackerCount }] = await Promise.all([
     loadTodos(),
     loadMealBasics(),
     loadMeals(today, addDays(today, 1)),
     supabase.from("members").select("id, colour"),
     loadRoutines(today),
     supabase.from("spotify_connections").select("household_id").maybeSingle(),
+    supabase.from("habits").select("id", { count: "exact", head: true }),
+    supabase.from("health_trackers").select("id", { count: "exact", head: true }),
   ]);
   const colourOf = new Map((memberRows ?? []).map((m) => [m.id, m.colour]));
 
   // The boxes this household flips between (Settings), and the one this screen showed last.
-  const boxes = panelBoxes(household.settings.panelBoxes, lists, day);
+  // Habits and Health only show once there's something set up in them (Connor, 2026-11-26).
+  const wanted = panelBoxes(household.settings.panelBoxes, lists, day).filter(
+    (b) => !(b.id === "habits" && !habitCount) && !(b.id === "health" && !trackerCount),
+  );
+  const boxes = wanted.length ? wanted : [{ id: "today", name: "Daily List" }];
   const box = boxes.find((b) => b.id === tab) ?? boxes[0];
   const showing = box.id;
+  // Ticks and adds come back to this page with the same box showing.
+  const returnTo = boxedHref(pageHref, showing);
   const list = lists.find((l) => l.id === showing);
   // The grocery list shows its own lines (quick adds while you cook or plan).
   const groceries = list?.is_groceries ? await loadGroceries(household) : null;
@@ -277,7 +285,7 @@ export async function TodayPanel({
   const dinnerCard = (
     <Link
       href={main ? cookHref({ id: main.meal.id, canCook: Boolean(main.meal.recipe_id) || main.meal.dishes.some((d) => d.recipe_id) }) : `/review?week=${today}`}
-      className="flex shrink-0 items-center gap-5 rounded-[var(--radius-card)] bg-meal px-[1.4rem] py-5 text-meal-ink shadow-raised"
+      className="flex h-[8.75rem] shrink-0 items-center gap-5 overflow-hidden rounded-[var(--radius-card)] bg-meal px-[1.4rem] text-meal-ink shadow-raised"
     >
       <Emoji emoji={main ? mealIcon(main.meal, recipes, categories) : "🍽️"} className="size-18" />
       <span className="flex min-w-0 flex-col">
@@ -289,7 +297,7 @@ export async function TodayPanel({
             <b className="line-clamp-2 font-hand text-[1.75rem] leading-[1.15]" style={{ color: hand(main.meal.cook_id ? colourOf.get(main.meal.cook_id) : null) }}>
               {mealName(main.meal, recipes, categories)}
             </b>
-            {others.map((m) => (
+            {others.slice(0, 1).map((m) => (
               <span key={m.meal.id} className="tabular mt-1 truncate text-[1.125rem] font-semibold">
                 {m.timeName} · {at(m)} · <span className="font-hand">{mealName(m.meal, recipes, categories)}</span>
               </span>

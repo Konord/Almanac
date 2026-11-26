@@ -363,3 +363,16 @@ test("with no quieter day it stays on its due date", () => {
   });
   assert.equal(where(plan, "c"), "2026-11-13");
 });
+
+test("chores ticked off today keep using today's room, so no new one comes in", () => {
+  const chores = [chore("a"), chore("b"), chore("c")];
+  // Free day takes 2. Two were made this morning and one got done: only one more fits, not two.
+  const fresh = planChoreDays({ choreDays: [free], chores, today: MON, days: 3 });
+  assert.equal(fresh.days[0].items.length, 2);
+  const after = planChoreDays({ choreDays: [free], chores: [chore("b"), chore("c")], today: MON, days: 3, keptToday: new Set(["b"]), doneToday: [{ big: false }] });
+  assert.deepEqual(
+    after.days[0].items.map((i) => i.id),
+    ["b"],
+  );
+  assert.equal(where(after, "c"), TUE);
+});

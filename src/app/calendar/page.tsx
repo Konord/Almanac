@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { CaretLeft, CaretRight, Plus, X } from "@phosphor-icons/react/dist/ssr";
-import { ActionLink, AppFrame, HolidayColoursHere, IconLink, Notice, ScreenHeader, Segmented, SoftLink, firstParam, LoadingOutline } from "@/components/ui";
+import { ActionLink, AppFrame, HolidayColoursHere, IconLink, Notice, ScreenHeader, Segmented, firstParam, LoadingOutline } from "@/components/ui";
 import { RememberDisplay } from "@/components/remember-display";
 import { WallRefresh } from "@/components/wall-refresh";
 import { addMonths, dayOfWeek, daysWithPanel, firstOfMonth, monthGridDays, rollingWeekDays, weekDays } from "@/lib/calendar-layout";
@@ -141,7 +141,6 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
   // two days drop out instead (SPEC "Week view: LOCKED", REVISED), so five
   // keep their full width.
   const panelOpen = panelPrefs.open || routineOpen;
-  const away = !days.includes(today);
   const unit = byMonth ? "month" : "week";
   return (
     <>
@@ -149,8 +148,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
       <WallRefresh timeZone={timeZone} />
       {/* The grid is white and the header's words are on the rail, so Christmas and Halloween colours read fine. */}
       <HolidayColoursHere />
-      <div className="flex min-h-0 flex-1 flex-col lg:-mx-8 lg:-mt-6 lg:-mb-6">
-        <div className="lg:px-8">
+      <div className="flex min-h-0 flex-1 flex-col gap-3.5 lg:gap-5">
           <ScreenHeader
             {...headerTitle(view, days, anchor, household)}
             weather
@@ -165,8 +163,9 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
                 label="View"
                 options={[
                   { href: "/", label: "Agenda", active: false },
-                  { href: href({ view: "week", edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
-                  { href: href({ view: "month", edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
+                  // The tabs always bring you back to today (Connor, 2026-11-26), instead of a "This week" button.
+                  { href: href({ view: "week", date: null, edit: null, add: null, panel: null }), label: "Week", active: view === "week" },
+                  { href: href({ view: "month", date: null, edit: null, add: null, panel: null }), label: "Month", active: view === "month" },
                 ]}
               />
             }
@@ -181,14 +180,10 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
                 {placing ? "Stop" : "Add"}
               </ActionLink>
             }
-          >
-            {/* Away from this week or month: a way straight back. */}
-            {away ? <SoftLink href={href({ date: today, edit: null, add: null, panel: null })}>{`This ${unit}`}</SoftLink> : null}
-          </ScreenHeader>
-        </div>
+          />
         {/* No "tap a day" bar while adding (Connor, 2026-11-16): Add turns into Stop, and the days light up under a finger or the mouse. */}
         {error || message ? (
-          <div className="flex shrink-0 flex-col gap-2 pb-3 lg:px-8">
+          <div className="flex shrink-0 flex-col gap-2">
             {error ? <Notice tone="error">{error}</Notice> : null}
             {message ? <Notice tone="success">{message}</Notice> : null}
           </div>
@@ -200,7 +195,7 @@ async function CalendarContent({ searchParams }: { searchParams: PageProps<"/cal
             <TodayPanel
               household={household}
               today={today}
-              tab={panelPrefs.tab}
+              tab={firstParam(params.box)}
               returnTo={panelReturn}
               day
               routine={

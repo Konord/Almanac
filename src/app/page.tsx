@@ -14,9 +14,8 @@ import type { CalendarItem } from "./calendar/types";
 import { loadSpecialDays } from "./holidays/data";
 import { loadRoutines } from "./routines/data";
 import { loadMealBasics, loadMeals } from "./meals/data";
-import { mealsForRoutines, placeTodayMeals } from "./meals/today";
+import { cookHref, mealsForRoutines, placeTodayMeals } from "./meals/today";
 import { TodayPanel } from "./today-panel/panel";
-import { readPanelPrefs } from "./today-panel/prefs";
 import { floatingDay } from "./routines/floating";
 import { RoutineChecklist } from "./routines/routine-checklist";
 import { QuickAddSheet, readAdding } from "./calendar/adding";
@@ -26,7 +25,7 @@ import { choreSchedule } from "./chores/plan";
 import { reviewReminder } from "./review/data";
 import { eventsOnDay, isAllDayStyle, isPointEvent, minutesIntoDay } from "./calendar/views";
 import { AgendaFit, NowLabel } from "./agenda/fit";
-import { AllDayStrip, ComingUp, EventCard, RoutineCard, type AgendaEvent, type AgendaRoutine, type AllDayChip, type ComingUpItem } from "./agenda/parts";
+import { AllDayStrip, ComingUp, EventCard, MealCard, RoutineCard, type AgendaEvent, type AgendaMeal, type AgendaRoutine, type AllDayChip, type ComingUpItem } from "./agenda/parts";
 
 /**
  * Today (the Agenda), in the Glance look (docs/glance/SPEC.md, "Finalized
@@ -163,7 +162,10 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const nextEvent = timed
     .filter((e) => isToday && new Date(e.starts_at).getTime() > now.getTime())
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0];
-  type Card = { kind: "event"; startMin: number; past: boolean; event: AgendaEvent } | { kind: "routine"; startMin: number; past: boolean; routine: AgendaRoutine };
+  type Card =
+    | { kind: "event"; startMin: number; past: boolean; event: AgendaEvent }
+    | { kind: "routine"; startMin: number; past: boolean; routine: AgendaRoutine }
+    | { kind: "meal"; startMin: number; past: boolean; meal: AgendaMeal };
   const cards: Card[] = [
     ...timed.map((e): Card => {
       const startMin = startOf(e);
@@ -190,6 +192,27 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
       };
     }),
     ...[...grouped.values()].map((r): Card => ({ kind: "routine", startMin: r.startMin, past: r.past, routine: r })),
+    // The day's meals at their eating time (leftover blanks have nothing to show).
+    ...placedMeals
+      .filter((m) => !m.blank)
+      .map((m): Card => {
+        const past = isToday && (m.cooked || m.eatEnd <= nowMin);
+        return {
+          kind: "meal",
+          startMin: m.eatStart,
+          past,
+          meal: {
+            key: `meal:${m.id}`,
+            label: m.mealTimeName,
+            title: m.name,
+            emoji: m.icon,
+            start: shortClockTime(zonedToUtc(day, hhmm(m.eatStart), timeZone), locale, timeZone),
+            colour: m.cookId ? (colourOf.get(m.cookId) ?? null) : null,
+            href: cookHref(m),
+            past,
+          },
+        };
+      }),
   ].sort((a, b) => a.startMin - b.startMin);
   const finished = cards.filter((c) => c.past);
   const ahead = cards.filter((c) => !c.past);
@@ -229,7 +252,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
         title: e.title,
         emoji: eventEmoji(e.icon, e.title),
         when: quiet && isTomorrow ? time(e.starts_at) : `${new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(new Date(e.starts_at))} · ${time(e.starts_at)}`,
-        href: editLink(e),
+        // Tapping opens that day's Agenda, not the event's edit sheet (Connor, 2026-11-26).
+        href: `/?date=${localDateOf(new Date(e.starts_at), timeZone)}`,
         tomorrow: isTomorrow,
       };
     });
@@ -238,8 +262,15 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   const nextSlot = isToday ? Math.min(Math.ceil((nowMin + 1) / 30) * 30, 23 * 60) : 9 * 60;
   const addHref = withHere(`add=${day}&start=${hhmm(nextSlot)}`);
   // Which box the right-hand card shows (each screen remembers the last one picked).
-  const panelTab = (await readPanelPrefs()).tab;
-  const drawCard = (c: Card) => (c.kind === "event" ? <EventCard key={c.event.key} event={c.event} /> : <RoutineCard key={c.routine.key} routine={c.routine} />);
+  const panelTab = firstParam(params.box);
+  const drawCard = (c: Card) =>
+    c.kind === "event" ? (
+      <EventCard key={c.event.key} event={c.event} />
+    ) : c.kind === "meal" ? (
+      <MealCard key={c.meal.key} meal={c.meal} />
+    ) : (
+      <RoutineCard key={c.routine.key} routine={c.routine} />
+    );
 
   return (
     <>
@@ -265,8 +296,8 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             label="View"
             options={[
               { href: "/", label: "Agenda", active: isToday },
-              { href: `/calendar?view=week&date=${day}`, label: "Week", active: false },
-              { href: `/calendar?view=month&date=${day}`, label: "Month", active: false },
+              { href: "/calendar?view=week", label: "Week", active: false },
+              { href: "/calendar?view=month", label: "Month", active: false },
             ]}
           />
         }
