@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { WarningCircle } from "@phosphor-icons/react";
 import { Emoji } from "@/components/ui";
-import { ForecastCard } from "./forecast-card";
+import { ALERT_PILL, ForecastCard, toneOf } from "./forecast-card";
 import { degrees, describeWeather, type Forecast, type WeatherAnswer } from "@/lib/weather";
 
 /*
@@ -78,21 +77,36 @@ export function WeatherSlot() {
   const { now } = forecast;
   const look = describeWeather(now.code, now.isDay);
 
-  // A government weather alert goes to the left of the weather, in the
-  // Planner's warning look (Connor, 2026-11-26). Tap it for the forecast.
+  // A government weather alert goes to the left of the weather, coloured by
+  // how serious it is, with its weather as a picture (Connor, 2026-11-26). Tap it for the forecast.
   const alert = forecast.alerts?.[0];
   return (
     <>
       {alert ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="hidden min-h-13 max-w-[26rem] min-w-0 shrink items-center gap-[0.5rem] rounded-full bg-alert-soft px-5 text-[1.5rem] font-bold text-now-on-tint lg:flex"
-        >
-          <WarningCircle size="0.9em" weight="fill" className="shrink-0" aria-hidden />
-          <span className="truncate">{alert.name}</span>
-          {forecast.alerts.length > 1 ? <span className="shrink-0">+{forecast.alerts.length - 1}</span> : null}
-        </button>
+        toneOf(alert) === "statement" ? (
+          // A statement or advisory: just the picture; what it says is in the pop-up.
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={`${alert.name}: ${alert.short}`}
+            className={`relative hidden size-13 shrink-0 items-center justify-center rounded-full lg:flex ${ALERT_PILL.statement}`}
+          >
+            <Emoji emoji={alert.emoji ?? "⚠️"} className="size-[2.2rem]" />
+            {forecast.alerts.length > 1 ? (
+              <span className="absolute -top-1 -right-1 rounded-full bg-board px-1.5 text-[1.125rem] font-bold leading-tight text-ink shadow-raised">+{forecast.alerts.length - 1}</span>
+            ) : null}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className={`hidden min-h-13 max-w-[26rem] min-w-0 shrink items-center gap-[0.5rem] rounded-full px-5 text-[1.5rem] font-bold lg:flex ${ALERT_PILL[toneOf(alert)]}`}
+          >
+            <Emoji emoji={alert.emoji ?? "⚠️"} className="-ml-1 size-[2rem]" />
+            <span className="truncate">{alert.short ?? alert.name}</span>
+            {forecast.alerts.length > 1 ? <span className="shrink-0">+{forecast.alerts.length - 1}</span> : null}
+          </button>
+        )
       ) : null}
       <button
         type="button"

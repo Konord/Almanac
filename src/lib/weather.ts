@@ -98,6 +98,15 @@ export type WeatherAlert = {
   text: string;
   /** When it runs out (ISO), or null. */
   until: string | null;
+  /**
+   * What the header pill says: the alert's name, or for a vague one ("Special
+   * weather statement", "Weather advisory") what it's about, found in its
+   * words ("Snow squalls"). Connor, 2026-11-26.
+   */
+  short: string;
+  level: AlertLevel;
+  /** Its weather as a picture: ❄️, 🌧️, 🥶 … */
+  emoji: string;
 };
 
 /** What /api/weather answers. */
@@ -361,6 +370,54 @@ export function inCanadaArea(place: WeatherPlace): boolean {
 }
 
 const ALERT_ORDER = ["warning", "watch", "advisory", "statement"];
+
+/** Names that don't say what the weather is. */
+const VAGUE = /^(special weather statement|weather advisory|special air quality statement)$/i;
+
+/** What a vague alert is about, by the first of these its words mention (most specific first). */
+const TOPICS: [RegExp, string, string][] = [
+  [/snow squall/i, "Snow squalls", "🌨️"],
+  [/freezing rain/i, "Freezing rain", "🧊"],
+  [/freezing drizzle/i, "Freezing drizzle", "🧊"],
+  [/blizzard/i, "Blizzard", "🌬️"],
+  [/blowing snow/i, "Blowing snow", "🌬️"],
+  [/ice pellets/i, "Ice pellets", "🧊"],
+  [/snowfall|heavy snow|winter storm|snow\b/i, "Snow", "❄️"],
+  [/thunderstorm/i, "Thunderstorms", "⛈️"],
+  [/tornado/i, "Tornado risk", "🌪️"],
+  [/rainfall|heavy rain|\brain\b/i, "Heavy rain", "🌧️"],
+  [/flash flood|flood|storm surge/i, "Flooding", "🌊"],
+  [/wind chill|extreme cold|arctic|cold/i, "Extreme cold", "🥶"],
+  [/\bheat\b|humidex/i, "Heat", "🥵"],
+  [/wind/i, "Strong winds", "💨"],
+  [/fog/i, "Fog", "🌫️"],
+  [/frost/i, "Frost", "❄️"],
+  [/smoke|air quality/i, "Air quality", "😷"],
+];
+
+/** What a vague alert is about ("Snow squalls"), or null. */
+export function alertTopic(text: string): string | null {
+  return TOPICS.find(([re]) => re.test(text))?.[1] ?? null;
+}
+
+/** The picture for an alert: its weather, by name then words (⚠️ if neither says). */
+export function alertEmoji(name: string, text: string): string {
+  return (TOPICS.find(([re]) => re.test(name)) ?? TOPICS.find(([re]) => re.test(text)))?.[2] ?? "⚠️";
+}
+
+/**
+ * How serious, for how it looks from across the room (Connor, 2026-11-26:
+ * "i and ! are hard to tell apart from a distance"): a statement or advisory
+ * is soft red, a watch orange, a warning solid red.
+ */
+export type AlertLevel = "statement" | "watch" | "warning";
+export function alertLevel(kind: string, name: string): AlertLevel {
+  const k = `${kind} ${name}`.toLowerCase();
+  if (/warning/.test(k)) return "warning";
+  if (/watch/.test(k)) return "watch";
+  return "statement";
+}
+
 const COLOUR_ORDER = ["red", "orange", "yellow"];
 
 /**
@@ -375,19 +432,25 @@ export function parseAlerts(raw: unknown, now: Date): WeatherAlert[] | null {
     const p = (f as { properties?: Record<string, unknown> } | null)?.properties;
     if (!p) continue;
     const str = (k: string) => (typeof p[k] === "string" && (p[k] as string).trim() ? (p[k] as string).trim() : null);
-    const name = str("alert_short_name_en") ?? str("alert_name_en");
+    // The full name ("special weather statement"); the short one can be just "special weather".
+    const name = str("alert_name_en") ?? str("alert_short_name_en");
     if (!name) continue;
     const status = (str("status_en") ?? "").toLowerCase();
     if (status.includes("cancel") || status.includes("ended")) continue;
     const until = str("expiration_datetime") ?? str("event_end_datetime");
     if (until && !Number.isNaN(Date.parse(until)) && Date.parse(until) <= now.getTime()) continue;
     const colour = str("risk_colour_en")?.toLowerCase() ?? null;
+    const full = name.charAt(0).toUpperCase() + name.slice(1);
+    const text = str("alert_text_en") ?? "";
     const alert: WeatherAlert = {
       kind: (str("alert_type") ?? "").toLowerCase(),
-      name: name.charAt(0).toUpperCase() + name.slice(1),
+      name: full,
       colour: colour && COLOUR_ORDER.includes(colour) ? colour : null,
-      text: str("alert_text_en") ?? "",
+      text,
       until,
+      short: VAGUE.test(full) ? (alertTopic(text) ?? full) : full,
+      level: alertLevel(str("alert_type") ?? "", full),
+      emoji: alertEmoji(VAGUE.test(full) ? "" : full, text),
     };
     const key = alert.name.toLowerCase();
     const had = out.get(key);

@@ -69,6 +69,17 @@ export type ThemeTokens = {
     missedSoft: string;
     /** Health: the shaded band on a reading above its line (a fever) */
     alertSoft: string;
+    /** A weather statement or advisory: calm sky blue (Connor: not red, orange, yellow or green). */
+    alertInfo: string;
+    alertInfoEdge: string;
+    /** A weather watch: its own colour, violet, with white ink. */
+    alertWatch: string;
+    /** An orange warning (Environment Canada's colour), with dark ink. */
+    alertOrange: string;
+    alertOrangeInk: string;
+    /** A yellow warning (Environment Canada's colour), with dark ink. */
+    alertYellow: string;
+    alertYellowInk: string;
     /** The tray handle bar */
     handle: string;
     /** The art screen saver's mat board: white, cream and charcoal (src/components/screen-saver.tsx) */
@@ -165,6 +176,13 @@ export const brightTheme: Theme = {
       missed: "#D9533F",
       missedSoft: "#F2A79A",
       alertSoft: "#FDECE8",
+      alertInfo: "#D4EAF7",
+      alertInfoEdge: "#5B9FCB",
+      alertWatch: "#6A44A8",
+      alertOrange: "#F4A340",
+      alertOrangeInk: "#3D2200",
+      alertYellow: "#F6D44C",
+      alertYellowInk: "#3A2E00",
       handle: "#C5C8CE",
       matWhite: "#F7F6F2",
       matCream: "#ECE5D6",
