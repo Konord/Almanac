@@ -35,7 +35,7 @@ import { soft, strong } from "@/lib/colours";
 import { ChecksMenu, KindBox, PickerBox, type KindChoice, type Picker } from "./boxes";
 import type { ReviewColumn, ReviewData } from "./data";
 import { ChoreColumn, choresOnDay, useChorePlan, type PlannedChore } from "./chores-view";
-import { GrocerySheet } from "./grocery-sheet";
+import { GroceryPanel } from "./grocery-sheet";
 import { MealBox, type MealTarget } from "./meal-box";
 import { Face, SectionTitle, type Person } from "./parts";
 
@@ -319,11 +319,7 @@ export function ReviewBoard({
         // The checks sit in the middle, in the same quiet type the title's second line used.
         middle={
           <>
-            {weekHref.isComing ? null : (
-              <button type="button" onClick={() => go(weekHref.coming)} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] px-3 text-2xl font-bold whitespace-nowrap text-accent lg:text-[2rem]">
-                The coming week
-              </button>
-            )}
+            {/* No "The coming week" link (Connor, 2026-11-26): the Week tab goes back to it. */}
             <div className="flex min-w-0">
               <ChecksMenu problems={problems} onFix={(p) => p.fix && change((d) => applyFix(d, p.fix!.apply))} onLeave={(p) => change((d) => dismiss(d, p.id))} />
             </div>
@@ -338,9 +334,18 @@ export function ReviewBoard({
         }
         tabs={
           <div className={segTrackClass} role="group" aria-label="Show">
-            <ViewButton on={view === "week" && !groceries} onClick={() => { setGroceries(false); setView("week"); }} label="Week" />
+            <ViewButton
+              on={view === "week" && !groceries}
+              onClick={() => {
+                setGroceries(false);
+                setView("week");
+                // Like Week on the calendar: tapping it brings you back to the coming week.
+                if (!weekHref.isComing) go(weekHref.coming);
+              }}
+              label="Week"
+            />
             <ViewButton on={view === "chores" && !groceries} onClick={() => { setGroceries(false); setView("chores"); }} label="Chores" />
-            {/* Groceries opens the grocery list beside the week. */}
+            {/* Groceries shows the grocery list in place of the week, like the other two tabs. */}
             <ViewButton on={groceries} onClick={() => setGroceries(true)} label="Groceries" />
           </div>
         }
@@ -360,7 +365,10 @@ export function ReviewBoard({
         }
       />
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 border-t border-frame bg-board sm:grid-cols-4 lg:grid-cols-7">
+      {groceries ? (
+        <GroceryPanel dirty={dirty} />
+      ) : (
+      <div className="grid min-h-0 flex-1 grid-cols-2 overflow-hidden rounded-[var(--radius-card)] bg-board shadow-raised sm:grid-cols-4 lg:grid-cols-7">
         {data.columns.map((col, i) => {
           const groups = groupsOn(col.date);
           const chores = choresOn(col.date);
@@ -471,6 +479,7 @@ export function ReviewBoard({
           );
         })}
       </div>
+      )}
 
       {mealTarget ? (
         <MealBox
@@ -509,7 +518,7 @@ export function ReviewBoard({
           })()
         : null}
       {picker ? <PickerBox picker={picker} onClose={() => setPicker(null)} /> : null}
-      {groceries ? <GrocerySheet dirty={dirty} onClose={() => setGroceries(false)} /> : null}
+
       {guard.leaving || goTo ? (
         <LeaveDialog
           what="this week"
