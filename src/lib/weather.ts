@@ -377,11 +377,11 @@ const VAGUE = /^(special weather statement|weather advisory|special air quality 
 /** What a vague alert is about, by the first of these its words mention (most specific first). */
 const TOPICS: [RegExp, string, string][] = [
   [/snow squall/i, "Snow squalls", "🌨️"],
-  [/freezing rain/i, "Freezing rain", "🧊"],
-  [/freezing drizzle/i, "Freezing drizzle", "🧊"],
+  [/freezing rain/i, "Freezing rain", "🌧️"],
+  [/freezing drizzle/i, "Freezing drizzle", "🌧️"],
   [/blizzard/i, "Blizzard", "🌬️"],
   [/blowing snow/i, "Blowing snow", "🌬️"],
-  [/ice pellets/i, "Ice pellets", "🧊"],
+  [/ice pellets/i, "Ice pellets", "🌨️"],
   [/snowfall|heavy snow|winter storm|snow\b/i, "Snow", "❄️"],
   [/thunderstorm/i, "Thunderstorms", "⛈️"],
   [/tornado/i, "Tornado risk", "🌪️"],
@@ -392,7 +392,7 @@ const TOPICS: [RegExp, string, string][] = [
   [/wind/i, "Strong winds", "💨"],
   [/fog/i, "Fog", "🌫️"],
   [/frost/i, "Frost", "❄️"],
-  [/smoke|air quality/i, "Air quality", "😷"],
+  [/smoke|air quality/i, "Air quality", "🌫️"],
 ];
 
 /** What a vague alert is about ("Snow squalls"), or null. */
