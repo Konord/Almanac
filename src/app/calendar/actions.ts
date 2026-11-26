@@ -418,6 +418,21 @@ export async function removeTemplate(formData: FormData) {
   back(formData, "message", `Removed the ${name} template.`);
 }
 
+/** "+ New template" on the Templates page: a blank one, opened straight away to fill in. */
+export async function newTemplate(formData: FormData) {
+  const household = await requireHousehold();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("event_templates")
+    .insert({ household_id: household.id, title: "New template", minutes: household.settings.defaultEventMinutes, all_day: false, member_ids: [], sort_order: 100 })
+    .select("id")
+    .single();
+  if (error) back(formData, "error", error.message);
+  await log(household.id, "template_added", "event_template", data.id, "New template");
+  revalidatePath("/calendar");
+  redirect(`/templates?tpl=${data.id}`);
+}
+
 /** Saves the template card: name, picture, usual start and length, people, kind of day and notes. */
 export async function updateTemplate(formData: FormData) {
   const household = await requireHousehold();

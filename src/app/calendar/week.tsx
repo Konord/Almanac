@@ -134,7 +134,7 @@ export function WeekView({
         <>
           <span aria-hidden className="absolute inset-y-0 left-0 w-[0.35rem]" style={{ background: bar }} />
           <CardBody box={box} time={timeText(startMin, box.short)} emoji={<Emoji emoji={eventEmoji(e.icon, e.title)} className={emojiClass(box)} />}>
-            <HandText colour={monthInk(e, memberById)} className={titleClass()}>
+            <HandText colour={monthInk(e, memberById)} className={titleClass(box)}>
               {e.recurrence_rule ? <span className="sr-only">Repeats: </span> : null}
               {e.title}
             </HandText>
@@ -171,7 +171,7 @@ export function WeekView({
         draw: (box) => (
           <Link href={m.href} aria-label={`${m.name}: start cooking`} className={`${cardClass(box)} bg-meal`}>
             <CardBody box={box} time={timeText(m.startMin, box.short)} emoji={<Emoji emoji={m.icon} className={emojiClass(box)} />} meal>
-              <span className={`font-hand text-meal-ink ${titleClass()}`}>{m.name}</span>
+              <span className={`font-hand text-meal-ink ${titleClass(box)}`}>{m.name}</span>
             </CardBody>
           </Link>
         ),
@@ -197,7 +197,7 @@ export function WeekView({
               time={`${t.date_kind === "due" ? "by " : ""}${timeText(startMin, box.short || t.date_kind === "due")}`}
               emoji={<span aria-hidden className={`${box.short ? "size-[1.35rem]" : "size-[1.75rem] justify-self-center"} shrink-0 rounded-full border-[0.2rem] bg-board`} style={{ borderColor: colour ? strong(colour) : "var(--color-check-border)" }} />}
             >
-              <span className={`font-hand ${titleClass()}`} style={{ color: hand(colour) }}>
+              <span className={`font-hand ${titleClass(box)}`} style={{ color: hand(colour) }}>
                 {t.title}
               </span>
             </CardBody>
@@ -393,13 +393,21 @@ function emojiClass({ short }: { short: boolean; tall: boolean }): string {
   return short ? "size-[1.5rem]" : "size-[2.15rem]";
 }
 
-function titleClass(): string {
-  return "line-clamp-2 min-w-0 text-[1.25rem] leading-[1.15] font-bold";
+/**
+ * As many lines as the card has room for (UI audit H6, 2026-11-21): an
+ * hour-long card has room for three under its height, or two when it is
+ * squeezed beside another card (its time and picture take a line). A
+ * longer card adds one more.
+ */
+function titleClass(box: { short: boolean; tall: boolean }): string {
+  const lines = (box.short ? 2 : 3) + (box.tall ? 1 : 0);
+  const clamp = { 2: "line-clamp-2", 3: "line-clamp-3", 4: "line-clamp-4" }[lines];
+  return `${clamp} min-w-0 text-[1.25rem] leading-[1.15] font-bold break-words hyphens-auto`;
 }
 
 /**
- * Inside a card: printed start time, picture, handwritten title (two lines
- * at most). Full width it's one row like the agenda; squeezed beside
+ * Inside a card: printed start time, picture, handwritten title (as many
+ * lines as fit, see titleClass). Full width it's one row like the agenda; squeezed beside
  * others the time and picture go on a line above the title.
  */
 function CardBody({

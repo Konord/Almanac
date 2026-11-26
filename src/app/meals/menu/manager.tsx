@@ -199,7 +199,7 @@ export function MenuManager({
         )}
       </MealsHeader>
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[18rem_22rem_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_26rem_minmax(0,1fr)]">
         {/* Kinds of meal */}
         <section className={card}>
           <h2 className={h2}>Kinds of meal</h2>
@@ -217,7 +217,7 @@ export function MenuManager({
                   className={`${pickRowClass(r.id === pickedRow.id)} ${r.active ? "" : "opacity-55"}`}
                 >
                   <Emoji emoji={r.icon} className="size-[2.15rem]" />
-                  <span className={`min-w-0 flex-1 truncate text-[1.5rem] font-extrabold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name"}</span>
+                  <span className={`line-clamp-2 min-w-0 flex-1 text-left text-[1.5rem] leading-[1.15] font-extrabold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name"}</span>
                   <span className="tabular text-[1.35rem] font-extrabold text-ink-muted">{r.count ?? ""}</span>
                 </button>
               </li>
@@ -254,7 +254,7 @@ export function MenuManager({
               <li key={m.id}>
                 <button type="button" onClick={() => setSelected(m.id)} aria-pressed={m.id === meal?.id} className={pickRowClass(m.id === meal?.id)}>
                   <Emoji emoji={menuMealIcon(asLike(m), dishById) ?? "🍽️"} className="size-[2.15rem]" />
-                  <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{nameOf(m)}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 text-left text-[1.5rem] leading-[1.15] font-extrabold text-ink">{nameOf(m)}</span>
                 </button>
               </li>
             ))}
@@ -411,7 +411,7 @@ function MealEditor({
           <Trash size="1.5rem" aria-hidden />
         </button>
       </div>
-      <p className="mt-1 shrink-0 text-[1.25rem] font-bold text-ink-muted">Spots in this meal. A set dish, or one you pick on the day.</p>
+      <p className="mt-1 shrink-0 text-[1.25rem] font-bold text-ink-muted">What goes in this meal: a set dish, or one you pick on the day.</p>
 
       {categories.length ? (
         <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2" role="group" aria-label="Kinds of meal it's in">

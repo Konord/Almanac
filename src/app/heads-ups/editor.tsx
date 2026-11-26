@@ -1,6 +1,7 @@
 import { X } from "@phosphor-icons/react/dist/ssr";
 import { Button, Chips, Emoji, fieldLabelClass, Input } from "@/components/ui";
 import { LEAD_UNITS, leadLabel } from "@/lib/heads-ups";
+import { NumberStepper } from "@/components/touch-pickers";
 import { createClient } from "@/lib/supabase/server";
 import { addHeadsUp, removeHeadsUp } from "./actions";
 
@@ -75,9 +76,9 @@ export function HeadsUpEditor({
               <span className={fieldLabelClass}>New heads-up</span>
               <Input name="huLabel" maxLength={80} />
             </label>
-            <label className="flex w-28 shrink-0 flex-col gap-[0.35rem]">
+            <label className="flex shrink-0 flex-col gap-[0.35rem]">
               <span className={fieldLabelClass}>How long</span>
-              <Input name="huAmount" type="number" min={0} max={999} defaultValue={1} className="tabular-nums" />
+              <NumberStepper name="huAmount" min={0} max={999} defaultValue={1} aria-label="How long" />
             </label>
           </div>
           <div className="flex flex-wrap items-end gap-x-5 gap-y-3">

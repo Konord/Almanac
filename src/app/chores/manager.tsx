@@ -18,6 +18,7 @@ import {
   whoChipStyle,
 } from "@/components/ui";
 import { EmojiPicker } from "@/components/emoji-picker";
+import { DayField, NumberStepper, TimeField } from "@/components/touch-pickers";
 import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { hand, soft } from "@/lib/colours";
@@ -74,6 +75,15 @@ export type DayPreview = { date: string; items: { icon: string | null; name: str
 
 type Selection = { kind: "occasional" } | { kind: "day"; id: string };
 type Tab = "chore" | "repeats" | "more";
+
+/**
+ * When an occasional chore comes next, in one wording everywhere (UI audit M7):
+ * the day it's put on (or due), "Today", or "Overdue".
+ */
+function whenText(i: OccasionalInfo, today: string, dateLabel: (d: string) => string): string {
+  const on = i.placedOn ?? i.dueOn;
+  return on < today ? "Overdue" : on === today ? "Today" : dateLabel(on);
+}
 
 const DAYS_PER_PAGE = 8;
 const OCCASIONAL_PER_PAGE = 9;
@@ -190,9 +200,8 @@ export function ChoreManager({
   const dateLabel = (d: string) =>
     d === today ? "Today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   // Short, like the mock's "Fri 20", so the line fits the 22rem card.
-  const nextLabel = (d: string) =>
-    d < today ? "overdue" : d === today ? "today" : new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const timeLabel = (t: string) => wallTime(t, locale);
+  const whenLabel = (i: OccasionalInfo) => whenText(i, today, dateLabel);
 
   const days = [...draft.days.filter((d) => !d.is_free), ...draft.days.filter((d) => d.is_free)];
   const dayPages = Math.max(1, Math.ceil(days.length / daysPerPage));
@@ -256,11 +265,8 @@ export function ChoreManager({
           type="button"
           onClick={() => setSelection({ kind: "occasional" })}
           aria-pressed={selection.kind === "occasional"}
-          className="flex w-full flex-col gap-[0.2rem] rounded-[var(--radius-card)] px-4 py-[0.85rem] text-left"
-          style={{
-            background: soft("orange"),
-            boxShadow: selection.kind === "occasional" ? "inset 0 0 0 2px var(--color-ink)" : undefined,
-          }}
+          // The same picked look as every other list (UI audit M6): grey with a dark ring.
+          className={`flex w-full flex-col gap-[0.2rem] rounded-[var(--radius)] px-3 py-[0.85rem] text-left ${selection.kind === "occasional" ? "bg-rail shadow-[inset_0_0_0_2px_var(--color-ink)]" : "hover:bg-rail"}`}
         >
           <span className="flex items-center gap-[0.7rem]">
             <Emoji emoji="🔁" className="size-[2.4rem]" />
@@ -271,7 +277,7 @@ export function ChoreManager({
           </span>
           {nextUp ? (
             <span className="line-clamp-2 text-[1.25rem] leading-tight font-bold" style={{ color: hand("orange") }}>
-              Next: {nextUp.name}, {nextLabel(info[nextUp.id].placedOn ?? info[nextUp.id].dueOn)}
+              Next: {nextUp.name} · {whenLabel(info[nextUp.id])}
             </span>
           ) : null}
           {hardCount > 0 ? (
@@ -491,7 +497,7 @@ function DayPanel({
                 </option>
               ))}
             </select>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Due by" className={`${control} w-[11.5rem] px-3!`} />
+            <TimeField value={time} onChange={setTime} step={5} allowEmpty emptyText="Any time" aria-label="Due by" className="w-[12rem]! shrink-0 px-3!" />
             <button type="button" onClick={add} disabled={!name.trim()} className={`${primaryActionClass} text-[1.25rem]! disabled:opacity-40`}>
               <Plus size="1.25rem" weight="bold" aria-hidden />
               Add
@@ -521,7 +527,7 @@ function DayPanel({
                           ))}
                         </select>
                       </label>
-                      <input type="time" value={c.due_time ?? ""} onChange={(e) => setChore(c.id, { due_time: e.target.value || null })} aria-label="Due by" className={`${control} w-[11.5rem] px-3!`} />
+                      <TimeField value={c.due_time ?? ""} onChange={(t) => setChore(c.id, { due_time: t || null })} step={5} allowEmpty emptyText="Any time" aria-label="Due by" className="w-[12rem]! shrink-0 px-3!" />
                     </div>
                     <div className="flex items-center gap-2">
                       <input value={c.notes ?? ""} onChange={(e) => setChore(c.id, { notes: e.target.value || null })} maxLength={2000} placeholder="Notes" aria-label="Notes" className={`${control} flex-1 placeholder:text-ink-muted`} />
@@ -675,7 +681,8 @@ function OccasionalPanel({
   // New chores (not saved yet) show under their first date: the one set, or a quiet day picked for them.
   const picked = autoFirstDues(draft.occasional, dueOnOf(info), today);
   const firstOf = (c: DraftOccasional) => c.first_due ?? picked.get(c.id) ?? today;
-  const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id] ? (c.first_due && info[c.id].firstTime ? c.first_due : info[c.id].dueOn) : firstOf(c) }));
+  // In the order they come up: the day each is put on (or due), the same day the row shows (UI audit M7).
+  const withDue = draft.occasional.map((c) => ({ chore: c, dueOn: info[c.id] ? (c.first_due && info[c.id].firstTime ? c.first_due : (info[c.id].placedOn ?? info[c.id].dueOn)) : firstOf(c) }));
   const tabs = seasonTabs(withDue, today);
   const selected = draft.occasional.find((c) => c.id === choreId) ?? null;
   const selectedSeason = selected ? tabs.find((t) => t.chores.some((x) => x.chore.id === selected.id))?.season : undefined;
@@ -692,6 +699,9 @@ function OccasionalPanel({
   const p = Math.min(page, pages - 1);
   const shown = tab.chores.slice(p * occasionalPerPage, (p + 1) * occasionalPerPage);
   const dayById = new Map(draft.days.map((d) => [d.id, d]));
+  const whenLabel = (i: OccasionalInfo) => whenText(i, today, dateLabel);
+  // Nothing tapped yet: the first chore on show is open, so the editor's room isn't spent on a hint (UI audit M3).
+  const current = selected ?? shown[0]?.chore ?? null;
 
   const ruleText = (c: DraftOccasional) => {
     const cols = ruleColumns(c);
@@ -767,16 +777,16 @@ function OccasionalPanel({
             const i = info[c.id];
             const isNew = c.id.startsWith(NEW_PREFIX);
             const hard = c.active ? i?.hard : null;
-            const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : i.dueOn < today ? "Overdue" : i.dueOn === today ? "Due today" : dateLabel(i.placedOn ?? i.dueOn);
+            const due = !i ? `New · ${dateLabel(firstOf(c))}` : i.onToday ? "" : whenLabel(i);
             return (
-              <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-frame ${c.id === choreId ? "rounded-[var(--radius)] border-transparent bg-rail px-2 shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
+              <li key={c.id} className={`flex min-h-16 items-center gap-2 border-b border-frame ${c.id === current?.id ? "rounded-[var(--radius)] border-transparent bg-rail px-2 shadow-[inset_0_0_0_2px_var(--color-ink)]" : ""}`}>
                 <button type="button" onClick={() => setChoreId(c.id)} className={`flex min-w-0 flex-1 items-center gap-3 self-stretch text-left ${c.active ? "" : "opacity-55"}`}>
                   <Emoji emoji={eventEmoji(c.icon, c.name, CHORE_PICTURE)} className="size-[2.15rem]" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-[1.35rem] leading-tight font-bold text-ink">{c.name || "Unnamed"}</span>
                     <span className={`truncate text-[1.15rem] font-bold ${hard ? "text-now-on-tint" : "text-ink-muted"}`}>{!c.active ? "Paused" : (hard ?? ruleText(c))}</span>
                   </span>
-                  <span className="shrink-0 text-[1.15rem] font-extrabold text-ink-muted" style={due === "Overdue" || due === "Due today" ? { color: hand("orange") } : undefined}>
+                  <span className="shrink-0 text-[1.15rem] font-extrabold text-ink-muted" style={due === "Overdue" || due === "Today" ? { color: hand("orange") } : undefined}>
                     {due}
                   </span>
                 </button>
@@ -789,10 +799,10 @@ function OccasionalPanel({
                     type="button"
                     onClick={() => plus(c.id)}
                     disabled={busy !== null}
-                    aria-label={`Add ${c.name} to the Daily list`}
-                    className="flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full bg-primary text-primary-ink disabled:opacity-40"
+                    aria-label={`Do ${c.name} today: put it on the Daily list`}
+                    className="flex min-h-[var(--touch-target)] shrink-0 items-center rounded-full px-3 text-[1.15rem] font-bold text-accent hover:bg-rail disabled:opacity-40"
                   >
-                    <Plus size="1.375rem" weight="bold" aria-hidden />
+                    Do today
                   </button>
                 ) : null}
               </li>
@@ -809,12 +819,12 @@ function OccasionalPanel({
         </div>
       </div>
 
-      {selected ? (
+      {current ? (
         <OccasionalEditor
-          key={selected.id}
-          chore={selected}
-          info={info[selected.id]}
-          firstDue={selected.first_due ?? picked.get(selected.id) ?? info[selected.id]?.dueOn ?? null}
+          key={current.id}
+          chore={current}
+          info={info[current.id]}
+          firstDue={current.first_due ?? picked.get(current.id) ?? info[current.id]?.dueOn ?? null}
           draft={draft}
           update={update}
           members={members}
@@ -827,7 +837,7 @@ function OccasionalPanel({
           timeZone={timeZone}
         />
       ) : (
-        <EmptyState emoji="🧹" hint="Tap a chore to change how often it comes round" />
+        <EmptyState emoji="🧹" hint="No occasional chores yet" />
       )}
     </div>
   );
@@ -910,7 +920,7 @@ function OccasionalEditor({
         // Never done yet: its first date can be moved. New chores get a quiet day.
         <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-ink-muted">
           <span>{info ? "Not done yet · first time" : "First time"}</span>
-          <input type="date" value={firstDue} onChange={(e) => set({ first_due: e.target.value || null })} aria-label="First time it's due" className={smallControl} />
+          <DayField value={firstDue} onChange={(d) => set({ first_due: d || null })} aria-label="First time it's due" className="w-auto! px-3! text-[1.25rem]!" />
           {info ? null : c.first_due ? (
             <button type="button" onClick={() => set({ first_due: null })} className="flex min-h-[var(--touch-target)] items-center rounded-[var(--radius)] bg-board px-4 font-bold text-ink">
               Pick a free day
@@ -983,19 +993,11 @@ function OccasionalEditor({
                     A set date
                   </Chip>
                   {c.repeat_from === "date" ? (
-                    <input type="date" value={c.start_date ?? ""} onChange={(e) => set({ start_date: e.target.value || null })} aria-label="The date it counts from" className={smallControl} />
+                    <DayField value={c.start_date ?? ""} onChange={(d) => set({ start_date: d || null })} aria-label="The date it counts from" className="w-auto! px-3! text-[1.25rem]!" />
                   ) : null}
                 </Group>
                 <Group label="Every">
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={c.repeat_every}
-                    onChange={(e) => set({ repeat_every: Math.max(1, Math.min(365, Number(e.target.value) || 1)) })}
-                    aria-label="How many"
-                    className={`${smallControl} w-20 text-center`}
-                  />
+                  <NumberStepper value={c.repeat_every} onChange={(n) => set({ repeat_every: n ?? 1 })} min={1} max={365} aria-label="How many" />
                   {UNIT_CHIPS.map((u) => (
                     <Chip key={u.value} on={c.repeat_unit === u.value} onClick={() => set({ repeat_unit: u.value })}>
                       {u.label}
@@ -1063,7 +1065,7 @@ function OccasionalEditor({
               <label className="flex flex-col gap-1">
                 <span className={fieldLabelClass}>At an exact time (optional)</span>
                 <span className="flex items-center gap-1.5">
-                  <input type="time" value={c.at_time ?? ""} onChange={(e) => set({ at_time: e.target.value || null })} aria-label="At an exact time" className={smallControl} />
+                  <TimeField value={c.at_time ?? ""} onChange={(t) => set({ at_time: t || null })} step={5} allowEmpty emptyText="No set time" aria-label="At an exact time" className="w-auto! px-3! text-[1.25rem]!" />
                   {c.at_time ? (
                     <IconButton label="No set time" onClick={() => set({ at_time: null })}>
                       <X size="1.25rem" aria-hidden />
@@ -1120,7 +1122,7 @@ function HeadsUps({ list, onChange }: { list: DraftHeadsUp[]; onChange: (list: D
       {list.length < MAX_HEADS_UPS ? (
         <div className="flex items-center gap-1.5">
           <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="New heads-up" aria-label="New heads-up" className={`${smallControl} flex-1 placeholder:text-ink-muted`} />
-          <input type="number" min={0} max={60} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))} aria-label="How long before" className={`${smallControl} w-16 text-center`} />
+          <NumberStepper value={amount} onChange={(n) => setAmount(n ?? 0)} min={0} max={60} aria-label="How long before" className="shrink-0" />
           <select value={unit} onChange={(e) => setUnit(e.target.value as LeadUnit)} aria-label="Unit" className={smallControl}>
             {LEAD_UNITS.map((u) => (
               <option key={u.unit} value={u.unit}>

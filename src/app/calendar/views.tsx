@@ -270,11 +270,12 @@ export function MonthView({
               </span>
               <span className={`relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col gap-[0.08rem] pt-[0.06rem] ${past ? "opacity-55" : ""}`}>
                 {timed.map((e, n) => (
-                  <span key={e.id} data-month-ev hidden={n >= MONTH_CELL_LIMIT} className="flex min-w-0 shrink-0 items-center gap-[0.45rem] pr-[0.15rem]">
+                  <span key={e.id} data-month-ev hidden={n >= MONTH_CELL_LIMIT} className="flex min-w-0 shrink-0 items-start gap-[0.45rem] pr-[0.15rem]">
                     <span className="grid size-[1.6rem] shrink-0 place-items-center">
                       <Emoji emoji={eventEmoji(e.icon, e.title)} className="size-[1.45rem]" />
                     </span>
-                    <HandText colour={monthInk(e, memberById)} className="min-w-0 truncate text-[1.15rem] leading-[1.15] font-bold">
+                    {/* Up to two lines where the square has room; MonthFit squeezes them back to one line before it hides anything (UI audit H6). */}
+                    <HandText data-month-title colour={monthInk(e, memberById)} className="line-clamp-2 min-w-0 text-[1.15rem] leading-[1.15] font-bold break-words hyphens-auto">
                       {e.title}
                     </HandText>
                   </span>

@@ -74,14 +74,14 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
         </ActionLink>
       </MealsHeader>
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[16rem_22rem_minmax(0,1fr)]">
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[15rem_26rem_minmax(0,1fr)]">
         <section className={card}>
           <h2 className={h2}>In a meal</h2>
           <ul className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {kindPage.items.map((r) => (
               <li key={r.id}>
                 <Link href={here({ kind: r.id === ALL ? null : r.id, recipe: null })} scroll={false} aria-current={r.id === picked ? "true" : undefined} className={pickRowClass(r.id === picked)}>
-                  <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{r.name}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 text-[1.5rem] leading-[1.15] font-extrabold text-ink">{r.name}</span>
                   <span className="tabular text-[1.35rem] font-extrabold text-ink-muted">{r.count}</span>
                 </Link>
               </li>
@@ -95,14 +95,13 @@ async function Library({ searchParams }: { searchParams: PageProps<"/meals/libra
             key={picked}
             heading={pickedName}
             fallback={DISH_PAGE}
-            paging="more"
             focus={openRecipe ? list.indexOf(openRecipe) : undefined}
             empty={<li className="px-1 text-lg text-ink-muted">No dishes yet</li>}
             rows={list.map((r) => (
               <li key={r.id}>
                 <Link href={here({ recipe: r.id })} scroll={false} aria-current={r.id === openRecipe?.id ? "true" : undefined} className={pickRowClass(r.id === openRecipe?.id)}>
                   <Emoji emoji={r.icon ?? basics.kinds.find((k) => k.id === r.kind_ids[0])?.icon} className="size-[2.15rem]" />
-                  <span className="min-w-0 flex-1 truncate text-[1.5rem] font-extrabold text-ink">{r.name}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 text-[1.5rem] leading-[1.15] font-extrabold text-ink">{r.name}</span>
                 </Link>
               </li>
             ))}

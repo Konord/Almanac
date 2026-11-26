@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
 import { emojiImage } from "@/lib/emoji";
+import { PendingTab } from "./pending-tab";
 import { hand, soft, strong } from "@/lib/colours";
 import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
 import { TimerPill } from "./timer-pill";
@@ -131,8 +132,9 @@ export function Segmented({ options, label }: { options: { href: string; label: 
   return (
     <nav aria-label={label} className={segTrackClass}>
       {options.map((o) => (
-        <Link key={o.label} href={o.href} aria-current={o.active ? "page" : undefined} className={segItemClass(o.active)}>
-          {o.label}
+        <Link key={o.label} href={o.href} aria-current={o.active ? "page" : undefined} className={`relative ${segItemClass(o.active)}`}>
+          {o.active ? null : <PendingTab />}
+          <span className="relative">{o.label}</span>
         </Link>
       ))}
     </nav>
@@ -271,9 +273,14 @@ export function ActionLink({
 }
 
 /** Text someone in the family wrote: handwriting in their ink (dark ink if it isn't anyone's). */
-export function HandText({ colour, className = "", children }: { colour?: string | null; className?: string; children: ReactNode }) {
+export function HandText({
+  colour,
+  className = "",
+  children,
+  ...rest
+}: { colour?: string | null; className?: string; children: ReactNode } & Omit<ComponentProps<"span">, "className" | "children" | "style" | "color">) {
   return (
-    <span className={`font-hand ${className}`} style={{ color: hand(colour) }}>
+    <span {...rest} className={`font-hand ${className}`} style={{ color: hand(colour) }}>
       {children}
     </span>
   );
@@ -420,8 +427,8 @@ export function Button({
 }: ComponentProps<"button"> & { variant?: "primary" | "secondary" | "danger" | "save" }) {
   const look = {
     primary: "bg-primary text-primary-ink",
-    // The blue of the screen-wide Save (unsaved-changes.tsx), so every Save looks the same.
-    save: "bg-accent text-white",
+    // The same black as the header's Save (unsaved-changes.tsx), so every Save looks the same (UI audit M6).
+    save: "bg-primary text-primary-ink",
     secondary: "bg-panel text-ink",
     danger: "border-2 border-danger bg-board text-danger",
   }[variant];

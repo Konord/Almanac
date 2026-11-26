@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CaretLeft, CaretRight, GearSix, X } from "@phosphor-icons/react/dist/ssr";
+import { CaretLeft, CaretRight, Check, GearSix, X } from "@phosphor-icons/react/dist/ssr";
 import { Sheet } from "@/components/sheet";
+import { TimeField } from "@/components/touch-pickers";
 import { FitList } from "@/components/fit-list";
 import {
   ActionLink,
@@ -30,7 +31,7 @@ import { trackerEmoji } from "./tracker-emoji";
 
 /**
  * Health (2026-11-12; Glance look 2026-11-15, g-final-health): one person
- * per page, paged with the header arrows. Three cards: the last three days
+ * per page, picked with the colour chips in the header. Three cards: the last three days
  * (a reading like temperature with its alert shading and the doses along
  * the bottom, or a medicine's daily check-in), the medicines with "Log it",
  * and today's entries (tap one to fix or remove it). Nothing here
@@ -86,36 +87,29 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
     return s ? `/habits/health?${s}` : "/habits/health";
   };
   const personHref = (i: number) => href({ member: i > 0 ? members[i].id : null, chart: null });
-  const prev = members[index - 1];
-  const next = members[index + 1];
 
   const header = (
     <ScreenHeader
       title="Habits"
       sub={member?.name}
-      nav={
+      middle={
+        // Whose page: everyone as a colour chip, so it's clear how to switch (UI audit M8).
         members.length > 1 ? (
-          <>
-            {prev ? (
-              <Link href={personHref(index - 1)} aria-label={`Previous person: ${prev.name}`} title={prev.name} className={roundArrow}>
-                <CaretLeft size="1.5rem" weight="bold" aria-hidden />
+          <nav aria-label="Whose health" className="flex min-w-0 flex-wrap justify-center gap-2">
+            {members.map((m, i) => (
+              <Link
+                key={m.id}
+                href={personHref(i)}
+                aria-current={i === index ? "page" : undefined}
+                className={`flex min-h-[var(--touch-target)] items-center gap-2 rounded-full border-2 px-4 text-[1.25rem] font-bold whitespace-nowrap ${i === index ? "border-ink text-ink" : "border-transparent bg-panel text-ink-soft"}`}
+                style={i === index ? { background: soft(m.colour) } : undefined}
+              >
+                <span aria-hidden className="size-[1.1rem] rounded-full" style={{ background: strong(m.colour) }} />
+                {m.name}
               </Link>
-            ) : (
-              <span className={`${roundArrow} opacity-30`} aria-hidden>
-                <CaretLeft size="1.5rem" weight="bold" />
-              </span>
-            )}
-            {next ? (
-              <Link href={personHref(index + 1)} aria-label={`Next person: ${next.name}`} title={next.name} className={roundArrow}>
-                <CaretRight size="1.5rem" weight="bold" aria-hidden />
-              </Link>
-            ) : (
-              <span className={`${roundArrow} opacity-30`} aria-hidden>
-                <CaretRight size="1.5rem" weight="bold" />
-              </span>
-            )}
-          </>
-        ) : null
+            ))}
+          </nav>
+        ) : undefined
       }
       tabs={
         <Segmented
@@ -233,8 +227,8 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {options.length > 1 ? (
-              <nav aria-label="Show on the chart" className="flex min-w-0 flex-1 gap-2">
-                {options.slice(0, 6).map((o) => (
+              <nav aria-label="Show on the chart" className="flex min-w-0 flex-1 flex-wrap gap-2">
+                {options.slice(0, 4).map((o) => (
                   <Link
                     key={o.id}
                     href={href({ chart: o.id })}
@@ -242,9 +236,11 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
                     aria-label={`Show ${o.name}`}
                     title={o.name}
                     aria-current={o.id === picked ? "true" : undefined}
-                    className={`flex size-[var(--touch-target)] shrink-0 items-center justify-center rounded-full border-2 ${o.id === picked ? "border-ink bg-board" : "border-transparent bg-panel"}`}
+                    className={`flex min-h-[var(--touch-target)] min-w-0 items-center gap-[0.4rem] rounded-full border-2 px-3 text-[1.15rem] font-bold text-ink ${o.id === picked ? "border-ink bg-board" : "border-transparent bg-panel"}`}
                   >
-                    <Emoji emoji={o.icon} className="size-[1.75rem]" />
+                    <Emoji emoji={o.icon} className="size-[1.6rem]" />
+                    {/* The last word, so two medicines with one picture still tell apart (UI audit M8). */}
+                    <span className="truncate">{shortName(o.name)}</span>
                   </Link>
                 ))}
               </nav>
@@ -285,7 +281,7 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
                 days={days}
                 today={today}
                 dayName={dayName}
-                count={(d) => windowDoses.filter((l) => l.choice_id === chartChoice.id && localDateOf(new Date(l.logged_at), timeZone) === d).length}
+                taken={(d) => windowDoses.filter((l) => l.choice_id === chartChoice.id && localDateOf(new Date(l.logged_at), timeZone) === d).map((l) => new Date(l.logged_at)).toSorted((a, b) => a.getTime() - b.getTime())}
                 next={cards.find((c) => c.choice.id === chartChoice.id)?.status.next ?? null}
                 time={time}
                 colour={member.colour}
@@ -341,10 +337,10 @@ async function Health({ searchParams }: { searchParams: PageProps<"/habits/healt
                         color: status.next || status.atMost ? "var(--color-now-on-tint)" : "var(--color-success)",
                       }}
                     >
-                      {status.next ? `next ${whenText(status.next)}` : status.atMost ? "most for today" : "OK now"}
+                      {status.next ? `Next dose at ${whenText(status.next)}` : status.atMost ? "No more today" : "Can have it now"}
                     </span>
-                    {` · ${small}`}
                   </span>
+                  <span className="truncate text-[1.15rem] font-bold text-ink-muted">{small}</span>
                 </span>
                 <Link href={href({ log: tracker.id, choice: choice.id })} scroll={false} className={`${secondaryActionClass} px-[1.5rem]`}>
                   Log it
@@ -411,7 +407,7 @@ function CheckIn({
   days,
   today,
   dayName,
-  count,
+  taken,
   next,
   time,
   colour,
@@ -419,43 +415,44 @@ function CheckIn({
   days: LocalDate[];
   today: LocalDate;
   dayName: (d: LocalDate) => string;
-  count: (d: LocalDate) => number;
+  taken: (d: LocalDate) => Date[];
   next: Date | null;
   time: (d: Date) => string;
   colour: string;
 }) {
+  // A tick a day with the times it was taken (UI audit M3: a yes/no doesn't need a giant bar).
   return (
-    <div className="absolute inset-0 flex items-end gap-[0.8rem] pt-2" role="img" aria-label={days.map((d) => `${dayName(d)}: ${count(d) ? `taken ${count(d)}` : "not taken"}`).join(", ")}>
+    <div className="absolute inset-0 flex items-center gap-[0.8rem]" role="img" aria-label={days.map((d) => `${dayName(d)}: ${taken(d).length ? `taken at ${taken(d).map(time).join(", ")}` : "not taken"}`).join(", ")}>
       {days.map((d) => {
-        const n = count(d);
+        const at = taken(d);
         const isToday = d === today;
-        const label = n ? (n > 1 ? `Taken ×${n}` : "Taken") : isToday ? (next ? `Next ${time(next)}` : "Not yet") : "Not taken";
         return (
-          <div key={d} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-[0.4rem]">
-            <span className="text-[1.5rem] font-extrabold text-ink">{label}</span>
+          <div key={d} className="flex min-w-0 flex-1 flex-col items-center gap-3">
+            <span className={`text-[1.35rem] font-bold ${isToday ? "text-now-on-tint" : "text-ink-muted"}`}>{dayName(d)}</span>
             <span
-              className="w-full rounded-t-[var(--radius)] rounded-b-[0.4rem] border-2"
-              style={
-                n
-                  ? {
-                      height: `${Math.min(100, 55 + 15 * n)}%`,
-                      background: soft(colour),
-                      borderColor: strong(colour),
-                    }
-                  : {
-                      height: "28%",
-                      background: "var(--color-board)",
-                      borderStyle: "dashed",
-                      borderColor: isToday ? "var(--color-now)" : "var(--color-check-border)",
-                    }
-              }
-            />
-            <span className={`text-[1.25rem] font-bold ${isToday ? "text-now-on-tint" : "text-ink-muted"}`}>{dayName(d)}</span>
+              aria-hidden
+              className="flex size-28 items-center justify-center rounded-full border-[0.2rem]"
+              style={at.length ? { background: soft(colour), borderColor: strong(colour), color: strong(colour) } : { borderStyle: "dashed", borderColor: isToday ? "var(--color-now)" : "var(--color-check-border)" }}
+            >
+              {at.length ? <Check size="3.5rem" weight="bold" /> : null}
+            </span>
+            <span className="tabular text-center text-[1.35rem] leading-tight font-extrabold text-ink">
+              {at.length ? at.map(time).join(", ") : isToday ? (next ? `Next ${time(next)}` : "Not yet") : "Not taken"}
+            </span>
           </div>
         );
       })}
     </div>
   );
+}
+
+/** "Children's Tylenol" → "Tylenol": short enough for a chip, and tells two medicines apart. */
+function shortName(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length < 2 || name.length <= 12) return name;
+  const last = words[words.length - 1];
+  // "Vitamin D drops": the last word says what kind, not which one.
+  return /^(drops?|syrup|tablets?|pills?|spray|cream|liquid|chewables?|gummies)$/i.test(last) ? words[0] : last;
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +605,7 @@ function EntryDialog({ log, tracker, closeHref, returnTo, timeValue }: { log: He
         <div className="flex flex-wrap gap-4">
           <label className="flex flex-col gap-1.5">
             <span className={fieldLabelClass}>When</span>
-            <input type="time" name="time" defaultValue={timeValue} className={`${editorInputClass} w-52`} />
+            <TimeField name="time" defaultValue={timeValue} step={5} aria-label="When" className="w-52!" />
           </label>
           {log.choice_id !== null || log.amount !== null ? (
             <label className="flex flex-col gap-1.5">
