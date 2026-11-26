@@ -237,21 +237,20 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
   ];
 
   // --- Coming up: the next few timed things after today ----------------------
-  // In the evening, with two things or fewer left today, Coming up grows and
-  // leads with tomorrow: that's the question then (UI audit M4).
-  const quiet = isToday && ahead.length <= 2;
+  // Always one row of three at the bottom (Connor, 2026-11-26: the bigger
+  // "quiet evening" version with up to nine is gone).
   const tomorrow = addDays(day, 1);
   const coming: ComingUpItem[] = shown
     .filter((e) => !isAllDayStyle(e, timeZone) && localDateOf(new Date(e.starts_at), timeZone) > day)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-    .slice(0, quiet ? 9 : 3)
+    .slice(0, 3)
     .map((e) => {
       const isTomorrow = localDateOf(new Date(e.starts_at), timeZone) === tomorrow;
       return {
         key: e.id,
         title: e.title,
         emoji: eventEmoji(e.icon, e.title),
-        when: quiet && isTomorrow ? time(e.starts_at) : `${new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(new Date(e.starts_at))} · ${time(e.starts_at)}`,
+        when: `${new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" }).format(new Date(e.starts_at))} · ${time(e.starts_at)}`,
         // Tapping opens that day's Agenda, not the event's edit sheet (Connor, 2026-11-26).
         href: `/?date=${localDateOf(new Date(e.starts_at), timeZone)}`,
         tomorrow: isTomorrow,
@@ -330,7 +329,7 @@ async function Today({ searchParams }: { searchParams: PageProps<"/">["searchPar
             hidden
             className="tabular flex min-h-[var(--touch-target)] w-full shrink-0 items-center justify-center text-[1.25rem] font-bold text-ink-soft"
           />
-          <ComingUp items={coming} lead={quiet} />
+          <ComingUp items={coming} />
         </AgendaFit>
 
         <TodayPanel
