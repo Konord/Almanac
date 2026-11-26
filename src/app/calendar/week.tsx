@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Emoji, HandText } from "@/components/ui";
 import { hand, strong } from "@/lib/colours";
-import { eventEmoji } from "@/lib/emoji";
+import { eventEmoji, holidayWash } from "@/lib/emoji";
 import { layoutDay } from "@/lib/calendar-layout";
 import { minutesText } from "@/lib/time-text";
 import { zonedToUtc, type LocalDate } from "@/lib/time";
@@ -207,7 +207,7 @@ export function WeekView({
     }
 
     const holiday = special.find((x) => x.kind === "holiday");
-    // Like Month: the holiday picture fades to 18% when the day has events (meals and tasks don't count).
+    // Like Month: the holiday picture (flat, on its colour) fades to 38% when the day has events (meals and tasks don't count).
     const hasEvents = dayEvents.some((x) => !isAllDayStyle(x, timeZone));
     return {
       hasEvents,
@@ -231,8 +231,10 @@ export function WeekView({
     "--cols-open": days.map((d) => (dropWhenOpen.includes(d) ? "minmax(0, 0fr)" : "minmax(0, 1fr)")).join(" "),
   } as React.CSSProperties;
   const drops = (day: LocalDate) => (dropWhenOpen.includes(day) ? "week-drop" : "");
-  const wash = (c: { isToday: boolean; pastDay: boolean }) =>
-    c.isToday
+  const wash = (c: { isToday: boolean; pastDay: boolean; holiday?: { icon: string } }) =>
+    c.holiday && !c.pastDay
+      ? holidayWash(c.holiday.icon)
+      : c.isToday
       ? "color-mix(in srgb, var(--color-now) 1.5%, var(--color-board))"
       : c.pastDay
         ? "color-mix(in srgb, var(--color-rail) 60%, var(--color-board))"
@@ -289,7 +291,7 @@ export function WeekView({
               <div key={c.day} className={`relative min-w-0 ${i < columns.length - 1 ? "border-r border-frame" : ""} ${drops(c.day)}`} style={{ background: wash(c) }}>
                 {c.holiday ? (
                   <span className="absolute inset-0 grid place-items-center overflow-hidden" style={{ containerType: "size" }}>
-                    <Emoji emoji={c.holiday.icon} className={`size-[88cqmin] ${c.hasEvents ? "opacity-[0.18]" : ""}`} />
+                    <Emoji emoji={c.holiday.icon} flat className={`size-[94cqmin] ${c.hasEvents ? "opacity-[0.38]" : ""}`} />
                   </span>
                 ) : null}
               </div>

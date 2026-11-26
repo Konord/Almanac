@@ -9,7 +9,7 @@ import { useFitRows } from "@/components/use-fit-rows";
 import { LeaveDialog, SaveButton, useUnsavedChanges } from "@/components/unsaved-changes";
 import { menuMealIcon, menuMealName, type DishLike, type MenuMealLike } from "@/lib/menu";
 import { saveMenu, type DraftKind, type DraftMenuMeal, type KindChanges, type MenuChanges } from "../menu-actions";
-import { BatchSwitch, MealsHeader, pickRowClass, roundIconClass } from "../parts";
+import { BatchSwitch, MealsHeader, roundIconClass } from "../parts";
 
 /*
  * The Menu Manager's Meals tab, in the browser: every change waits for
@@ -23,14 +23,14 @@ type Category = DraftKind;
 /** The left column's "every meal" and "under no kind" rows. */
 const ALL = "all";
 const NONE = "none";
-const KINDS_PER_PAGE = 11;
-const MEALS_PER_PAGE = 11;
+const KINDS_PER_PAGE = 7;
+/** 5 × 3 tiles; the last page keeps a tile for Add. */
+const MEALS_PER_PAGE = 14;
 const SPOTS_PER_PAGE = 7;
 const DISHES_PER_PAGE = 11;
 
 /** The three white cards (g-final-meals-menu: 1.25rem × 1.4rem padding, raised). */
 const card = "flex min-h-0 min-w-0 flex-col rounded-[var(--radius-card)] bg-board px-[1.4rem] py-5 shadow-raised";
-const h2 = "flex shrink-0 items-center gap-3 text-2xl font-bold text-ink";
 
 let counter = 0;
 const newId = () => `new-${Date.now().toString(36)}-${counter++}`;
@@ -79,8 +79,8 @@ export function MenuManager({
   // Start on the page that shows the picked kind ("Every meal" is first).
   const [kindPage, setKindPage] = useState(() => Math.floor((categories.findIndex((c) => c.id === category) + 1) / KINDS_PER_PAGE));
   const [mealPage, setMealPage] = useState(0);
-  const [kindsRef, kindsPerPage] = useFitRows<HTMLUListElement>(KINDS_PER_PAGE);
-  const [mealsRef, mealsPerPage] = useFitRows<HTMLUListElement>(MEALS_PER_PAGE);
+  const kindsPerPage = KINDS_PER_PAGE;
+  const mealsPerPage = MEALS_PER_PAGE;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || JSON.stringify(kindDraft) !== JSON.stringify(categories);
@@ -199,79 +199,98 @@ export function MenuManager({
         )}
       </MealsHeader>
 
-      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_26rem_minmax(0,1fr)]">
-        {/* Kinds of meal */}
+      {/*
+        A wall of meal tiles (Connor, 2026-11-26, look A): the kinds of meal
+        are filter chips across the top, the meals big picture tiles, and
+        the picked meal's dishes and batches in the card on the right.
+      */}
+      <div className="grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_44rem]">
         <section className={card}>
-          <h2 className={h2}>Kinds of meal</h2>
-          <ul ref={kindsRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {kindList.items.map((r) => (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPicked(r.id);
-                    setMealPage(0);
-                    setEditingKind(null);
-                  }}
-                  aria-pressed={r.id === pickedRow.id}
-                  className={`${pickRowClass(r.id === pickedRow.id)} ${r.active ? "" : "opacity-55"}`}
-                >
-                  <Emoji emoji={r.icon} className="size-[2.15rem]" />
-                  <span className={`line-clamp-2 min-w-0 flex-1 text-left text-[1.5rem] leading-[1.15] font-extrabold ${r.name ? "text-ink" : "text-ink-muted"}`}>{r.name || "No name"}</span>
-                  <span className="tabular text-[1.35rem] font-extrabold text-ink-muted">{r.count ?? ""}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <Arrows page={kindList.page} pages={kindList.pages} setPage={setKindPage} />
-          <button type="button" onClick={addKind} className={`${secondaryActionClass} mt-3 w-full`}>
-            <Plus size="1.25rem" weight="bold" aria-hidden />
-            Add a kind
-          </button>
-        </section>
-
-        {/* That kind's meals */}
-        <section className={card}>
+          <div className="flex shrink-0 items-center gap-2" role="group" aria-label="Kinds of meal">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              {kindList.items.map((r) => {
+                const on = r.id === pickedRow.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      setPicked(r.id);
+                      setMealPage(0);
+                      setEditingKind(null);
+                    }}
+                    aria-pressed={on}
+                    className={`flex min-h-12 items-center gap-2 rounded-full px-4 text-[1.25rem] font-bold ${on ? "bg-ink text-board" : "bg-rail text-ink-soft"} ${r.active ? "" : "opacity-55"}`}
+                  >
+                    {r.id === ALL ? null : <Emoji emoji={r.icon} className="size-7" />}
+                    <span className="max-w-[12rem] truncate">{r.id === ALL ? "All" : r.name || "No name"}</span>
+                    {r.count !== null ? <span className={`tabular ${on ? "text-board/70" : "text-ink-muted"}`}>{r.count}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <Arrows page={kindList.page} pages={kindList.pages} setPage={setKindPage} />
+            {pickedRow.id !== ALL && pickedRow.id !== NONE ? (
+              <button type="button" onClick={() => setEditingKind(pickedRow.id)} aria-label={`Rename ${pickedRow.name}`} className={roundIconClass}>
+                <PencilSimple size="1.5rem" aria-hidden />
+              </button>
+            ) : null}
+            <button type="button" onClick={addKind} className={secondaryActionClass}>
+              <Plus size="1.25rem" weight="bold" aria-hidden />
+              Kind
+            </button>
+          </div>
           {editingRow ? (
-            <KindEditor
-              kind={editingRow}
-              onChange={(patch) => changeKind(editingRow.id, patch)}
-              onRemove={editingRow.isLeftovers ? null : () => removeKind(editingRow.id)}
-              onDone={() => setEditingKind(null)}
-            />
+            <div className="mt-3 max-w-[36rem] shrink-0">
+              <KindEditor
+                kind={editingRow}
+                onChange={(patch) => changeKind(editingRow.id, patch)}
+                onRemove={editingRow.isLeftovers ? null : () => removeKind(editingRow.id)}
+                onDone={() => setEditingKind(null)}
+              />
+            </div>
+          ) : null}
+
+          {blank ? (
+            // The Leftovers kind is a blank: a night for what's already cooked, so it has no meals of its own.
+            <div className="m-auto flex max-w-[30rem] flex-col items-center gap-2 text-center">
+              <Emoji emoji={pickedRow.icon ?? "🥡"} className="size-20" />
+              <span className="text-2xl font-bold text-ink">A leftovers night</span>
+              <span className="text-lg text-ink-muted">No meals to set up: it’s for eating what’s already cooked. Plan it in the Planner like any kind.</span>
+            </div>
           ) : (
-            <div className={`${h2} min-h-[var(--touch-target)]`}>
-              <span className="min-w-0 flex-1 truncate">{pickedRow.name || "No name"}</span>
-              {pickedRow.id !== ALL && pickedRow.id !== NONE ? (
-                <button type="button" onClick={() => setEditingKind(pickedRow.id)} aria-label={`Rename ${pickedRow.name}`} className={roundIconClass}>
-                  <PencilSimple size="1.5rem" aria-hidden />
+            <div className="mt-4 grid min-h-0 flex-1 grid-cols-5 grid-rows-3 gap-3">
+              {mealList.items.map((m) => {
+                const on = m.id === meal?.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setSelected(m.id)}
+                    aria-pressed={on}
+                    className={`flex min-h-0 min-w-0 flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 px-3 text-center ${on ? "border-ink bg-meal" : "border-frame bg-board hover:bg-rail"}`}
+                  >
+                    <Emoji emoji={menuMealIcon(asLike(m), dishById) ?? "🍽️"} className="size-[4.5rem]" />
+                    <span className="line-clamp-2 text-[1.35rem] leading-[1.15] font-extrabold text-ink">{nameOf(m)}</span>
+                  </button>
+                );
+              })}
+              {mealList.page === mealList.pages - 1 ? (
+                <button type="button" onClick={addMeal} className="flex min-h-0 flex-col items-center justify-center gap-2 rounded-[var(--radius-card)] border-2 border-dashed border-frame text-[1.35rem] font-bold text-ink-soft hover:bg-rail">
+                  <Plus size="2rem" weight="bold" aria-hidden />
+                  Add
                 </button>
               ) : null}
             </div>
           )}
-          <ul ref={mealsRef} className="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
-            {mealList.items.map((m) => (
-              <li key={m.id}>
-                <button type="button" onClick={() => setSelected(m.id)} aria-pressed={m.id === meal?.id} className={pickRowClass(m.id === meal?.id)}>
-                  <Emoji emoji={menuMealIcon(asLike(m), dishById) ?? "🍽️"} className="size-[2.15rem]" />
-                  <span className="line-clamp-2 min-w-0 flex-1 text-left text-[1.5rem] leading-[1.15] font-extrabold text-ink">{nameOf(m)}</span>
-                </button>
-              </li>
-            ))}
-            {blank ? (
-              // The Leftovers kind is a blank: a night for what's already cooked, so it has no meals of its own.
-              <li className="flex flex-col gap-2 px-1 pt-1">
-                <span className="text-lg font-bold text-ink">A leftovers night</span>
-                <span className="text-lg text-ink-muted">No meals to set up: it’s for eating what’s already cooked. Plan it in the Planner like any kind.</span>
-              </li>
-            ) : shown.length === 0 ? (
-              <li className="px-1 text-lg text-ink-muted">No meals yet</li>
-            ) : null}
-          </ul>
-          <Arrows page={mealList.page} pages={mealList.pages} setPage={setMealPage} />
+          {blank ? null : (
+            <div className="mt-3 flex shrink-0 justify-end">
+              <Arrows page={mealList.page} pages={mealList.pages} setPage={setMealPage} />
+            </div>
+          )}
         </section>
 
-        {/* The chosen meal */}
+        {/* The picked meal: its dishes and batches */}
         <section className={`${card} relative`}>
           {meal ? (
             <MealEditor
@@ -290,7 +309,7 @@ export function MenuManager({
               }}
             />
           ) : (
-            <EmptyState emoji="🍽️" title={blank ? undefined : "Pick a meal"} hint={blank ? undefined : "Its spots show here: a set dish, or one you pick on the day."} />
+            <EmptyState emoji="🍽️" title={blank ? undefined : "Pick a meal"} hint={blank ? undefined : "Its dishes show here: a set dish, or one you pick on the day."} />
           )}
         </section>
       </div>

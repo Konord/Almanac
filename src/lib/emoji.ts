@@ -24,6 +24,42 @@ export function emojiImage(emoji: string | null | undefined): string | null {
   return file ? `/emoji/${file}` : null;
 }
 
+/**
+ * The flat (2D) Fluent picture for an emoji, used for holidays only
+ * (Connor, 2026-11-26): bundled as SVGs in public/emoji/flat/. Null if
+ * there's no flat one; the 3D picture stands in.
+ */
+export function emojiFlatImage(emoji: string | null | undefined): string | null {
+  if (!emoji) return null;
+  const file = FILES[plain(emoji)];
+  if (!file || NO_FLAT.has(file)) return null;
+  return `/emoji/flat/${file.replace(/\.[a-z]+$/, "")}.svg`;
+}
+const NO_FLAT = new Set(["piñata.webp"]);
+
+/** A soft wash behind a holiday's picture, in the holiday's colour (a few known ones; warm yellow otherwise). */
+const HOLIDAY_WASH_RAW: Record<string, string> = {
+  "🎄": "#2f9e5b",
+  "🎃": "#f08a24",
+  "🍁": "#d8342c",
+  "🦃": "#b5651d",
+  "💝": "#e5487a",
+  "💐": "#e5487a",
+  "☘️": "#3aa655",
+  "🐰": "#9b7fd4",
+  "🐣": "#f2c230",
+  "🌷": "#e5487a",
+  "🧡": "#f08a24",
+  "🎆": "#3b6fd8",
+  "👑": "#9b7fd4",
+  "🎉": "#f2a33a",
+};
+const HOLIDAY_WASH = new Map(Object.entries(HOLIDAY_WASH_RAW).map(([e, c]) => [plain(e), c]));
+export function holidayWash(emoji: string | null | undefined): string {
+  const colour = (emoji && HOLIDAY_WASH.get(plain(emoji))) || "#f2c230";
+  return `color-mix(in srgb, ${colour} 9%, var(--color-board))`;
+}
+
 /** Words in an event's title → a picture, used when the event has none. */
 const GUESSES: [RegExp, string][] = [
   [/\b(court|trial|hearing|lawyer|legal)\b/i, "⚖️"],

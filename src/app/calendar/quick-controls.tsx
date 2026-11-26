@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 /** The mock's plain `.who-chip`: grey frame; picked, an ink border on grey. */
 const chipBase =
@@ -84,5 +84,91 @@ export function CardTabs({ tabs, initial = 0 }: { tabs: { label: string; panel: 
         </div>
       ))}
     </div>
+  );
+}
+
+/*
+ * The event sheet's views (Connor, 2026-11-26, look A): the main view reads
+ * like a sentence; Repeats and More options (and, editing, Heads-ups) are
+ * views of their own with a Back button. Every view stays in the form, only
+ * hidden, so Save sends everything.
+ */
+type SheetView = "main" | "repeats" | "more" | "heads-ups";
+const SheetViewContext = createContext<{ show: (v: SheetView) => void; repeat: string }>({ show: () => {}, repeat: "none" });
+
+const REPEAT_WORDS: Record<string, string> = { none: "never", daily: "daily", weekly: "weekly", monthly: "monthly", yearly: "yearly" };
+
+export function SheetViews({
+  main,
+  repeats,
+  more,
+  headsUps,
+  initial = "main",
+  initialRepeat = "none",
+}: {
+  main: ReactNode;
+  repeats: ReactNode;
+  more: ReactNode;
+  headsUps?: ReactNode;
+  initial?: SheetView;
+  initialRepeat?: string;
+}) {
+  const [view, setView] = useState<SheetView>(initial);
+  const [repeat, setRepeat] = useState(initialRepeat);
+  const back = (title: string) => (
+    <div className="flex shrink-0 items-center gap-3">
+      <button type="button" onClick={() => setView(view === "heads-ups" ? "more" : "main")} className={chipButtonClass(false)}>
+        ‹ Back
+      </button>
+      <span className="text-[1.5rem] font-bold text-ink">{title}</span>
+    </div>
+  );
+  return (
+    <SheetViewContext.Provider value={{ show: setView, repeat }}>
+      <div hidden={view !== "main"} className="grid min-h-0 content-start gap-4">
+        {main}
+      </div>
+      <div
+        hidden={view !== "repeats"}
+        className="grid min-h-0 content-start gap-4"
+        onChange={(e) => {
+          const t = e.target as HTMLInputElement;
+          if (t.name === "repeatFrequency") setRepeat(t.value);
+        }}
+      >
+        {back("Repeats")}
+        {repeats}
+      </div>
+      <div hidden={view !== "more"} className="grid min-h-0 content-start gap-4">
+        {back("More options")}
+        {more}
+      </div>
+      {headsUps ? (
+        <div hidden={view !== "heads-ups"} className="grid min-h-0 content-start gap-4">
+          {back("Heads-ups")}
+          {headsUps}
+        </div>
+      ) : null}
+    </SheetViewContext.Provider>
+  );
+}
+
+/** "Repeats: weekly ›" on the main view. */
+export function RepeatsButton() {
+  const { show, repeat } = useContext(SheetViewContext);
+  return (
+    <button type="button" onClick={() => show("repeats")} className={chipButtonClass(repeat !== "none")}>
+      Repeats: {REPEAT_WORDS[repeat] ?? repeat} ›
+    </button>
+  );
+}
+
+/** A labelled button that opens another view ("More options ›", "Heads-ups ›"). */
+export function SheetViewButton({ view, children }: { view: Exclude<SheetView, "main">; children: ReactNode }) {
+  const { show } = useContext(SheetViewContext);
+  return (
+    <button type="button" onClick={() => show(view)} className={`${chipButtonClass(false)} justify-self-start`}>
+      {children} ›
+    </button>
   );
 }

@@ -2,7 +2,7 @@ import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import type { Icon } from "@phosphor-icons/react";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
-import { emojiImage } from "@/lib/emoji";
+import { emojiFlatImage, emojiImage } from "@/lib/emoji";
 import { PendingTab } from "./pending-tab";
 import { hand, soft, strong } from "@/lib/colours";
 import { HOLIDAY_READY_ATTR } from "@/lib/holiday-theme";
@@ -79,7 +79,7 @@ export function ScreenHeader({
   middle,
   children,
 }: {
-  /** Something centred between the title and the right-hand controls (the Planner's checks). */
+  /** Something right after the title (the Planner's checks pill). */
   middle?: ReactNode;
   title: ReactNode;
   sub?: ReactNode;
@@ -100,7 +100,7 @@ export function ScreenHeader({
         <h1 className="shrink-0 pb-[0.06em] text-[3.5rem] leading-[0.9] font-extrabold tracking-[-0.045em] text-title lg:text-[6.75rem]">{title}</h1>
         {sub && sub !== title ? <span className="tabular min-w-0 truncate text-2xl leading-none font-bold tracking-[-0.02em] whitespace-nowrap text-title-soft lg:text-[2rem]">{sub}</span> : null}
       </div>
-      {middle ? <div className="flex min-w-0 flex-1 items-center justify-center gap-[0.6rem]">{middle}</div> : null}
+      {middle ? <div className="flex min-w-0 flex-1 items-center justify-start gap-[0.6rem]">{middle}</div> : null}
       {children ? <div className="flex min-w-0 items-center gap-[0.6rem]">{children}</div> : null}
       <div className="flex shrink-0 items-center gap-[0.6rem]">
         {weather ? <WeatherSlot /> : null}
@@ -356,9 +356,10 @@ export function Card({
 }
 
 /** A Fluent 3D picture for an emoji (or the plain emoji if we don't have one). */
-export function Emoji({ emoji, className = "size-10", faded = false }: { emoji: string | null | undefined; className?: string; faded?: boolean }) {
+export function Emoji({ emoji, className = "size-10", faded = false, flat = false }: { emoji: string | null | undefined; className?: string; faded?: boolean; flat?: boolean }) {
   if (!emoji) return null;
-  const src = emojiImage(emoji);
+  // `flat`: the 2D picture, for holidays only (Connor, 2026-11-26).
+  const src = (flat ? emojiFlatImage(emoji) : null) ?? emojiImage(emoji);
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element -- small local pictures; no resizing needed
     return <img src={src} alt="" aria-hidden className={`shrink-0 ${className} ${faded ? "opacity-55" : ""}`} />;

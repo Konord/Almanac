@@ -4,7 +4,7 @@ import { Emoji, editorInputClass, fieldLabelClass } from "@/components/ui";
 import { eventEmoji } from "@/lib/emoji";
 import { VISIBILITY_OPTIONS } from "./options";
 import type { RepeatOptions } from "@/lib/recurrence";
-import { CardTabs, ToggleChips, choiceChipClass } from "./quick-controls";
+import { RepeatsButton, SheetViewButton, SheetViews, ToggleChips, choiceChipClass } from "./quick-controls";
 import { WhenFields } from "./when-fields";
 import { DayField, NumberStepper } from "@/components/touch-pickers";
 import { PendingSync } from "./pending-sync";
@@ -15,7 +15,8 @@ import type { DayKind, EventTemplate, Member } from "./types";
 /*
  * The event sheet's fields, in the Glance look (g-final-event.html): small
  * grey labels over big bold inputs, people as colour chips, kinds of day
- * as plain chips, and Event | Repeats | More | Heads-ups as tabs.
+ * as plain chips. The main view reads like a sentence; Repeats, More
+ * options and Heads-ups open as views of their own (Connor, 2026-11-26).
  */
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -189,74 +190,68 @@ export function EventCardFields({
   return (
     <>
       {adding ? <PendingSync defaults={defaults} /> : null}
-      <CardTabs
-        initial={initialTab === "heads-ups" ? 3 : 0}
-        tabs={[
-          {
-            label: "Event",
-            panel: (
-              <>
-                {templates ? <TemplateRow {...templates} /> : null}
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-[0.8rem]">
-                  <EmojiPicker initial={defaults.icon} className="border-0 bg-panel [&_img]:size-[2.35rem]" />
-                  <SheetField label="What">
-                    <input name="title" required maxLength={120} autoFocus={adding} defaultValue={defaults.title} className={editorInputClass} />
-                  </SheetField>
-                </div>
-                <WhenFields
-                  date={defaults.date}
-                  startTime={defaults.startTime}
-                  minutes={defaults.minutes}
-                  allDay={defaults.allDay}
-                  endDate={defaults.endDate}
-                  adding={adding}
-                />
-                <Stickers members={members} memberIds={defaults.memberIds} />
-                <DayKindChips kinds={dayKinds} value={defaults.dayKind} />
-                <LocationField value={defaults.location} />
-              </>
-            ),
-          },
-          {
-            label: "Repeats",
-            panel: (
-              <>
-                {repeatText ? <p className="text-[1.25rem] font-bold text-ink-soft">Now: {repeatText}</p> : null}
-                <ChoiceChips
-                  name="repeatFrequency"
-                  label="How often"
-                  defaultValue={defaults.repeat?.frequency ?? "none"}
-                  options={[
-                    { value: "none", label: "Doesn't repeat" },
-                    { value: "daily", label: "Daily" },
-                    { value: "weekly", label: "Weekly" },
-                    { value: "monthly", label: "Monthly" },
-                    { value: "yearly", label: "Yearly" },
-                  ]}
-                />
-                <RepeatDetails repeat={defaults.repeat} />
-              </>
-            ),
-          },
-          {
-            label: "More",
-            panel: (
-              <>
-                <SheetField label="Notes">
-                  <textarea
-                    name="notes"
-                    maxLength={2000}
-                    rows={4}
-                    defaultValue={defaults.notes}
-                    className={`${editorInputClass} resize-none py-3 text-[1.375rem] leading-snug font-semibold`}
-                  />
-                </SheetField>
-                <ChoiceChips name="visibility" label="Who can see it" defaultValue={defaults.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
-              </>
-            ),
-          },
-          ...(headsUps ? [{ label: "Heads-ups", panel: headsUps }] : []),
-        ]}
+      <SheetViews
+        initial={initialTab === "heads-ups" ? "heads-ups" : "main"}
+        initialRepeat={defaults.repeat?.frequency ?? "none"}
+        main={
+          <>
+            {templates ? <TemplateRow {...templates} /> : null}
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-[0.8rem]">
+              <EmojiPicker initial={defaults.icon} className="border-0 bg-panel [&_img]:size-[2.35rem]" />
+              <SheetField label="What">
+                <input name="title" required maxLength={120} autoFocus={adding} defaultValue={defaults.title} className={editorInputClass} />
+              </SheetField>
+            </div>
+            <WhenFields
+              date={defaults.date}
+              startTime={defaults.startTime}
+              minutes={defaults.minutes}
+              allDay={defaults.allDay}
+              endDate={defaults.endDate}
+              adding={adding}
+              extra={<RepeatsButton />}
+            />
+            <Stickers members={members} memberIds={defaults.memberIds} />
+            <SheetViewButton view="more">More options</SheetViewButton>
+          </>
+        }
+        repeats={
+          <>
+            {repeatText ? <p className="text-[1.25rem] font-bold text-ink-soft">Now: {repeatText}</p> : null}
+            <ChoiceChips
+              name="repeatFrequency"
+              label="How often"
+              defaultValue={defaults.repeat?.frequency ?? "none"}
+              options={[
+                { value: "none", label: "Doesn't repeat" },
+                { value: "daily", label: "Daily" },
+                { value: "weekly", label: "Weekly" },
+                { value: "monthly", label: "Monthly" },
+                { value: "yearly", label: "Yearly" },
+              ]}
+            />
+            <RepeatDetails repeat={defaults.repeat} />
+          </>
+        }
+        // More options, kept tidy: one labelled question per line, most used first.
+        more={
+          <>
+            <DayKindChips kinds={dayKinds} value={defaults.dayKind} />
+            <LocationField value={defaults.location} />
+            <SheetField label="Notes">
+              <textarea
+                name="notes"
+                maxLength={2000}
+                rows={3}
+                defaultValue={defaults.notes}
+                className={`${editorInputClass} resize-none py-3 text-[1.375rem] leading-snug font-semibold`}
+              />
+            </SheetField>
+            <ChoiceChips name="visibility" label="Who can see it" defaultValue={defaults.visibility ?? "everyone"} options={VISIBILITY_OPTIONS} />
+            {headsUps ? <SheetViewButton view="heads-ups">Heads-ups</SheetViewButton> : null}
+          </>
+        }
+        headsUps={headsUps}
       />
     </>
   );

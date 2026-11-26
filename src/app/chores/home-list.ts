@@ -16,6 +16,8 @@ export async function homeListId(supabase: Awaited<ReturnType<typeof createClien
     .select("id")
     .eq("is_chores", false)
     .eq("is_groceries", false)
+    // Not an adults-only list: those stay off the kitchen screen, and the day's chores must show there.
+    .eq("visibility", "everyone")
     .order("sort_order")
     .order("name")
     .limit(1)

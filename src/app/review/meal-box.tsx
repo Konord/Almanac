@@ -38,14 +38,17 @@ export type MealTarget = {
   eaters: string[];
 };
 
-type Mode = { name: "kinds" } | { name: "meals"; categoryId: string } | { name: "plate" } | { name: "backups" };
+/** "menu": the menu's meals as tiles, filtered by a kind of meal ("all", or a kind's id) like the Menu page. */
+type Mode = { name: "menu"; tab: string } | { name: "plate" } | { name: "backups" };
+const ALL = "all";
 
 const KINDS_PER_PAGE = 11;
-const MEALS_PER_PAGE = 5;
+/** Meal tiles per page: 6 across, 2 down (the last page keeps a spot for Custom meal). */
+const MEALS_PER_PAGE = 11;
+const CHIPS_PER_PAGE = 8;
 const DISHES_PER_PAGE = 8;
 const PICKS_PER_PAGE = 8;
 
-const ink = "text-[color-mix(in_srgb,var(--color-meal-ink)_70%,var(--color-meal))]";
 
 export function MealBox({
   target,
@@ -73,15 +76,16 @@ export function MealBox({
   const dishes = [...data.dishes, ...newDishes.filter((d) => !data.dishes.some((x) => x.id === d.id))];
   const menuMeals = [...data.menuMeals, ...newMeals.filter((m) => !data.menuMeals.some((x) => x.id === m.id))];
   const dish = new Map(dishes.map((d) => [d.id, d]));
-  const kind = new Map(data.kinds.map((k) => [k.id, k]));
   const known = new Set(dishes.map((d) => d.id));
   const lastPicks = new Map(Object.entries(data.lastPicks));
 
   const blankId = data.categories.find((c) => c.is_leftovers)?.id ?? null;
   const startMode: Mode =
-    !meal ? { name: "kinds" } : meal.dishes.length > 0 ? { name: "plate" } : meal.categoryId && meal.categoryId !== blankId ? { name: "meals", categoryId: meal.categoryId } : { name: "kinds" };
+    // A meal planned as just a kind ("Tacos") opens on that kind's tab (Connor, 2026-11-26).
+    !meal ? { name: "menu", tab: ALL } : meal.dishes.length > 0 ? { name: "plate" } : meal.categoryId && meal.categoryId !== blankId ? { name: "menu", tab: meal.categoryId } : { name: "menu", tab: ALL };
   const [mode, setMode] = useState<Mode>(startMode);
   const [page, setPage] = useState(0);
+  const [chipPage, setChipPage] = useState(0);
   const go = (m: Mode) => {
     setMode(m);
     setPage(0);
@@ -111,12 +115,10 @@ export function MealBox({
     else go({ name: "plate" });
   };
 
-  const pickCategory = (categoryId: string) => {
-    const options = mealsUnder(menuMeals, categoryId);
-    if (options.length === 1) return pickMeal(options[0], categoryId);
-    // Several (or none yet): it stays on the plan as the kind until one is picked.
+  /** "Tacos, pick on the day": the kind goes on the plan; the meal is picked later. */
+  const justKind = (categoryId: string) => {
     onChange({ ...base(), categoryId, menuMealId: null, dishes: [] });
-    go({ name: "meals", categoryId });
+    onClose();
   };
 
   const startCustom = (categoryId: string | null) => {
@@ -134,40 +136,72 @@ export function MealBox({
 
   let body: React.ReactNode = null;
   let pages = 1;
-  if (mode.name === "kinds") {
-    // Leftovers and Custom meal take the last two spots on every page.
-    const per = blank ? KINDS_PER_PAGE - 1 : KINDS_PER_PAGE;
-    pages = Math.max(1, Math.ceil(categories.length / per));
-    const shown = categories.slice(page * per, (page + 1) * per);
+  if (mode.name === "menu") {
+    // Like the Menu page: kinds of meal as chips across the top (All first,
+    // Leftovers last), the meals as tiles, Custom meal at the end.
+    const tab = mode.tab;
+    const tabKind = tab === ALL ? undefined : category.get(tab);
+    const options = tab === ALL ? menuMeals : mealsUnder(menuMeals, tab);
+    const chips = [{ id: ALL, name: "All", icon: null as string | null, count: menuMeals.length }, ...categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, count: mealsUnder(menuMeals, c.id).length }))];
+    const chipPages = Math.max(1, Math.ceil(chips.length / CHIPS_PER_PAGE));
+    const chipAt = Math.min(chipPage, chipPages - 1);
+    // A kind's tab starts with "pick on the day"; every last page ends with Custom meal.
+    const tiles: React.ReactNode[] = [
+      ...(tabKind
+        ? [
+            <button
+              key="kind"
+              type="button"
+              onClick={() => justKind(tabKind.id)}
+              aria-pressed={meal?.categoryId === tabKind.id && !meal?.menuMealId}
+              className="flex min-h-0 min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1.375rem] border-[3px] border-dashed border-meal-ink bg-[color-mix(in_srgb,var(--color-meal)_40%,white)] p-3 text-center"
+            >
+              <Emoji emoji={tabKind.icon} className="size-14" />
+              <span className="line-clamp-2 text-xl leading-tight font-extrabold text-ink">{tabKind.name}</span>
+              <span className="text-base font-bold text-ink-muted">Pick on the day</span>
+            </button>,
+          ]
+        : []),
+      ...options.map((m) => <MealTile key={m.id} meal={m} on={meal?.menuMealId === m.id} onClick={() => pickMeal(m, tabKind?.id ?? m.category_ids[0] ?? null)} />),
+    ];
+    pages = Math.max(1, Math.ceil((tiles.length + 1) / (MEALS_PER_PAGE + 1)));
+    const at = Math.min(page, pages - 1);
+    const shown = tiles.slice(at * MEALS_PER_PAGE, (at + 1) * MEALS_PER_PAGE);
     body = (
-      <div className="grid grid-cols-3 gap-3.5 sm:grid-cols-6">
-        {shown.map((c) => {
-          const n = mealsUnder(menuMeals, c.id).length;
-          return <Tile key={c.id} icon={c.icon} label={c.name} note={n > 1 ? `${n} meals` : undefined} on={meal?.categoryId === c.id} onClick={() => pickCategory(c.id)} />;
-        })}
-        {blank ? <Tile icon={blank.icon} label={blank.name} note="No cooking" on={meal?.categoryId === blank.id} onClick={pickBlank} /> : null}
-        <CustomTile onClick={() => startCustom(null)} />
-      </div>
-    );
-  } else if (mode.name === "meals") {
-    const c = category.get(mode.categoryId);
-    const options = mealsUnder(menuMeals, mode.categoryId);
-    pages = Math.max(1, Math.ceil((options.length + 1) / (MEALS_PER_PAGE + 1)));
-    const shown = options.slice(page * MEALS_PER_PAGE, (page + 1) * MEALS_PER_PAGE);
-    body = (
-      <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-[repeat(2,minmax(0,15rem))] gap-4">
-        {shown.map((m) => (
-          <MealCard key={m.id} meal={m} dish={dish} kind={kind} on={meal?.menuMealId === m.id} onClick={() => pickMeal(m, mode.categoryId)} />
-        ))}
-        <button
-          type="button"
-          onClick={() => startCustom(mode.categoryId)}
-          className="flex min-w-0 flex-col items-center justify-center gap-2 rounded-[1.375rem] border-[3px] border-dashed border-check-border bg-rail p-5 text-center text-ink hover:bg-panel"
-        >
-          <Plus size="3rem" weight="bold" aria-hidden className="text-ink-muted" />
-          <span className="text-2xl font-extrabold">Custom meal</span>
-        </button>
-        {options.length === 0 ? <p className="col-span-2 self-center text-lg text-ink-muted">No {c?.name ?? ""} meals yet.</p> : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex shrink-0 items-center gap-2" role="group" aria-label="Kinds of meal">
+          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+            {chips.slice(chipAt * CHIPS_PER_PAGE, (chipAt + 1) * CHIPS_PER_PAGE).map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={tab === c.id}
+                onClick={() => go({ name: "menu", tab: c.id })}
+                className={`flex min-h-12 items-center gap-2 rounded-full px-4 text-[1.25rem] font-bold ${tab === c.id ? "bg-ink text-board" : "bg-rail text-ink-soft"}`}
+              >
+                {c.icon ? <Emoji emoji={c.icon} className="size-7" /> : null}
+                <span className="max-w-[12rem] truncate">{c.name}</span>
+                <span className={`tabular ${tab === c.id ? "text-board/70" : "text-ink-muted"}`}>{c.count}</span>
+              </button>
+            ))}
+            {blank && chipAt === chipPages - 1 ? (
+              <button
+                type="button"
+                onClick={pickBlank}
+                aria-pressed={meal?.categoryId === blank.id}
+                className="flex min-h-12 items-center gap-2 rounded-full border-2 border-dashed border-frame px-4 text-[1.25rem] font-bold text-ink-soft"
+              >
+                <Emoji emoji={blank.icon} className="size-7" />
+                {blank.name}
+              </button>
+            ) : null}
+          </div>
+          {chipPages > 1 ? <Pager page={chipAt} pages={chipPages} setPage={setChipPage} /> : null}
+        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-6 grid-rows-2 gap-3.5">
+          {shown}
+          {at === pages - 1 ? <CustomTile onClick={() => startCustom(tabKind?.id ?? null)} /> : null}
+        </div>
       </div>
     );
   } else if (mode.name === "backups") {
@@ -215,10 +249,10 @@ export function MealBox({
   const back =
     mode.name === "plate"
       ? meal?.categoryId
-        ? { label: "Change meal", to: { name: "meals", categoryId: meal.categoryId } as Mode }
-        : { label: "Change meal", to: { name: "kinds" } as Mode }
-      : mode.name === "meals" || mode.name === "backups"
-        ? { label: "All", to: { name: "kinds" } as Mode }
+        ? { label: "Change meal", to: { name: "menu", tab: meal.categoryId === blankId ? ALL : meal.categoryId } as Mode }
+        : { label: "Change meal", to: { name: "menu", tab: ALL } as Mode }
+      : mode.name === "backups"
+        ? { label: "Menu", to: { name: "menu", tab: ALL } as Mode }
         : null;
 
   return (
@@ -230,15 +264,15 @@ export function MealBox({
             {back.label}
           </button>
         ) : null}
-        <Emoji emoji={mode.name === "meals" ? (category.get(mode.categoryId)?.icon ?? icon) : icon} className="size-16" />
+        <Emoji emoji={icon} className="size-16" />
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-4xl font-extrabold tracking-[-0.02em] text-ink">{mode.name === "meals" ? (category.get(mode.categoryId)?.name ?? title) : title}</h2>
+          <h2 className="truncate text-4xl font-extrabold tracking-[-0.02em] text-ink">{title}</h2>
           <p className="text-lg font-bold text-ink-muted">{target.where}</p>
         </div>
         <CloseButton onClick={onClose} />
       </div>
 
-      <div className={`flex min-h-0 flex-col ${mode.name === "meals" || mode.name === "plate" ? "h-[41rem]" : ""}`}>{body}</div>
+      <div className={`flex min-h-0 flex-col ${mode.name === "menu" || mode.name === "plate" ? "h-[41rem]" : ""}`}>{body}</div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-frame pt-4.5">
         {/* "Use a backup meal" is hidden for now (Connor, 2026-11-10); it returns with backup meals. */}
@@ -278,7 +312,7 @@ function CustomTile({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-[10.5rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1.375rem] border-[3px] border-dashed border-check-border bg-board px-2 text-center text-lg leading-tight font-extrabold text-ink hover:bg-rail"
+      className="flex min-h-0 min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1.375rem] border-[3px] border-dashed border-check-border bg-board px-2 text-center text-lg leading-tight font-extrabold text-ink hover:bg-rail"
     >
       <Plus size="2.75rem" weight="bold" aria-hidden className="text-ink-muted" />
       Custom meal
@@ -287,52 +321,17 @@ function CustomTile({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** A meal on the menu as a card: its dishes' pictures, its name, set dishes and the ones to pick. */
-function MealCard({
-  meal,
-  dish,
-  kind,
-  on,
-  onClick,
-}: {
-  meal: ReviewMenuMeal;
-  dish: Map<string, ReviewDish>;
-  kind: Map<string, { name: string }>;
-  on: boolean;
-  onClick: () => void;
-}) {
-  const spots = meal.spots.toSorted((a, b) => a.position - b.position);
-  const pictures = spots.flatMap((s) => (s.recipe_id && dish.get(s.recipe_id)?.icon ? [dish.get(s.recipe_id)!.icon!] : [])).slice(0, 3);
+/** A meal on the menu as a picture tile, like the Menu page's. */
+function MealTile({ meal, on, onClick }: { meal: ReviewMenuMeal; on: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden rounded-[1.375rem] border-[3px] p-4.5 text-left ${on ? "border-meal-ink bg-meal" : "border-frame bg-board hover:bg-rail"}`}
+      className={`flex min-h-0 min-w-0 flex-col items-center justify-center gap-2 rounded-[1.375rem] border-[3px] p-3 text-center ${on ? "border-meal-ink bg-meal" : "border-frame bg-board hover:bg-rail"}`}
     >
-      <span className="flex shrink-0">
-        {(pictures.length ? pictures : [meal.icon ?? "🍽️"]).map((p, i) => (
-          <span key={i} className={i > 0 ? "-ml-3" : ""}>
-            <Emoji emoji={p} className="size-14" />
-          </span>
-        ))}
-      </span>
-      <span className="shrink-0 truncate text-2xl leading-tight font-extrabold text-ink">{meal.name}</span>
-      <span className="flex min-w-0 shrink-0 gap-1.5 overflow-hidden">
-        {spots.slice(0, 4).map((s) =>
-          s.recipe_id ? (
-            <span key={s.position} className="min-w-0 truncate rounded-xl bg-meal px-3 py-1 text-base font-bold text-meal-ink">
-              {dish.get(s.recipe_id)?.name ?? "Dish"}
-            </span>
-          ) : (
-            <span key={s.position} className={`shrink-0 rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--color-meal-ink)_45%,white)] px-3 py-0.5 text-base font-bold ${ink}`}>
-              + {kind.get(s.kind_id ?? "")?.name ?? "Dish"}
-            </span>
-          ),
-        )}
-        {spots.length > 4 ? <span className="shrink-0 px-1 py-1 text-base font-bold text-ink-muted">+{spots.length - 4}</span> : null}
-      </span>
-      <span className="mt-auto shrink-0 text-sm font-bold text-ink-muted">{meal.summary}</span>
+      <Emoji emoji={meal.icon ?? "🍽️"} className="size-16" />
+      <span className="line-clamp-2 text-xl leading-tight font-extrabold text-ink">{meal.name}</span>
     </button>
   );
 }

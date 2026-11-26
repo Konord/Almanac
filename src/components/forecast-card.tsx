@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { WarningCircle, X } from "@phosphor-icons/react";
 import { Emoji, kickerClass } from "@/components/ui";
 import { wallTime } from "@/lib/time-text";
-import { alertTone, dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherHour } from "@/lib/weather";
+import { dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherHour } from "@/lib/weather";
 
 /*
  * The forecast pop-up: tap the weather in a calendar header (Connor,
@@ -81,10 +81,10 @@ function Alerts({ forecast }: { forecast: Forecast }) {
   return (
     <div className="flex shrink-0 flex-col gap-2">
       {alerts.slice(0, 2).map((a) => (
-        <div key={a.name} className="flex items-start gap-2 rounded-[var(--radius)] bg-board px-3 py-2">
-          <WarningCircle size="1.6rem" weight="fill" className={`mt-[0.1rem] shrink-0 ${alertTone(a)}`} aria-hidden />
+        <div key={a.name} className="flex items-start gap-2 rounded-[var(--radius)] bg-alert-soft px-3 py-2 text-now-on-tint">
+          <WarningCircle size="1.6rem" weight="fill" className="mt-[0.1rem] shrink-0" aria-hidden />
           <span className="flex min-w-0 flex-col">
-            <b className={`text-[1.35rem] leading-tight ${alertTone(a)}`}>{a.name}</b>
+            <b className="text-[1.35rem] leading-tight">{a.name}</b>
             {until(a.until) ? <span className="text-[1.125rem] text-ink-muted">{until(a.until)}</span> : null}
           </span>
         </div>

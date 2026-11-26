@@ -48,8 +48,16 @@ export function DailyListDrawer({
 
   return (
     <div data-daily-open={open} className="flex min-h-0 flex-1">
-      {/* The grid sits in the same white rounded card as the Agenda's (Connor, 2026-11-26). */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--radius-card)] bg-board shadow-raised">
+      {/*
+        With the list out, the grid sits in the same white rounded card as
+        the Agenda's. With it away, the grid fills the screen to its edges
+        and bottom corners, square, under the same header (Connor, 2026-11-26).
+      */}
+      <div
+        className={`relative flex min-w-0 flex-1 flex-col overflow-hidden bg-board transition-[margin,border-radius] duration-300 ease-out ${
+          open ? "rounded-[var(--radius-card)] shadow-raised" : "rounded-none lg:-mx-8 lg:-mb-6 lg:border-t lg:border-frame"
+        }`}
+      >
         {children}
         {open && closeOnTap ? (
           <button type="button" aria-label="Put the Daily List away" onClick={() => setOpen(false)} className="absolute inset-0 z-20 cursor-default max-lg:hidden" />
