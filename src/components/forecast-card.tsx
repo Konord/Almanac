@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, SunHorizon, X } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, SunHorizon, Warning, WarningCircle, WarningDiamond, X, type Icon } from "@phosphor-icons/react";
 import { Emoji, kickerClass } from "@/components/ui";
 import { wallTime } from "@/lib/time-text";
-import { alertLevel, dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherAlert, type WeatherHour } from "@/lib/weather";
+import { alertLevel, type AlertLevel, dayName, degrees, describeWeather, POLLEN_WORDS, pollenTone, worstPollen, type Forecast, type PollenType, type WeatherAlert, type WeatherHour } from "@/lib/weather";
 
 /*
  * The forecast pop-up: tap the weather in a calendar header (Connor,
@@ -55,7 +55,7 @@ function Shell({ forecast, onClose, width, tabs, children }: { forecast: Forecas
 function SunMark({ up }: { up: boolean }) {
   const Arrow = up ? ArrowUp : ArrowDown;
   return (
-    <span aria-label={up ? "Sunrise" : "Sunset"} className="relative flex size-9 shrink-0 items-center justify-center text-sun-ink">
+    <span aria-label={up ? "Sunrise" : "Sunset"} className="relative flex size-9 shrink-0 items-center justify-center text-ink-muted">
       <SunHorizon size="2.25rem" weight="duotone" aria-hidden />
       <Arrow size="1rem" weight="bold" aria-hidden className="absolute -top-1 -right-1" />
     </span>
@@ -93,17 +93,24 @@ function summary(text: string): string {
  * (Connor, 2026-11-26): a statement or advisory is just its weather picture
  * on sky blue (its words stay in the pop-up); a warning is in Environment
  * Canada's own colour (yellow, orange or red; red if it gives none); a watch
- * has its own colour, violet. All soft, light colours (Connor's pick).
+ * is blue like a statement. All soft, light colours (Connor's pick). Each
+ * has its Phosphor sign: circle statement, diamond watch, triangle warning.
  */
+export function levelOf(a: WeatherAlert): AlertLevel {
+  return a.level ?? alertLevel(a.kind, a.name);
+}
 type AlertTone = "statement" | "watch" | "yellow" | "orange" | "red";
 export function toneOf(a: WeatherAlert): AlertTone {
-  const level = a.level ?? alertLevel(a.kind, a.name);
+  const level = levelOf(a);
   if (level !== "warning") return level;
   return a.colour === "yellow" || a.colour === "orange" ? a.colour : "red";
 }
+/** The Phosphor sign for each level (Connor, 2026-11-26). */
+export const ALERT_ICON: Record<AlertLevel, Icon> = { statement: WarningCircle, watch: WarningDiamond, warning: Warning };
+
 export const ALERT_PILL: Record<AlertTone, string> = {
   statement: "bg-alert-info text-ink",
-  watch: "bg-[color-mix(in_srgb,var(--color-alert-watch)_16%,white)] text-alert-watch",
+  watch: "bg-alert-info text-ink",
   yellow: "bg-[color-mix(in_srgb,var(--color-alert-yellow)_35%,white)] text-alert-yellow-ink",
   orange: "bg-[color-mix(in_srgb,var(--color-alert-orange)_28%,white)] text-alert-orange-ink",
   red: "bg-alert-soft text-now-on-tint",
@@ -111,7 +118,7 @@ export const ALERT_PILL: Record<AlertTone, string> = {
 /** The pop-up's box: the same soft colour, with a stronger edge. */
 const ALERT_BOX: Record<AlertTone, string> = {
   statement: "border-alert-info-edge",
-  watch: "border-alert-watch",
+  watch: "border-alert-info-edge",
   yellow: "border-alert-yellow",
   orange: "border-alert-orange",
   red: "border-danger",
@@ -128,9 +135,9 @@ function Alerts({ forecast }: { forecast: Forecast }) {
     return `Until ${new Intl.DateTimeFormat(forecast.locale, { weekday: "short", hour: "numeric", minute: "2-digit" }).format(at)}`;
   };
   return (
-    <div className="flex shrink-0 flex-col gap-2">
+    <div className="-mx-5 flex shrink-0 flex-col gap-2">
       {alerts.slice(0, 2).map((a) => (
-        <div key={a.name} className={`flex flex-col rounded-[var(--radius)] border-l-[0.5rem] px-3 py-2 ${ALERT_PILL[toneOf(a)]} ${ALERT_BOX[toneOf(a)]}`}>
+        <div key={a.name} className={`flex flex-col border-l-[0.5rem] py-2 pr-5 pl-[calc(1.25rem-0.5rem)] ${ALERT_PILL[toneOf(a)]} ${ALERT_BOX[toneOf(a)]}`}>
           <span className="flex min-w-0 flex-col">
             <b className="text-[1.35rem] leading-tight text-ink">{a.name}</b>
             {until(a.until) ? <span className="text-[1.125rem] text-ink-muted">{until(a.until)}</span> : null}
