@@ -105,6 +105,10 @@ function Popover({ anchor: anchorRef, onClose, children, label }: { anchor: RefO
   );
 }
 
+/** A picker drawn as one tappable chunk of a sentence (the event sheet's "When" line). */
+const chunkClass =
+  "inline-flex min-h-[var(--touch-target)] max-w-full items-center rounded-[var(--radius)] bg-panel px-[0.8rem] text-[1.6rem] font-bold text-ink underline decoration-ink-muted decoration-2 underline-offset-[0.3em] disabled:opacity-40";
+
 /** Keeps a value either given (controlled) or our own (uncontrolled). */
 function useValue<T>(value: T | undefined, defaultValue: T, onChange?: (v: T) => void): [T, (v: T) => void, (el: HTMLInputElement | null) => void | (() => void)] {
   const [own, setOwn] = useState<T>(defaultValue);
@@ -146,6 +150,7 @@ export function DayField({
   emptyText = "Pick a day",
   "aria-label": ariaLabel,
   className = "",
+  chunk = false,
 }: {
   name?: string;
   value?: string;
@@ -160,6 +165,8 @@ export function DayField({
   emptyText?: string;
   "aria-label"?: string;
   className?: string;
+  /** Drawn as a tappable chunk of a sentence ("Thu, Nov 26"), not a field box. */
+  chunk?: boolean;
 }) {
   const [date, setDate, watchForm] = useValue(value, defaultValue, onChange);
   const [open, setOpen] = useState(false);
@@ -187,10 +194,10 @@ export function DayField({
           setMonth((isDate(date) ? date : todayLocal()).slice(0, 7));
           setOpen(true);
         }}
-        className={`${fieldClass} ${className}`}
+        className={`${chunk ? chunkClass : fieldClass} ${className}`}
       >
         <span className={`truncate ${isDate(date) ? "" : "text-ink-muted"}`}>{isDate(date) ? dayText(date) : emptyText}</span>
-        <CalendarBlank size="1.4rem" className="shrink-0 text-ink-muted" aria-hidden />
+        {chunk ? null : <CalendarBlank size="1.4rem" className="shrink-0 text-ink-muted" aria-hidden />}
       </button>
       {open ? (
         <Popover anchor={button} onClose={() => setOpen(false)} label={ariaLabel ?? "Pick a day"}>
@@ -300,6 +307,7 @@ export function TimeField({
   "aria-label": ariaLabel,
   className = "",
   defaultOpen = false,
+  chunk = false,
 }: {
   name?: string;
   value?: string;
@@ -316,6 +324,8 @@ export function TimeField({
   className?: string;
   /** Open the panel straight away (for a field that appears when you ask to pick a time). */
   defaultOpen?: boolean;
+  /** Drawn as a tappable chunk of a sentence ("2:15 pm"), not a field box. */
+  chunk?: boolean;
 }) {
   const [time, setTime, watchForm] = useValue(value, defaultValue, onChange);
   const [open, setOpen] = useState(defaultOpen);
@@ -339,10 +349,10 @@ export function TimeField({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className={`${fieldClass} ${className}`}
+        className={`${chunk ? chunkClass : fieldClass} ${className}`}
       >
         <span className={`tabular truncate ${has ? "" : "text-ink-muted"}`}>{has ? wallTime(time, locale) : emptyText}</span>
-        <Clock size="1.4rem" className="shrink-0 text-ink-muted" aria-hidden />
+        {chunk ? null : <Clock size="1.4rem" className="shrink-0 text-ink-muted" aria-hidden />}
       </button>
       {open ? (
         <Popover anchor={button} onClose={() => setOpen(false)} label={ariaLabel ?? "Pick a time"}>

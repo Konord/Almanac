@@ -35,6 +35,7 @@ export function WhenFields({
   allDay,
   endDate,
   adding = false,
+  extra,
 }: {
   date: string;
   startTime?: string;
@@ -44,6 +45,8 @@ export function WhenFields({
   endDate?: string;
   /** Adding a new event: keep the dashed outline on the timeline in step. */
   adding?: boolean;
+  /** More buttons on the row under the sentence (the event sheet's Repeats). */
+  extra?: React.ReactNode;
 }) {
   const pending = usePending();
   const [own, setOwn] = useState<Core>({
@@ -54,6 +57,7 @@ export function WhenFields({
   });
   const [anchor, setAnchor] = useState<When["anchor"]>("start");
   const [lastDay, setLastDay] = useState(endDate && endDate >= date ? endDate : date);
+  const [otherDay, setOtherDay] = useState(false);
 
   const shared = adding && pending !== null;
   const core: Core = shared ? { date: pending.date, start: pending.start, length: pending.minutes, allDay: pending.allDay } : own;
@@ -91,15 +95,18 @@ export function WhenFields({
   const point = core.length === 0;
   const timeFields = !core.allDay;
 
-  // The mock's `.when` row (Starts | All day | Ends), with the live extras
-  // under it: the day, the length dial and the end day.
   const allDayChip = (
     <label className={`${chip} border-frame bg-board has-checked:border-ink has-checked:bg-panel`}>
       <input type="checkbox" name="allDay" checked={core.allDay} onChange={(e) => toggleAllDay(e.target.checked)} className="sr-only" />
       All day
     </label>
   );
+  const word = "text-[1.6rem] font-semibold text-ink-soft";
+  const spansDays = timeFields ? end.date !== core.date || otherDay : lastDay !== core.date || otherDay;
 
+  // Read like a sentence (Connor, 2026-11-26, look A): "Thu, Nov 26 from
+  // 2:15 pm to 3:15 pm". Tap any chunk to change it. The length is shown,
+  // not asked; All day, No end and another end day are chips under it.
   return (
     <div className="grid gap-[0.7rem]">
       {/* What the form sends. */}
@@ -109,50 +116,57 @@ export function WhenFields({
       <input type="hidden" name="endTime" value={timeFields ? clock(end.minute) : ""} />
       <input type="hidden" name="minutes" value={core.length} />
 
-      {timeFields ? (
-        <>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-[0.7rem]">
-            <Labelled label="Starts">
-              <TimeField value={clock(when.start)} onChange={changeStart} aria-label="Starts" />
-            </Labelled>
-            {allDayChip}
-            <div className="flex min-w-0 flex-col gap-[0.35rem]">
-              <span className={fieldLabelClass}>Ends</span>
-              <div className="flex gap-[0.45rem]">
-                <TimeField value={clock(end.minute)} disabled={point} onChange={changeEndTime} aria-label="End time" className="flex-1" />
-                <button
-                  type="button"
-                  onClick={() => changeLength(point ? 60 : 0)}
-                  aria-pressed={point}
-                  title="A moment in time, with no length"
-                  className={`${chip} ${point ? "border-ink bg-panel" : "border-frame bg-board"}`}
-                >
-                  No end
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-[0.7rem]">
-            <Labelled label="Day">
-              <DayField value={core.date} onChange={changeDate} aria-label="Day" />
-            </Labelled>
-            <LengthDial minutes={core.length} onChange={changeLength} compact />
-            <Labelled label="End day">
-              <DayField value={end.date} min={core.date} disabled={point} onChange={changeEndDate} aria-label="End day" />
-            </Labelled>
-          </div>
-        </>
-      ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-[0.7rem]">
-          <Labelled label={lastDay !== core.date ? "First day" : "Day"}>
-            <DayField value={core.date} onChange={changeDate} aria-label="First day" />
-          </Labelled>
-          {allDayChip}
-          <Labelled label="Last day">
-            <DayField value={lastDay} min={core.date} onChange={(d) => isLocalDate(d) && setLastDay(d < core.date ? core.date : d)} aria-label="Last day" />
-          </Labelled>
-        </div>
-      )}
+      <span className={fieldLabelClass}>When</span>
+      <p className="flex flex-wrap items-center gap-x-[0.6rem] gap-y-[0.5rem]">
+        <DayField chunk value={core.date} onChange={changeDate} aria-label={timeFields ? "Day" : "First day"} />
+        {timeFields ? (
+          point ? (
+            <>
+              <span className={word}>at</span>
+              <TimeField chunk value={clock(when.start)} onChange={changeStart} aria-label="Starts" />
+            </>
+          ) : (
+            <>
+              <span className={word}>from</span>
+              <TimeField chunk value={clock(when.start)} onChange={changeStart} aria-label="Starts" />
+              <span className={word}>to</span>
+              {spansDays ? <DayField chunk value={end.date} min={core.date} onChange={changeEndDate} aria-label="End day" /> : null}
+              <TimeField chunk value={clock(end.minute)} onChange={changeEndTime} aria-label="Ends" />
+            </>
+          )
+        ) : (
+          <>
+            {spansDays ? (
+              <>
+                <span className={word}>to</span>
+                <DayField chunk value={lastDay} min={core.date} onChange={(d) => isLocalDate(d) && setLastDay(d < core.date ? core.date : d)} aria-label="Last day" />
+              </>
+            ) : null}
+            <span className={word}>, all day</span>
+          </>
+        )}
+      </p>
+      <div className="flex flex-wrap items-center gap-[0.6rem]">
+        {allDayChip}
+        {timeFields ? (
+          <button
+            type="button"
+            onClick={() => changeLength(point ? 60 : 0)}
+            aria-pressed={point}
+            title="A moment in time, with no length"
+            className={`${chip} ${point ? "border-ink bg-panel" : "border-frame bg-board"}`}
+          >
+            No end
+          </button>
+        ) : null}
+        {!point && !spansDays ? (
+          <button type="button" onClick={() => setOtherDay(true)} className={`${chip} border-frame bg-board`}>
+            Ends another day
+          </button>
+        ) : null}
+        {extra}
+        {timeFields && !point ? <span className="tabular ml-auto text-[1.35rem] font-bold text-ink-muted">{lengthLabel(core.length)}</span> : null}
+      </div>
     </div>
   );
 }
@@ -192,14 +206,6 @@ function shiftBy(day: string, from: string, to: string): string {
 const chip =
   "inline-flex min-h-[var(--touch-target)] shrink-0 cursor-pointer items-center justify-center rounded-full border-2 px-[1.1rem] text-[1.25rem] font-bold whitespace-nowrap text-ink select-none has-focus-visible:outline-2 has-focus-visible:outline-ink";
 
-function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex min-w-0 flex-col gap-[0.35rem]">
-      <span className={fieldLabelClass}>{label}</span>
-      {children}
-    </label>
-  );
-}
 
 /** Two decimal places, so the server and browser draw the dial identically. */
 const round = (n: number) => Math.round(n * 100) / 100;
