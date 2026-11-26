@@ -10,8 +10,8 @@ import { bothTemperatures, DONENESS, minutesText, type Helper } from "@/lib/meal
 import { batchAmount } from "@/lib/meals";
 import { measureText, type Measures } from "@/lib/units";
 import { UnitPill } from "../unit-pill";
+import { NumberStepper } from "@/components/touch-pickers";
 import { addMinute, startTimer, stopTimer, timeLeft, useAlarm, useNow, useTimers } from "@/components/timer-store";
-import { markCooked } from "../actions";
 import { BatchSwitch } from "../parts";
 
 /*
@@ -60,6 +60,9 @@ function useWakeLock() {
   }, []);
 }
 
+/** The quick timer buttons, in minutes (Connor, 2026-11-26: the old 1 to 15 were too short). */
+const QUICK_TIMERS = [5, 10, 15, 20, 30, 45, 60];
+
 export type CookDish = { recipeId: string; name: string; icon: string | null; batches: number; notes: string | null; ingredients: CookIngredient[]; steps: CookStep[] };
 
 export function CookingMode({
@@ -67,7 +70,6 @@ export function CookingMode({
   backHref,
   title,
   temperatureUnit,
-  canPlanLeftovers,
   dishes,
   measures,
 }: {
@@ -78,7 +80,6 @@ export function CookingMode({
   /** The meal's name, shown when it has more than one dish. */
   title: string;
   temperatureUnit: "celsius" | "fahrenheit";
-  canPlanLeftovers: boolean;
   /** The meal's dishes, each with its own steps; tabs switch between them. */
   dishes: CookDish[];
   measures: Measures;
@@ -90,7 +91,9 @@ export function CookingMode({
   const [ticked, setTicked] = useState<string[]>([]);
   const [ingredientPage, setIngredientPage] = useState(0);
   const [ingredientsRef, ingredientsPerPage] = useFitRows<HTMLUListElement>(INGREDIENT_PAGE);
-  const [finishing, setFinishing] = useState(false);
+  const [custom, setCustom] = useState(false);
+  const [customHours, setCustomHours] = useState(0);
+  const [customMinutes, setCustomMinutes] = useState(25);
   const dish = dishes[active];
   const { name, icon, notes, ingredients, steps } = dish;
   const step = stepOf[active] ?? 0;
@@ -218,16 +221,13 @@ export function CookingMode({
               <CaretLeft size="1.75rem" weight="bold" aria-hidden />
               Back
             </button>
-            {(last || !current) && mealId ? (
-              <button type="button" onClick={() => setFinishing(true)} className="flex min-h-[4.5rem] flex-[2] items-center justify-center gap-2 rounded-[var(--radius)] bg-success text-[1.75rem] font-bold text-white">
-                <Check size="1.75rem" weight="bold" aria-hidden />
-                Done cooking
-              </button>
-            ) : last || !current ? (
-              // Cooking a dish from the Dishes tab: no planned meal to mark, so Done just goes back.
+            {last || !current ? (
+              // No "Done cooking" (Connor, 2026-11-26): it locked you out of the
+              // recipe and asked about leftovers. The last step just goes back;
+              // the dinner card moves on by itself once the meal's time is over.
               <Link href={backHref} className="flex min-h-[4.5rem] flex-[2] items-center justify-center gap-2 rounded-[var(--radius)] bg-success text-[1.75rem] font-bold text-white">
                 <Check size="1.75rem" weight="bold" aria-hidden />
-                Done cooking
+                {mealId ? "Back to the calendar" : "Done"}
               </Link>
             ) : (
               <button type="button" onClick={() => setStep(step + 1)} className="flex min-h-[4.5rem] flex-[2] items-center justify-center gap-2 rounded-[var(--radius)] bg-ink text-[1.75rem] font-bold text-board">
@@ -270,12 +270,16 @@ export function CookingMode({
               {h.label ? ` · ${h.label.toLowerCase()}` : ""}
             </button>
           ))}
+          {/* Quick timers, longer ones too, and a custom one (Connor, 2026-11-26). */}
           <div className="grid grid-cols-4 gap-1.5">
-            {[1, 5, 10, 15].map((m) => (
-              <button key={m} type="button" onClick={() => startTimer(`${m} min`, m, mealId)} className="tabular min-h-12 rounded-[var(--radius-small)] bg-panel text-lg font-bold text-ink">
-                {m} min
+            {QUICK_TIMERS.map((m) => (
+              <button key={m} type="button" onClick={() => startTimer(minutesText(m), m, mealId)} className="tabular min-h-12 rounded-[var(--radius-small)] bg-panel text-lg font-bold text-ink">
+                {m < 60 ? `${m} min` : `${m / 60} hr`}
               </button>
             ))}
+            <button type="button" onClick={() => setCustom(true)} className="min-h-12 rounded-[var(--radius-small)] bg-ink text-lg font-bold text-board">
+              Custom
+            </button>
           </div>
 
           {oven ? (
@@ -308,31 +312,36 @@ export function CookingMode({
         </aside>
       </div>
 
-      {finishing && mealId ? (
+      {custom ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-[rgba(30,35,45,0.32)] p-8">
-          <form action={markCooked} className="flex w-full max-w-[44rem] flex-col gap-5 rounded-[var(--radius-card)] bg-board p-8 shadow-[0_0_2.5rem_rgba(30,35,45,0.25)]">
-            <input type="hidden" name="mealId" value={mealId} />
-            <input type="hidden" name="returnTo" value="/meals" />
-            <h2 className="text-4xl font-extrabold text-ink">All done?</h2>
-            {doneness.length ? (
-              <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-xl text-ink">
-                <input type="checkbox" required className="size-7 accent-[var(--color-ink)]" />
-                I checked it reached {doneness.map((h) => `${h.temperature}${deg}`).join(" / ")} inside
-              </label>
-            ) : null}
-            {canPlanLeftovers ? (
-              <label className="flex min-h-[var(--touch-target)] items-center gap-3 text-xl text-ink">
-                <input type="checkbox" name="leftovers" value="lunch" className="size-7 accent-[var(--color-ink)]" />
-                There are leftovers: plan them for tomorrow&apos;s lunch
-              </label>
-            ) : null}
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setFinishing(false)} className="min-h-[var(--touch-target)] flex-1 rounded-[var(--radius)] bg-rail text-xl font-bold text-ink">
-                Not yet
-              </button>
-              <button className="min-h-[var(--touch-target)] flex-[2] rounded-[var(--radius)] bg-success text-xl font-bold text-white">Done, enjoy!</button>
+          <div role="dialog" aria-label="Custom timer" className="flex w-full max-w-[34rem] flex-col gap-5 rounded-[var(--radius-dialog)] bg-board p-8 shadow-dialog">
+            <h2 className="text-[2.25rem] font-extrabold text-ink">Custom timer</h2>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[1.5rem] font-bold text-ink">Hours</span>
+              <NumberStepper value={customHours} onChange={(n) => setCustomHours(n ?? 0)} min={0} max={12} aria-label="hours" />
             </div>
-          </form>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[1.5rem] font-bold text-ink">Minutes</span>
+              <NumberStepper value={customMinutes} onChange={(n) => setCustomMinutes(n ?? 0)} min={0} max={55} step={5} aria-label="minutes" />
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setCustom(false)} className="min-h-[var(--touch-target)] flex-1 rounded-[var(--radius)] bg-rail text-xl font-bold text-ink">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={customHours * 60 + customMinutes === 0}
+                onClick={() => {
+                  const total = customHours * 60 + customMinutes;
+                  startTimer(minutesText(total), total, mealId);
+                  setCustom(false);
+                }}
+                className="min-h-[var(--touch-target)] flex-[2] rounded-[var(--radius)] bg-primary text-xl font-bold text-primary-ink disabled:opacity-40"
+              >
+                Start {minutesText(customHours * 60 + customMinutes)}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>

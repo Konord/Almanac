@@ -37,7 +37,6 @@ async function CookDish({ params, searchParams }: { params: PageProps<"/meals/co
       title={recipe.name}
       temperatureUnit={household.settings.temperatureUnit}
       measures={household.settings.measures}
-      canPlanLeftovers={false}
       dishes={[
         {
           recipeId: recipe.id,

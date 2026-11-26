@@ -223,8 +223,6 @@ export async function TodayPanel({
   const recipes = new Map(basics.recipes.map((r) => [r.id, r]));
   const categories = new Map(basics.categories.map((c) => [c.id, c]));
   const times = new Map(basics.mealTimes.map((t) => [t.id, t]));
-  const nowTime = localTimeOf(new Date(), timeZone);
-  const hourAgo = `${String(Math.max(0, Number(nowTime.slice(0, 2)) - 1)).padStart(2, "0")}${nowTime.slice(2, 5)}`;
   const taskTime = (time: string) =>
     shortClockTime(zonedToUtc(today, time.slice(0, 5), timeZone), locale, timeZone);
 
@@ -270,15 +268,16 @@ export async function TodayPanel({
                 ? listHref(lists.find((l) => !l.is_chores && !l.is_groceries)?.id)
                 : listHref(showing);
 
-  // The dinner card: tonight's dinner (or the next meal once it's eaten),
-  // with today's other meals still to come as a small line under it.
+  // The dinner card: only the next meal (Connor, 2026-11-26). A meal stays
+  // on it until its time is over (the end of its eating time), whether or
+  // not anyone said it was cooked; then the next one takes its place.
+  const endOf = new Map(todayMeals.map((m) => [m.id, m.eatEnd]));
   const upcoming = meals
-    .filter((m) => m.status === "planned")
+    .filter((m) => m.status === "planned" || m.status === "cooked")
     .map((m) => ({ meal: m, at: m.eat_at ?? times.get(m.meal_time_id)?.usual_time ?? "18:00", timeName: times.get(m.meal_time_id)?.name ?? "Meal" }))
-    .filter((m) => m.meal.date > today || m.at >= hourAgo)
+    .filter((m) => m.meal.date > today || (endOf.get(m.meal.id) ?? 0) > nowMinutes)
     .sort((a, b) => (a.meal.date === b.meal.date ? a.at.localeCompare(b.at) : a.meal.date.localeCompare(b.meal.date)));
-  const main = upcoming.find((m) => m.meal.date === today && m.timeName.toLowerCase() === "dinner") ?? upcoming[0];
-  const others = upcoming.filter((m) => m !== main && m.meal.date === today);
+  const main = upcoming[0];
   const at = (m: (typeof upcoming)[number]) => shortClockTime(zonedToUtc(m.meal.date, m.at, timeZone), locale, timeZone);
   const label = (m: (typeof upcoming)[number]) =>
     m.meal.date > today ? `${m.timeName} tomorrow` : m.timeName.toLowerCase() === "dinner" ? "Dinner tonight" : m.timeName;
@@ -297,11 +296,6 @@ export async function TodayPanel({
             <b className="line-clamp-2 font-hand text-[1.75rem] leading-[1.15]" style={{ color: hand(main.meal.cook_id ? colourOf.get(main.meal.cook_id) : null) }}>
               {mealName(main.meal, recipes, categories)}
             </b>
-            {others.slice(0, 1).map((m) => (
-              <span key={m.meal.id} className="tabular mt-1 truncate text-[1.125rem] font-semibold">
-                {m.timeName} · {at(m)} · <span className="font-hand">{mealName(m.meal, recipes, categories)}</span>
-              </span>
-            ))}
           </>
         ) : (
           <b className="text-[1.75rem] leading-[1.15] text-ink">Plan dinner</b>
