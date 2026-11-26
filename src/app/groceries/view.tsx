@@ -147,7 +147,8 @@ export function GroceryView({
           className={`h-[var(--touch-target)] min-w-0 flex-1 rounded-[var(--radius)] border-2 border-frame bg-board px-4 font-bold text-ink outline-none placeholder:text-ink-muted focus:border-accent ${compact ? "text-xl" : "max-w-[36rem] text-[1.5rem]"}`}
         />
         <button type="submit" disabled={pending} className="flex h-[var(--touch-target)] shrink-0 items-center gap-[0.6rem] rounded-[var(--radius)] bg-primary px-6 text-[1.25rem] font-bold text-primary-ink disabled:opacity-60">
-          <Plus size="1.25rem" weight="bold" aria-hidden />
+          {/* The Today panel's Add buttons are plain words (Connor, 2026-11-26). */}
+          {compact ? null : <Plus size="1.25rem" weight="bold" aria-hidden />}
           Add
         </button>
         {compact || !all.some((l) => l.parts.length > 1) ? null : (
